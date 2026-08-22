@@ -50,6 +50,33 @@ select, textarea {
   font-size: 14px;
 }
 
+.photo-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px dashed #aaa;
+  border-radius: 8px;
+  background: #fafafa;
+  font-size: 14px;
+}
+
+.photo-help {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.photo-preview {
+  display: none;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+}
+
 .section {
   margin-bottom: 26px;
 }
@@ -308,6 +335,18 @@ button {
   <label class="main-label">특이사항, 청소 외 업무</label>
   <textarea id="memo"></textarea>
 
+  <label class="main-label" for="reportPhoto">퇴근 현장사진 (선택)</label>
+  <input
+    type="file"
+    id="reportPhoto"
+    class="photo-input"
+    accept="image/*"
+    capture="environment"
+    onchange="previewReportPhoto()"
+  >
+  <div class="photo-help">사진은 전송 전에 자동으로 용량을 줄입니다.</div>
+  <img id="reportPhotoPreview" class="photo-preview" alt="선택한 퇴근 현장사진 미리보기">
+
   <div id="timeReasonSection" style="display:none;">
     <label class="main-label">퇴근시간 변동사유</label>
     <div class="reason-box">
@@ -450,6 +489,69 @@ function toggleNoshow() {
   }
 }
 
+function previewReportPhoto() {
+  const input = document.getElementById("reportPhoto");
+  const preview = document.getElementById("reportPhotoPreview");
+  const file = input.files[0];
+
+  if (!file) {
+    preview.removeAttribute("src");
+    preview.style.display = "none";
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    alert("이미지 파일만 선택할 수 있습니다.");
+    input.value = "";
+    preview.removeAttribute("src");
+    preview.style.display = "none";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = event => {
+    preview.src = event.target.result;
+    preview.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+}
+
+function compressPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = event => {
+      const image = new Image();
+
+      image.onload = () => {
+        const maxSize = 1600;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(image, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        resolve({
+          name: file.name.replace(/\.[^.]+$/, "") + ".jpg",
+          mimeType: "image/jpeg",
+          base64: dataUrl.split(",")[1]
+        });
+      };
+
+      image.onerror = () => reject(new Error("사진을 불러올 수 없습니다."));
+      image.src = event.target.result;
+    };
+
+    reader.onerror = () => reject(new Error("사진을 읽을 수 없습니다."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function getRegularMinutes() {
   const [hour, minute] = settings.regularTime.split(":").map(Number);
   return hour * 60 + minute;
@@ -524,6 +626,7 @@ async function submitForm() {
   const lostItemDetail = document.getElementById("lostItemDetail").value.trim();
   const memo = document.getElementById("memo").value.trim();
   const extraWorkTime = document.getElementById("extraWorkTime").value;
+  const photoFile = document.getElementById("reportPhoto").files[0] || null;
 
   const reasonReportedToBoss = document.getElementById("reasonReportedToBoss").checked;
   const reasonBossMission = document.getElementById("reasonBossMission").checked;
@@ -635,7 +738,20 @@ ${vacantText}
 
 퇴근시간 변동사유: ${timeReasonText}
 
-특이사항, 청소 외 업무: ${memo || "없음"}`;
+특이사항, 청소 외 업무: ${memo || "없음"}
+
+첨부사진: ${photoFile ? "있음" : "없음"}`;
+
+  let photo = null;
+  if (photoFile) {
+    try {
+      photo = await compressPhoto(photoFile);
+    } catch (error) {
+      alert(error.message || "사진 처리에 실패했습니다.");
+      console.error(error);
+      return;
+    }
+  }
 
   const payload = {
     report_type: "퇴근보고",
@@ -685,6 +801,11 @@ ${vacantText}
     extra_work_time: extraWorkTime,
 
     memo: memo || "없음",
+
+    has_photo: photo ? "예" : "아니오",
+    photo_name: photo ? photo.name : "",
+    photo_mime_type: photo ? photo.mimeType : "",
+    photo_base64: photo ? photo.base64 : "",
 
     text: text
   };

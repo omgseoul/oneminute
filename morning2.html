@@ -66,12 +66,26 @@ select, textarea {
   margin-bottom: 12px;
 }
 
-.photo-preview {
+.photo-requirements {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f5f6fa;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.photo-preview-list {
   display: none;
-  width: 100%;
-  max-height: 320px;
-  object-fit: contain;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin-bottom: 20px;
+}
+
+.photo-preview-item {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
   border-radius: 8px;
   border: 1px solid #ddd;
   background: #f5f5f5;
@@ -335,17 +349,23 @@ button {
   <label class="main-label">특이사항, 청소 외 업무</label>
   <textarea id="memo"></textarea>
 
-  <label class="main-label" for="reportPhoto">퇴근 현장사진 (선택)</label>
+  <div class="section-title">퇴근보고 사진 첨부</div>
+  <div class="photo-requirements">
+    <div><strong>필수1</strong> - 카드키 세팅</div>
+    <div><strong>필수2</strong> - 로비사진</div>
+    <div><strong>필수3</strong> -</div>
+    <div>그외 필요시 사진 올려주세요</div>
+  </div>
   <input
     type="file"
     id="reportPhoto"
     class="photo-input"
     accept="image/*"
-    capture="environment"
-    onchange="previewReportPhoto()"
+    multiple
+    onchange="previewReportPhotos()"
   >
-  <div class="photo-help">사진은 전송 전에 자동으로 용량을 줄입니다.</div>
-  <img id="reportPhotoPreview" class="photo-preview" alt="선택한 퇴근 현장사진 미리보기">
+  <div class="photo-help">사진을 3장 이상 선택해주세요. 선택한 사진은 전송 전에 자동으로 용량을 줄입니다.</div>
+  <div id="reportPhotoPreviewList" class="photo-preview-list"></div>
 
   <div id="timeReasonSection" style="display:none;">
     <label class="main-label">퇴근시간 변동사유</label>
@@ -489,31 +509,41 @@ function toggleNoshow() {
   }
 }
 
-function previewReportPhoto() {
+function previewReportPhotos() {
   const input = document.getElementById("reportPhoto");
-  const preview = document.getElementById("reportPhotoPreview");
-  const file = input.files[0];
+  const previewList = document.getElementById("reportPhotoPreviewList");
+  const files = [...input.files];
 
-  if (!file) {
-    preview.removeAttribute("src");
-    preview.style.display = "none";
+  previewList.innerHTML = "";
+
+  if (files.length === 0) {
+    previewList.style.display = "none";
     return;
   }
 
-  if (!file.type.startsWith("image/")) {
+  const invalidFile = files.find(file => !file.type.startsWith("image/"));
+  if (invalidFile) {
     alert("이미지 파일만 선택할 수 있습니다.");
     input.value = "";
-    preview.removeAttribute("src");
-    preview.style.display = "none";
+    previewList.style.display = "none";
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = event => {
-    preview.src = event.target.result;
-    preview.style.display = "block";
-  };
-  reader.readAsDataURL(file);
+  previewList.style.display = "grid";
+
+  files.forEach((file, index) => {
+    const image = document.createElement("img");
+    image.className = "photo-preview-item";
+    image.alt = `선택한 퇴근보고 사진 ${index + 1}`;
+
+    const reader = new FileReader();
+    reader.onload = event => {
+      image.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+
+    previewList.appendChild(image);
+  });
 }
 
 function compressPhoto(file) {
@@ -626,7 +656,7 @@ async function submitForm() {
   const lostItemDetail = document.getElementById("lostItemDetail").value.trim();
   const memo = document.getElementById("memo").value.trim();
   const extraWorkTime = document.getElementById("extraWorkTime").value;
-  const photoFile = document.getElementById("reportPhoto").files[0] || null;
+  const photoFiles = [...document.getElementById("reportPhoto").files];
 
   const reasonReportedToBoss = document.getElementById("reasonReportedToBoss").checked;
   const reasonBossMission = document.getElementById("reasonBossMission").checked;
@@ -665,6 +695,12 @@ async function submitForm() {
     alert("객실번호와 분실물 내용을 입력해주세요");
     showLostItemDetailField();
     document.getElementById("lostItemDetail").focus();
+    return;
+  }
+
+  if (photoFiles.length < 3) {
+    alert("퇴근보고 필수사진을 3장 이상 선택해주세요.");
+    document.getElementById("reportPhoto").focus();
     return;
   }
 
@@ -740,17 +776,15 @@ ${vacantText}
 
 특이사항, 청소 외 업무: ${memo || "없음"}
 
-첨부사진: ${photoFile ? "있음" : "없음"}`;
+첨부사진: ${photoFiles.length}장`;
 
-  let photo = null;
-  if (photoFile) {
-    try {
-      photo = await compressPhoto(photoFile);
-    } catch (error) {
-      alert(error.message || "사진 처리에 실패했습니다.");
-      console.error(error);
-      return;
-    }
+  let photos = [];
+  try {
+    photos = await Promise.all(photoFiles.map(compressPhoto));
+  } catch (error) {
+    alert(error.message || "사진 처리에 실패했습니다.");
+    console.error(error);
+    return;
   }
 
   const payload = {
@@ -802,10 +836,16 @@ ${vacantText}
 
     memo: memo || "없음",
 
-    has_photo: photo ? "예" : "아니오",
-    photo_name: photo ? photo.name : "",
-    photo_mime_type: photo ? photo.mimeType : "",
-    photo_base64: photo ? photo.base64 : "",
+    has_photo: photos.length > 0 ? "예" : "아니오",
+    photo_count: photos.length,
+    photo_name: photos[0] ? photos[0].name : "",
+    photo_mime_type: photos[0] ? photos[0].mimeType : "",
+    photo_base64: photos[0] ? photos[0].base64 : "",
+    photos: photos.map(photo => ({
+      name: photo.name,
+      mime_type: photo.mimeType,
+      base64: photo.base64
+    })),
 
     text: text
   };

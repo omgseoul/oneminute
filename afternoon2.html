@@ -195,6 +195,17 @@ select, textarea {
   margin-bottom: 18px;
 }
 
+.report-status-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.status-item { min-width: 0; }
+.status-label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: bold; text-align: center; }
+.status-buttons, .quantity-buttons { display: flex; gap: 5px; }
+.status-button, .quantity-button { width: auto; flex: 1; padding: 9px 4px; border: 1px solid #bbb; border-radius: 8px; background: #fff; color: #333; font-size: 13px; }
+.status-button.active, .quantity-button.active { border-color: #111; background: #111; color: #fff; }
+.quantity-buttons { display: none; flex-wrap: wrap; margin-top: 7px; }
+.quantity-buttons.visible { display: flex; }
+.quantity-button { flex: 0 0 calc(25% - 4px); }
+.status-select { display: none; }
+
 .compact-row-wrap {
   width: 100%;
   overflow-x: hidden;
@@ -382,24 +393,21 @@ button {
     <div id="reminder"></div>
   </div>
 
-  <div class="section">
-    <div class="section-title">노쇼</div>
-    <select id="noshowSelect" onchange="toggleNoshow()">
+  <div class="report-status-row">
+    <div class="status-item">
+      <span class="status-label">노쇼</span>
+      <div class="status-buttons"><button type="button" class="status-button" onclick="setStatus('noshowSelect', '없음', this)">없음</button><button type="button" class="status-button" onclick="setStatus('noshowSelect', '전날노쇼', this)">있음</button></div>
+    <select id="noshowSelect" class="status-select" onchange="toggleNoshow()">
       <option value="" selected>--</option>
       <option value="없음">없음</option>
       <option value="전날노쇼">전날노쇼</option>
       <option value="전전날노쇼">전전날노쇼</option>
     </select>
-
-    <div id="noshowBox" style="display:none;">
-      <div id="noshow"></div>
     </div>
-  </div>
-
-  <div class="inline-select-row">
-    <div class="inline-item">
-      <label for="stainRemoval">이불오염 제거</label>
-      <select id="stainRemoval" class="inline-small-select">
+    <div class="status-item">
+      <span class="status-label">이불오염</span>
+      <div class="status-buttons"><button type="button" class="status-button" onclick="setStainStatus('없음', this)">없음</button><button type="button" class="status-button" onclick="setStainStatus('있음', this)">있음</button></div>
+      <select id="stainRemoval" class="status-select">
         <option value="" selected>--</option>
         <option value="없음">없음</option>
         <option value="1">1</option>
@@ -410,17 +418,20 @@ button {
         <option value="6">6</option>
         <option value="7">7</option>
       </select>
+      <div id="stainQuantityButtons" class="quantity-buttons"><button type="button" class="quantity-button" onclick="setStainQuantity('1', this)">1</button><button type="button" class="quantity-button" onclick="setStainQuantity('2', this)">2</button><button type="button" class="quantity-button" onclick="setStainQuantity('3', this)">3</button><button type="button" class="quantity-button" onclick="setStainQuantity('4', this)">4</button><button type="button" class="quantity-button" onclick="setStainQuantity('5', this)">5</button><button type="button" class="quantity-button" onclick="setStainQuantity('6', this)">6</button><button type="button" class="quantity-button" onclick="setStainQuantity('7', this)">7</button></div>
     </div>
-
-    <div class="inline-item">
-      <label for="lostItemStatus">분실물</label>
-      <select id="lostItemStatus" class="inline-small-select" onchange="handleLostItemChange()">
+    <div class="status-item">
+      <span class="status-label">분실물</span>
+      <div class="status-buttons"><button type="button" class="status-button" onclick="setStatus('lostItemStatus', '없음', this)">없음</button><button type="button" class="status-button" onclick="setStatus('lostItemStatus', '있음', this)">있음</button></div>
+      <select id="lostItemStatus" class="status-select" onchange="handleLostItemChange()">
         <option value="" selected>--</option>
         <option value="없음">없음</option>
         <option value="있음">있음</option>
       </select>
     </div>
   </div>
+
+  <div id="noshowBox" class="section" style="display:none;"><div id="noshow"></div></div>
 
   <div class="inline-help">- 오전/오후 근무자가 검출한 이불 오염제거 -</div>
 
@@ -717,6 +728,26 @@ function toggleNoshow() {
     box.style.display = "none";
     document.querySelectorAll('input[name="noshow"]').forEach(cb => cb.checked = false);
   }
+}
+
+function setStatus(selectId, value, button) {
+  const select = document.getElementById(selectId);
+  select.value = value;
+  button.parentElement.querySelectorAll(".status-button").forEach(item => item.classList.toggle("active", item === button));
+  select.dispatchEvent(new Event("change"));
+}
+
+function setStainStatus(value, button) {
+  const quantities = document.getElementById("stainQuantityButtons");
+  button.parentElement.querySelectorAll(".status-button").forEach(item => item.classList.toggle("active", item === button));
+  document.getElementById("stainRemoval").value = value === "없음" ? "없음" : "";
+  quantities.classList.toggle("visible", value === "있음");
+  quantities.querySelectorAll(".quantity-button").forEach(item => item.classList.remove("active"));
+}
+
+function setStainQuantity(value, button) {
+  document.getElementById("stainRemoval").value = value;
+  button.parentElement.querySelectorAll(".quantity-button").forEach(item => item.classList.toggle("active", item === button));
 }
 
 function toggleNaverMailDetail() {

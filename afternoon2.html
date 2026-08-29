@@ -50,6 +50,47 @@ select, textarea {
   font-family: Arial, sans-serif;
 }
 
+.photo-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px dashed #aaa;
+  border-radius: 8px;
+  background: #fafafa;
+  font-size: 14px;
+}
+
+.photo-help {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.photo-requirements {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f5f6fa;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.photo-preview-list {
+  display: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.photo-preview-item {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+}
+
 .section {
   margin-bottom: 26px;
 }
@@ -459,6 +500,24 @@ button {
   <label class="main-label">특이사항</label>
   <textarea id="memo"></textarea>
 
+  <div class="section-title">퇴근보고 사진 첨부</div>
+  <div class="photo-requirements">
+    <div><strong>필수1</strong> - 카드키 세팅</div>
+    <div><strong>필수2</strong> - 로비사진</div>
+    <div><strong>필수3</strong> -</div>
+    <div>그외 필요시 사진 올려주세요</div>
+  </div>
+  <input
+    type="file"
+    id="reportPhoto"
+    class="photo-input"
+    accept="image/*"
+    multiple
+    onchange="previewReportPhotos()"
+  >
+  <div class="photo-help">사진을 3장 이상 선택해주세요. 선택한 사진은 전송 전에 자동으로 용량을 줄입니다.</div>
+  <div id="reportPhotoPreviewList" class="photo-preview-list"></div>
+
   <div id="timeReasonSection" style="display:none;">
     <label class="main-label">퇴근시간 변동사유</label>
     <div class="reason-box">
@@ -511,11 +570,7 @@ button {
 </div>
 
 <div id="donePage">
-  <div class="done-message">
-  퇴근보고 제출완료.
-  메신저에 사진 올려주세요. 
-  체크인카드1, 수건함1, 로비전체1,
-  공실카드1 </div>
+  <div class="done-message">퇴근보고 제출완료.</div>
 </div>
 
 <script>
@@ -693,6 +748,79 @@ function handleLostItemChange() {
   }
 }
 
+function previewReportPhotos() {
+  const input = document.getElementById("reportPhoto");
+  const previewList = document.getElementById("reportPhotoPreviewList");
+  const files = [...input.files];
+
+  previewList.innerHTML = "";
+
+  if (files.length === 0) {
+    previewList.style.display = "none";
+    return;
+  }
+
+  const invalidFile = files.find(file => !file.type.startsWith("image/"));
+  if (invalidFile) {
+    alert("이미지 파일만 선택할 수 있습니다.");
+    input.value = "";
+    previewList.style.display = "none";
+    return;
+  }
+
+  previewList.style.display = "grid";
+
+  files.forEach((file, index) => {
+    const image = document.createElement("img");
+    image.className = "photo-preview-item";
+    image.alt = `선택한 퇴근보고 사진 ${index + 1}`;
+
+    const reader = new FileReader();
+    reader.onload = event => {
+      image.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+
+    previewList.appendChild(image);
+  });
+}
+
+function compressPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = event => {
+      const image = new Image();
+
+      image.onload = () => {
+        const maxSize = 1600;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(image, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        resolve({
+          name: file.name.replace(/\.[^.]+$/, "") + ".jpg",
+          mimeType: "image/jpeg",
+          base64: dataUrl.split(",")[1]
+        });
+      };
+
+      image.onerror = () => reject(new Error("사진을 불러올 수 없습니다."));
+      image.src = event.target.result;
+    };
+
+    reader.onerror = () => reject(new Error("사진을 읽을 수 없습니다."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function getRegularMinutes() {
   const [hour, minute] = settings.regularTime.split(":").map(Number);
   return hour * 60 + minute;
@@ -770,6 +898,7 @@ async function submitForm() {
   const naverSimpleCheck = document.getElementById("naverSimpleCheck").value;
   const memo = document.getElementById("memo").value.trim();
   const extraWorkTime = document.getElementById("extraWorkTime").value;
+  const photoFiles = [...document.getElementById("reportPhoto").files];
 
   const reasonReportedToBoss = document.getElementById("reasonReportedToBoss").checked;
   const reasonBossMission = document.getElementById("reasonBossMission").checked;
@@ -823,6 +952,12 @@ async function submitForm() {
 
   if (naverSimpleCheck === "") {
     alert("네이버 간단예약관리 상태를 확인해주세요.");
+    return;
+  }
+
+  if (photoFiles.length < 3) {
+    alert("퇴근보고 필수사진을 3장 이상 선택해주세요.");
+    document.getElementById("reportPhoto").focus();
     return;
   }
 
@@ -903,7 +1038,18 @@ ${reminderText}
 
 퇴근시간 변동사유: ${timeReasonText}
 
-특이사항: ${memo || "없음"}`;
+특이사항: ${memo || "없음"}
+
+첨부사진: ${photoFiles.length}장`;
+
+  let photos = [];
+  try {
+    photos = await Promise.all(photoFiles.map(compressPhoto));
+  } catch (error) {
+    alert(error.message || "사진 처리에 실패했습니다.");
+    console.error(error);
+    return;
+  }
 
   const payload = {
     report_type: "퇴근보고",
@@ -976,6 +1122,17 @@ ${reminderText}
     extra_work_time: extraWorkTime || "--",
 
     memo: memo || "없음",
+
+    has_photo: photos.length > 0 ? "예" : "아니오",
+    photo_count: photos.length,
+    photo_name: photos[0] ? photos[0].name : "",
+    photo_mime_type: photos[0] ? photos[0].mimeType : "",
+    photo_base64: photos[0] ? photos[0].base64 : "",
+    photos: photos.map(photo => ({
+      name: photo.name,
+      mime_type: photo.mimeType,
+      base64: photo.base64
+    })),
 
     text: text
   };

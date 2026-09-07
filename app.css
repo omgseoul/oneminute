@@ -54,3 +54,36 @@ button{min-height:54px!important;border:0!important;border-radius:15px!important
 .noshow-room-box{margin-top:10px;padding:12px 10px 7px;border:1px solid #d9e7f8;border-radius:14px;background:#f8fbff}
 .noshow-room-help{margin:0 0 10px;color:#395777;font-size:12px;font-weight:750}
 @media(max-width:380px){.noshow-choice-button{font-size:11px!important;padding-left:1px!important;padding-right:1px!important}}
+
+
+/* 절대 지시사항 플립 카드 */
+.directive-section{margin-top:2px}
+.directive-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:13px}
+.directive-heading .section-title{margin:0!important}
+.directive-hint{color:#6d7b90;font-size:11px;font-weight:700;white-space:nowrap}
+.directive-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+.directive-card{position:relative;width:100%;height:285px;perspective:1100px;cursor:pointer;outline:none}
+.directive-card:focus-visible{border-radius:16px;box-shadow:0 0 0 3px rgba(47,112,205,.22)}
+.directive-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.75,.25,1)}
+.directive-card.flipped .directive-card-inner{transform:rotateY(180deg)}
+.directive-face{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid #dbe4f0;border-radius:17px;background:#fff;box-shadow:0 7px 20px rgba(35,72,120,.1);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.directive-front{justify-content:flex-end}
+.directive-front img{width:100%;height:100%;min-height:0;object-fit:cover;background:#eef4fb}
+.directive-front img.watch-card-image{object-fit:contain;padding:4px}
+.directive-front-label{position:absolute;left:8px;right:8px;bottom:8px;padding:8px 5px;border-radius:10px;background:rgba(24,49,83,.9);color:#fff;text-align:center;font-size:12px;font-weight:850;line-height:1.2}
+.directive-back{transform:rotateY(180deg);padding:14px 11px 11px;background:linear-gradient(155deg,#f8fbff,#eaf2fc)}
+.directive-back-title{margin:0 0 10px;color:#183153;font-size:14px;font-weight:900;text-align:center}
+.directive-back-copy{margin:0;color:#2b3f5c;font-size:12px;font-weight:720;line-height:1.6;word-break:keep-all}
+.directive-ack-button{width:100%!important;min-height:42px!important;margin-top:auto!important;padding:8px 4px!important;border-radius:11px!important;background:#2467bd!important;color:#fff!important;font-size:12px!important;box-shadow:none!important}
+.directive-card.acknowledged .directive-face{border-color:#78b994}
+.directive-card.acknowledged .directive-ack-button{background:#23824f!important}
+.directive-card.acknowledged .directive-ack-button:disabled{opacity:1!important}
+@media(max-width:420px){
+  .directive-grid{gap:8px}
+  .directive-card{height:255px}
+  .directive-back{padding:12px 8px 9px}
+  .directive-back-title{font-size:13px;margin-bottom:7px}
+  .directive-back-copy{font-size:11px;line-height:1.5}
+  .directive-ack-button{min-height:39px!important;font-size:11px!important}
+  .directive-front-label{font-size:11px}
+}

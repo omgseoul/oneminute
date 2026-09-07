@@ -218,7 +218,7 @@ button {
   }
 }
 </style>
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=5">
 </head>
 
 <body>
@@ -267,6 +267,44 @@ button {
     <div id="noshowBox" class="noshow-room-box" style="display:none;">
       <div class="noshow-room-help">노쇼 객실을 선택해주세요.</div>
       <div id="noshow"></div>
+    </div>
+  </div>
+
+
+  <div class="section directive-section" id="absoluteDirectives">
+    <div class="directive-heading">
+      <div class="section-title">절대 지시사항</div>
+      <div class="directive-hint">그림카드를 눌러주세요</div>
+    </div>
+
+    <div class="directive-grid">
+      <div class="directive-card" id="directiveWatchCard" role="button" tabindex="0" aria-label="워치 착용 지시사항 보기" onclick="openDirective('watch')" onkeydown="handleDirectiveKey(event, 'watch')">
+        <div class="directive-card-inner">
+          <div class="directive-face directive-front">
+            <img class="watch-card-image" src="directive-watch.png?v=1" alt="스마트워치를 가리키는 시바견 직원">
+            <div class="directive-front-label">워치 착용</div>
+          </div>
+          <div class="directive-face directive-back">
+            <div class="directive-back-title">워치 착용</div>
+            <p class="directive-back-copy">출근 즉시 워치 착용.<br>단 1분도 빼지 마세요.<br>게하폰과 5미터 이내에 있어야 작동합니다.</p>
+            <button type="button" class="directive-ack-button" onclick="acknowledgeDirective(event, 'watch')">이해했음</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="directive-card" id="directiveGuideCard" role="button" tabindex="0" aria-label="게스트 직접 안내 지시사항 보기" onclick="openDirective('guide')" onkeydown="handleDirectiveKey(event, 'guide')">
+        <div class="directive-card-inner">
+          <div class="directive-face directive-front">
+            <img src="directive-guest-guide.jpg?v=1" alt="게스트의 짐을 들고 카드키 사용법을 설명하는 시바견 직원">
+            <div class="directive-front-label">게스트 직접 안내</div>
+          </div>
+          <div class="directive-face directive-back">
+            <div class="directive-back-title">게스트 직접 안내</div>
+            <p class="directive-back-copy">게스트 짐을 들어주고 문 앞까지 이동.<br>문 앞에서 도어락과 객실 카드키 설명.</p>
+            <button type="button" class="directive-ack-button" onclick="acknowledgeDirective(event, 'guide')">이해했음</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -431,6 +469,39 @@ function toggleNoshow() {
   }
 }
 
+
+const directiveAcknowledged = {
+  watch: false,
+  guide: false
+};
+
+function getDirectiveCard(type) {
+  return document.getElementById(type === "watch" ? "directiveWatchCard" : "directiveGuideCard");
+}
+
+function openDirective(type) {
+  getDirectiveCard(type).classList.add("flipped");
+}
+
+function handleDirectiveKey(event, type) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    openDirective(type);
+  }
+}
+
+function acknowledgeDirective(event, type) {
+  event.stopPropagation();
+  const card = getDirectiveCard(type);
+  const button = card.querySelector(".directive-ack-button");
+
+  directiveAcknowledged[type] = true;
+  card.classList.add("acknowledged");
+  button.textContent = "✓ 이해했음";
+  button.disabled = true;
+  card.setAttribute("aria-label", type === "watch" ? "워치 착용 지시사항 확인 완료" : "게스트 직접 안내 지시사항 확인 완료");
+}
+
 function getRegularMinutes() {
   const [hour, minute] = settings.regularTime.split(":").map(Number);
   return hour * 60 + minute;
@@ -520,6 +591,13 @@ async function submitForm(skipLowCleanWarning = false) {
 
   if ((noshowMode === "전날노쇼" || noshowMode === "전전날노쇼") && noshowRooms.length === 0) {
     alert("노쇼 객실을 선택해주세요");
+    return;
+  }
+
+
+  if (!directiveAcknowledged.watch || !directiveAcknowledged.guide) {
+    alert("절대 지시사항 그림카드를 모두 눌러 내용을 확인하고, 각각 이해했음 버튼을 눌러주세요.");
+    document.getElementById("absoluteDirectives").scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
 

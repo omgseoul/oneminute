@@ -218,7 +218,7 @@ button {
   }
 }
 </style>
-<link rel="stylesheet" href="app.css?v=5">
+<link rel="stylesheet" href="app.css?v=6">
 </head>
 
 <body>
@@ -480,7 +480,7 @@ function getDirectiveCard(type) {
 }
 
 function openDirective(type) {
-  getDirectiveCard(type).classList.add("flipped");
+  getDirectiveCard(type).classList.toggle("flipped");
 }
 
 function handleDirectiveKey(event, type) {

@@ -87,3 +87,13 @@ button{min-height:54px!important;border:0!important;border-radius:15px!important
   .directive-ack-button{min-height:39px!important;font-size:11px!important}
   .directive-front-label{font-size:11px}
 }
+
+
+/* 주소 표시 없는 사이트 안내 팝업 */
+.custom-alert-overlay{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(15,25,40,.58)}
+.custom-alert-overlay.show{display:flex}
+.custom-alert-dialog{width:min(100%,430px);overflow:hidden;border-radius:22px;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28);animation:customAlertIn .18s ease-out}
+.custom-alert-message{padding:32px 25px 25px;color:#202a3a;font-size:18px;font-weight:650;line-height:1.55;white-space:pre-line;word-break:keep-all}
+.custom-alert-confirm{display:block;width:calc(100% - 36px)!important;min-height:52px!important;margin:0 18px 18px!important;border:0!important;border-radius:13px!important;background:#2f70cd!important;color:#fff!important;font-size:17px!important;font-weight:850!important;box-shadow:none!important}
+.custom-alert-confirm:active{transform:scale(.98)}
+@keyframes customAlertIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}

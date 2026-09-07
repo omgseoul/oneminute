@@ -73,17 +73,17 @@ button{min-height:54px!important;border:0!important;border-radius:15px!important
 .directive-front-label{position:absolute;left:8px;right:8px;bottom:8px;padding:8px 5px;border-radius:10px;background:rgba(24,49,83,.9);color:#fff;text-align:center;font-size:12px;font-weight:850;line-height:1.2}
 .directive-back{transform:rotateY(180deg);padding:14px 11px 11px;background:linear-gradient(155deg,#f8fbff,#eaf2fc)}
 .directive-back-title{margin:0 0 10px;color:#183153;font-size:14px;font-weight:900;text-align:center}
-.directive-back-copy{margin:0;color:#2b3f5c;font-size:12px;font-weight:720;line-height:1.6;word-break:keep-all}
-.directive-ack-button{width:100%!important;min-height:42px!important;margin-top:auto!important;padding:8px 4px!important;border-radius:11px!important;background:#2467bd!important;color:#fff!important;font-size:12px!important;box-shadow:none!important}
-.directive-card.acknowledged .directive-face{border-color:#78b994}
-.directive-card.acknowledged .directive-ack-button{background:#23824f!important}
+.directive-back-copy{margin:0;color:#2b3f5c;font-size:18px;font-weight:720;line-height:1.48;word-break:keep-all}
+.directive-ack-button{width:100%!important;min-height:42px!important;margin-top:auto!important;padding:8px 4px!important;border:1px solid #cfd9e8!important;border-radius:11px!important;background:transparent!important;color:#53657d!important;font-size:12px!important;box-shadow:none!important}
+.directive-card.acknowledged .directive-face{border-color:#8eb8ee}
+.directive-card.acknowledged .directive-ack-button{border-color:#2f70cd!important;background:#2f70cd!important;color:#fff!important}
 .directive-card.acknowledged .directive-ack-button:disabled{opacity:1!important}
 @media(max-width:420px){
   .directive-grid{gap:8px}
   .directive-card{height:255px}
   .directive-back{padding:12px 8px 9px}
   .directive-back-title{font-size:13px;margin-bottom:7px}
-  .directive-back-copy{font-size:11px;line-height:1.5}
+  .directive-back-copy{font-size:16.5px;line-height:1.45}
   .directive-ack-button{min-height:39px!important;font-size:11px!important}
   .directive-front-label{font-size:11px}
 }

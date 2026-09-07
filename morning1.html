@@ -218,7 +218,7 @@ button {
   }
 }
 </style>
-<link rel="stylesheet" href="app.css?v=6">
+<link rel="stylesheet" href="app.css?v=7">
 </head>
 
 <body>
@@ -726,6 +726,42 @@ ${inspectRoomsText}
     console.error(error);
   }
 }
+</script>
+
+
+<script>
+(function installCustomAlert() {
+  let overlay;
+  let messageBox;
+  let confirmButton;
+
+  function ensureAlertDialog() {
+    if (overlay) return;
+    overlay = document.createElement("div");
+    overlay.className = "custom-alert-overlay";
+    overlay.setAttribute("role", "presentation");
+    overlay.innerHTML =
+      '<div class="custom-alert-dialog" role="alertdialog" aria-modal="true" aria-labelledby="customAlertMessage">' +
+        '<div id="customAlertMessage" class="custom-alert-message"></div>' +
+        '<button type="button" class="custom-alert-confirm">확인</button>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    messageBox = overlay.querySelector(".custom-alert-message");
+    confirmButton = overlay.querySelector(".custom-alert-confirm");
+
+    confirmButton.addEventListener("click", function () {
+      overlay.classList.remove("show");
+    });
+  }
+
+  window.alert = function (message) {
+    ensureAlertDialog();
+    messageBox.textContent = String(message);
+    overlay.classList.add("show");
+    setTimeout(function () { confirmButton.focus(); }, 0);
+  };
+})();
 </script>
 
 </body>

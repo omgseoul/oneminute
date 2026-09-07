@@ -182,14 +182,16 @@ button {
   <div class="section">
     <div class="section-title">노쇼</div>
 
-    <select id="noshowSelect" onchange="toggleNoshow()">
-      <option value="" selected>--</option>
-      <option value="없음">없음</option>
-      <option value="전날노쇼">전날노쇼</option>
-      <option value="전전날노쇼">전전날노쇼</option>
-    </select>
+    <input type="hidden" id="noshowSelect" value="">
 
-    <div id="noshowBox" style="display:none;">
+    <div class="noshow-choice-row" role="group" aria-label="노쇼 상태 선택">
+      <button type="button" class="noshow-choice-button" data-value="없음" onclick="selectNoshow(this)">없음</button>
+      <button type="button" class="noshow-choice-button" data-value="전날노쇼" onclick="selectNoshow(this)">전날노쇼</button>
+      <button type="button" class="noshow-choice-button" data-value="전전날노쇼" onclick="selectNoshow(this)">전전날노쇼</button>
+    </div>
+
+    <div id="noshowBox" class="noshow-room-box" style="display:none;">
+      <div class="noshow-room-help">노쇼 객실을 선택해주세요.</div>
       <div id="noshow"></div>
     </div>
   </div>
@@ -295,6 +297,19 @@ function getChecked(name) {
 
 function updateCount() {
   document.getElementById("planCount").innerText = getChecked("plan").length;
+}
+
+function selectNoshow(button) {
+  const select = document.getElementById("noshowSelect");
+  select.value = button.dataset.value;
+
+  document.querySelectorAll(".noshow-choice-button").forEach(item => {
+    const isSelected = item === button;
+    item.classList.toggle("active", isSelected);
+    item.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
+
+  toggleNoshow();
 }
 
 function toggleNoshow() {

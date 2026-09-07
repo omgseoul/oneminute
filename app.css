@@ -45,3 +45,12 @@ button{min-height:54px!important;border:0!important;border-radius:15px!important
 .report-status-row.expanded .status-detail .room-options{width:100%!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:4px!important}
 .report-status-row.expanded .status-detail .room-options label{min-height:32px!important;padding:5px 1px!important;font-size:10px!important;border-radius:9px!important}
 @media(max-width:420px){.report-status-row.expanded .status-item{grid-template-columns:46px 84px minmax(0,1fr)!important;gap:4px!important}.report-status-row.expanded .status-buttons{width:84px!important}.report-status-row.expanded .status-detail .room-options{gap:3px!important}.report-status-row.expanded .status-detail .room-options label{font-size:10px!important}}
+
+
+/* 출근보고 노쇼 빠른 선택 */
+.noshow-choice-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:4px;margin-bottom:12px;border-radius:13px;background:#e8eef6}
+.noshow-choice-button{width:100%!important;min-width:0!important;min-height:42px!important;margin:0!important;padding:7px 3px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:#708096!important;font-size:12px!important;font-weight:800!important;box-shadow:none!important;white-space:nowrap}
+.noshow-choice-button.active{background:#2467bd!important;color:#fff!important;box-shadow:0 3px 8px rgba(36,103,189,.22)!important}
+.noshow-room-box{margin-top:10px;padding:12px 10px 7px;border:1px solid #d9e7f8;border-radius:14px;background:#f8fbff}
+.noshow-room-help{margin:0 0 10px;color:#395777;font-size:12px;font-weight:750}
+@media(max-width:380px){.noshow-choice-button{font-size:11px!important;padding-left:1px!important;padding-right:1px!important}}

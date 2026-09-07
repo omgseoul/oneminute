@@ -48,8 +48,8 @@ button{min-height:54px!important;border:0!important;border-radius:15px!important
 
 
 /* 출근보고 노쇼 빠른 선택 */
-.noshow-choice-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:4px;margin-bottom:12px;border-radius:13px;background:#e8eef6}
-.noshow-choice-button{width:100%!important;min-width:0!important;min-height:42px!important;margin:0!important;padding:7px 3px!important;border:0!important;border-radius:10px!important;background:transparent!important;color:#708096!important;font-size:12px!important;font-weight:800!important;box-shadow:none!important;white-space:nowrap}
+.noshow-choice-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0;margin-bottom:12px;background:transparent}
+.noshow-choice-button{width:100%!important;min-width:0!important;min-height:46px!important;margin:0!important;padding:8px 3px!important;border:1px solid #d7e1ee!important;border-radius:12px!important;background:#f3f6fa!important;color:#53647a!important;font-size:12px!important;font-weight:800!important;box-shadow:none!important;white-space:nowrap}
 .noshow-choice-button.active{background:#2467bd!important;color:#fff!important;box-shadow:0 3px 8px rgba(36,103,189,.22)!important}
 .noshow-room-box{margin-top:10px;padding:12px 10px 7px;border:1px solid #d9e7f8;border-radius:14px;background:#f8fbff}
 .noshow-room-help{margin:0 0 10px;color:#395777;font-size:12px;font-weight:750}

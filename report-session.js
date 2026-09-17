@@ -5,7 +5,11 @@
     "afternoon1.html": { shift: "afternoon", reportType: "clock_in" },
     "afternoon2.html": { shift: "afternoon", reportType: "clock_out" }
   };
-  const context = contexts[location.pathname.split("/").pop()];
+  const fileName = location.pathname.split("/").pop();
+  const requestedType = new URLSearchParams(location.search).get("type");
+  const context = fileName === "report.html" && ["clock_in", "clock_out"].includes(requestedType)
+    ? { shift: null, reportType: requestedType }
+    : contexts[fileName];
   const formPage = document.getElementById("formPage");
   const donePage = document.getElementById("donePage");
   const notice = document.createElement("div");
@@ -44,14 +48,7 @@
     if (context.reportType === "clock_out") await window.omgSession.logout();
     window.scrollTo(0, 0);
   }
-  function receiptKey(id) { return "omg_make_accepted_" + id; }
-  function hasReceipt(id) {
-    try { return localStorage.getItem(receiptKey(id)) === "true"; } catch (_) { return false; }
-  }
-  function rememberReceipt(id) {
-    try { localStorage.setItem(receiptKey(id), "true"); } catch (_) { /* Database still stores the report. */ }
-  }
-  api.submit = function (payload, url) {
+  api.submit = function (payload) {
     if (inFlight) return inFlight;
     inFlight = (async () => {
       const session = await api.ready;
@@ -65,29 +62,30 @@
       saved = record;
       notice.hidden = false;
       notice.textContent = "보고가 저장됐습니다. 전달 상태를 확인하고 있습니다…";
-      if (!saved.make_accepted && !hasReceipt(saved.report_id)) {
-        const endpoint = url || (typeof webhookUrl === "string" ? webhookUrl : null);
-        if (!endpoint) throw new Error("보고는 저장됐지만 전달 주소를 확인하지 못했습니다.");
+      if (!saved.make_accepted) {
+        const endpoint = `${window.OMG_SUPABASE.url}/functions/v1/deliver-report`;
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);
         let response;
         try {
           response = await fetch(endpoint, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(saved.payload), signal: controller.signal
+            method: "POST", headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${window.OMG_SUPABASE.publishableKey}`,
+              "apikey": window.OMG_SUPABASE.publishableKey
+            },
+            body: JSON.stringify({
+              access_token: session.accessToken,
+              report_id: saved.report_id,
+              report_type: context.reportType
+            }), signal: controller.signal
           });
         } finally { clearTimeout(timer); }
-        if (!response.ok) throw new Error("보고는 저장됐지만 전달에 실패했습니다.");
-        rememberReceipt(saved.report_id);
-      }
-      if (!saved.make_accepted) {
-        const ack = await rpc("mark_report_delivered", {
-          p_access_token: session.accessToken, p_report_id: saved.report_id
-        });
-        if (!ack?.ok) throw new Error(ack?.message || "전달 상태 확인을 다시 시도해주세요.");
+        let result = null;
+        try { result = await response.json(); } catch (_) { /* Use the status below. */ }
+        if (!response.ok || !result?.ok) throw new Error(result?.message || "보고는 저장됐지만 전달에 실패했습니다.");
         saved.make_accepted = true;
       }
-      try { localStorage.removeItem(receiptKey(saved.report_id)); } catch (_) {}
       await finish();
       return saved;
     })().catch(error => {
@@ -117,7 +115,7 @@
   api.ready = (async () => {
     const session = await window.omgSession.require({ allowCompleted: true });
     if (!session) return null;
-    if (!context || session.shift !== context.shift) {
+    if (session.sessionKind !== "staff" || !context || (context.shift && session.shift !== context.shift)) {
       location.replace("index.html");
       return null;
     }

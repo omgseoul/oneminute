@@ -21,6 +21,7 @@ public class MainActivity extends AppCompatActivity {
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private LinearLayout root;
+    private boolean openedStaffWorkApp;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -52,10 +53,10 @@ public class MainActivity extends AppCompatActivity {
     private void showEntry() { if(auth.getCurrentUser()==null) showLogin(); else loadUser(); }
 
     private void showLogin() {
-        base(); root.addView(title("Guesthouse Manager",32));
-        TextView sub=title("원미닛 직원 관리",16); sub.setTextColor(Color.GRAY); root.addView(sub);
+        base(); root.addView(title("게하관리",32));
+        TextView sub=title("이 기기에서 알림을 받기 위한 최초 설정입니다.\n한 번 로그인하면 이후에는 직원 PIN 화면이 바로 열립니다.",15); sub.setTextColor(Color.GRAY); root.addView(sub);
         EditText email=input("이메일",false), password=input("비밀번호",true);
-        Button login=button("로그인",Color.rgb(36,103,189));
+        Button login=button("기기 설정 로그인",Color.rgb(36,103,189));
         login.setOnClickListener(v -> { login.setEnabled(false); auth.signInWithEmailAndPassword(email.getText().toString().trim(),password.getText().toString()).addOnCompleteListener(t->{ if(t.isSuccessful())loadUser(); else {login.setEnabled(true);Toast.makeText(this,"로그인 정보를 확인해주세요.",Toast.LENGTH_LONG).show();}}); });
     }
 
@@ -72,14 +73,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showMenu(String role,String branch) {
-        base(); root.addView(title("Guesthouse Manager",30));
+        base(); root.addView(title("게하관리",30));
         TextView who=title("owner".equals(role)?"사장님 계정":"ONE MINUTE · 공용 게하폰",15); who.setTextColor(Color.GRAY); root.addView(who);
-        Button attendance=button("출퇴근 보고",Color.rgb(36,103,189));
+        Button attendance=button("직원 로그인 · 출퇴근 보고",Color.rgb(36,103,189));
         attendance.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class)));
         Button emergency=button("사장님께 긴급보고",Color.rgb(211,61,61));
         emergency.setVisibility("owner".equals(role)?View.GONE:View.VISIBLE);
         emergency.setOnClickListener(v->startActivity(new Intent(this,EmergencyReportActivity.class)));
         Button mission=button("미션",Color.rgb(67,87,112)); mission.setOnClickListener(v->Toast.makeText(this,"미션 기능은 다음 버전에 추가됩니다.",Toast.LENGTH_SHORT).show());
         Button logout=button("로그아웃",Color.GRAY); logout.setOnClickListener(v->{auth.signOut();showLogin();});
+        if (!"owner".equals(role) && !openedStaffWorkApp) {
+            openedStaffWorkApp = true;
+            attendance.post(attendance::performClick);
+        }
     }
 }

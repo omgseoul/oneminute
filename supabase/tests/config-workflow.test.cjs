@@ -12,6 +12,7 @@ const foundation = read('migrations/001_initial_schema.sql');
 const sessions = read('migrations/003_staff_sessions.sql');
 const settings = read('migrations/006_property_report_settings.sql');
 const missions = read('migrations/008_missions_reminder_cards.sql');
+const management = read('migrations/009_complete_management.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -34,6 +35,7 @@ async function run() {
   await db.exec(sessions);
   await db.exec(settings);
   await db.exec(missions);
+  await db.exec(management);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -54,6 +56,7 @@ async function run() {
   let ownerConfig = await rpc('get_work_app_config', [ownerLogin.access_token]);
   check(ownerConfig.can_manage && ownerConfig.employees.length === 4, 'owner receives employee settings');
   check(ownerConfig.property.rooms.length === 16, 'existing One Minute rooms are preserved as defaults');
+  check(ownerConfig.property.room_types.length === 4, 'existing One Minute rooms are grouped by room type');
 
   const employeeConfigs = {};
   for (const employee of ownerConfig.employees) {
@@ -64,11 +67,21 @@ async function run() {
   const saved = await rpc('save_property_settings', [
     ownerLogin.access_token,
     '테스트 숙소',
-    ['101', '102', '102', '103'],
-    employeeConfigs
+    ['101', '102', '103'],
+    employeeConfigs,
+    [{ name: '싱글', rooms: ['101', '102'] }, { name: '더블', rooms: ['103'] }]
   ]);
   check(saved.ok && saved.property.name === '테스트 숙소', 'owner changes property title');
   check(saved.property.rooms.join(',') === '101,102,103', 'room names are trimmed and deduplicated');
+  check(saved.property.room_types[0].name === '싱글' && saved.property.room_types[1].rooms[0] === '103', 'room type names and room numbers are saved together');
+
+  const accountSaved = await rpc('save_employee_accounts', [ownerLogin.access_token, [
+    ...ownerConfig.employees.map(employee => ({ employee_id: employee.employee_id, display_name: employee.display_name, pin: '' })),
+    { employee_id: null, display_name: '신규직원', pin: '246813' }
+  ]]);
+  check(accountSaved.ok && accountSaved.employees.some(employee => employee.display_name === '신규직원'), 'owner adds a worker account with a PIN');
+  const added = accountSaved.employees.find(employee => employee.display_name === '신규직원');
+  check((await rpc('start_work_session', [added.employee_id, '246813', 'general'])).ok, 'new worker PIN can log in');
 
   const loginTitle = await rpc('get_login_property', []);
   check(loginTitle.property_name === '테스트 숙소', 'new property title appears on login');
@@ -79,17 +92,23 @@ async function run() {
   check(staffConfig.report_config.clock_in.join(',') === 'clean_rooms,no_show,reminder_cards', 'staff receives only configured check-in fields');
   check(staffConfig.report_config.clock_out.join(',') === 'cleaned_rooms', 'staff receives only configured check-out fields');
   check(staffConfig.report_config.reminder_cards.length === 2, 'staff receives configured reminder cards');
-  check((await rpc('save_property_settings', [staffLogin.access_token, '해킹', ['999'], {}])).code === 'owner_required', 'staff cannot change property settings');
-  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs])).code === 'invalid_rooms', 'empty room list is rejected');
-  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [], reminder_cards: [] } }])).code === 'invalid_employee_config', 'unknown report fields are rejected');
+  check((await rpc('save_property_settings', [staffLogin.access_token, '해킹', ['999'], {}, [{ name: '객실', rooms: ['999'] }]])).code === 'owner_required', 'staff cannot change property settings');
+  check((await rpc('save_employee_accounts', [staffLogin.access_token, [{ display_name: '침입자', pin: '123456' }]])).code === 'owner_required', 'staff cannot create worker accounts');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs, []])).code === 'invalid_room_types', 'empty room types are rejected');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [], reminder_cards: [] } }, [{ name: '객실', rooms: ['101'] }]])).code === 'invalid_employee_config', 'unknown report fields are rejected');
 
   const newMission = await rpc('save_mission', [ownerLogin.access_token, {
     title: '침구 확인', description: '오염 여부 확인', timing: 'today', priority: 'important',
     target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 15, due_at: null
   }]);
   check(newMission.ok, 'owner creates a targeted mission');
+  const editedMission = await rpc('save_mission', [ownerLogin.access_token, {
+    id: newMission.mission_id, title: '침구 재확인', description: '오염 여부 재확인', timing: 'this_week', priority: 'urgent',
+    target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 20, due_at: null
+  }]);
+  check(editedMission.ok && editedMission.mission_id === newMission.mission_id, 'owner edits an existing mission');
   let staffMissions = await rpc('list_missions', [staffLogin.access_token]);
-  check(staffMissions.missions.length === 1 && staffMissions.missions[0].title === '침구 확인', 'target employee sees mission');
+  check(staffMissions.missions.length === 1 && staffMissions.missions[0].title === '침구 재확인', 'target employee sees edited mission');
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '', ''])).code === 'photo_required', 'required completion photo is enforced');
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '완료', 'data:image/jpeg;base64,dGVzdA=='])).ok, 'staff completes mission with photo');
   staffMissions = await rpc('list_missions', [staffLogin.access_token]);

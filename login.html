@@ -29,10 +29,10 @@
       <select id="employee" required><option value="">불러오는 중...</option></select>
       <label for="pin">개인 PIN</label>
       <input id="pin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" minlength="6" maxlength="8" autocomplete="off" placeholder="6~8자리 숫자" required>
-      <button id="loginButton" type="submit" disabled>로그인하고 근무 시작</button>
+      <button id="loginButton" type="submit" disabled>로그인</button>
       <div id="message" class="message" role="alert"></div>
     </form>
-    <div class="owner-row"><a class="owner-link" href="owner-login.html">사장 로그인</a></div>
+    <div class="owner-row"><a class="owner-link" href="owner-login.html">관리자 로그인</a></div>
     <p class="foot">LOGIN TIME = CLOCK-IN TIME</p>
   </section></main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -74,7 +74,7 @@
       event.preventDefault();
       message.textContent = "";
       button.disabled = true;
-      button.textContent = "출근 처리 중...";
+      button.textContent = "로그인 중...";
 
       try {
         const { data, error } = await window.omgSupabase.rpc("start_work_session", {
@@ -86,14 +86,13 @@
         });
         if (error || !data?.ok) throw new Error(data?.message || "로그인하지 못했습니다. 연결과 설정을 확인해주세요.");
         window.omgSession.set(window.omgSession.fromResponse(data, data.access_token));
-        const nextPage = data.checkin_report_at ? "app.html" : "report.html?type=clock_in";
-        location.replace(nextPage);
+        location.replace("app.html");
       } catch (error) {
         message.textContent = error.message || "로그인하지 못했습니다.";
       } finally {
         document.getElementById("pin").value = "";
         button.disabled = false;
-        button.textContent = "로그인하고 근무 시작";
+        button.textContent = "로그인";
       }
     });
 

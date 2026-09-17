@@ -68,9 +68,18 @@ async function run() {
   }
   const loginHtml = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
   check(!loginHtml.includes('name="shift"') && !loginHtml.includes('근무 구분'), 'login has no morning/afternoon choice');
+  check(loginHtml.includes('>로그인</button>') && loginHtml.includes('관리자 로그인'), 'login labels use the requested wording');
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   check(!indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'report menu has no shift sections');
-  check(fs.readFileSync(path.join(root, 'app.html'), 'utf8').includes('href="mission.html"'), 'main menu opens web mission page');
+  const appHtml = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
+  check(appHtml.includes('href="mission.html"'), 'main menu opens web mission page');
+  check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
+  const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
+  check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
+  check(reportHtml.includes('field.kind==="number"') && fs.readFileSync(path.join(root, 'work-config.js'), 'utf8').includes('{ key: "bedding_stain"') && fs.readFileSync(path.join(root, 'work-config.js'), 'utf8').includes('kind: "number"'), 'bedding stains use a numeric quantity');
+  const missionHtml = fs.readFileSync(path.join(root, 'mission.html'), 'utf8');
+  check(['지연','당일','금주','아무때나','완료'].every(label => missionHtml.includes(`>${label}<`)), 'mission dashboard restores all mature categories');
+  check(missionHtml.includes('happy-clapping-shiba.js') && missionHtml.includes('미션 클리어'), 'mission completion restores the dog celebration');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
   check(true, 'work config script syntax');
   let b = browser('clock_in');

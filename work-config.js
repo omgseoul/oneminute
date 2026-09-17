@@ -4,7 +4,7 @@
       { key: "clean_rooms", label: "청소할 객실", help: "오늘 청소할 객실을 선택합니다." },
       { key: "inspect_rooms", label: "점검할 객실", help: "청소하지 않지만 확인할 객실을 선택합니다." },
       { key: "no_show", label: "노쇼", help: "노쇼가 발생한 객실을 선택합니다." },
-      { key: "bedding_stain", label: "침구류 오염", help: "오염된 침구류가 있는 객실을 선택합니다." }
+      { key: "bedding_stain", label: "침구류 오염", help: "오염된 침구류 수량을 숫자로 선택합니다.", kind: "number" }
     ],
     clock_out: [
       { key: "cleaned_rooms", label: "청소 완료 객실", help: "청소를 완료한 객실을 선택합니다." },
@@ -49,6 +49,16 @@
     return result;
   }
 
+  function normalizeRoomTypes(roomTypes, rooms) {
+    const source = Array.isArray(roomTypes) && roomTypes.length
+      ? roomTypes
+      : [{ name: "객실", rooms: Array.isArray(rooms) ? rooms : [] }];
+    return source.slice(0, 30).map((group, index) => ({
+      name: String(group?.name || `객실타입${index + 1}`).trim().slice(0, 40),
+      rooms: [...new Set((Array.isArray(group?.rooms) ? group.rooms : []).map(room => String(room).trim()).filter(Boolean))].slice(0, 100)
+    })).filter(group => group.name && group.rooms.length);
+  }
+
   async function rpc(name, args) {
     const { data, error } = await window.omgSupabase.rpc(name, args);
     if (error || !data?.ok) {
@@ -70,6 +80,7 @@
     async load(accessToken) {
       const data = await rpc("get_work_app_config", { p_access_token: accessToken });
       data.report_config = normalizeReportConfig(data.report_config);
+      data.property.room_types = normalizeRoomTypes(data.property.room_types, data.property.rooms);
       if (Array.isArray(data.employees)) {
         data.employees = data.employees.map(employee => ({
           ...employee,
@@ -78,13 +89,19 @@
       }
       return data;
     },
-    async save(accessToken, propertyName, rooms, employeeConfigs) {
+    async save(accessToken, propertyName, roomTypes, employeeConfigs) {
+      const normalizedRoomTypes = normalizeRoomTypes(roomTypes);
       return rpc("save_property_settings", {
         p_access_token: accessToken,
         p_property_name: propertyName,
-        p_rooms: rooms,
+        p_rooms: normalizedRoomTypes.flatMap(group => group.rooms),
+        p_room_types: normalizedRoomTypes,
         p_employee_configs: employeeConfigs
       });
+    },
+    normalizeRoomTypes,
+    async saveEmployees(accessToken, employees) {
+      return rpc("save_employee_accounts", { p_access_token: accessToken, p_employees: employees });
     }
   };
 })();

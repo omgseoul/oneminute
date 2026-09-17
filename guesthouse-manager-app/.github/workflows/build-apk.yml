@@ -1,6 +1,8 @@
 name: Build Guesthouse Manager APK
 on:
   workflow_dispatch:
+  pull_request:
+    paths: ['guesthouse-manager-app/**']
   push:
     paths: ['guesthouse-manager-app/**']
 jobs:

@@ -81,7 +81,7 @@ public class AttendanceActivity extends AppCompatActivity {
             } else if ("mission".equals(action)) {
                 webView.loadUrl("https://omgseoul.github.io/oneminute/mission.html");
             } else if ("inbox".equals(action)) {
-                Toast.makeText(this, "사장님 확인함은 사장 계정에서 이용해주세요.", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(this, OwnerInboxActivity.class));
             }
             return true;
         }

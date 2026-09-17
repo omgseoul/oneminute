@@ -1,4 +1,4 @@
-// Browser workflow tests with a real DOM and mocked RPC/Make transports.
+// Browser workflow tests with a real DOM and mocked RPC/server-delivery transports.
 // No live API or webhook requests are made.
 const { JSDOM } = require('jsdom');
 const assert = require('node:assert/strict');
@@ -13,18 +13,22 @@ function check(value, message) { assert.ok(value, message); checks++; }
 const session = {
   accessToken: '10000000-0000-4000-8000-000000000001',
   employeeId: '20000000-0000-4000-8000-000000000001',
-  employeeName: '테스트 직원', shift: 'morning', timezone: 'Asia/Seoul',
+  employeeName: '테스트 직원', role: 'staff', sessionKind: 'staff', shift: 'morning', timezone: 'Asia/Seoul',
   clockInAt: '2026-09-16T00:02:00Z', status: 'working'
 };
-function browser(file, state = {}) {
+function browser(reportType, state = {}) {
   state.events ||= []; state.postCount ||= 0; state.saveCount ||= 0;
-  const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'), {
-    url: 'https://staff.example.test/' + file, runScripts: 'outside-only'
+  const fixture = `<!doctype html><body>
+    <main id="formPage"><select id="worker"></select></main>
+    <section id="donePage" style="display:none"></section>
+  </body>`;
+  const dom = new JSDOM(fixture, {
+    url: 'https://staff.example.test/report.html?type=' + reportType, runScripts: 'outside-only'
   });
   const w = dom.window;
   w.scrollTo = () => {};
   w.AbortController = global.AbortController;
-  w.webhookUrl = 'https://make.example.test/report';
+  w.OMG_SUPABASE = { url: 'https://db.example.test', publishableKey: 'test-only' };
   w.omgSession = {
     require: async () => ({ ...session, ...state.session }),
     logout: async () => { state.events.push('logout'); state.loggedOut = true; }
@@ -40,32 +44,35 @@ function browser(file, state = {}) {
         make_accepted: false, payload: { ...args.p_payload, worker: '테스트 직원', report_id: '30000000-0000-4000-8000-000000000001' } };
       return { data: structuredClone(state.saved) };
     }
-    if (name === 'mark_report_delivered') {
-      if (state.failAck) { state.failAck = false; return { error: { message: 'simulated ack failure' } }; }
-      state.saved.make_accepted = true;
-      return { data: { ok: true } };
-    }
     throw new Error('Unexpected RPC: ' + name);
   }};
   w.fetch = async (url, args) => {
-    assert.equal(url, w.webhookUrl, 'only mocked webhook allowed');
-    state.events.push('make'); state.postCount++;
+    assert.equal(url, 'https://db.example.test/functions/v1/deliver-report', 'only mocked server relay allowed');
+    assert.equal(args.headers.Authorization, 'Bearer test-only', 'relay uses project publishable key');
+    state.events.push('relay'); state.postCount++;
     state.lastPayload = JSON.parse(args.body);
-    if (state.failPost) { state.failPost = false; return { ok: false }; }
-    return { ok: true };
+    if (state.failPost) { state.failPost = false; return { ok: false, json: async () => ({ ok: false }) }; }
+    state.saved.make_accepted = true;
+    return { ok: true, json: async () => ({ ok: true }) };
   };
   w.eval(source);
   return { dom, w, state };
 }
 async function run() {
   // Parse every changed inline script as JavaScript; don't execute legacy UI code.
-  for (const file of ['app.html', 'index.html', 'login.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
+  for (const file of ['app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
     const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const script of dom.window.document.querySelectorAll('script:not([src])')) new vm.Script(script.textContent, { filename: file });
     dom.window.close();
     check(true, file + ' script syntax');
   }
-  let b = browser('morning1.html');
+  const loginHtml = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
+  check(!loginHtml.includes('name="shift"') && !loginHtml.includes('근무 구분'), 'login has no morning/afternoon choice');
+  const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  check(!indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'report menu has no shift sections');
+  new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
+  check(true, 'work config script syntax');
+  let b = browser('clock_in');
   await b.w.omgReport.ready;
   check(b.w.document.getElementById('worker').value === session.employeeName && b.w.document.getElementById('worker').disabled, 'worker comes from verified session');
   check(b.w.omgReport.getCheckinTimeDiff('09:00') === 2, 'lateness uses login time in property timezone');
@@ -75,44 +82,29 @@ async function run() {
   check(first === second, 'double tap shares one submission');
   await first;
   check(b.state.saveCount === 1 && b.state.postCount === 1, 'one save and one delivery');
-  check(b.state.events.indexOf('save_work_report') < b.state.events.indexOf('make'), 'database saves before webhook');
+  check(b.state.events.indexOf('save_work_report') < b.state.events.indexOf('relay'), 'database saves before server delivery');
   check(b.w.document.getElementById('donePage').style.display === 'block', 'success page shown');
   b.dom.window.close();
 
-  b = browser('morning1.html', { failSave: true });
+  b = browser('clock_in', { failSave: true });
   await b.w.omgReport.ready;
   await assert.rejects(() => b.w.omgReport.submit({ memo: 'offline' }));
-  check(b.state.postCount === 0, 'database failure never sends to Make');
+  check(b.state.postCount === 0, 'database failure never calls delivery relay');
   check(!b.w.document.getElementById('formPage').inert, 'unsaved form stays editable');
   b.dom.window.close();
 
-  b = browser('morning2.html', { failPost: true });
+  b = browser('clock_out', { failPost: true });
   await b.w.omgReport.ready;
   await assert.rejects(() => b.w.omgReport.submit({ memo: 'original report' }));
   check(!b.state.loggedOut && b.w.document.getElementById('formPage').inert, 'failed delivery retains session and locks saved contents');
   check(b.w.document.querySelector('[role="status"] button'), 'retry control available');
   await b.w.omgReport.submit({ memo: 'should not overwrite saved report' });
-  check(b.state.saveCount === 1 && b.state.postCount === 2 && b.state.lastPayload.memo === 'original report', 'delivery retry uses original stored report');
+  check(b.state.saveCount === 1 && b.state.postCount === 2 && b.state.saved.payload.memo === 'original report', 'delivery retry uses original stored report');
   check(b.state.loggedOut && b.state.events.at(-1) === 'logout', 'checkout logs out only after acknowledgement');
   b.dom.window.close();
 
-  const ackState = { failAck: true };
-  b = browser('morning2.html', ackState);
-  await b.w.omgReport.ready;
-  await assert.rejects(() => b.w.omgReport.submit({ memo: 'accepted by Make' }));
-  const receipt = b.w.localStorage.getItem('omg_make_accepted_' + ackState.saved.report_id);
-  check(receipt === 'true' && !ackState.loggedOut, 'HTTP success retained if acknowledgement fails');
-  b.dom.window.close();
-  b = browser('morning2.html', ackState);
-  b.w.localStorage.setItem('omg_make_accepted_' + ackState.saved.report_id, receipt);
-  await b.w.omgReport.ready;
-  check(b.w.document.querySelector('[role="status"] button'), 'reload restores saved-report retry');
-  await b.w.omgReport.submit(null);
-  check(ackState.postCount === 1 && ackState.loggedOut, 'acknowledgement retry after reload does not repost');
-  b.dom.window.close();
-
   const pending = { saved: { ok: true, report_id: 'test-pending', make_accepted: false, payload: { memo: 'pending' } } };
-  b = browser('morning1.html', pending);
+  b = browser('clock_in', pending);
   await b.w.omgReport.ready;
   pending.expired = true;
   await assert.rejects(() => b.w.omgReport.submit(null));
@@ -125,14 +117,14 @@ async function run() {
   let logoutCalls = 0;
   w.OMG_SUPABASE = { url: 'https://db.example.test', publishableKey: 'test-only' };
   w.supabase = { createClient: () => ({ rpc: async name => {
-    if (name === 'end_device_session') { logoutCalls++; return { data: { ok: true } }; }
+    if (name === 'end_app_session') { logoutCalls++; return { data: { ok: true } }; }
     return { data: { ok: true, employee_id: session.employeeId, employee_name: session.employeeName,
-      session_id: 'test-session', role: 'staff', status: 'working', shift: 'morning', clock_in_at: session.clockInAt } };
+      session_id: 'test-session', role: 'staff', session_kind: 'staff', status: 'working', shift: 'morning', clock_in_at: session.clockInAt } };
   } }) };
   w.eval(client);
-  w.omgSession.set({ accessToken: session.accessToken, role: 'owner', clockInAt: 'forged' });
+  w.omgSession.set({ accessToken: session.accessToken, role: 'owner', sessionKind: 'owner', clockInAt: 'forged' });
   const verified = await w.omgSession.require();
-  check(verified.role === 'staff' && verified.clockInAt === session.clockInAt, 'server overrides forged local role and timestamp');
+  check(verified.role === 'staff' && verified.sessionKind === 'staff' && verified.clockInAt === session.clockInAt, 'server overrides forged local role, session kind, and timestamp');
   await w.omgSession.logout();
   check(logoutCalls === 1 && w.omgSession.get() === null, 'logout reaches server and clears local session');
   dom.window.close();

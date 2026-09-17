@@ -1,0 +1,2 @@
+[functions.deliver-report]
+verify_jwt = false

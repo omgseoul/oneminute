@@ -900,6 +900,7 @@ function handleEtcReasonChange() {
 }
 
 async function submitForm() {
+  if (!await window.omgReport.ready) return;
   const worker = document.getElementById("worker").value;
   const checkinPlanned = getChecked("checkinPlanned");
   const checkinDone = getChecked("checkinDone");
@@ -1175,28 +1176,24 @@ ${reminderText}
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error("Webhook 전송 실패");
-    }
+    await window.omgReport.submit(payload, webhookUrl);
 
     document.getElementById("formPage").style.display = "none";
     document.getElementById("donePage").style.display = "block";
     window.scrollTo(0, 0);
 
   } catch (error) {
-    alert("전송 실패");
+    alert(error.message || "전송 실패");
     console.error(error);
   }
 }
 
 (function initReportIssueLayout(){const row=document.querySelector(".report-status-row");if(!row)return;const items=row.querySelectorAll(".status-item"),noshowBox=document.getElementById("noshowBox"),lostDetail=document.getElementById("lostItemDetailSection"),quantities=document.getElementById("stainQuantityButtons");if(noshowBox&&items[0]){noshowBox.classList.add("status-detail");items[0].appendChild(noshowBox)}if(lostDetail&&items[2]){lostDetail.classList.add("status-detail");items[2].appendChild(lostDetail)}function defaultNone(id){const select=document.getElementById(id);if(!select||select.value)return;select.value="없음";const button=select.closest(".status-item")?.querySelector(".status-button");if(button)button.classList.add("active");select.dispatchEvent(new Event("change"))}function update(){const noshow=document.getElementById("noshowSelect")?.value,lost=document.getElementById("lostItemStatus")?.value,stain=quantities?.classList.contains("visible");row.classList.toggle("expanded",(noshow&&noshow!=="없음")||lost==="있음"||stain)}row.addEventListener("click",()=>setTimeout(update,0));row.addEventListener("change",update);update()})();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-client.js"></script>
+<script src="report-session.js"></script>
 
 
 <script>

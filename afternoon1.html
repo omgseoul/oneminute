@@ -412,9 +412,7 @@ function getRegularMinutes() {
 }
 
 function getCurrentTimeDiffMinutes() {
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return currentMinutes - getRegularMinutes();
+  return window.omgReport.getCheckinTimeDiff(settings.regularTime);
 }
 
 function formatTimeDiffText(diffMinutes) {
@@ -449,6 +447,7 @@ function handleEtcReasonChange() {
 }
 
 async function submitForm() {
+  if (!await window.omgReport.ready) return;
   const worker = document.getElementById("worker").value;
   const plan = getChecked("plan");
   const noshowMode = document.getElementById("noshowSelect").value;
@@ -528,6 +527,7 @@ async function submitForm() {
   const text =
 `[오후 출근보고]
 근로자: ${worker}
+출근시각: ${window.omgReport.clockInText()}
 제출시각: ${submittedAtText}
 
 청소객실+공실객실 점검 계획: ${plan.length}개
@@ -577,26 +577,22 @@ ${planRoomsText}
   };
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error("Webhook 전송 실패");
-    }
+    await window.omgReport.submit(payload, webhookUrl);
 
     document.getElementById("formPage").style.display = "none";
     document.getElementById("donePage").style.display = "block";
     window.scrollTo(0, 0);
 
   } catch (error) {
-    alert("전송 실패");
+    alert(error.message || "전송 실패");
     console.error(error);
   }
 }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-client.js"></script>
+<script src="report-session.js"></script>
 
 
 <script>

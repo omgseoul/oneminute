@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fc">
+  <title>게하워크 로그인</title>
+  <style>
+    :root{--navy:#183153;--blue:#2467bd;--ink:#17243a;--muted:#6d7b90;--line:#e4ebf5;--bg:#f4f7fc}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg)}
+    body{font-family:Inter,"Pretendard","Noto Sans KR",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+    .shell{width:min(100%,480px);min-height:100vh;margin:auto;padding:38px 18px calc(32px + env(safe-area-inset-bottom));display:flex;align-items:center}
+    .card{width:100%;padding:28px 22px;border:1px solid var(--line);border-radius:26px;background:#fff;box-shadow:0 12px 34px rgba(42,78,120,.1)}
+    .brand{display:flex;align-items:center;gap:14px;margin-bottom:25px}.brand img{width:70px;height:70px;object-fit:contain}.brand small{display:block;margin-bottom:4px;color:var(--blue);font-size:11px;font-weight:900;letter-spacing:.1em}.brand h1{margin:0;color:var(--navy);font-size:29px;letter-spacing:-.05em}
+    .intro{margin:0 0 23px;color:var(--muted);font-size:13px;line-height:1.55}
+    label{display:block;margin:16px 2px 7px;color:var(--navy);font-size:13px;font-weight:800}
+    select,input{width:100%;height:52px;padding:0 14px;border:1px solid #cfdaea;border-radius:13px;background:#fff;color:var(--ink);font-size:16px;outline:none}
+    input:focus,select:focus{border-color:#6a9ddd;box-shadow:0 0 0 3px rgba(36,103,189,.1)}
+    .shift{display:grid;grid-template-columns:1fr 1fr;gap:9px}.shift input{position:absolute;opacity:0}.shift label{display:grid;place-items:center;height:50px;margin:0;border:1px solid #cfdaea;border-radius:13px;background:#fff;color:var(--muted);cursor:pointer}.shift input:checked+label{border-color:var(--blue);background:#eaf3ff;color:var(--navy)}
+    button{width:100%;height:54px;margin-top:23px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-size:17px;font-weight:900;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+    .message{min-height:20px;margin:13px 2px 0;color:#c33;font-size:12px;text-align:center}.foot{margin:20px 0 0;color:#9aa5b4;font-size:10px;text-align:center}
+  </style>
+</head>
+<body>
+  <main class="shell"><section class="card">
+    <div class="brand"><img src="shiba-worker-logo-v2.png" alt="게하워크 시바견"><div><small>OMG WORKS</small><h1>게하워크</h1></div></div>
+    <p class="intro">직원을 선택하고 개인 PIN을 입력하세요.<br>로그인에 성공한 시간이 오늘의 출근시간으로 기록됩니다.</p>
+    <form id="loginForm">
+      <label for="employee">근무자</label>
+      <select id="employee" required><option value="">불러오는 중...</option></select>
+      <label for="pin">개인 PIN</label>
+      <input id="pin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" minlength="6" maxlength="8" autocomplete="off" placeholder="6~8자리 숫자" required>
+      <label>근무 구분</label>
+      <div class="shift">
+        <input id="morning" type="radio" name="shift" value="morning" required><label for="morning">오전</label>
+        <input id="afternoon" type="radio" name="shift" value="afternoon" required><label for="afternoon">오후</label>
+      </div>
+      <button id="loginButton" type="submit" disabled>로그인하고 근무 시작</button>
+      <div id="message" class="message" role="alert"></div>
+    </form>
+    <p class="foot">LOGIN TIME = CLOCK-IN TIME</p>
+  </section></main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script>
+    const employeeSelect = document.getElementById("employee");
+    const form = document.getElementById("loginForm");
+    const button = document.getElementById("loginButton");
+    const message = document.getElementById("message");
+
+    async function loadEmployees() {
+      try {
+        const { data, error } = await window.omgSupabase.rpc("list_login_employees", {
+          p_business_code: window.OMG_SUPABASE.businessCode,
+          p_property_code: window.OMG_SUPABASE.propertyCode
+        });
+        if (error || !Array.isArray(data)) throw new Error("직원 목록을 불러오지 못했습니다. 연결과 로그인 설정을 확인해주세요.");
+        employeeSelect.replaceChildren(new Option("직원을 선택하세요", ""));
+        for (const employee of data) {
+          employeeSelect.add(new Option(employee.display_name, employee.employee_id));
+        }
+        button.disabled = data.length === 0;
+        if (!data.length) message.textContent = "로그인 가능한 직원이 아직 등록되지 않았습니다.";
+      } catch (error) {
+        employeeSelect.replaceChildren(new Option("직원 목록을 불러오지 못했습니다", ""));
+        message.textContent = error.message || "연결을 확인하고 새로고침해주세요.";
+      }
+    }
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      message.textContent = "";
+      button.disabled = true;
+      button.textContent = "출근 처리 중...";
+
+      try {
+        const shift = new FormData(form).get("shift");
+        const { data, error } = await window.omgSupabase.rpc("start_work_session", {
+          p_employee_id: employeeSelect.value,
+          p_pin: document.getElementById("pin").value,
+          p_shift: shift,
+          p_business_code: window.OMG_SUPABASE.businessCode,
+          p_property_code: window.OMG_SUPABASE.propertyCode
+        });
+        if (error || !data?.ok) throw new Error(data?.message || "로그인하지 못했습니다. 연결과 설정을 확인해주세요.");
+        window.omgSession.set(window.omgSession.fromResponse(data, data.access_token));
+        const nextPage = data.checkin_report_at ? "app.html"
+          : data.shift === "morning" ? "morning1.html" : "afternoon1.html";
+        location.replace(nextPage);
+      } catch (error) {
+        message.textContent = error.message || "로그인하지 못했습니다.";
+      } finally {
+        document.getElementById("pin").value = "";
+        button.disabled = false;
+        button.textContent = "로그인하고 근무 시작";
+      }
+    });
+
+    loadEmployees();
+  </script>
+</body>
+</html>

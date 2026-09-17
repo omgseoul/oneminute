@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -13,7 +14,8 @@ function response(body: Record<string, unknown>, status = 200) {
   });
 }
 
-Deno.serve(async request => {
+export default {
+  async fetch(request: Request) {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return response({ ok: false, message: "POST 요청만 허용됩니다." }, 405);
 
@@ -61,4 +63,5 @@ Deno.serve(async request => {
   } catch (_) {
     return response({ ok: false, message: "보고 전송 요청을 처리하지 못했습니다." }, 500);
   }
-});
+  }
+};

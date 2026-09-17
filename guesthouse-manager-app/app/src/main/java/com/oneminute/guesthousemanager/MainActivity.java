@@ -21,7 +21,7 @@ public class MainActivity extends AppCompatActivity {
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private LinearLayout root;
-    private boolean openedStaffWorkApp;
+    private boolean openedWebApp;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
         String uid=auth.getCurrentUser().getUid();
         db.collection("users").document(uid).get().addOnSuccessListener(doc->{
             String role=doc.getString("role"); String branch=doc.getString("branch");
-            registerToken(role,branch); showMenu(role,branch);
+            registerToken(role,branch); openWebApp();
         }).addOnFailureListener(e->Toast.makeText(this,"사용자 정보를 읽지 못했습니다.",Toast.LENGTH_LONG).show());
     }
 
@@ -72,19 +72,10 @@ public class MainActivity extends AppCompatActivity {
         FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token->{ Map<String,Object> d=new HashMap<>(); d.put("token",token); d.put("role",role); d.put("branch",branch==null?"":branch); db.collection("deviceTokens").document(auth.getUid()).set(d); });
     }
 
-    private void showMenu(String role,String branch) {
-        base(); root.addView(title("게하관리",30));
-        TextView who=title("owner".equals(role)?"사장님 계정":"ONE MINUTE · 공용 게하폰",15); who.setTextColor(Color.GRAY); root.addView(who);
-        Button attendance=button("직원 로그인 · 출퇴근 보고",Color.rgb(36,103,189));
-        attendance.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class)));
-        Button emergency=button("사장님께 긴급보고",Color.rgb(211,61,61));
-        emergency.setVisibility("owner".equals(role)?View.GONE:View.VISIBLE);
-        emergency.setOnClickListener(v->startActivity(new Intent(this,EmergencyReportActivity.class)));
-        Button mission=button("미션",Color.rgb(67,87,112)); mission.setOnClickListener(v->Toast.makeText(this,"미션 기능은 다음 버전에 추가됩니다.",Toast.LENGTH_SHORT).show());
-        Button logout=button("로그아웃",Color.GRAY); logout.setOnClickListener(v->{auth.signOut();showLogin();});
-        if (!"owner".equals(role) && !openedStaffWorkApp) {
-            openedStaffWorkApp = true;
-            attendance.post(attendance::performClick);
-        }
+    private void openWebApp() {
+        if (openedWebApp) return;
+        openedWebApp = true;
+        startActivity(new Intent(this,AttendanceActivity.class));
+        finish();
     }
 }

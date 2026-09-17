@@ -12,18 +12,40 @@
     ]
   };
   const defaults = {
-    clock_in: fieldGroups.clock_in.map(field => field.key),
-    clock_out: fieldGroups.clock_out.map(field => field.key)
+    clock_in: [...fieldGroups.clock_in.map(field => field.key), "reminder_cards"],
+    clock_out: fieldGroups.clock_out.map(field => field.key),
+    reminder_cards: [
+      {
+        id: "watch",
+        title: "워치 착용",
+        image: "directive-watch.png",
+        text: "출근 즉시 워치 착용.\n절대 빼지 마세요. 방수임.\n게하폰과 5미터 이내에 있어야 작동합니다."
+      },
+      {
+        id: "guest-guide",
+        title: "게스트 직접 안내",
+        image: "directive-guest-guide.jpg",
+        text: "짐을 들어주고 문 앞까지 갈 것.\n도어락과 카드키 설명.\n앉아서 말로만 안내하는 건 퇴사 사유임."
+      }
+    ]
   };
 
   function normalizeReportConfig(config) {
     const result = {};
     for (const type of ["clock_in", "clock_out"]) {
-      const allowed = new Set(fieldGroups[type].map(field => field.key));
+      const allowed = new Set([...fieldGroups[type].map(field => field.key), "reminder_cards"]);
       result[type] = Array.isArray(config?.[type])
         ? [...new Set(config[type].filter(key => allowed.has(key)))]
         : [...defaults[type]];
     }
+    result.reminder_cards = Array.isArray(config?.reminder_cards)
+      ? config.reminder_cards.slice(0, 6).map((card, index) => ({
+          id: String(card?.id || `card-${index + 1}`).slice(0, 50),
+          title: String(card?.title || "리마인더").slice(0, 50),
+          image: String(card?.image || "").slice(0, 900000),
+          text: String(card?.text || "").slice(0, 1000)
+        })).filter(card => card.title && card.image && card.text)
+      : defaults.reminder_cards.map(card => ({ ...card }));
     return result;
   }
 

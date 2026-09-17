@@ -11,6 +11,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const foundation = read('migrations/001_initial_schema.sql');
 const sessions = read('migrations/003_staff_sessions.sql');
 const settings = read('migrations/006_property_report_settings.sql');
+const missions = read('migrations/008_missions_reminder_cards.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -32,6 +33,7 @@ async function run() {
   await db.exec(pinSetup);
   await db.exec(sessions);
   await db.exec(settings);
+  await db.exec(missions);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -56,7 +58,7 @@ async function run() {
   const employeeConfigs = {};
   for (const employee of ownerConfig.employees) {
     employeeConfigs[employee.employee_id] = employee.employee_id === staff.id
-      ? { clock_in: ['clean_rooms', 'no_show'], clock_out: ['cleaned_rooms'] }
+      ? { clock_in: ['clean_rooms', 'no_show', 'reminder_cards'], clock_out: ['cleaned_rooms'], reminder_cards: employee.report_config.reminder_cards }
       : employee.report_config;
   }
   const saved = await rpc('save_property_settings', [
@@ -74,11 +76,25 @@ async function run() {
   check(staffLogin.session_kind === 'staff', 'employee login creates a staff attendance session');
   const staffConfig = await rpc('get_work_app_config', [staffLogin.access_token]);
   check(!staffConfig.can_manage && staffConfig.employees.length === 0, 'staff cannot list employee settings');
-  check(staffConfig.report_config.clock_in.join(',') === 'clean_rooms,no_show', 'staff receives only configured check-in fields');
+  check(staffConfig.report_config.clock_in.join(',') === 'clean_rooms,no_show,reminder_cards', 'staff receives only configured check-in fields');
   check(staffConfig.report_config.clock_out.join(',') === 'cleaned_rooms', 'staff receives only configured check-out fields');
+  check(staffConfig.report_config.reminder_cards.length === 2, 'staff receives configured reminder cards');
   check((await rpc('save_property_settings', [staffLogin.access_token, '해킹', ['999'], {}])).code === 'owner_required', 'staff cannot change property settings');
   check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs])).code === 'invalid_rooms', 'empty room list is rejected');
-  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [] } }])).code === 'invalid_employee_config', 'unknown report fields are rejected');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [], reminder_cards: [] } }])).code === 'invalid_employee_config', 'unknown report fields are rejected');
+
+  const newMission = await rpc('save_mission', [ownerLogin.access_token, {
+    title: '침구 확인', description: '오염 여부 확인', timing: 'today', priority: 'important',
+    target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 15, due_at: null
+  }]);
+  check(newMission.ok, 'owner creates a targeted mission');
+  let staffMissions = await rpc('list_missions', [staffLogin.access_token]);
+  check(staffMissions.missions.length === 1 && staffMissions.missions[0].title === '침구 확인', 'target employee sees mission');
+  check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '', ''])).code === 'photo_required', 'required completion photo is enforced');
+  check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '완료', 'data:image/jpeg;base64,dGVzdA=='])).ok, 'staff completes mission with photo');
+  staffMissions = await rpc('list_missions', [staffLogin.access_token]);
+  check(Boolean(staffMissions.missions[0].completed_at), 'mission completion is returned');
+  check((await rpc('archive_mission', [ownerLogin.access_token, newMission.mission_id])).ok, 'owner archives mission');
 
   let tableDenied = false;
   try { await asAnon(() => db.query('select * from public.properties')); } catch (_) { tableDenied = true; }

@@ -17,7 +17,7 @@
     select,input{width:100%;height:52px;padding:0 14px;border:1px solid #cfdaea;border-radius:13px;background:#fff;color:var(--ink);font-size:16px;outline:none}
     input:focus,select:focus{border-color:#6a9ddd;box-shadow:0 0 0 3px rgba(36,103,189,.1)}
     button{width:100%;height:54px;margin-top:23px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-size:17px;font-weight:900;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
-    .message{min-height:20px;margin:13px 2px 0;color:#c33;font-size:12px;text-align:center}.owner-link{display:block;margin-top:16px;color:#718198;font-size:12px;text-align:center;text-decoration:none}.foot{margin:20px 0 0;color:#9aa5b4;font-size:10px;text-align:center}
+    .message{min-height:20px;margin:13px 2px 0;color:#c33;font-size:12px;text-align:center}.owner-row{display:flex;justify-content:flex-end;margin-top:18px}.owner-link{display:flex;align-items:center;gap:10px;min-width:168px;padding:13px 15px;border:1px solid #d7e3f1;border-radius:14px;background:#f5f9ff;color:var(--navy);font-size:14px;font-weight:900;text-decoration:none;box-shadow:0 4px 13px rgba(42,78,120,.06)}.owner-link:before{content:"⚙";display:grid;place-items:center;width:33px;height:33px;border-radius:10px;background:#e5effd;color:var(--blue);font-size:18px}.owner-link:after{content:"›";margin-left:auto;color:#83a1c6;font-size:21px}.foot{margin:20px 0 0;color:#9aa5b4;font-size:10px;text-align:center}
   </style>
 </head>
 <body>
@@ -32,7 +32,7 @@
       <button id="loginButton" type="submit" disabled>로그인하고 근무 시작</button>
       <div id="message" class="message" role="alert"></div>
     </form>
-    <a class="owner-link" href="owner-login.html">사장 로그인</a>
+    <div class="owner-row"><a class="owner-link" href="owner-login.html">사장 로그인</a></div>
     <p class="foot">LOGIN TIME = CLOCK-IN TIME</p>
   </section></main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

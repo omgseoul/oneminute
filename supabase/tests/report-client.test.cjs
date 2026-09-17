@@ -60,7 +60,7 @@ function browser(reportType, state = {}) {
 }
 async function run() {
   // Parse every changed inline script as JavaScript; don't execute legacy UI code.
-  for (const file of ['app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
+  for (const file of ['app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'mission.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
     const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const script of dom.window.document.querySelectorAll('script:not([src])')) new vm.Script(script.textContent, { filename: file });
     dom.window.close();
@@ -70,6 +70,7 @@ async function run() {
   check(!loginHtml.includes('name="shift"') && !loginHtml.includes('근무 구분'), 'login has no morning/afternoon choice');
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   check(!indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'report menu has no shift sections');
+  check(fs.readFileSync(path.join(root, 'app.html'), 'utf8').includes('href="mission.html"'), 'main menu opens web mission page');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
   check(true, 'work config script syntax');
   let b = browser('clock_in');

@@ -27,7 +27,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(state);
         if (android.os.Build.VERSION.SDK_INT >= 33 && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 10);
-        showEntry();
+        // Firebase is used only for native push notifications. A fresh install must
+        // never block the Supabase employee/owner login behind the old Firebase
+        // device account screen.
+        if (auth.getCurrentUser() == null) openWebApp();
+        else loadUser();
     }
 
     private void base() {

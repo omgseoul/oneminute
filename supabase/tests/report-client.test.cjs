@@ -80,11 +80,12 @@ async function run() {
   const appHtml = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
   check(appHtml.includes('href="mission.html"'), 'main menu opens web mission page');
   check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
+  check(appHtml.includes('shiba-face-morning-in.png') && appHtml.includes('shiba-face-morning-out.png'), 'report buttons show bright and tired dog faces');
   check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
   const workConfigHtml = fs.readFileSync(path.join(root, 'work-config.js'), 'utf8');
-  check(reportHtml.includes('compact-input') && workConfigHtml.includes('{ key: "bedding_stain"') && workConfigHtml.includes('kind: "number"'), 'bedding stains use a compact inline numeric quantity');
+  check(reportHtml.includes('createStepper') && reportHtml.includes('수량 줄이기') && reportHtml.includes('수량 늘리기'), 'no-show and bedding stain quantities use minus and plus steppers');
   check(workConfigHtml.includes('kind: "room_count"') && reportHtml.includes('expand-rooms'), 'no-show quantity expands room selection');
   check(reportHtml.includes('grid-template-columns:repeat(6,minmax(0,1fr))'), 'up to six room numbers fit on one row');
   check(source.includes('role", "dialog"') && source.includes('수정하기'), 'existing report uses a custom edit dialog');
@@ -92,8 +93,11 @@ async function run() {
   check(['지연','당일','금주','아무때나','완료'].every(label => missionHtml.includes(`>${label}<`)), 'mission dashboard restores all mature categories');
   check(missionHtml.includes('happy-clapping-shiba.js') && missionHtml.includes('미션 클리어'), 'mission completion restores the dog celebration');
   check(missionHtml.includes('new Option("All",""') && !missionHtml.includes('workerFilter.disabled=true'), 'mission worker filter is clickable and includes All');
+  check(missionHtml.includes('id="priorityStar"') && !missionHtml.includes('예상 시간(분)') && missionHtml.includes('creator_name'), 'mission editor uses a star toggle, omits estimated time, and shows creator');
+  check(missionHtml.includes('document.getElementById("newMission").hidden=false'), 'staff and owner both receive the new mission button');
   const ownerSettingsHtml = fs.readFileSync(path.join(root, 'owner-settings.html'), 'utf8');
   check(ownerSettingsHtml.includes('delete-account') && ownerSettingsHtml.includes('>Delete</button>'), 'worker delete is a compact button beside the worker label');
+  check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
   check(true, 'work config script syntax');
   let b = browser('clock_in');

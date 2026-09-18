@@ -66,7 +66,7 @@ function browser(reportType, state = {}) {
 }
 async function run() {
   // Parse every changed inline script as JavaScript; don't execute legacy UI code.
-  for (const file of ['account.html', 'app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'staff-management.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
+  for (const file of ['account.html', 'app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'staff-management.html', 'attendance.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
     const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const script of dom.window.document.querySelectorAll('script:not([src])')) new vm.Script(script.textContent, { filename: file });
     dom.window.close();
@@ -78,6 +78,7 @@ async function run() {
   check(loginHtml.indexOf('id="staffTab"') < loginHtml.indexOf('id="adminTab"'), 'staff is the default first login role');
   check(loginHtml.includes('get_or_create_account_property') && loginHtml.includes('list_account_login_employees') && loginHtml.includes('start_account_admin_session'), 'PIN login is scoped to the authenticated property account');
   check(loginHtml.includes('id="welcomeModal"') && loginHtml.includes('임시 관리자 PIN') && loginHtml.includes('1234'), 'new accounts receive a designed temporary administrator PIN dialog');
+  check(loginHtml.includes('source.length===1') && loginHtml.includes('accountSelect.value=source[0].owner_id'), 'a single administrator is shown once and selected automatically');
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   check(indexHtml.includes('account.html') && !indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'root starts at account login and has no shift sections');
   const accountHtml = fs.readFileSync(path.join(root, 'account.html'), 'utf8');
@@ -92,8 +93,10 @@ async function run() {
   check(appHtml.includes('id="noticeCard"') && appHtml.includes('공지사항'), 'staff main screen includes property announcement');
   check(appHtml.includes('class="notice-section empty"') && appHtml.includes('class="notice-line"') && !appHtml.includes('class="card notice-card'), 'announcement is rendered as a plain titled section');
   check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
-  check(appHtml.includes('class="owner-grid"') && appHtml.includes('href="staff-management.html"') && appHtml.includes('>직원관리<'), 'owner property settings and staff management share a row');
+  check(appHtml.includes('class="owner-grid"') && appHtml.includes('href="staff-management.html"') && appHtml.includes('>계정관리<'), 'owner property settings and account management share a row');
   check(appHtml.includes('id="owner-inbox" class="card quick-card"') && appHtml.includes('id="missionMenu" class="card quick-card"'), 'owner inbox and mission share a row');
+  check(appHtml.includes('>메세지함<') && appHtml.includes('href="attendance.html"') && appHtml.includes('id="attendanceManagement"'), 'owner dashboard includes message and attendance management menus');
+  check(appHtml.includes('class="quick-visual account-dogs"') && appHtml.includes('<svg viewBox="0 0 32 32"'), 'owner menu visuals are placed on the right');
   check(appHtml.includes('isOwner?(Number(item.target_count)') && appHtml.includes('todayMissionCount'), 'owner mission menu receives the today counter');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
@@ -117,6 +120,10 @@ async function run() {
   const staffManagementHtml = fs.readFileSync(path.join(root, 'staff-management.html'), 'utf8');
   check(!ownerSettingsHtml.includes('id="accounts"') && staffManagementHtml.includes('delete-account') && staffManagementHtml.includes('>Delete</button>'), 'worker account controls moved from property settings to staff management');
   check(staffManagementHtml.includes('id="adminAccounts"') && staffManagementHtml.includes('saveAdministrators'), 'staff management creates and updates administrator accounts');
+  check(staffManagementHtml.includes('<h1>계정관리</h1>') && staffManagementHtml.includes('PIN을 변경'), 'account management edits the default administrator name and PIN');
+  const attendanceHtml = fs.readFileSync(path.join(root, 'attendance.html'), 'utf8');
+  check(['data-period="day"','data-period="week"','data-period="month"'].every(token => attendanceHtml.includes(token)), 'attendance management provides day, week, and month views');
+  check(attendanceHtml.includes('list_attendance_statistics') && attendanceHtml.includes('class="sheet"') && attendanceHtml.includes('근무시간 현황'), 'attendance page combines visual totals with an Excel-style table');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
   check(ownerSettingsHtml.includes('id="propertyNotice"') && ownerSettingsHtml.includes('saveNotice'), 'property settings save an announcement');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });

@@ -81,6 +81,8 @@ async function run() {
   check(appHtml.includes('href="mission.html"'), 'main menu opens web mission page');
   check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
   check(appHtml.includes('shiba-face-morning-in.png') && appHtml.includes('shiba-face-morning-out.png'), 'report buttons show bright and tired dog faces');
+  check(appHtml.includes('id="secondaryMenu"') && appHtml.includes('id="todayMissionCount"') && appHtml.includes('당일미션'), 'urgent report and mission share a row with a today counter');
+  check(appHtml.includes('id="noticeCard"') && appHtml.includes('공지사항'), 'staff main screen includes property announcement');
   check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
@@ -95,9 +97,13 @@ async function run() {
   check(missionHtml.includes('new Option("All",""') && !missionHtml.includes('workerFilter.disabled=true'), 'mission worker filter is clickable and includes All');
   check(missionHtml.includes('id="priorityStar"') && !missionHtml.includes('예상 시간(분)') && missionHtml.includes('creator_name'), 'mission editor uses a star toggle, omits estimated time, and shows creator');
   check(missionHtml.includes('document.getElementById("newMission").hidden=false'), 'staff and owner both receive the new mission button');
+  check(missionHtml.includes('aria-label="미션 추가"') && !missionHtml.includes('+ 새 미션'), 'mission title has a compact plus-only add button');
+  check(missionHtml.includes('id="descriptionPhotoInput"') && missionHtml.includes('description_photo'), 'mission details support a reference photo');
+  check(missionHtml.includes('>중요</label>') && missionHtml.includes('완료 사진 필수') && !missionHtml.includes('완료 사진을 반드시 받기'), 'mission editor uses compact labels');
   const ownerSettingsHtml = fs.readFileSync(path.join(root, 'owner-settings.html'), 'utf8');
   check(ownerSettingsHtml.includes('delete-account') && ownerSettingsHtml.includes('>Delete</button>'), 'worker delete is a compact button beside the worker label');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
+  check(ownerSettingsHtml.includes('id="propertyNotice"') && ownerSettingsHtml.includes('saveNotice'), 'property settings save an announcement');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
   check(true, 'work config script syntax');
   let b = browser('clock_in');

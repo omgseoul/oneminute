@@ -1,19 +1,19 @@
 (function () {
+  const reportFields = [
+    { key: "clean_rooms", label: "청소할 객실", help: "오늘 청소할 객실을 선택합니다." },
+    { key: "inspect_rooms", label: "점검할 객실", help: "청소하지 않지만 확인할 객실을 선택합니다." },
+    { key: "no_show", label: "노쇼", help: "노쇼 수량을 입력하면 객실을 선택할 수 있습니다.", kind: "room_count" },
+    { key: "bedding_stain", label: "침구류 오염", help: "오염된 침구류 수량을 숫자로 선택합니다.", kind: "number" },
+    { key: "cleaned_rooms", label: "청소 완료 객실", help: "청소를 완료한 객실을 선택합니다." },
+    { key: "inspected_rooms", label: "점검 완료 객실", help: "점검을 완료한 객실을 선택합니다." }
+  ];
   const fieldGroups = {
-    clock_in: [
-      { key: "clean_rooms", label: "청소할 객실", help: "오늘 청소할 객실을 선택합니다." },
-      { key: "inspect_rooms", label: "점검할 객실", help: "청소하지 않지만 확인할 객실을 선택합니다." },
-      { key: "no_show", label: "노쇼", help: "노쇼 수량을 입력하면 객실을 선택할 수 있습니다.", kind: "room_count" },
-      { key: "bedding_stain", label: "침구류 오염", help: "오염된 침구류 수량을 숫자로 선택합니다.", kind: "number" }
-    ],
-    clock_out: [
-      { key: "cleaned_rooms", label: "청소 완료 객실", help: "청소를 완료한 객실을 선택합니다." },
-      { key: "inspected_rooms", label: "점검 완료 객실", help: "점검을 완료한 객실을 선택합니다." }
-    ]
+    clock_in: reportFields,
+    clock_out: reportFields
   };
   const defaults = {
-    clock_in: [...fieldGroups.clock_in.map(field => field.key), "reminder_cards"],
-    clock_out: fieldGroups.clock_out.map(field => field.key),
+    clock_in: ["clean_rooms", "inspect_rooms", "no_show", "bedding_stain", "reminder_cards"],
+    clock_out: ["cleaned_rooms", "inspected_rooms"],
     reminder_cards: [
       {
         id: "watch",

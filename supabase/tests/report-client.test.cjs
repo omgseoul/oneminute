@@ -95,8 +95,9 @@ async function run() {
   check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
   check(appHtml.includes('class="owner-grid"') && appHtml.includes('href="staff-management.html"') && appHtml.includes('>계정관리<'), 'owner property settings and account management share a row');
   check(appHtml.includes('id="owner-inbox" class="card quick-card"') && appHtml.includes('id="missionMenu" class="card quick-card"'), 'owner inbox and mission share a row');
-  check(appHtml.includes('>메세지함<') && appHtml.includes('href="attendance.html"') && appHtml.includes('id="attendanceManagement"'), 'owner dashboard includes message and attendance management menus');
-  check(appHtml.includes('class="quick-visual account-dogs"') && appHtml.includes('<svg viewBox="0 0 32 32"'), 'owner menu visuals are placed on the right');
+  check(appHtml.includes('>메세지함<') && appHtml.includes('id="attendanceManagement"') && appHtml.includes('>근무시간 관리<'), 'owner dashboard includes message and work-time management menus');
+  check(appHtml.includes('class="quick-visual account-dogs"') && appHtml.includes('viewBox="0 0 66 34"'), 'account management shows three neutral shiba faces on the right');
+  check(appHtml.includes('id="staffWorkStatus"') && appHtml.includes('<b>근무현황</b>') && appHtml.includes('staffWorkStatus").style.display = isOwner ? "none" : "flex"'), 'staff main menu includes a half-width self attendance card');
   check(appHtml.includes('isOwner?(Number(item.target_count)') && appHtml.includes('todayMissionCount'), 'owner mission menu receives the today counter');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
@@ -124,6 +125,9 @@ async function run() {
   const attendanceHtml = fs.readFileSync(path.join(root, 'attendance.html'), 'utf8');
   check(['data-period="day"','data-period="week"','data-period="month"'].every(token => attendanceHtml.includes(token)), 'attendance management provides day, week, and month views');
   check(attendanceHtml.includes('list_attendance_statistics') && attendanceHtml.includes('class="sheet"') && attendanceHtml.includes('근무시간 현황'), 'attendance page combines visual totals with an Excel-style table');
+  check(attendanceHtml.includes('end.setTime(start.getTime());end.setDate(end.getDate()+6)'), 'weekly range ends six days after the calculated Monday');
+  check(attendanceHtml.indexOf('<th>근무시간</th>') < attendanceHtml.indexOf('<th>출근</th>') && attendanceHtml.includes('class="duration-cell"'), 'attendance table prioritizes work duration before clock-in and clock-out');
+  check(attendanceHtml.includes('filterRow.hidden=true') && attendanceHtml.includes('session.employeeId'), 'staff attendance view hides the worker filter and selects the signed-in worker');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
   check(ownerSettingsHtml.includes('id="propertyNotice"') && ownerSettingsHtml.includes('saveNotice'), 'property settings save an announcement');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });

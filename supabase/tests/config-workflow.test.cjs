@@ -16,6 +16,7 @@ const management = read('migrations/009_complete_management.sql');
 const compactSettings = read('migrations/010_compact_settings_report_edits.sql');
 const urgentMessages = read('migrations/011_urgent_messages_and_mission_filter.sql');
 const staffMissionMigration = read('migrations/012_staff_missions_property_number.sql');
+const missionNoticeMigration = read('migrations/013_mission_photos_property_notice.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -42,6 +43,7 @@ async function run() {
   await db.exec(compactSettings);
   await db.exec(urgentMessages);
   await db.exec(staffMissionMigration);
+  await db.exec(missionNoticeMigration);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -64,6 +66,7 @@ async function run() {
   check(ownerConfig.property.rooms.length === 16, 'existing One Minute rooms are preserved as defaults');
   check(ownerConfig.property.room_types.length === 4, 'existing One Minute rooms are grouped by room type');
   check(ownerConfig.property.management_number === 1, 'current property receives management number 1');
+  check(ownerConfig.property.notice === '', 'property announcement defaults to empty');
 
   const employeeConfigs = {};
   for (const employee of ownerConfig.employees) {
@@ -104,19 +107,25 @@ async function run() {
   check((await rpc('save_employee_accounts', [staffLogin.access_token, [{ display_name: '침입자', pin: '123456' }]])).code === 'owner_required', 'staff cannot create worker accounts');
   check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs, []])).code === 'invalid_room_types', 'empty room types are rejected');
   check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [], reminder_cards: [] } }, [{ name: '객실', rooms: ['101'] }]])).code === 'invalid_employee_config', 'unknown report fields are rejected');
+  ownerConfig = await rpc('save_property_notice', [ownerLogin.access_token, '오늘 3층 소방 점검이 있습니다.']);
+  check(ownerConfig.property.notice.includes('소방 점검'), 'owner saves a property announcement');
+  check((await rpc('save_property_notice', [staffLogin.access_token, '변조 공지'])).code === 'owner_required', 'staff cannot change property announcement');
 
   const newMission = await rpc('save_mission', [ownerLogin.access_token, {
     title: '침구 확인', description: '오염 여부 확인', timing: 'today', priority: 'important',
-    target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 15, due_at: null
+    target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 15, due_at: null,
+    description_photo: 'data:image/jpeg;base64,dGVzdA=='
   }]);
   check(newMission.ok, 'owner creates a targeted mission');
   const editedMission = await rpc('save_mission', [ownerLogin.access_token, {
     id: newMission.mission_id, title: '침구 재확인', description: '오염 여부 재확인', timing: 'this_week', priority: 'urgent',
-    target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 20, due_at: null
+    target_employee_ids: [staff.id], photo_required: true, estimated_minutes: 20, due_at: null,
+    description_photo: 'data:image/jpeg;base64,dGVzdA=='
   }]);
   check(editedMission.ok && editedMission.mission_id === newMission.mission_id, 'owner edits an existing mission');
   let staffMissions = await rpc('list_missions', [staffLogin.access_token]);
   check(staffMissions.missions.length === 1 && staffMissions.missions[0].title === '침구 재확인', 'target employee sees edited mission');
+  check(staffMissions.missions[0].description_photo.startsWith('data:image/'), 'mission reference photo is returned');
   check(staffMissions.employees.some(employee => employee.employee_id === staff.id), 'mission response includes selectable workers');
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '', ''])).code === 'photo_required', 'required completion photo is enforced');
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '완료', 'data:image/jpeg;base64,dGVzdA=='])).ok, 'staff completes mission with photo');

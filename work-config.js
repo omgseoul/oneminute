@@ -119,6 +119,9 @@
       });
     },
     normalizeRoomTypes,
+    async saveNotice(accessToken, notice) {
+      return rpc("save_property_notice", { p_access_token: accessToken, p_notice: notice });
+    },
     async saveEmployees(accessToken, employees) {
       return rpc("save_employee_accounts", { p_access_token: accessToken, p_employees: employees });
     },

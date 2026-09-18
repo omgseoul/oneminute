@@ -96,7 +96,8 @@ async function run() {
   check(appHtml.includes('class="owner-grid"') && appHtml.includes('href="staff-management.html"') && appHtml.includes('>계정관리<'), 'owner property settings and account management share a row');
   check(appHtml.includes('id="owner-inbox" class="card quick-card"') && appHtml.includes('id="missionMenu" class="card quick-card"'), 'owner inbox and mission share a row');
   check(appHtml.includes('>메세지함<') && appHtml.includes('id="attendanceManagement"') && appHtml.includes('>근무시간 관리<'), 'owner dashboard includes message and work-time management menus');
-  check(appHtml.includes('class="quick-visual account-dogs"') && appHtml.includes('viewBox="0 0 66 34"'), 'account management shows three neutral shiba faces on the right');
+  check(appHtml.includes('data-icon="users-round"'), 'account management uses the selected people line icon');
+  check(appHtml.includes('data-icon="chart-no-axes-combined"'), 'work-time management uses the selected combined chart icon');
   check(appHtml.includes('id="staffWorkStatus"') && appHtml.includes('<b>근무현황</b>') && appHtml.includes('staffWorkStatus").style.display = isOwner ? "none" : "flex"'), 'staff main menu includes a half-width self attendance card');
   check(appHtml.includes('isOwner?(Number(item.target_count)') && appHtml.includes('todayMissionCount'), 'owner mission menu receives the today counter');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');

@@ -18,6 +18,7 @@ const urgentMessages = read('migrations/011_urgent_messages_and_mission_filter.s
 const staffMissionMigration = read('migrations/012_staff_missions_property_number.sql');
 const missionNoticeMigration = read('migrations/013_mission_photos_property_notice.sql');
 const accountAdminMigration = read('migrations/014_account_staff_admin_navigation.sql');
+const accountPropertyMigration = read('migrations/015_account_property_tenancy.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -32,9 +33,25 @@ async function rpc(name, args) {
   const placeholders = args.map((_, index) => '$' + (index + 1)).join(',');
   return asAnon(async () => (await one(`select public.${name}(${placeholders}) as result`, args)).result);
 }
+async function accountRpc(userId, email, name, args = []) {
+  await db.exec(`set role authenticated; set request.jwt.claim.sub='${userId}'; set request.jwt.claim.email='${email.replaceAll("'", "''")}';`);
+  try {
+    const placeholders = args.map((_, index) => '$' + (index + 1)).join(',');
+    return (await one(`select public.${name}(${placeholders}) as result`, args)).result;
+  } finally { await db.exec('reset role; reset request.jwt.claim.sub; reset request.jwt.claim.email;'); }
+}
+async function accountRows(userId, email, name) {
+  await db.exec(`set role authenticated; set request.jwt.claim.sub='${userId}'; set request.jwt.claim.email='${email.replaceAll("'", "''")}';`);
+  try { return await rows(`select * from public.${name}()`); }
+  finally { await db.exec('reset role; reset request.jwt.claim.sub; reset request.jwt.claim.email;'); }
+}
 
 async function run() {
-  await db.exec('create role anon; create role authenticated; grant usage on schema public to anon, authenticated;');
+  await db.exec(`create role anon; create role authenticated; grant usage on schema public to anon, authenticated;
+    create schema auth; create table auth.users(id uuid primary key,email text not null);
+    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+    create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('email',current_setting('request.jwt.claim.email',true))$$;
+    grant usage on schema auth to authenticated; grant execute on function auth.uid(),auth.jwt() to authenticated;`);
   await db.exec(foundation);
   await db.exec(pinSetup);
   await db.exec(sessions);
@@ -51,9 +68,27 @@ async function run() {
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
     .replace(/OWNER_PIN_6_TO_8/g, ownerPin);
   await db.exec(ownerSetup);
+  const existingUserId = 'e770cb6a-9925-4f62-a5f3-cebcfe37278f';
+  const newUserId = '10000000-0000-4000-8000-000000000099';
+  await db.query('insert into auth.users(id,email) values($1,$2),($3,$4)', [existingUserId, 'oneminute01@naver.com', newUserId, 'new-owner@example.com']);
+  await db.exec(accountPropertyMigration);
 
   const employees = await rows('select id,display_name from public.employees order by display_name');
   const staff = employees.find(employee => employee.display_name === '문정국');
+
+  const existingContext = await accountRpc(existingUserId, 'oneminute01@naver.com', 'get_or_create_account_property');
+  check(existingContext.ok && existingContext.property_name === 'One Minute' && !existingContext.onboarding_pending, 'existing email is linked to original One Minute data');
+  const existingStaff = await accountRows(existingUserId, 'oneminute01@naver.com', 'list_account_login_employees');
+  check(existingStaff.length === 4, 'existing account sees its original workers');
+  const newContext = await accountRpc(newUserId, 'new-owner@example.com', 'get_or_create_account_property');
+  check(newContext.ok && newContext.property_name === '새 숙소' && newContext.onboarding_pending, 'new email automatically receives an isolated property');
+  const newAdmins = await accountRows(newUserId, 'new-owner@example.com', 'list_account_login_admins');
+  check(newAdmins.length === 1 && newAdmins[0].display_name === '관리자', 'new property receives a temporary administrator');
+  const newAdminLogin = await accountRpc(newUserId, 'new-owner@example.com', 'start_account_admin_session', [newAdmins[0].owner_id, '1234']);
+  check(newAdminLogin.ok && newAdminLogin.session_kind === 'owner', 'temporary administrator PIN 1234 logs in');
+  check((await accountRows(newUserId, 'new-owner@example.com', 'list_account_login_employees')).length === 0, 'new property cannot see original workers');
+  check((await accountRpc(newUserId, 'new-owner@example.com', 'acknowledge_account_onboarding')).ok, 'welcome dialog can be acknowledged');
+  check(!(await accountRpc(newUserId, 'new-owner@example.com', 'get_or_create_account_property')).onboarding_pending, 'welcome dialog is shown only until acknowledged');
 
   const publicProperty = await rpc('get_login_property', []);
   check(publicProperty.ok && publicProperty.property_name === 'One Minute', 'login title loads without a session');

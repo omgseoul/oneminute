@@ -29,7 +29,7 @@
   document.getElementById("reportMenu").style.display = isOwner ? "none" : "";
   document.getElementById("settings").style.display = isOwner ? "" : "none";
   document.getElementById("owner-inbox").style.display = isOwner ? "" : "none";
-  document.getElementById("emergency").style.display = isOwner ? "none" : "";document.getElementById("missionCounter").style.display=isOwner?"none":"";const notice=String(config.property.notice||"").trim();const noticeCard=document.getElementById("noticeCard");document.getElementById("noticeText").textContent=notice;noticeCard.classList.toggle("empty",isOwner||!notice);
+  document.getElementById("emergency").style.display = isOwner ? "none" : "";document.getElementById("missionCounter").style.display=isOwner?"none":"";const notice=String(config.property.notice||"").trim();const noticeCard=document.getElementById("noticeCard");document.getElementById("noticeText").textContent=notice||"등록된 공지사항이 없습니다.";noticeCard.classList.toggle("empty",isOwner);
   document.getElementById("missionCopy").textContent = isOwner ? "미션 등록·진행 확인" : "오늘의 업무와 전달사항 확인";
 if(!isOwner){const{data}=await window.omgSupabase.rpc("list_missions",{p_access_token:session.accessToken});if(data?.ok){const todayCount=(data.missions||[]).filter(item=>item.timing==="today"&&(!item.target_employee_ids?.length||item.target_employee_ids.includes(session.employeeId))&&!(item.completion_employee_ids||[]).includes(session.employeeId)).length;document.getElementById("todayMissionCount").textContent=String(todayCount);}}  document.getElementById("mainMenu").inert = false;
 })().catch(error => { document.getElementById("workerStatus").textContent = error.message; });

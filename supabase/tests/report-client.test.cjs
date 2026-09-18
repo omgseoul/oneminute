@@ -123,13 +123,16 @@ async function run() {
   check(staffManagementHtml.includes('id="adminAccounts"') && staffManagementHtml.includes('saveAdministrators'), 'staff management creates and updates administrator accounts');
   check(staffManagementHtml.includes('<h1>계정관리</h1>') && staffManagementHtml.includes('PIN을 변경'), 'account management edits the default administrator name and PIN');
   const attendanceHtml = fs.readFileSync(path.join(root, 'attendance.html'), 'utf8');
-  check(['data-period="day"','data-period="week"','data-period="month"'].every(token => attendanceHtml.includes(token)), 'attendance management provides day, week, and month views');
+  check(['data-period="day"','data-period="month"','data-period="custom"'].every(token => attendanceHtml.includes(token)) && !attendanceHtml.includes('data-period="week"'), 'attendance management provides day, month, and custom range views');
   check(attendanceHtml.includes('list_attendance_statistics') && attendanceHtml.includes('class="sheet"') && attendanceHtml.includes('근무시간 현황'), 'attendance page combines visual totals with an Excel-style table');
-  check(attendanceHtml.includes('end.setTime(start.getTime());end.setDate(end.getDate()+6)'), 'weekly range ends six days after the calculated Monday');
+  check(attendanceHtml.includes('date.setDate(1);anchor.value=isoDate(date)') && attendanceHtml.includes('id="rangeStart"') && attendanceHtml.includes('id="rangeEnd"'), 'monthly dates are forced to day one and custom range has start and end inputs');
   check(attendanceHtml.indexOf('<th>근무시간</th>') < attendanceHtml.indexOf('<th>출근</th>') && attendanceHtml.includes('class="duration-cell"'), 'attendance table prioritizes work duration before clock-in and clock-out');
   check(attendanceHtml.includes('filterRow.hidden=true') && attendanceHtml.includes('session.employeeId'), 'staff attendance view hides the worker filter and selects the signed-in worker');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
   check(ownerSettingsHtml.includes('id="propertyNotice"') && ownerSettingsHtml.includes('saveNotice'), 'property settings save an announcement');
+  check(ownerSettingsHtml.includes('class="report-tabs"') && ownerSettingsHtml.includes('data-report="clock_in"') && ownerSettingsHtml.includes('data-report="clock_out"'), 'report settings use side-by-side check-in and check-out tabs');
+  check(ownerSettingsHtml.includes('${label} 리마인더') && ownerSettingsHtml.includes('report_types') && ownerSettingsHtml.includes('report_weekdays'), 'each report tab manages its own reminder cards and weekdays');
+  check(workConfigHtml.includes('report_types: ["clock_in"]') && workConfigHtml.includes('report_weekdays') && reportHtml.includes('.includes(reportType)'), 'reminder cards are filtered for the selected report type and its weekday schedule');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
   check(true, 'work config script syntax');
   let b = browser('clock_in');

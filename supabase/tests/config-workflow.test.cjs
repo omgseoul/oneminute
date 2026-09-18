@@ -15,6 +15,7 @@ const missions = read('migrations/008_missions_reminder_cards.sql');
 const management = read('migrations/009_complete_management.sql');
 const compactSettings = read('migrations/010_compact_settings_report_edits.sql');
 const urgentMessages = read('migrations/011_urgent_messages_and_mission_filter.sql');
+const staffMissionMigration = read('migrations/012_staff_missions_property_number.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -40,6 +41,7 @@ async function run() {
   await db.exec(management);
   await db.exec(compactSettings);
   await db.exec(urgentMessages);
+  await db.exec(staffMissionMigration);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -61,6 +63,7 @@ async function run() {
   check(ownerConfig.can_manage && ownerConfig.employees.length === 4, 'owner receives employee settings');
   check(ownerConfig.property.rooms.length === 16, 'existing One Minute rooms are preserved as defaults');
   check(ownerConfig.property.room_types.length === 4, 'existing One Minute rooms are grouped by room type');
+  check(ownerConfig.property.management_number === 1, 'current property receives management number 1');
 
   const employeeConfigs = {};
   for (const employee of ownerConfig.employees) {
@@ -123,6 +126,16 @@ async function run() {
   check(ownerMissions.missions[0].completions[0].note === '완료', 'owner can open completed mission details');
   check(staffMissions.missions[0].completion_employee_ids.includes(staff.id), 'staff mission filter receives completion employee ids');
   check((await rpc('archive_mission', [ownerLogin.access_token, newMission.mission_id])).ok, 'owner archives mission');
+
+  const staffCreated = await rpc('save_mission', [staffLogin.access_token, {
+    title: '직원 생성 미션', description: '직접 등록', timing: 'anytime', priority: 'important',
+    target_employee_ids: [], photo_required: false, due_at: null
+  }]);
+  check(staffCreated.ok, 'staff creates a mission for themselves');
+  staffMissions = await rpc('list_missions', [staffLogin.access_token]);
+  const staffCreatedItem = staffMissions.missions.find(item => item.id === staffCreated.mission_id);
+  check(staffCreatedItem.creator_name === staff.display_name && staffCreatedItem.target_employee_ids.includes(staff.id), 'staff mission records employee creator and self target');
+  check((await rpc('save_mission', [staffLogin.access_token, { id: staffCreated.mission_id, title: '변조', timing: 'today' }])).code === 'owner_required', 'staff cannot edit an existing mission');
 
   const urgent = await rpc('send_urgent_message', [staffLogin.access_token, '보일러가 작동하지 않습니다.']);
   check(urgent.ok, 'staff sends an urgent message through Supabase');

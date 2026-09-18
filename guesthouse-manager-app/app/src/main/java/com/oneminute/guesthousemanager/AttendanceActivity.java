@@ -14,7 +14,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class AttendanceActivity extends AppCompatActivity {
-    private static final String LOGIN_URL = "https://omgseoul.github.io/oneminute/login.html";
+    private static final String LOGIN_URL = "https://omgworks24.com/login.html";
+    private static final String MISSION_URL = "https://omgworks24.com/mission.html";
     private static final int FILE_CHOOSER_REQUEST = 2201;
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
@@ -79,17 +80,19 @@ public class AttendanceActivity extends AppCompatActivity {
             if ("emergency".equals(action)) {
                 startActivity(new Intent(this, EmergencyReportActivity.class));
             } else if ("mission".equals(action)) {
-                webView.loadUrl("https://omgseoul.github.io/oneminute/mission.html");
+                webView.loadUrl(MISSION_URL);
             } else if ("inbox".equals(action)) {
                 startActivity(new Intent(this, OwnerInboxActivity.class));
             }
             return true;
         }
 
-        boolean isAppPage = "https".equals(uri.getScheme())
-                && "omgseoul.github.io".equals(uri.getHost())
-                && uri.getPath() != null
-                && uri.getPath().startsWith("/oneminute/");
+        String host = uri.getHost();
+        String path = uri.getPath();
+        boolean isCustomDomain = "omgworks24.com".equals(host) || "www.omgworks24.com".equals(host);
+        boolean isLegacyDomain = "omgseoul.github.io".equals(host)
+                && path != null && path.startsWith("/oneminute/");
+        boolean isAppPage = "https".equals(uri.getScheme()) && (isCustomDomain || isLegacyDomain);
         if (isAppPage) return false;
 
         if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {

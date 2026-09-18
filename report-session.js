@@ -42,6 +42,25 @@
     };
     notice.append(retry);
   }
+  function askEdit(label) {
+    if (typeof window.omgConfirmReportEdit === "function") return Promise.resolve(window.omgConfirmReportEdit(label));
+    return new Promise(resolve => {
+      const overlay = document.createElement("div");
+      overlay.setAttribute("role", "presentation");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:22px;background:rgba(18,39,66,.52);backdrop-filter:blur(3px)";
+      const dialog = document.createElement("section");
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-labelledby", "edit-report-title");
+      dialog.style.cssText = "width:min(100%,390px);padding:24px 20px 19px;border-radius:25px;background:white;box-shadow:0 24px 70px rgba(17,42,72,.28);text-align:center;font-family:Inter,'Pretendard','Noto Sans KR',sans-serif";
+      dialog.innerHTML = `<div style="display:grid;place-items:center;width:54px;height:54px;margin:0 auto 14px;border-radius:18px;background:#eaf3ff;color:#2467bd;font-size:25px">✎</div><h2 id="edit-report-title" style="margin:0;color:#183153;font-size:22px">${label} 수정</h2><p style="margin:10px 0 20px;color:#6d7b90;font-size:14px;line-height:1.55">이미 제출한 보고가 있습니다.<br>기존 내용을 불러와 수정할까요?</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button data-answer="no" type="button" style="height:49px;border:1px solid #d6e0ed;border-radius:14px;background:#f7f9fc;color:#65758b;font-weight:900">아니요</button><button data-answer="yes" type="button" style="height:49px;border:0;border-radius:14px;background:#2467bd;color:white;font-weight:900;box-shadow:0 7px 18px rgba(36,103,189,.22)">수정하기</button></div>`;
+      overlay.append(dialog);document.body.append(overlay);
+      const finish = answer => { overlay.remove(); resolve(answer); };
+      dialog.querySelector('[data-answer="no"]').onclick = () => finish(false);
+      dialog.querySelector('[data-answer="yes"]').onclick = () => finish(true);
+      dialog.querySelector('[data-answer="yes"]').focus();
+    });
+  }
   async function finish() {
     notice.hidden = true;
     if (formPage) formPage.style.display = "none";
@@ -137,7 +156,7 @@
     if (record?.ok) {
       saved = record;
       const label = context.reportType === "clock_in" ? "출근보고" : "퇴근보고";
-      if (confirm(`이미 ${label}를 완료했습니다.\n기존 보고를 수정하시겠습니까?`)) {
+      if (await askEdit(label)) {
         editing = true;
         notice.hidden = true;
         if (formPage) formPage.inert = false;

@@ -82,7 +82,10 @@ async function run() {
   check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
   check(appHtml.includes('shiba-face-morning-in.png') && appHtml.includes('shiba-face-morning-out.png'), 'report buttons show bright and tired dog faces');
   check(appHtml.includes('id="secondaryMenu"') && appHtml.includes('id="todayMissionCount"') && appHtml.includes('당일미션'), 'urgent report and mission share a row with a today counter');
+  check(appHtml.includes('사장님<br>긴급보고') && appHtml.includes('class="quick-visual"'), 'urgent report uses large two-line text with the siren on the right');
+  check(!appHtml.includes('<span class="icon">✓</span>') && appHtml.includes('<span class="copy"><b>미션</b>'), 'mission button removes the leading check icon');
   check(appHtml.includes('id="noticeCard"') && appHtml.includes('공지사항'), 'staff main screen includes property announcement');
+  check(appHtml.includes('class="notice-section empty"') && appHtml.includes('class="notice-line"') && !appHtml.includes('class="card notice-card'), 'announcement is rendered as a plain titled section');
   check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');

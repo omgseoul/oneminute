@@ -13,6 +13,7 @@ const sessions = read('migrations/003_staff_sessions.sql');
 const settings = read('migrations/006_property_report_settings.sql');
 const missions = read('migrations/008_missions_reminder_cards.sql');
 const management = read('migrations/009_complete_management.sql');
+const compactSettings = read('migrations/010_compact_settings_report_edits.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -36,6 +37,7 @@ async function run() {
   await db.exec(settings);
   await db.exec(missions);
   await db.exec(management);
+  await db.exec(compactSettings);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -91,7 +93,8 @@ async function run() {
   check(!staffConfig.can_manage && staffConfig.employees.length === 0, 'staff cannot list employee settings');
   check(staffConfig.report_config.clock_in.join(',') === 'clean_rooms,no_show,reminder_cards', 'staff receives only configured check-in fields');
   check(staffConfig.report_config.clock_out.join(',') === 'cleaned_rooms', 'staff receives only configured check-out fields');
-  check(staffConfig.report_config.reminder_cards.length === 2, 'staff receives configured reminder cards');
+  check(staffConfig.report_config.reminder_cards.length === 4, 'staff receives four default reminder cards');
+  check(staffConfig.report_config.reminder_cards.every(card => card.weekdays.length === 7), 'reminder cards include weekday visibility');
   check((await rpc('save_property_settings', [staffLogin.access_token, '해킹', ['999'], {}, [{ name: '객실', rooms: ['999'] }]])).code === 'owner_required', 'staff cannot change property settings');
   check((await rpc('save_employee_accounts', [staffLogin.access_token, [{ display_name: '침입자', pin: '123456' }]])).code === 'owner_required', 'staff cannot create worker accounts');
   check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs, []])).code === 'invalid_room_types', 'empty room types are rejected');
@@ -113,7 +116,17 @@ async function run() {
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '완료', 'data:image/jpeg;base64,dGVzdA=='])).ok, 'staff completes mission with photo');
   staffMissions = await rpc('list_missions', [staffLogin.access_token]);
   check(Boolean(staffMissions.missions[0].completed_at), 'mission completion is returned');
+  const ownerMissions = await rpc('list_missions', [ownerLogin.access_token]);
+  check(ownerMissions.missions[0].completions[0].note === '완료', 'owner can open completed mission details');
   check((await rpc('archive_mission', [ownerLogin.access_token, newMission.mission_id])).ok, 'owner archives mission');
+
+  const originalReport = await rpc('save_work_report', [staffLogin.access_token, 'clock_in', { memo: '처음 보고' }]);
+  const editedReport = await rpc('update_work_report', [staffLogin.access_token, 'clock_in', { memo: '수정 보고' }]);
+  check(originalReport.report_id === editedReport.report_id && editedReport.payload.memo === '수정 보고' && !editedReport.make_accepted, 'completed report can be edited and queued for delivery again');
+
+  const deleted = await rpc('delete_employee_account', [ownerLogin.access_token, added.employee_id]);
+  check(deleted.ok && !deleted.employees.some(employee => employee.employee_id === added.employee_id), 'owner can remove a worker account');
+  check(!(await rpc('start_work_session', [added.employee_id, '246813', 'general'])).ok, 'deleted worker cannot log in');
 
   let tableDenied = false;
   try { await asAnon(() => db.query('select * from public.properties')); } catch (_) { tableDenied = true; }

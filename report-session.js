@@ -19,6 +19,7 @@
   if (formPage) { formPage.inert = true; formPage.before(notice); }
   else document.body.prepend(notice);
   let saved = null;
+  let editing = false;
   let inFlight = null;
   let initialError = null;
   const api = window.omgReport = { session: null, ready: null };
@@ -55,11 +56,14 @@
       if (!session) throw initialError || new Error("다시 로그인해주세요.");
       if (formPage) formPage.inert = true;
       const args = { p_access_token: session.accessToken, p_report_type: context.reportType };
-      const record = saved
+      const record = saved && !editing
         ? await rpc("get_work_report", args)
-        : await rpc("save_work_report", { ...args, p_payload: payload });
+        : editing
+          ? await rpc("update_work_report", { ...args, p_payload: payload })
+          : await rpc("save_work_report", { ...args, p_payload: payload });
       if (!record?.ok) throw new Error(record?.message || "보고를 저장하지 못했습니다. 다시 로그인해주세요.");
       saved = record;
+      editing = false;
       notice.hidden = false;
       notice.textContent = "보고가 저장됐습니다. 전달 상태를 확인하고 있습니다…";
       if (!saved.make_accepted) {
@@ -132,8 +136,16 @@
     });
     if (record?.ok) {
       saved = record;
-      if (record.make_accepted) await finish();
-      else showPending("저장된 보고의 전달이 완료되지 않았습니다. 아래 버튼으로 다시 시도해주세요.");
+      const label = context.reportType === "clock_in" ? "출근보고" : "퇴근보고";
+      if (confirm(`이미 ${label}를 완료했습니다.\n기존 보고를 수정하시겠습니까?`)) {
+        editing = true;
+        notice.hidden = true;
+        if (formPage) formPage.inert = false;
+        if (typeof api.onEdit === "function") api.onEdit(record.payload || {});
+      } else {
+        location.replace("app.html");
+        return session;
+      }
     } else if (record?.code === "not_found" && session.status === "working") {
       notice.hidden = true;
       if (formPage) formPage.inert = false;

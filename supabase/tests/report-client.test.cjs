@@ -17,7 +17,7 @@ const session = {
   clockInAt: '2026-09-16T00:02:00Z', status: 'working'
 };
 function browser(reportType, state = {}) {
-  state.events ||= []; state.postCount ||= 0; state.saveCount ||= 0;
+  state.events ||= []; state.postCount ||= 0; state.saveCount ||= 0; state.updateCount ||= 0;
   const fixture = `<!doctype html><body>
     <main id="formPage"><select id="worker"></select></main>
     <section id="donePage" style="display:none"></section>
@@ -27,6 +27,7 @@ function browser(reportType, state = {}) {
   });
   const w = dom.window;
   w.scrollTo = () => {};
+  w.confirm = () => state.confirmEdit ?? true;
   w.AbortController = global.AbortController;
   w.OMG_SUPABASE = { url: 'https://db.example.test', publishableKey: 'test-only' };
   w.omgSession = {
@@ -42,6 +43,11 @@ function browser(reportType, state = {}) {
       state.saveCount++;
       state.saved ||= { ok: true, report_id: '30000000-0000-4000-8000-000000000001',
         make_accepted: false, payload: { ...args.p_payload, worker: '테스트 직원', report_id: '30000000-0000-4000-8000-000000000001' } };
+      return { data: structuredClone(state.saved) };
+    }
+    if (name === 'update_work_report') {
+      state.updateCount++;
+      state.saved = { ...state.saved, make_accepted: false, payload: { ...args.p_payload, worker: '테스트 직원', report_id: state.saved.report_id } };
       return { data: structuredClone(state.saved) };
     }
     throw new Error('Unexpected RPC: ' + name);

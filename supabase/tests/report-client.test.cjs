@@ -76,6 +76,8 @@ async function run() {
   check(!loginHtml.includes('name="shift"') && !loginHtml.includes('근무 구분'), 'login has no morning/afternoon choice');
   check(loginHtml.includes('id="staffTab"') && loginHtml.includes('id="adminTab"') && loginHtml.includes('>관리자</button>'), 'one PIN page provides staff and administrator roles');
   check(loginHtml.indexOf('id="staffTab"') < loginHtml.indexOf('id="adminTab"'), 'staff is the default first login role');
+  check(loginHtml.includes('get_or_create_account_property') && loginHtml.includes('list_account_login_employees') && loginHtml.includes('start_account_admin_session'), 'PIN login is scoped to the authenticated property account');
+  check(loginHtml.includes('id="welcomeModal"') && loginHtml.includes('임시 관리자 PIN') && loginHtml.includes('1234'), 'new accounts receive a designed temporary administrator PIN dialog');
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   check(indexHtml.includes('account.html') && !indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'root starts at account login and has no shift sections');
   const accountHtml = fs.readFileSync(path.join(root, 'account.html'), 'utf8');

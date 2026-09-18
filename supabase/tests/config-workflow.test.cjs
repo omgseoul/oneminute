@@ -17,6 +17,7 @@ const compactSettings = read('migrations/010_compact_settings_report_edits.sql')
 const urgentMessages = read('migrations/011_urgent_messages_and_mission_filter.sql');
 const staffMissionMigration = read('migrations/012_staff_missions_property_number.sql');
 const missionNoticeMigration = read('migrations/013_mission_photos_property_notice.sql');
+const accountAdminMigration = read('migrations/014_account_staff_admin_navigation.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -44,6 +45,7 @@ async function run() {
   await db.exec(urgentMessages);
   await db.exec(staffMissionMigration);
   await db.exec(missionNoticeMigration);
+  await db.exec(accountAdminMigration);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -67,6 +69,12 @@ async function run() {
   check(ownerConfig.property.room_types.length === 4, 'existing One Minute rooms are grouped by room type');
   check(ownerConfig.property.management_number === 1, 'current property receives management number 1');
   check(ownerConfig.property.notice === '', 'property announcement defaults to empty');
+  check(ownerConfig.administrators.length === 1 && ownerConfig.administrators[0].is_current, 'owner receives the current administrator account');
+
+  const publicAdmins = await asAnon(() => rows('select * from public.list_login_admins($1,$2)', ['omg', 'seoul-station']));
+  check(publicAdmins.length === 1 && publicAdmins[0].display_name === '사장', 'unified PIN login lists administrators');
+  const adminByPin = await rpc('start_admin_session', [publicAdmins[0].owner_id, ownerPin, 'omg', 'seoul-station']);
+  check(adminByPin.ok && adminByPin.session_kind === 'owner', 'administrator can enter with the same PIN flow');
 
   const employeeConfigs = {};
   for (const employee of ownerConfig.employees) {
@@ -92,6 +100,14 @@ async function run() {
   check(accountSaved.ok && accountSaved.employees.some(employee => employee.display_name === '신규직원'), 'owner adds a worker account with a PIN');
   const added = accountSaved.employees.find(employee => employee.display_name === '신규직원');
   check((await rpc('start_work_session', [added.employee_id, '246813', 'general'])).ok, 'new worker PIN can log in');
+
+  const adminSaved = await rpc('save_admin_accounts', [ownerLogin.access_token, [
+    ...ownerConfig.administrators.map(admin => ({ owner_id: admin.owner_id, display_name: admin.display_name, login_id: admin.login_id, pin: '' })),
+    { owner_id: null, display_name: '보조 관리자', login_id: 'assistant.manager', pin: '314159' }
+  ]]);
+  check(adminSaved.ok && adminSaved.administrators.some(admin => admin.display_name === '보조 관리자'), 'owner adds an administrator account with a PIN');
+  const addedAdmin = adminSaved.administrators.find(admin => admin.display_name === '보조 관리자');
+  check((await rpc('start_admin_session', [addedAdmin.owner_id, '314159', 'omg', 'seoul-station'])).ok, 'new administrator PIN can log in');
 
   const loginTitle = await rpc('get_login_property', []);
   check(loginTitle.property_name === '테스트 숙소', 'new property title appears on login');
@@ -161,6 +177,9 @@ async function run() {
   const deleted = await rpc('delete_employee_account', [ownerLogin.access_token, added.employee_id]);
   check(deleted.ok && !deleted.employees.some(employee => employee.employee_id === added.employee_id), 'owner can remove a worker account');
   check(!(await rpc('start_work_session', [added.employee_id, '246813', 'general'])).ok, 'deleted worker cannot log in');
+  const deletedAdmin = await rpc('delete_admin_account', [ownerLogin.access_token, addedAdmin.owner_id]);
+  check(deletedAdmin.ok && !deletedAdmin.administrators.some(admin => admin.owner_id === addedAdmin.owner_id), 'owner can remove another administrator account');
+  check(!(await rpc('start_admin_session', [addedAdmin.owner_id, '314159', 'omg', 'seoul-station'])).ok, 'deleted administrator cannot log in');
 
   let tableDenied = false;
   try { await asAnon(() => db.query('select * from public.properties')); } catch (_) { tableDenied = true; }

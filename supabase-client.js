@@ -10,12 +10,32 @@
     config.publishableKey,
     {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        persistSession: true,
+        autoRefreshToken: true,
         detectSessionInUrl: false
       }
     }
   );
+
+  window.omgAccount = {
+    async get() {
+      const { data } = await window.omgSupabase.auth.getSession();
+      return data?.session || null;
+    },
+    async require() {
+      const session = await this.get();
+      if (!session) {
+        location.replace("account.html");
+        return null;
+      }
+      return session;
+    },
+    async logout() {
+      window.omgSession?.clear();
+      await window.omgSupabase.auth.signOut();
+      location.replace("account.html");
+    }
+  };
 
   window.omgSession = {
     key: "omg_work_session",
@@ -56,7 +76,7 @@
     },
     async require({ allowCompleted = false } = {}) {
       const session = this.get();
-      const loginPage = session?.sessionKind === "owner" ? "owner-login.html" : "login.html";
+      const loginPage = "login.html";
       const tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!session || !tokenPattern.test(session.accessToken || "")) {
         this.clear();

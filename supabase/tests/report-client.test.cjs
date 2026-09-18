@@ -66,7 +66,7 @@ function browser(reportType, state = {}) {
 }
 async function run() {
   // Parse every changed inline script as JavaScript; don't execute legacy UI code.
-  for (const file of ['app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
+  for (const file of ['account.html', 'app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'staff-management.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
     const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const script of dom.window.document.querySelectorAll('script:not([src])')) new vm.Script(script.textContent, { filename: file });
     dom.window.close();
@@ -74,9 +74,12 @@ async function run() {
   }
   const loginHtml = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
   check(!loginHtml.includes('name="shift"') && !loginHtml.includes('근무 구분'), 'login has no morning/afternoon choice');
-  check(loginHtml.includes('>로그인</button>') && loginHtml.includes('관리자 로그인'), 'login labels use the requested wording');
+  check(loginHtml.includes('id="staffTab"') && loginHtml.includes('id="adminTab"') && loginHtml.includes('>관리자</button>'), 'one PIN page provides staff and administrator roles');
+  check(loginHtml.indexOf('id="staffTab"') < loginHtml.indexOf('id="adminTab"'), 'staff is the default first login role');
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  check(!indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'report menu has no shift sections');
+  check(indexHtml.includes('account.html') && !indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'root starts at account login and has no shift sections');
+  const accountHtml = fs.readFileSync(path.join(root, 'account.html'), 'utf8');
+  check(accountHtml.includes('계정 로그인') && accountHtml.includes('가입') && accountHtml.includes('signUp') && accountHtml.includes('signInWithPassword'), 'account screen supports email login and signup');
   const appHtml = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
   check(appHtml.includes('href="mission.html"'), 'main menu opens web mission page');
   check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
@@ -87,6 +90,9 @@ async function run() {
   check(appHtml.includes('id="noticeCard"') && appHtml.includes('공지사항'), 'staff main screen includes property announcement');
   check(appHtml.includes('class="notice-section empty"') && appHtml.includes('class="notice-line"') && !appHtml.includes('class="card notice-card'), 'announcement is rendered as a plain titled section');
   check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
+  check(appHtml.includes('class="owner-grid"') && appHtml.includes('href="staff-management.html"') && appHtml.includes('>직원관리<'), 'owner property settings and staff management share a row');
+  check(appHtml.includes('id="owner-inbox" class="card quick-card"') && appHtml.includes('id="missionMenu" class="card quick-card"'), 'owner inbox and mission share a row');
+  check(appHtml.includes('isOwner?(Number(item.target_count)') && appHtml.includes('todayMissionCount'), 'owner mission menu receives the today counter');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
   const workConfigHtml = fs.readFileSync(path.join(root, 'work-config.js'), 'utf8');
@@ -102,9 +108,13 @@ async function run() {
   check(missionHtml.includes('document.getElementById("newMission").hidden=false'), 'staff and owner both receive the new mission button');
   check(missionHtml.includes('aria-label="미션 추가"') && !missionHtml.includes('+ 새 미션'), 'mission title has a compact plus-only add button');
   check(missionHtml.includes('id="descriptionPhotoInput"') && missionHtml.includes('description_photo'), 'mission details support a reference photo');
-  check(missionHtml.includes('>중요</label>') && missionHtml.includes('완료 사진 필수') && !missionHtml.includes('완료 사진을 반드시 받기'), 'mission editor uses compact labels');
+  check(missionHtml.includes('<span>중요</span>') && missionHtml.includes('완료 사진 필수') && !missionHtml.includes('완료 사진을 반드시 받기'), 'mission editor uses compact photo and star controls');
+  check(missionHtml.includes('id="creatorDisplay"') && missionHtml.includes('class="editor-grid"') && missionHtml.includes('for="dueAt">마감일시'), 'mission editor places creator by timing and deadline below');
+  check(missionHtml.includes('class="mission-row"') && missionHtml.includes('class="mission-preview-row"') && missionHtml.includes('photo-indicator'), 'mission list uses compact summary rows with a photo indicator');
   const ownerSettingsHtml = fs.readFileSync(path.join(root, 'owner-settings.html'), 'utf8');
-  check(ownerSettingsHtml.includes('delete-account') && ownerSettingsHtml.includes('>Delete</button>'), 'worker delete is a compact button beside the worker label');
+  const staffManagementHtml = fs.readFileSync(path.join(root, 'staff-management.html'), 'utf8');
+  check(!ownerSettingsHtml.includes('id="accounts"') && staffManagementHtml.includes('delete-account') && staffManagementHtml.includes('>Delete</button>'), 'worker account controls moved from property settings to staff management');
+  check(staffManagementHtml.includes('id="adminAccounts"') && staffManagementHtml.includes('saveAdministrators'), 'staff management creates and updates administrator accounts');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
   check(ownerSettingsHtml.includes('id="propertyNotice"') && ownerSettingsHtml.includes('saveNotice'), 'property settings save an announcement');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });

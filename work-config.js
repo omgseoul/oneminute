@@ -127,6 +127,12 @@
     },
     async deleteEmployee(accessToken, employeeId) {
       return rpc("delete_employee_account", { p_access_token: accessToken, p_employee_id: employeeId });
+    },
+    async saveAdministrators(accessToken, administrators) {
+      return rpc("save_admin_accounts", { p_access_token: accessToken, p_administrators: administrators });
+    },
+    async deleteAdministrator(accessToken, ownerId) {
+      return rpc("delete_admin_account", { p_access_token: accessToken, p_owner_id: ownerId });
     }
   };
 })();

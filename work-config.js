@@ -19,13 +19,29 @@
         id: "watch",
         title: "워치 착용",
         image: "directive-watch.png",
-        text: "출근 즉시 워치 착용.\n절대 빼지 마세요. 방수임.\n게하폰과 5미터 이내에 있어야 작동합니다."
+        text: "출근 즉시 워치 착용.\n절대 빼지 마세요. 방수임.\n게하폰과 5미터 이내에 있어야 작동합니다.",
+        weekdays: [0, 1, 2, 3, 4, 5, 6]
       },
       {
         id: "guest-guide",
         title: "게스트 직접 안내",
         image: "directive-guest-guide.jpg",
-        text: "짐을 들어주고 문 앞까지 갈 것.\n도어락과 카드키 설명.\n앉아서 말로만 안내하는 건 퇴사 사유임."
+        text: "짐을 들어주고 문 앞까지 갈 것.\n도어락과 카드키 설명.\n앉아서 말로만 안내하는 건 퇴사 사유임.",
+        weekdays: [0, 1, 2, 3, 4, 5, 6]
+      },
+      {
+        id: "carry-devices",
+        title: "게하폰·워치 항상 소지",
+        image: "shiba-worker-logo-v2.png",
+        text: "워치와 게하폰을 책상 위에 두고 청소하지 마세요.\n알람을 놓치지 않도록 근무 중 항상 몸에 소지합니다.",
+        weekdays: [0, 1, 2, 3, 4, 5, 6]
+      },
+      {
+        id: "final-check",
+        title: "객실 최종 확인",
+        image: "shiba-cleaner-logo.png",
+        text: "객실을 나오기 전에 비품, 도어락, 조명, 냉난방 상태를 마지막으로 확인합니다.",
+        weekdays: [0, 1, 2, 3, 4, 5, 6]
       }
     ]
   };
@@ -39,11 +55,14 @@
         : [...defaults[type]];
     }
     result.reminder_cards = Array.isArray(config?.reminder_cards)
-      ? config.reminder_cards.slice(0, 6).map((card, index) => ({
+      ? config.reminder_cards.slice(0, 12).map((card, index) => ({
           id: String(card?.id || `card-${index + 1}`).slice(0, 50),
           title: String(card?.title || "리마인더").slice(0, 50),
           image: String(card?.image || "").slice(0, 900000),
-          text: String(card?.text || "").slice(0, 1000)
+          text: String(card?.text || "").slice(0, 1000),
+          weekdays: Array.isArray(card?.weekdays)
+            ? [...new Set(card.weekdays.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6))]
+            : [0, 1, 2, 3, 4, 5, 6]
         })).filter(card => card.title && card.image && card.text)
       : defaults.reminder_cards.map(card => ({ ...card }));
     return result;
@@ -102,6 +121,9 @@
     normalizeRoomTypes,
     async saveEmployees(accessToken, employees) {
       return rpc("save_employee_accounts", { p_access_token: accessToken, p_employees: employees });
+    },
+    async deleteEmployee(accessToken, employeeId) {
+      return rpc("delete_employee_account", { p_access_token: accessToken, p_employee_id: employeeId });
     }
   };
 })();

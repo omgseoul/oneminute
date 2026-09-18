@@ -19,6 +19,7 @@ const staffMissionMigration = read('migrations/012_staff_missions_property_numbe
 const missionNoticeMigration = read('migrations/013_mission_photos_property_notice.sql');
 const accountAdminMigration = read('migrations/014_account_staff_admin_navigation.sql');
 const accountPropertyMigration = read('migrations/015_account_property_tenancy.sql');
+const attendanceMigration = read('migrations/016_attendance_statistics.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -72,6 +73,7 @@ async function run() {
   const newUserId = '10000000-0000-4000-8000-000000000099';
   await db.query('insert into auth.users(id,email) values($1,$2),($3,$4)', [existingUserId, 'oneminute01@naver.com', newUserId, 'new-owner@example.com']);
   await db.exec(accountPropertyMigration);
+  await db.exec(attendanceMigration);
 
   const employees = await rows('select id,display_name from public.employees order by display_name');
   const staff = employees.find(employee => employee.display_name === '문정국');
@@ -208,6 +210,11 @@ async function run() {
   const originalReport = await rpc('save_work_report', [staffLogin.access_token, 'clock_in', { memo: '처음 보고' }]);
   const editedReport = await rpc('update_work_report', [staffLogin.access_token, 'clock_in', { memo: '수정 보고' }]);
   check(originalReport.report_id === editedReport.report_id && editedReport.payload.memo === '수정 보고' && !editedReport.make_accepted, 'completed report can be edited and queued for delivery again');
+  const attendanceDate = (await one('select work_date from public.work_sessions where id=$1', [staffLogin.session_id])).work_date;
+  await db.query("update public.work_sessions set clock_out_at=clock_in_at+interval '7 hours 35 minutes',status='completed' where id=$1", [staffLogin.session_id]);
+  const attendance = await rpc('list_attendance_statistics', [ownerLogin.access_token, attendanceDate, attendanceDate]);
+  check(attendance.ok && attendance.sessions.some(item => item.employee_id === staff.id && item.duration_minutes === 455), 'owner attendance statistics calculate completed hours and minutes');
+  check((await rpc('list_attendance_statistics', [staffLogin.access_token, attendanceDate, attendanceDate])).code === 'owner_required', 'staff cannot read attendance statistics');
 
   const deleted = await rpc('delete_employee_account', [ownerLogin.access_token, added.employee_id]);
   check(deleted.ok && !deleted.employees.some(employee => employee.employee_id === added.employee_id), 'owner can remove a worker account');

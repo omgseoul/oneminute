@@ -14,6 +14,7 @@ const settings = read('migrations/006_property_report_settings.sql');
 const missions = read('migrations/008_missions_reminder_cards.sql');
 const management = read('migrations/009_complete_management.sql');
 const compactSettings = read('migrations/010_compact_settings_report_edits.sql');
+const urgentMessages = read('migrations/011_urgent_messages_and_mission_filter.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -38,6 +39,7 @@ async function run() {
   await db.exec(missions);
   await db.exec(management);
   await db.exec(compactSettings);
+  await db.exec(urgentMessages);
 
   const ownerSetup = read('setup/007_create_owner.example.sql')
     .replace(/OWNER_LOGIN_ID/g, 'boss.test')
@@ -112,13 +114,23 @@ async function run() {
   check(editedMission.ok && editedMission.mission_id === newMission.mission_id, 'owner edits an existing mission');
   let staffMissions = await rpc('list_missions', [staffLogin.access_token]);
   check(staffMissions.missions.length === 1 && staffMissions.missions[0].title === '침구 재확인', 'target employee sees edited mission');
+  check(staffMissions.employees.some(employee => employee.employee_id === staff.id), 'mission response includes selectable workers');
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '', ''])).code === 'photo_required', 'required completion photo is enforced');
   check((await rpc('complete_mission', [staffLogin.access_token, newMission.mission_id, '완료', 'data:image/jpeg;base64,dGVzdA=='])).ok, 'staff completes mission with photo');
   staffMissions = await rpc('list_missions', [staffLogin.access_token]);
   check(Boolean(staffMissions.missions[0].completed_at), 'mission completion is returned');
   const ownerMissions = await rpc('list_missions', [ownerLogin.access_token]);
   check(ownerMissions.missions[0].completions[0].note === '완료', 'owner can open completed mission details');
+  check(staffMissions.missions[0].completion_employee_ids.includes(staff.id), 'staff mission filter receives completion employee ids');
   check((await rpc('archive_mission', [ownerLogin.access_token, newMission.mission_id])).ok, 'owner archives mission');
+
+  const urgent = await rpc('send_urgent_message', [staffLogin.access_token, '보일러가 작동하지 않습니다.']);
+  check(urgent.ok, 'staff sends an urgent message through Supabase');
+  let inbox = await rpc('list_urgent_messages', [ownerLogin.access_token]);
+  check(inbox.unread_count === 1 && inbox.messages[0].employee_name === staff.display_name, 'owner receives the staff urgent message');
+  check((await rpc('acknowledge_urgent_message', [ownerLogin.access_token, inbox.messages[0].message_id])).ok, 'owner acknowledges an urgent message');
+  inbox = await rpc('list_urgent_messages', [ownerLogin.access_token]);
+  check(inbox.unread_count === 0 && inbox.messages[0].acknowledged_at, 'acknowledged urgent message remains in history');
 
   const originalReport = await rpc('save_work_report', [staffLogin.access_token, 'clock_in', { memo: '처음 보고' }]);
   const editedReport = await rpc('update_work_report', [staffLogin.access_token, 'clock_in', { memo: '수정 보고' }]);

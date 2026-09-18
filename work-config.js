@@ -3,7 +3,7 @@
     clock_in: [
       { key: "clean_rooms", label: "청소할 객실", help: "오늘 청소할 객실을 선택합니다." },
       { key: "inspect_rooms", label: "점검할 객실", help: "청소하지 않지만 확인할 객실을 선택합니다." },
-      { key: "no_show", label: "노쇼", help: "노쇼가 발생한 객실을 선택합니다." },
+      { key: "no_show", label: "노쇼", help: "노쇼 수량을 입력하면 객실을 선택할 수 있습니다.", kind: "room_count" },
       { key: "bedding_stain", label: "침구류 오염", help: "오염된 침구류 수량을 숫자로 선택합니다.", kind: "number" }
     ],
     clock_out: [

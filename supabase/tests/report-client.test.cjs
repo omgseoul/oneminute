@@ -27,7 +27,7 @@ function browser(reportType, state = {}) {
   });
   const w = dom.window;
   w.scrollTo = () => {};
-  w.confirm = () => state.confirmEdit ?? true;
+  w.omgConfirmReportEdit = () => state.confirmEdit ?? true;
   w.AbortController = global.AbortController;
   w.OMG_SUPABASE = { url: 'https://db.example.test', publishableKey: 'test-only' };
   w.omgSession = {
@@ -66,7 +66,7 @@ function browser(reportType, state = {}) {
 }
 async function run() {
   // Parse every changed inline script as JavaScript; don't execute legacy UI code.
-  for (const file of ['app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'mission.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
+  for (const file of ['app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
     const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const script of dom.window.document.querySelectorAll('script:not([src])')) new vm.Script(script.textContent, { filename: file });
     dom.window.close();
@@ -80,12 +80,20 @@ async function run() {
   const appHtml = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
   check(appHtml.includes('href="mission.html"'), 'main menu opens web mission page');
   check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
+  check(appHtml.includes('href="emergency.html"') && appHtml.includes('href="owner-inbox.html"'), 'urgent report and owner inbox use Supabase web pages');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
-  check(reportHtml.includes('field.kind==="number"') && fs.readFileSync(path.join(root, 'work-config.js'), 'utf8').includes('{ key: "bedding_stain"') && fs.readFileSync(path.join(root, 'work-config.js'), 'utf8').includes('kind: "number"'), 'bedding stains use a numeric quantity');
+  const workConfigHtml = fs.readFileSync(path.join(root, 'work-config.js'), 'utf8');
+  check(reportHtml.includes('compact-input') && workConfigHtml.includes('{ key: "bedding_stain"') && workConfigHtml.includes('kind: "number"'), 'bedding stains use a compact inline numeric quantity');
+  check(workConfigHtml.includes('kind: "room_count"') && reportHtml.includes('expand-rooms'), 'no-show quantity expands room selection');
+  check(reportHtml.includes('grid-template-columns:repeat(6,minmax(0,1fr))'), 'up to six room numbers fit on one row');
+  check(source.includes('role", "dialog"') && source.includes('수정하기'), 'existing report uses a custom edit dialog');
   const missionHtml = fs.readFileSync(path.join(root, 'mission.html'), 'utf8');
   check(['지연','당일','금주','아무때나','완료'].every(label => missionHtml.includes(`>${label}<`)), 'mission dashboard restores all mature categories');
   check(missionHtml.includes('happy-clapping-shiba.js') && missionHtml.includes('미션 클리어'), 'mission completion restores the dog celebration');
+  check(missionHtml.includes('new Option("All",""') && !missionHtml.includes('workerFilter.disabled=true'), 'mission worker filter is clickable and includes All');
+  const ownerSettingsHtml = fs.readFileSync(path.join(root, 'owner-settings.html'), 'utf8');
+  check(ownerSettingsHtml.includes('delete-account') && ownerSettingsHtml.includes('>Delete</button>'), 'worker delete is a compact button beside the worker label');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });
   check(true, 'work config script syntax');
   let b = browser('clock_in');

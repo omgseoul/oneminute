@@ -78,7 +78,7 @@ function buildPayload(session, config){
   if(!isClockIn){document.getElementById("doneText").textContent="퇴근시간이 기록되고 보고가 전달되었습니다.";document.getElementById("doneLink").href="login.html";document.getElementById("doneLink").textContent="확인";}
   const fields=window.omgWorkConfig.fieldGroups[reportType].filter(field=>enabled.has(field.key));
   if(fields.length)fields.forEach(field=>fieldContainer.append(createField(field,pageConfig.property.room_types||[])));
-  const weekday=currentWeekday(session.timezone);const cards=pageConfig.report_config.reminder_cards.filter(card=>(card.weekdays||[0,1,2,3,4,5,6]).includes(weekday));
+  const weekday=currentWeekday(session.timezone);const cards=pageConfig.report_config.reminder_cards.filter(card=>(card.report_types||["clock_in"]).includes(reportType)&&(card.report_weekdays?.[reportType]||card.weekdays||[0,1,2,3,4,5,6]).includes(weekday));
   if(enabled.has("reminder_cards")&&cards.length)document.getElementById("reminderSlot").append(createReminder(cards));
   else if(!enabled.has("reminder_cards")){const empty=document.createElement("div");empty.className="empty";empty.textContent="사장이 설정한 선택 항목이 없습니다. 특이사항만 작성할 수 있습니다.";fieldContainer.append(empty);}
   if(pendingEditPayload)restorePayload(pendingEditPayload);

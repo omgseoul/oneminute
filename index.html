@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OMG WORKS</title></head><body><p>로그인 상태를 확인하고 있습니다…</p><script>
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f4f7fc"><title>OMG WORKS</title><style>html,body{margin:0;min-height:100%;background:#f4f7fc}</style></head><body><script>
 let target="account.html";
 try{const session=JSON.parse(localStorage.getItem("omg_work_session")||"null");if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session?.accessToken||""))target="app.html";}catch(_){}
 location.replace(target);

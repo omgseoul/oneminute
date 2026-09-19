@@ -34,7 +34,7 @@ jobs:
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
         working-directory: guesthouse-manager-app
       - name: Build debug APK
-        run: gradle assembleDebug
+        run: gradle clean assembleDebug --no-build-cache --stacktrace
         working-directory: guesthouse-manager-app
       - uses: actions/upload-artifact@v4
         with:

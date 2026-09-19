@@ -29,6 +29,7 @@ public class AttendanceActivity extends AppCompatActivity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         WebView.setWebContentsDebuggingEnabled(false);
@@ -59,9 +60,11 @@ public class AttendanceActivity extends AppCompatActivity {
                 return true;
             }
         });
-        // app.html validates the persisted work session and only returns to login when
-        // the employee has logged out or successfully submitted a checkout report.
-        webView.loadUrl(APP_URL);
+        if (state == null || webView.restoreState(state) == null) {
+            // app.html validates the persisted work session and only returns to login
+            // after an explicit logout or a successful checkout report.
+            webView.loadUrl(APP_URL);
+        }
     }
 
     @Override
@@ -105,8 +108,21 @@ public class AttendanceActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
+        if (webView == null) {
+            moveTaskToBack(true);
+            return;
+        }
+        Uri current = Uri.parse(webView.getUrl() == null ? APP_URL : webView.getUrl());
+        String path = current.getPath();
+        boolean isMainPage = path == null || "/".equals(path) || path.endsWith("/app.html");
+        if (!isMainPage && webView.canGoBack()) webView.goBack();
+        else moveTaskToBack(true);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (webView != null) webView.saveState(outState);
+        super.onSaveInstanceState(outState);
     }
 
     @Override

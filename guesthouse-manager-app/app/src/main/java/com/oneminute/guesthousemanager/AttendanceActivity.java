@@ -14,7 +14,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class AttendanceActivity extends AppCompatActivity {
-    private static final String LOGIN_URL = "https://omgworks24.com/";
+    private static final String APP_URL = "https://omgworks24.com/app.html";
     private static final String MISSION_URL = "https://omgworks24.com/mission.html";
     private static final int FILE_CHOOSER_REQUEST = 2201;
     private WebView webView;
@@ -59,7 +59,9 @@ public class AttendanceActivity extends AppCompatActivity {
                 return true;
             }
         });
-        webView.loadUrl(LOGIN_URL);
+        // app.html validates the persisted work session and only returns to login when
+        // the employee has logged out or successfully submitted a checkout report.
+        webView.loadUrl(APP_URL);
     }
 
     @Override

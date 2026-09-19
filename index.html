@@ -1,1 +1,5 @@
-<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url=account.html"><title>OMG WORKS</title></head><body><a href="account.html">계정 로그인으로 이동</a><script>location.replace("account.html");</script></body></html>
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OMG WORKS</title></head><body><p>로그인 상태를 확인하고 있습니다…</p><script>
+let target="account.html";
+try{const session=JSON.parse(localStorage.getItem("omg_work_session")||"null");if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session?.accessToken||""))target="app.html";}catch(_){}
+location.replace(target);
+</script></body></html>

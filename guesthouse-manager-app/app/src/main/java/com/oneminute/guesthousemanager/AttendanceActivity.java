@@ -22,6 +22,38 @@ public class AttendanceActivity extends AppCompatActivity {
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
 
+    private void subscribeToUrgentTopic(String propertyId, String role) {
+        if (propertyId == null) return;
+        String safeProperty = propertyId.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
+        if (safeProperty.isEmpty()) return;
+
+        // Telegram urgent messages are broadcast to the property's urgent
+        // channel. Do not split that subscription by the signed-in UI role:
+        // an owner session on an installed device must receive it as well.
+        String topic = "property_" + safeProperty + "_staff";
+        String safeRole = "owner".equals(role) ? "owner" : "staff";
+        String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("topic", "");
+
+        // Save before the asynchronous Firebase call so a token refresh or app
+        // restart can retry the correct property subscription.
+        getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                .putString("topic", topic)
+                .putString("property_id", safeProperty)
+                .putString("role", safeRole)
+                .apply();
+
+        if (!previous.isEmpty() && !topic.equals(previous))
+            FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
+
+        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token ->
+                FirebaseMessaging.getInstance().subscribeToTopic(topic)
+                        .addOnFailureListener(error -> runOnUiThread(() ->
+                                Toast.makeText(AttendanceActivity.this,
+                                        "긴급 알림 연결에 실패했습니다. 앱을 다시 열어주세요.",
+                                        Toast.LENGTH_LONG).show())));
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -73,24 +105,18 @@ public class AttendanceActivity extends AppCompatActivity {
     private final class PushBridge {
         @JavascriptInterface
         public void registerPush(String propertyId, String role) {
-            if (propertyId == null || role == null) return;
-            String safeProperty = propertyId.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
-            if (safeProperty.isEmpty()) return;
-            String safeRole = "owner".equals(role) ? "owner" : "staff";
-            String topic = "property_" + safeProperty + "_" + safeRole;
-            String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
-                    .getString("topic", "");
-            if (!previous.isEmpty() && !topic.equals(previous))
-                FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
-            // Always subscribe again. A restored preference can outlive the FCM
-            // token/app installation and otherwise leaves a fresh APK silent.
-            FirebaseMessaging.getInstance().subscribeToTopic(topic).addOnSuccessListener(unused ->
-                    getSharedPreferences("omg_push", MODE_PRIVATE).edit()
-                            .putString("topic", topic)
-                            .putString("property_id", safeProperty)
-                            .putString("role", safeRole)
-                            .apply());
+            subscribeToUrgentTopic(propertyId, role);
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        String propertyId = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("property_id", "");
+        String role = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("role", "staff");
+        if (!propertyId.isEmpty()) subscribeToUrgentTopic(propertyId, role);
     }
 
     @Override

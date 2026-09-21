@@ -11,6 +11,15 @@
         <activity android:name=".EmergencyReportActivity" />
         <activity android:name=".OwnerInboxActivity" />
         <activity android:name=".AttendanceActivity" />
+        <activity
+            android:name=".UrgentAlertActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/UrgentAlertTheme"
+            android:turnScreenOn="true" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

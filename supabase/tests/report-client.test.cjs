@@ -145,8 +145,9 @@ async function run() {
   check(attendanceHtml.includes('filterRow.hidden=true') && attendanceHtml.includes('session.employeeId'), 'staff attendance view hides the worker filter and selects the signed-in worker');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
   check(ownerSettingsHtml.includes('<h2>Property 기본정보</h2>') && !ownerSettingsHtml.includes('숙소명은 로그인과 메인화면'), 'property settings use the requested heading without the retired explanation');
+  check(ownerSettingsHtml.includes('>Property ID</label>') && ownerSettingsHtml.includes('property-id-title') && !ownerSettingsHtml.includes('OMG WORKS 운영자만 변경 가능'), 'property ID stays on one line without the operator note');
   check(['value="lodging"','value="general"','value="other"'].every(token => ownerSettingsHtml.includes(token)) && ownerSettingsHtml.includes('id="lodgingFields" hidden'), 'property type choices control the lodging-only room editor');
-  check(ownerSettingsHtml.includes('id="customFieldName"') && ownerSettingsHtml.includes('addCustomField') && ownerSettingsHtml.includes('custom-delete'), 'owners can add and delete custom report fields');
+  check(ownerSettingsHtml.includes('<div class="custom-field-row"><input id="customFieldName"') && ownerSettingsHtml.includes('addCustomField') && ownerSettingsHtml.includes('custom-delete'), 'all property types show custom report input inside the report panel');
   check(workConfigHtml.includes('fieldsFor(property)') && reportHtml.includes('fieldsFor(pageConfig.property)') && reportHtml.includes('field.kind==="text"'), 'custom fields flow into the staff report form as text inputs');
   const platformAdminHtml = fs.readFileSync(path.join(root, 'platform-admin.html'), 'utf8');
   check(platformAdminHtml.includes('get_platform_dashboard') && platformAdminHtml.includes('update_platform_property') && platformAdminHtml.includes('reset_platform_property_admin_pin'), 'platform operator center lists tenants, controls status, and resets administrator PINs');

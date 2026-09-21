@@ -1,0 +1,59 @@
+html.omg-booting,
+html.omg-leaving {
+  background: #f4f7fc;
+}
+
+html.omg-booting body > *:not(script),
+html.omg-leaving body > *:not(script) {
+  visibility: hidden !important;
+}
+
+html.omg-booting::before,
+html.omg-leaving::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  background: #f4f7fc;
+}
+
+html.omg-brand::after {
+  content: "OMG WORKS";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 2147483647;
+  width: 180px;
+  padding-top: 96px;
+  transform: translate(-50%, -54%);
+  background: url("shiba-worker-logo-v2.png?v=1") center top / 84px 84px no-repeat;
+  color: #2467bd;
+  font: 900 15px/1.2 Inter, "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: .18em;
+  text-align: center;
+  animation: omg-brand-in .18s ease-out both, omg-brand-breathe 1.25s ease-in-out .18s infinite alternate;
+}
+
+html.omg-revealing body > *:not(script) {
+  animation: omg-page-in .16s ease-out both;
+}
+
+@keyframes omg-brand-in {
+  from { opacity: 0; transform: translate(-50%, -51%); }
+  to { opacity: 1; transform: translate(-50%, -54%); }
+}
+
+@keyframes omg-brand-breathe {
+  from { opacity: .78; }
+  to { opacity: 1; }
+}
+
+@keyframes omg-page-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.omg-brand::after,
+  html.omg-revealing body > *:not(script) { animation: none; }
+}

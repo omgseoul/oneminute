@@ -66,13 +66,15 @@ function browser(reportType, state = {}) {
 }
 async function run() {
   // Parse every changed inline script as JavaScript; don't execute legacy UI code.
-  for (const file of ['account.html', 'app.html', 'index.html', 'login.html', 'owner-login.html', 'report.html', 'owner-settings.html', 'staff-management.html', 'attendance.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
+  for (const file of ['account.html', 'app.html', 'index.html', 'login.html', 'owner-login.html', 'platform-admin.html', 'report.html', 'owner-settings.html', 'staff-management.html', 'attendance.html', 'mission.html', 'emergency.html', 'owner-inbox.html', 'morning1.html', 'morning2.html', 'afternoon1.html', 'afternoon2.html']) {
     const dom = new JSDOM(fs.readFileSync(path.join(root, file), 'utf8'));
     for (const script of dom.window.document.querySelectorAll('script:not([src])')) new vm.Script(script.textContent, { filename: file });
     dom.window.close();
     check(true, file + ' script syntax');
   }
   const loginHtml = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
+  check(!loginHtml.includes('id="propertyTitle">게하워크') && loginHtml.includes('id="propertyTitle" class="loading"'), 'PIN login does not flash a hard-coded property name');
+  check(loginHtml.includes('window.omgSession.get()') && loginHtml.includes('window.omgSession.require()') && loginHtml.includes('location.replace("app.html")'), 'PIN login automatically resumes an active work session');
   check(!loginHtml.includes('name="shift"') && !loginHtml.includes('근무 구분'), 'login has no morning/afternoon choice');
   check(loginHtml.includes('id="staffTab"') && loginHtml.includes('id="adminTab"') && loginHtml.includes('>관리자</button>'), 'one PIN page provides staff and administrator roles');
   check(loginHtml.indexOf('id="staffTab"') < loginHtml.indexOf('id="adminTab"'), 'staff is the default first login role');
@@ -80,10 +82,16 @@ async function run() {
   check(loginHtml.includes('id="welcomeModal"') && loginHtml.includes('임시 관리자 PIN') && loginHtml.includes('1234'), 'new accounts receive a designed temporary administrator PIN dialog');
   check(loginHtml.includes('source.length===1') && loginHtml.includes('accountSelect.value=source[0].owner_id'), 'a single administrator is shown once and selected automatically');
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  check(indexHtml.includes('account.html') && !indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'root starts at account login and has no shift sections');
+  check(indexHtml.includes('omg_work_session') && indexHtml.includes('target="app.html"') && indexHtml.includes('target="account.html"') && !indexHtml.includes('오전 근무자') && !indexHtml.includes('오후 근무자'), 'root resumes a persisted work session before account login');
   const accountHtml = fs.readFileSync(path.join(root, 'account.html'), 'utf8');
   check(accountHtml.includes('계정 로그인') && accountHtml.includes('가입') && accountHtml.includes('signUp') && accountHtml.includes('signInWithPassword'), 'account screen supports email login and signup');
+  check(accountHtml.includes('id="accountShell" class="shell"') && accountHtml.includes('.shell.ready{visibility:visible') && accountHtml.includes('accountShell").classList.add("ready")'), 'account screen stays hidden while an existing account session redirects');
+  const androidActivity = fs.readFileSync(path.join(root, 'guesthouse-manager-app/app/src/main/java/com/oneminute/guesthousemanager/AttendanceActivity.java'), 'utf8');
+  check(androidActivity.includes('moveTaskToBack(true)') && !androidActivity.includes('else super.onBackPressed()'), 'Android back at the dashboard backgrounds the app instead of closing the activity');
+  check(androidActivity.includes('WebSettings.LOAD_NO_CACHE') && androidActivity.includes('webView.restoreState(state)') && androidActivity.includes('webView.saveState(outState)'), 'Android WebView avoids stale startup pages and preserves navigation state');
   const appHtml = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
+  check(!appHtml.includes('id="propertyTitle">One Minute') && appHtml.includes('id="propertyTitle" class="loading"'), 'dashboard does not flash a hard-coded property name');
+  check(appHtml.includes('id="appShell" class="shell"') && appHtml.includes('.shell.ready{visibility:visible') && appHtml.includes('appShell").classList.add("ready")'), 'dashboard stays hidden until session, role, and property data are ready');
   check(appHtml.includes('href="mission.html"'), 'main menu opens web mission page');
   check(appHtml.includes('report.html?type=clock_in') && appHtml.includes('report.html?type=clock_out'), 'main menu has direct side-by-side check-in and check-out buttons');
   check(appHtml.includes('shiba-face-morning-in.png') && appHtml.includes('shiba-face-morning-out-slim.png'), 'report buttons show bright and subtly slimmer tired dog faces');
@@ -100,13 +108,17 @@ async function run() {
   check(appHtml.includes('data-icon="building-2"') && appHtml.includes('<b>Property</b>'), 'property menu uses the selected building icon and short label');
   check(appHtml.includes('data-icon="message-square-text"'), 'message inbox uses the selected conversation icon');
   check(appHtml.includes('id="staffWorkStatus"') && appHtml.includes('<b>근무현황</b>') && appHtml.includes('staffWorkStatus").style.display = isOwner ? "none" : "flex"'), 'staff main menu includes a half-width self attendance card');
+  check(appHtml.includes('id="platformAdmin"') && appHtml.includes('href="platform-admin.html"') && appHtml.includes('is_platform_administrator'), 'founder owner menu reveals the separate platform operator center');
+  check(appHtml.indexOf('id="attendanceManagement"') < appHtml.indexOf('id="platformAdmin"') && !appHtml.includes('.attendance-card{grid-column:1/-1'), 'work-time management and operator center share one half-width row');
+  check(appHtml.includes('page-transition.css') && appHtml.includes('window.omgTransition.ready()'), 'dashboard waits for complete data before revealing the branded transition');
   check(appHtml.includes('isOwner?(Number(item.target_count)') && appHtml.includes('todayMissionCount'), 'owner mission menu receives the today counter');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
+  check(reportHtml.includes('data-omg-ready="manual"') && reportHtml.includes('window.omgTransition.ready()'), 'report page hides default labels until the complete report is ready');
   check(reportHtml.indexOf('memo-card') < reportHtml.indexOf('id="reminderSlot"') && reportHtml.indexOf('id="reminderSlot"') < reportHtml.indexOf('id="submitButton"'), 'reminder cards appear immediately above submit');
   const workConfigHtml = fs.readFileSync(path.join(root, 'work-config.js'), 'utf8');
   check(reportHtml.includes('createStepper') && reportHtml.includes('수량 줄이기') && reportHtml.includes('수량 늘리기'), 'no-show and bedding stain quantities use minus and plus steppers');
   check(workConfigHtml.includes('kind: "room_count"') && reportHtml.includes('expand-rooms'), 'no-show quantity expands room selection');
-  check(reportHtml.includes('grid-template-columns:repeat(6,minmax(0,1fr))'), 'up to six room numbers fit on one row');
+  check(reportHtml.includes('.room-group{display:grid;grid-template-columns:76px minmax(0,1fr)') && reportHtml.includes('grid-template-columns:repeat(5,minmax(0,1fr))'), 'room type stays left while up to five room numbers fit on the right');
   check(source.includes('role", "dialog"') && source.includes('수정하기'), 'existing report uses a custom edit dialog');
   const missionHtml = fs.readFileSync(path.join(root, 'mission.html'), 'utf8');
   check(['지연','당일','금주','아무때나','완료'].every(label => missionHtml.includes(`>${label}<`)), 'mission dashboard restores all mature categories');
@@ -117,7 +129,7 @@ async function run() {
   check(missionHtml.includes('aria-label="미션 추가"') && !missionHtml.includes('+ 새 미션'), 'mission title has a compact plus-only add button');
   check(missionHtml.includes('id="descriptionPhotoInput"') && missionHtml.includes('description_photo'), 'mission details support a reference photo');
   check(missionHtml.includes('<span>중요</span>') && missionHtml.includes('완료 사진 필수') && !missionHtml.includes('완료 사진을 반드시 받기'), 'mission editor uses compact photo and star controls');
-  check(missionHtml.includes('id="creatorDisplay"') && missionHtml.includes('class="editor-grid"') && missionHtml.includes('for="dueAt">마감일시'), 'mission editor places creator by timing and deadline below');
+  check(missionHtml.includes('id="creatorDisplay"') && missionHtml.includes('class="editor-grid"') && missionHtml.includes('for="dueAt">마감일') && missionHtml.includes('id="dueAt" type="date"') && !missionHtml.includes('datetime-local'), 'mission editor places creator by timing and uses a date-only deadline');
   check(missionHtml.includes('class="mission-row"') && missionHtml.includes('class="mission-preview-row"') && missionHtml.includes('photo-indicator'), 'mission list uses compact summary rows with a photo indicator');
   const ownerSettingsHtml = fs.readFileSync(path.join(root, 'owner-settings.html'), 'utf8');
   const staffManagementHtml = fs.readFileSync(path.join(root, 'staff-management.html'), 'utf8');
@@ -131,8 +143,13 @@ async function run() {
   check(attendanceHtml.indexOf('<th>근무시간</th>') < attendanceHtml.indexOf('<th>출근</th>') && attendanceHtml.includes('class="duration-cell"'), 'attendance table prioritizes work duration before clock-in and clock-out');
   check(attendanceHtml.includes('filterRow.hidden=true') && attendanceHtml.includes('session.employeeId'), 'staff attendance view hides the worker filter and selects the signed-in worker');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
+  const platformAdminHtml = fs.readFileSync(path.join(root, 'platform-admin.html'), 'utf8');
+  check(platformAdminHtml.includes('get_platform_dashboard') && platformAdminHtml.includes('update_platform_property') && platformAdminHtml.includes('reset_platform_property_admin_pin'), 'platform operator center lists tenants, controls status, and resets administrator PINs');
+  check(platformAdminHtml.includes('전체 숙소') && platformAdminHtml.includes('현재 근무 중') && platformAdminHtml.includes('최근 운영 기록'), 'platform operator center shows service and usage summaries');
   check(!ownerSettingsHtml.includes('id="propertyNotice"') && !ownerSettingsHtml.includes('saveNotice'), 'property settings omit the retired announcement field');
   check(ownerSettingsHtml.includes('class="report-tabs"') && ownerSettingsHtml.includes('data-report="clock_in"') && ownerSettingsHtml.includes('data-report="clock_out"'), 'report settings use side-by-side check-in and check-out tabs');
+  check(!ownerSettingsHtml.includes('class="employee-head"') && !ownerSettingsHtml.includes('class="report-enabled"'), 'report settings remove duplicate employee identity and reminder enable checkboxes');
+  check(workConfigHtml.includes('clock_in: reportFields') && workConfigHtml.includes('clock_out: reportFields'), 'check-in and check-out settings share the same report field choices');
   check(ownerSettingsHtml.includes('${label} 리마인더') && ownerSettingsHtml.includes('report_types') && ownerSettingsHtml.includes('report_weekdays'), 'each report tab manages its own reminder cards and weekdays');
   check(workConfigHtml.includes('report_types: ["clock_in"]') && workConfigHtml.includes('report_weekdays') && reportHtml.includes('.includes(reportType)'), 'reminder cards are filtered for the selected report type and its weekday schedule');
   new vm.Script(fs.readFileSync(path.join(root, 'work-config.js'), 'utf8'), { filename: 'work-config.js' });

@@ -54,10 +54,27 @@
     ]
   };
 
-  function normalizeReportConfig(config) {
+  function normalizeCustomFields(fields) {
+    const seen = new Set();
+    return (Array.isArray(fields) ? fields : []).slice(0, 20).map(field => ({
+      key: String(field?.key || "").trim().slice(0, 57),
+      label: String(field?.label || "").trim().slice(0, 40),
+      help: "내용을 입력해주세요.",
+      kind: "text",
+      custom: true
+    })).filter(field => /^custom_[a-z0-9_-]{1,50}$/.test(field.key) && field.label && !seen.has(field.key) && seen.add(field.key));
+  }
+
+  function fieldsFor(property) {
+    const custom = normalizeCustomFields(property?.custom_report_fields);
+    return property?.business_type === "lodging" ? [...reportFields, ...custom] : custom;
+  }
+
+  function normalizeReportConfig(config, property) {
     const result = {};
+    const customKeys = normalizeCustomFields(property?.custom_report_fields).map(field => field.key);
     for (const type of ["clock_in", "clock_out"]) {
-      const allowed = new Set([...fieldGroups[type].map(field => field.key), "reminder_cards"]);
+      const allowed = new Set([...fieldGroups[type].map(field => field.key), ...customKeys, "reminder_cards"]);
       result[type] = Array.isArray(config?.[type])
         ? [...new Set(config[type].filter(key => allowed.has(key)))]
         : [...defaults[type]];
@@ -104,6 +121,8 @@
 
   window.omgWorkConfig = {
     fieldGroups,
+    fieldsFor,
+    normalizeCustomFields,
     defaults,
     normalizeReportConfig,
     async loadLoginProperty() {
@@ -114,23 +133,27 @@
     },
     async load(accessToken) {
       const data = await rpc("get_work_app_config", { p_access_token: accessToken });
-      data.report_config = normalizeReportConfig(data.report_config);
+      data.property.business_type = ["lodging", "general", "other"].includes(data.property.business_type) ? data.property.business_type : null;
+      data.property.custom_report_fields = normalizeCustomFields(data.property.custom_report_fields);
+      data.report_config = normalizeReportConfig(data.report_config, data.property);
       data.property.room_types = normalizeRoomTypes(data.property.room_types, data.property.rooms);
       if (Array.isArray(data.employees)) {
         data.employees = data.employees.map(employee => ({
           ...employee,
-          report_config: normalizeReportConfig(employee.report_config)
+          report_config: normalizeReportConfig(employee.report_config, data.property)
         }));
       }
       return data;
     },
-    async save(accessToken, propertyName, roomTypes, employeeConfigs) {
-      const normalizedRoomTypes = normalizeRoomTypes(roomTypes);
+    async save(accessToken, propertyName, businessType, roomTypes, customFields, employeeConfigs) {
+      const normalizedRoomTypes = businessType === "lodging" ? normalizeRoomTypes(roomTypes) : [];
       return rpc("save_property_settings", {
         p_access_token: accessToken,
         p_property_name: propertyName,
         p_rooms: normalizedRoomTypes.flatMap(group => group.rooms),
         p_room_types: normalizedRoomTypes,
+        p_business_type: businessType || null,
+        p_custom_report_fields: normalizeCustomFields(customFields).map(({ key, label }) => ({ key, label })),
         p_employee_configs: employeeConfigs
       });
     },

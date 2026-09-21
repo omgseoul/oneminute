@@ -21,6 +21,9 @@ const accountAdminMigration = read('migrations/014_account_staff_admin_navigatio
 const accountPropertyMigration = read('migrations/015_account_property_tenancy.sql');
 const attendanceMigration = read('migrations/016_attendance_statistics.sql');
 const staffAttendanceMigration = read('migrations/017_staff_attendance_access.sql');
+const sharedReportFieldsMigration = read('migrations/018_shared_report_fields.sql');
+const platformOperatorMigration = read('migrations/019_platform_operator_center.sql');
+const businessTypesMigration = read('migrations/020_business_types_custom_report_fields.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -76,6 +79,7 @@ async function run() {
   await db.exec(accountPropertyMigration);
   await db.exec(attendanceMigration);
   await db.exec(staffAttendanceMigration);
+  await db.exec(sharedReportFieldsMigration);
 
   const employees = await rows('select id,display_name from public.employees order by display_name');
   const staff = employees.find(employee => employee.display_name === '문정국');
@@ -94,6 +98,26 @@ async function run() {
   check((await accountRpc(newUserId, 'new-owner@example.com', 'acknowledge_account_onboarding')).ok, 'welcome dialog can be acknowledged');
   check(!(await accountRpc(newUserId, 'new-owner@example.com', 'get_or_create_account_property')).onboarding_pending, 'welcome dialog is shown only until acknowledged');
 
+  await db.exec(platformOperatorMigration);
+  await db.exec(businessTypesMigration);
+  check(await accountRpc(existingUserId, 'oneminute01@naver.com', 'is_platform_administrator'), 'founder email receives platform operator access');
+  check(!(await accountRpc(newUserId, 'new-owner@example.com', 'is_platform_administrator')), 'tenant email does not receive platform operator access');
+  const platformDenied = await accountRpc(newUserId, 'new-owner@example.com', 'get_platform_dashboard');
+  check(!platformDenied.ok && platformDenied.code === 'platform_admin_required', 'tenant cannot open the platform dashboard');
+  let platformDashboard = await accountRpc(existingUserId, 'oneminute01@naver.com', 'get_platform_dashboard');
+  check(platformDashboard.ok && platformDashboard.properties.length === 2, 'platform dashboard lists every isolated property');
+  check(platformDashboard.summary.total === 2 && platformDashboard.summary.active === 1 && platformDashboard.summary.trial === 1, 'platform dashboard summarizes active and trial properties');
+  const tenantProperty = platformDashboard.properties.find(item => item.email === 'new-owner@example.com');
+  check(tenantProperty && tenantProperty.management_number === 2 && tenantProperty.employee_count === 0, 'platform dashboard shows tenant management number and usage');
+  check((await accountRpc(newUserId, 'new-owner@example.com', 'update_platform_property', [tenantProperty.property_id, 'suspended', 'blocked'])).code === 'platform_admin_required', 'tenant cannot change service status');
+  check((await accountRpc(existingUserId, 'oneminute01@naver.com', 'update_platform_property', [tenantProperty.property_id, 'suspended', '지원 확인 중'])).ok, 'platform operator suspends a property');
+  check((await accountRpc(newUserId, 'new-owner@example.com', 'start_account_admin_session', [newAdmins[0].owner_id, '1234'])).code === 'service_unavailable', 'suspended property cannot start a PIN session');
+  check((await accountRpc(existingUserId, 'oneminute01@naver.com', 'update_platform_property', [tenantProperty.property_id, 'active', '확인 완료'])).ok, 'platform operator reactivates a property');
+  check((await accountRpc(existingUserId, 'oneminute01@naver.com', 'reset_platform_property_admin_pin', [tenantProperty.property_id])).temporary_pin === '1234', 'platform operator resets the default administrator PIN without reading it');
+  check((await accountRpc(newUserId, 'new-owner@example.com', 'start_account_admin_session', [newAdmins[0].owner_id, '1234'])).ok, 'reset temporary administrator PIN logs in after reactivation');
+  platformDashboard = await accountRpc(existingUserId, 'oneminute01@naver.com', 'get_platform_dashboard');
+  check(platformDashboard.recent_actions.length === 3, 'platform changes are retained in an audit log');
+
   const publicProperty = await rpc('get_login_property', []);
   check(publicProperty.ok && publicProperty.property_name === 'One Minute', 'login title loads without a session');
 
@@ -108,6 +132,8 @@ async function run() {
   check(ownerConfig.property.room_types.length === 4, 'existing One Minute rooms are grouped by room type');
   check(ownerConfig.property.management_number === 1, 'current property receives management number 1');
   check(ownerConfig.property.notice === '', 'property announcement defaults to empty');
+  check(ownerConfig.property.business_type === null, 'business type defaults to no selection');
+  check(ownerConfig.property.custom_report_fields.length === 0, 'custom report fields default to empty');
   check(ownerConfig.administrators.length === 1 && ownerConfig.administrators[0].is_current, 'owner receives the current administrator account');
 
   const publicAdmins = await asAnon(() => rows('select * from public.list_login_admins($1,$2)', ['omg', 'seoul-station']));
@@ -126,11 +152,14 @@ async function run() {
     '테스트 숙소',
     ['101', '102', '103'],
     employeeConfigs,
-    [{ name: '싱글', rooms: ['101', '102'] }, { name: '더블', rooms: ['103'] }]
+    [{ name: '싱글', rooms: ['101', '102'] }, { name: '더블', rooms: ['103'] }],
+    'lodging',
+    [{ key: 'custom_lobby_note', label: '로비 상태' }]
   ]);
   check(saved.ok && saved.property.name === '테스트 숙소', 'owner changes property title');
   check(saved.property.rooms.join(',') === '101,102,103', 'room names are trimmed and deduplicated');
   check(saved.property.room_types[0].name === '싱글' && saved.property.room_types[1].rooms[0] === '103', 'room type names and room numbers are saved together');
+  check(saved.property.business_type === 'lodging' && saved.property.custom_report_fields[0].label === '로비 상태', 'business type and custom report fields are saved');
 
   const accountSaved = await rpc('save_employee_accounts', [ownerLogin.access_token, [
     ...ownerConfig.employees.map(employee => ({ employee_id: employee.employee_id, display_name: employee.display_name, pin: '' })),
@@ -158,10 +187,12 @@ async function run() {
   check(staffConfig.report_config.clock_out.join(',') === 'cleaned_rooms', 'staff receives only configured check-out fields');
   check(staffConfig.report_config.reminder_cards.length === 4, 'staff receives four default reminder cards');
   check(staffConfig.report_config.reminder_cards.every(card => card.weekdays.length === 7), 'reminder cards include weekday visibility');
-  check((await rpc('save_property_settings', [staffLogin.access_token, '해킹', ['999'], {}, [{ name: '객실', rooms: ['999'] }]])).code === 'owner_required', 'staff cannot change property settings');
+  check((await rpc('save_property_settings', [staffLogin.access_token, '해킹', ['999'], {}, [{ name: '객실', rooms: ['999'] }], 'lodging', []])).code === 'owner_required', 'staff cannot change property settings');
   check((await rpc('save_employee_accounts', [staffLogin.access_token, [{ display_name: '침입자', pin: '123456' }]])).code === 'owner_required', 'staff cannot create worker accounts');
-  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs, []])).code === 'invalid_room_types', 'empty room types are rejected');
-  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [], reminder_cards: [] } }, [{ name: '객실', rooms: ['101'] }]])).code === 'invalid_employee_config', 'unknown report fields are rejected');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs, [], 'lodging', []])).code === 'invalid_room_types', 'lodging requires room types');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', [], employeeConfigs, [], 'general', []])).ok, 'non-lodging properties do not require room types');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['unknown'], clock_out: [], reminder_cards: [] } }, [{ name: '객실', rooms: ['101'] }], 'lodging', []])).code === 'invalid_employee_config', 'unknown report fields are rejected');
+  check((await rpc('save_property_settings', [ownerLogin.access_token, '테스트 숙소', ['101'], { [staff.id]: { clock_in: ['custom_missing'], clock_out: [], reminder_cards: [] } }, [{ name: '객실', rooms: ['101'] }], 'lodging', []])).code === 'invalid_employee_config', 'unregistered custom report fields are rejected');
   ownerConfig = await rpc('save_property_notice', [ownerLogin.access_token, '오늘 3층 소방 점검이 있습니다.']);
   check(ownerConfig.property.notice.includes('소방 점검'), 'owner saves a property announcement');
   check((await rpc('save_property_notice', [staffLogin.access_token, '변조 공지'])).code === 'owner_required', 'staff cannot change property announcement');

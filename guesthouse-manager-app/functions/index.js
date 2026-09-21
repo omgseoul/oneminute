@@ -14,11 +14,11 @@ exports.sendUrgentAlert=onDocumentCreated({document:"alerts/{alertId}",region:"a
 
 exports.telegramUrgent=onRequest({region:"asia-northeast3",secrets:[telegramUrgentSecret]},async(req,res)=>{
  if(req.method!=="POST"){res.status(405).json({ok:false,message:"POST only"});return;}
- if(req.get("x-omg-secret")!==telegramUrgentSecret.value()){res.status(401).json({ok:false,message:"Unauthorized"});return;}
+ if(req.get("x-webhook-secret")!==telegramUrgentSecret.value()){res.status(401).json({ok:false,message:"Unauthorized"});return;}
  const body=req.body||{};
  const source=typeof body.message==="object"?body.message:{};
- const raw=String(body.text||body.message_text||source.text||"").trim();
- const propertyId=String(body.property_id||body.propertyId||"").trim();
+  const raw=String(body.text||body.message_text||(typeof body.message==="string"?body.message:source.text)||"").trim();
+  const propertyId=String(body.property_id||body.propertyId||"").trim();
  if(!raw.startsWith("!!")){res.status(200).json({ok:true,ignored:true});return;}
  if(!propertyId){res.status(400).json({ok:false,message:"property_id is required"});return;}
  const safeProperty=propertyId.replace(/[^A-Za-z0-9_.~-]/g,"_");

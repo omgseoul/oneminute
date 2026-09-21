@@ -24,6 +24,7 @@ const staffAttendanceMigration = read('migrations/017_staff_attendance_access.sq
 const sharedReportFieldsMigration = read('migrations/018_shared_report_fields.sql');
 const platformOperatorMigration = read('migrations/019_platform_operator_center.sql');
 const businessTypesMigration = read('migrations/020_business_types_custom_report_fields.sql');
+const attendanceAdjustmentMigration = read('migrations/021_attendance_adjustment_approval.sql');
 const pins = ['731482', '628951', '849263', '953728']; // Synthetic local-only PINs.
 const ownerPin = '517394';
 const pinSetup = read('setup/002_register_employee_pins.example.sql')
@@ -100,6 +101,7 @@ async function run() {
 
   await db.exec(platformOperatorMigration);
   await db.exec(businessTypesMigration);
+  await db.exec(attendanceAdjustmentMigration);
   check(await accountRpc(existingUserId, 'oneminute01@naver.com', 'is_platform_administrator'), 'founder email receives platform operator access');
   check(!(await accountRpc(newUserId, 'new-owner@example.com', 'is_platform_administrator')), 'tenant email does not receive platform operator access');
   const platformDenied = await accountRpc(newUserId, 'new-owner@example.com', 'get_platform_dashboard');
@@ -245,8 +247,14 @@ async function run() {
   check(originalReport.report_id === editedReport.report_id && editedReport.payload.memo === '수정 보고' && !editedReport.make_accepted, 'completed report can be edited and queued for delivery again');
   const attendanceDate = (await one('select work_date from public.work_sessions where id=$1', [staffLogin.session_id])).work_date;
   await db.query("update public.work_sessions set clock_out_at=clock_in_at+interval '7 hours 35 minutes',status='completed' where id=$1", [staffLogin.session_id]);
+  const adjustment = await rpc('request_attendance_adjustment', [staffLogin.access_token, staffLogin.session_id, '09:00', '17:00']);
+  check(adjustment.ok && adjustment.status === 'pending', 'staff submits an attendance adjustment for owner approval');
+  inbox = await rpc('list_urgent_messages', [ownerLogin.access_token]);
+  const approvalMessage = inbox.messages.find(item => item.attendance_request_id === adjustment.request_id);
+  check(approvalMessage?.message_type === 'attendance_approval' && approvalMessage.approval_status === 'pending', 'attendance adjustment appears in the owner inbox as an approval');
+  check((await rpc('approve_attendance_adjustment', [ownerLogin.access_token, adjustment.request_id])).status === 'approved', 'owner approves the attendance adjustment');
   const attendance = await rpc('list_attendance_statistics', [ownerLogin.access_token, attendanceDate, attendanceDate]);
-  check(attendance.ok && attendance.sessions.some(item => item.employee_id === staff.id && item.duration_minutes === 455), 'owner attendance statistics calculate completed hours and minutes');
+  check(attendance.ok && attendance.sessions.some(item => item.employee_id === staff.id && item.duration_minutes === 480 && item.adjustment_status === 'approved'), 'approved attendance times replace the recorded duration');
   const staffAttendance = await rpc('list_attendance_statistics', [staffLogin.access_token, attendanceDate, attendanceDate]);
   check(staffAttendance.ok && staffAttendance.scope === 'self' && staffAttendance.sessions.every(item => item.employee_id === staff.id), 'staff attendance statistics return only the logged-in worker');
 

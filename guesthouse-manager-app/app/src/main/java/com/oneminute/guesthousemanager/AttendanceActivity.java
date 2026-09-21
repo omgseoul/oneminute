@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.ValueCallback;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -12,6 +13,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 public class AttendanceActivity extends AppCompatActivity {
     private static final String APP_URL = "https://omgworks24.com/app.html";
@@ -33,6 +35,7 @@ public class AttendanceActivity extends AppCompatActivity {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         WebView.setWebContentsDebuggingEnabled(false);
+        webView.addJavascriptInterface(new PushBridge(), "OMGNative");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -64,6 +67,22 @@ public class AttendanceActivity extends AppCompatActivity {
             // app.html validates the persisted work session and only returns to login
             // after an explicit logout or a successful checkout report.
             webView.loadUrl(APP_URL);
+        }
+    }
+
+    private final class PushBridge {
+        @JavascriptInterface
+        public void registerPush(String propertyId, String role) {
+            if (propertyId == null || role == null) return;
+            String safeProperty = propertyId.replaceAll("[^A-Za-z0-9_.~-]", "_");
+            String safeRole = "owner".equals(role) ? "owner" : "staff";
+            String topic = "property_" + safeProperty + "_" + safeRole;
+            String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
+                    .getString("topic", "");
+            if (topic.equals(previous)) return;
+            if (!previous.isEmpty()) FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
+            FirebaseMessaging.getInstance().subscribeToTopic(topic).addOnSuccessListener(unused ->
+                    getSharedPreferences("omg_push", MODE_PRIVATE).edit().putString("topic", topic).apply());
         }
     }
 

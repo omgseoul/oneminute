@@ -37,6 +37,9 @@
   document.getElementById("owner-inbox").style.display = isOwner ? "" : "none";
   document.getElementById("emergency").style.display = isOwner ? "none" : "";
   document.getElementById("missionCopy").textContent = isOwner ? "미션 등록·진행 확인" : "오늘의 업무와 전달사항 확인";
+  if (window.OMGNative?.registerPush && session.propertyId) {
+    window.OMGNative.registerPush(session.propertyId, isOwner ? "owner" : "staff");
+  }
 const[{data},{data:isPlatformAdmin}]=await Promise.all([window.omgSupabase.rpc("list_missions",{p_access_token:session.accessToken}),isOwner?window.omgSupabase.rpc("is_platform_administrator"):Promise.resolve({data:false})]);if(data?.ok){const todayCount=(data.missions||[]).filter(item=>item.timing==="today"&&(isOwner?(Number(item.target_count)||0)>(Number(item.completed_count)||0):(!item.target_employee_ids?.length||item.target_employee_ids.includes(session.employeeId))&&!(item.completion_employee_ids||[]).includes(session.employeeId))).length;document.getElementById("todayMissionCount").textContent=String(todayCount);}document.getElementById("platformAdmin").style.display=isOwner&&isPlatformAdmin?"flex":"none";document.getElementById("mainMenu").inert=false;document.getElementById("appShell").classList.add("ready");window.omgTransition.ready();
 })().catch(error => { document.getElementById("workerStatus").textContent = error.message;document.getElementById("appShell").classList.add("ready");window.omgTransition.ready(); });
 async function logoutWorkApp(){await window.omgSession.logout();location.replace("login.html");}

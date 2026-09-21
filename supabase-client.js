@@ -62,6 +62,7 @@
         role: data.role,
         sessionKind: data.session_kind || "staff",
         shift: data.shift,
+        propertyId: data.property_id,
         propertyName: data.property_name || "One Minute",
         reportConfig: data.report_config || null,
         clockInAt: data.clock_in_at,

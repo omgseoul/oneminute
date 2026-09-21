@@ -110,6 +110,7 @@ async function run() {
   check(appHtml.includes('id="staffWorkStatus"') && appHtml.includes('<b>근무현황</b>') && appHtml.includes('staffWorkStatus").style.display = isOwner ? "none" : "flex"'), 'staff main menu includes a half-width self attendance card');
   check(appHtml.includes('id="platformAdmin"') && appHtml.includes('href="platform-admin.html"') && appHtml.includes('is_platform_administrator'), 'founder owner menu reveals the separate platform operator center');
   check(appHtml.indexOf('id="attendanceManagement"') < appHtml.indexOf('id="platformAdmin"') && !appHtml.includes('.attendance-card{grid-column:1/-1'), 'work-time management and operator center share one half-width row');
+  check(appHtml.includes('<b>OMG WORKS</b>') && !appHtml.includes('OMG WORKS<br>운영자 센터'), 'operator center uses the compact OMG WORKS title');
   check(appHtml.includes('page-transition.css') && appHtml.includes('window.omgTransition.ready()'), 'dashboard waits for complete data before revealing the branded transition');
   check(appHtml.includes('isOwner?(Number(item.target_count)') && appHtml.includes('todayMissionCount'), 'owner mission menu receives the today counter');
   const reportHtml = fs.readFileSync(path.join(root, 'report.html'), 'utf8');
@@ -143,6 +144,10 @@ async function run() {
   check(attendanceHtml.indexOf('<th>근무시간</th>') < attendanceHtml.indexOf('<th>출근</th>') && attendanceHtml.includes('class="duration-cell"'), 'attendance table prioritizes work duration before clock-in and clock-out');
   check(attendanceHtml.includes('filterRow.hidden=true') && attendanceHtml.includes('session.employeeId'), 'staff attendance view hides the worker filter and selects the signed-in worker');
   check(ownerSettingsHtml.includes('id="managementNumber"') && ownerSettingsHtml.includes('readonly'), 'property settings show an operator-only management number');
+  check(ownerSettingsHtml.includes('<h2>Property 기본정보</h2>') && !ownerSettingsHtml.includes('숙소명은 로그인과 메인화면'), 'property settings use the requested heading without the retired explanation');
+  check(['value="lodging"','value="general"','value="other"'].every(token => ownerSettingsHtml.includes(token)) && ownerSettingsHtml.includes('id="lodgingFields" hidden'), 'property type choices control the lodging-only room editor');
+  check(ownerSettingsHtml.includes('id="customFieldName"') && ownerSettingsHtml.includes('addCustomField') && ownerSettingsHtml.includes('custom-delete'), 'owners can add and delete custom report fields');
+  check(workConfigHtml.includes('fieldsFor(property)') && reportHtml.includes('fieldsFor(pageConfig.property)') && reportHtml.includes('field.kind==="text"'), 'custom fields flow into the staff report form as text inputs');
   const platformAdminHtml = fs.readFileSync(path.join(root, 'platform-admin.html'), 'utf8');
   check(platformAdminHtml.includes('get_platform_dashboard') && platformAdminHtml.includes('update_platform_property') && platformAdminHtml.includes('reset_platform_property_admin_pin'), 'platform operator center lists tenants, controls status, and resets administrator PINs');
   check(platformAdminHtml.includes('전체 숙소') && platformAdminHtml.includes('현재 근무 중') && platformAdminHtml.includes('최근 운영 기록'), 'platform operator center shows service and usage summaries');

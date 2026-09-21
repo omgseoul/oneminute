@@ -1,6 +1,36 @@
 package com.oneminute.guesthousemanager;
-import android.content.Intent; import com.google.firebase.messaging.*; import com.google.firebase.auth.FirebaseAuth; import com.google.firebase.firestore.FirebaseFirestore; import java.util.*;
+
+import android.content.Intent;
+import androidx.core.content.ContextCompat;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingService;
+import com.google.firebase.messaging.RemoteMessage;
+
 public class GuesthouseMessagingService extends FirebaseMessagingService {
- @Override public void onNewToken(String token){String uid=FirebaseAuth.getInstance().getUid();if(uid!=null)FirebaseFirestore.getInstance().collection("deviceTokens").document(uid).update("token",token);}
- @Override public void onMessageReceived(RemoteMessage m){String mode=m.getData().get("mode");if("stop".equals(mode)){stopService(new Intent(this,EmergencyAlarmService.class));return;}Intent i=new Intent(this,EmergencyAlarmService.class);i.putExtra("alertId",m.getData().get("alertId"));i.putExtra("message",m.getData().get("message"));i.putExtra("mode",mode==null?"urgent":mode);startForegroundService(i);}
+    @Override
+    public void onNewToken(String token) {
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid != null) FirebaseFirestore.getInstance().collection("deviceTokens")
+                .document(uid).update("token", token);
+
+        String topic = getSharedPreferences("omg_push", MODE_PRIVATE).getString("topic", "");
+        if (!topic.isEmpty()) FirebaseMessaging.getInstance().subscribeToTopic(topic);
+    }
+
+    @Override
+    public void onMessageReceived(RemoteMessage message) {
+        String mode = message.getData().get("mode");
+        Intent service = new Intent(this, EmergencyAlarmService.class);
+        if ("stop".equals(mode)) {
+            service.setAction(EmergencyAlarmService.ACTION_STOP);
+        } else {
+            service.setAction(EmergencyAlarmService.ACTION_START);
+            service.putExtra("alertId", message.getData().get("alertId"));
+            service.putExtra("message", message.getData().get("message"));
+            service.putExtra("mode", mode == null ? "urgent" : mode);
+        }
+        ContextCompat.startForegroundService(this, service);
+    }
 }

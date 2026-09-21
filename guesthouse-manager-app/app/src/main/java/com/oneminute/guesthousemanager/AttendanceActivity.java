@@ -74,15 +74,22 @@ public class AttendanceActivity extends AppCompatActivity {
         @JavascriptInterface
         public void registerPush(String propertyId, String role) {
             if (propertyId == null || role == null) return;
-            String safeProperty = propertyId.replaceAll("[^A-Za-z0-9_.~-]", "_");
+            String safeProperty = propertyId.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
+            if (safeProperty.isEmpty()) return;
             String safeRole = "owner".equals(role) ? "owner" : "staff";
             String topic = "property_" + safeProperty + "_" + safeRole;
             String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
                     .getString("topic", "");
-            if (topic.equals(previous)) return;
-            if (!previous.isEmpty()) FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
+            if (!previous.isEmpty() && !topic.equals(previous))
+                FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
+            // Always subscribe again. A restored preference can outlive the FCM
+            // token/app installation and otherwise leaves a fresh APK silent.
             FirebaseMessaging.getInstance().subscribeToTopic(topic).addOnSuccessListener(unused ->
-                    getSharedPreferences("omg_push", MODE_PRIVATE).edit().putString("topic", topic).apply());
+                    getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                            .putString("topic", topic)
+                            .putString("property_id", safeProperty)
+                            .putString("role", safeRole)
+                            .apply());
         }
     }
 

@@ -1,10 +1,14 @@
 package com.oneminute.guesthousemanager;
 
 import android.Manifest;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -18,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 10;
+    private static final int FULL_SCREEN_PERMISSION_REQUEST = 11;
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private LinearLayout root;
@@ -25,13 +31,51 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        if (android.os.Build.VERSION.SDK_INT >= 33 && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 10);
+        if (Build.VERSION.SDK_INT >= 33 && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        continueStartup();
+    }
+
+    private void continueStartup() {
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            boolean alreadyPrompted = getSharedPreferences("urgent_permissions", MODE_PRIVATE)
+                    .getBoolean("full_screen_prompted", false);
+            if (manager != null && !manager.canUseFullScreenIntent() && !alreadyPrompted) {
+                getSharedPreferences("urgent_permissions", MODE_PRIVATE).edit()
+                        .putBoolean("full_screen_prompted", true).apply();
+                Intent settings = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                        Uri.parse("package:" + getPackageName()));
+                try {
+                    startActivityForResult(settings, FULL_SCREEN_PERMISSION_REQUEST);
+                    return;
+                } catch (Exception ignored) {
+                    // Some vendor Android builds omit this settings screen.
+                }
+            }
+        }
         // Firebase is used only for native push notifications. A fresh install must
         // never block the Supabase employee/owner login behind the old Firebase
         // device account screen.
         if (auth.getCurrentUser() == null) openWebApp();
         else loadUser();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) continueStartup();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FULL_SCREEN_PERMISSION_REQUEST) {
+            if (auth.getCurrentUser() == null) openWebApp();
+            else loadUser();
+        }
     }
 
     private void base() {

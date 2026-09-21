@@ -6,4 +6,15 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">#F4F7FC</item>
     </style>
+
+    <style name="UrgentAlertTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowDimAmount">0.78</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#D9363E</item>
+    </style>
 </resources>

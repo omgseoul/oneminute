@@ -5,6 +5,14 @@ alter table public.properties
   add column if not exists business_type text,
   add column if not exists custom_report_fields jsonb not null default '[]'::jsonb;
 
+-- Commit the table shape before compiling functions that access the new
+-- columns through properties%rowtype. On hosted Postgres, compiling those
+-- functions in the same transaction can still see the pre-ALTER row type and
+-- roll the whole migration back with `column custom_report_fields does not
+-- exist`.
+commit;
+begin;
+
 do $$
 begin
   if not exists (

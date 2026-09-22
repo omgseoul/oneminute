@@ -98,11 +98,17 @@ public class EmergencyAlarmService extends Service {
 
         // Full-screen intent wakes the lock screen. Direct launch also displays the
         // same dog countdown immediately while the employee is already in the app.
-        try {
-            startActivity(screen);
-        } catch (Exception ignored) {
-            // The full-screen notification remains as fallback.
-        }
+        Runnable showScreen = () -> {
+            try {
+                startActivity(screen);
+            } catch (Exception ignored) {
+                // The full-screen notification remains as fallback.
+            }
+        };
+        handler.post(showScreen);
+        // Some Android builds only allow the activity launch after the foreground
+        // service has become visible. Retry once without changing the deadline.
+        handler.postDelayed(showScreen, 350L);
 
         if ("urgent".equals(mode)) {
             startPersistentAlarm = () -> {

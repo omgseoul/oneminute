@@ -108,8 +108,24 @@ public class AttendanceActivity extends AppCompatActivity {
         if (state == null || webView.restoreState(state) == null) {
             // app.html validates the persisted work session and only returns to login
             // after an explicit logout or a successful checkout report.
-            webView.loadUrl(APP_URL);
+            webView.loadUrl(appUrlFromIntent(getIntent()));
         }
+    }
+
+    private String appUrlFromIntent(Intent intent) {
+        Uri data = intent == null ? null : intent.getData();
+        if (data == null || !"https".equals(data.getScheme())) return APP_URL;
+        String host = data.getHost();
+        if ("omgworks24.com".equals(host) || "www.omgworks24.com".equals(host))
+            return data.toString();
+        return APP_URL;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (webView != null) webView.loadUrl(appUrlFromIntent(intent));
     }
 
     private final class PushBridge {

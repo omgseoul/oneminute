@@ -22,6 +22,48 @@ public class AttendanceActivity extends AppCompatActivity {
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
 
+    private String safeTopicPart(String value) {
+        return value == null ? "" : value.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
+    }
+
+    private void subscribeTopic(String preferenceKey, String topic) {
+        if (topic == null || topic.isEmpty()) return;
+        String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString(preferenceKey, "");
+        getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                .putString(preferenceKey, topic).apply();
+        if (!previous.isEmpty() && !topic.equals(previous))
+            FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
+        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token ->
+                FirebaseMessaging.getInstance().subscribeToTopic(topic)
+                        .addOnFailureListener(error -> runOnUiThread(() ->
+                                Toast.makeText(AttendanceActivity.this,
+                                        "긴급 알림 연결에 실패했습니다. 앱을 다시 열어주세요.",
+                                        Toast.LENGTH_LONG).show())));
+    }
+
+    private void subscribeToUrgentTopic(String propertyId, String role) {
+        String safeProperty = safeTopicPart(propertyId);
+        if (safeProperty.isEmpty()) return;
+        String safeRole = "owner".equals(role) ? "owner" : "staff";
+        getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                .putString("property_id", safeProperty)
+                .putString("role", safeRole).apply();
+        // Keep the original property-wide topic for Telegram !! alerts.
+        subscribeTopic("base_topic", "property_" + safeProperty + "_staff");
+    }
+
+    private void subscribeToMemberTopic(String propertyId, String role, String memberId) {
+        String safeProperty = safeTopicPart(propertyId);
+        String safeMember = safeTopicPart(memberId);
+        if (safeProperty.isEmpty() || safeMember.isEmpty()) return;
+        String safeRole = "owner".equals(role) ? "owner" : "employee";
+        getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                .putString("member_id", safeMember).apply();
+        subscribeTopic("member_topic",
+                "property_" + safeProperty + "_" + safeRole + "_" + safeMember);
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -73,24 +115,27 @@ public class AttendanceActivity extends AppCompatActivity {
     private final class PushBridge {
         @JavascriptInterface
         public void registerPush(String propertyId, String role) {
-            if (propertyId == null || role == null) return;
-            String safeProperty = propertyId.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
-            if (safeProperty.isEmpty()) return;
-            String safeRole = "owner".equals(role) ? "owner" : "staff";
-            String topic = "property_" + safeProperty + "_" + safeRole;
-            String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
-                    .getString("topic", "");
-            if (!previous.isEmpty() && !topic.equals(previous))
-                FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
-            // Always subscribe again. A restored preference can outlive the FCM
-            // token/app installation and otherwise leaves a fresh APK silent.
-            FirebaseMessaging.getInstance().subscribeToTopic(topic).addOnSuccessListener(unused ->
-                    getSharedPreferences("omg_push", MODE_PRIVATE).edit()
-                            .putString("topic", topic)
-                            .putString("property_id", safeProperty)
-                            .putString("role", safeRole)
-                            .apply());
+            subscribeToUrgentTopic(propertyId, role);
         }
+
+        @JavascriptInterface
+        public void registerMemberPush(String propertyId, String role, String memberId) {
+            subscribeToMemberTopic(propertyId, role, memberId);
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        String propertyId = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("property_id", "");
+        String role = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("role", "staff");
+        String memberId = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("member_id", "");
+        if (!propertyId.isEmpty()) subscribeToUrgentTopic(propertyId, role);
+        if (!propertyId.isEmpty() && !memberId.isEmpty())
+            subscribeToMemberTopic(propertyId, role, memberId);
     }
 
     @Override

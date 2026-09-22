@@ -41,6 +41,7 @@ public class EmergencyAlarmService extends Service {
     private String alertId;
     private String message;
     private String mode;
+    private String senderLabel;
     private long deadlineEpochMs;
 
     @Override
@@ -52,7 +53,7 @@ public class EmergencyAlarmService extends Service {
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, "사장님 긴급 메시지", NotificationManager.IMPORTANCE_HIGH);
+                CHANNEL_ID, "긴급 메세지", NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("잠금화면을 깨우고 확인할 때까지 표시되는 긴급 알림");
         channel.enableVibration(false);
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
@@ -79,6 +80,8 @@ public class EmergencyAlarmService extends Service {
         alertId = intent.getStringExtra("alertId");
         message = intent.getStringExtra("message");
         mode = intent.getStringExtra("mode");
+        senderLabel = intent.getStringExtra("senderLabel");
+        if (senderLabel == null || senderLabel.trim().isEmpty()) senderLabel = "사장님";
         if (message == null || message.trim().isEmpty()) message = "사장님이 보낸 메시지입니다.";
         if (!"test".equals(mode)) mode = "urgent";
         deadlineEpochMs = System.currentTimeMillis() + COUNTDOWN_MS;
@@ -121,6 +124,7 @@ public class EmergencyAlarmService extends Service {
                 .putExtra("alertId", alertId)
                 .putExtra("message", message)
                 .putExtra("mode", mode)
+                .putExtra("senderLabel", senderLabel)
                 .putExtra("deadlineEpochMs", deadlineEpochMs);
     }
 
@@ -135,12 +139,18 @@ public class EmergencyAlarmService extends Service {
         return ((alertId == null ? "urgent" : alertId) + suffix).hashCode();
     }
 
+    private String senderIntro() {
+        return "사장님".equals(senderLabel)
+                ? "사장님이 보낸 메세지입니다"
+                : senderLabel + "님이 보낸 메세지입니다";
+    }
+
     private Notification buildNotification(PendingIntent fullScreen,
                                            PendingIntent acknowledge,
                                            boolean ringing) {
         boolean test = "test".equals(mode);
         String title = test ? "긴급알림 테스트" :
-                (ringing ? "미확인 긴급 메시지" : "사장님이 보낸 메시지입니다");
+                (ringing ? "미확인 긴급 메세지" : senderIntro());
         String content = ringing ? "확인할 때까지 긴급 알람이 계속 울립니다." : message;
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
@@ -195,7 +205,7 @@ public class EmergencyAlarmService extends Service {
                     .build());
             Bundle parameters = new Bundle();
             parameters.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f);
-            speech.speak("사장님 메세지입니다.", TextToSpeech.QUEUE_FLUSH,
+            speech.speak(senderIntro() + ".", TextToSpeech.QUEUE_FLUSH,
                     parameters, "owner_message_intro");
         });
     }

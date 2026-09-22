@@ -41,6 +41,7 @@ async function loadMissionSummary(session,isOwner){let data=null;if(isOwner){con
   propertyTitle.removeAttribute("aria-busy");
   document.title = `${config.property.name} · 게하관리`;
   document.getElementById("reportMenu").style.display = isOwner ? "none" : "";
+  document.getElementById("ownerSettingsMenu").style.display = isOwner ? "grid" : "none";
   document.getElementById("settings").style.display = isOwner ? "flex" : "none";document.getElementById("accountManagement").style.display = isOwner ? "flex" : "none";document.getElementById("attendanceManagement").style.display = isOwner ? "flex" : "none";document.getElementById("staffWorkStatus").style.display = isOwner ? "none" : "flex";
   document.getElementById("emergency").style.display = isOwner ? "none" : "";
   document.getElementById("missionCopy").textContent = isOwner ? "미션 등록·진행 확인" : "오늘의 업무와 전달사항 확인";

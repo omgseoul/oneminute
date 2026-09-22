@@ -43,10 +43,10 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= 34) {
             NotificationManager manager = getSystemService(NotificationManager.class);
             boolean alreadyPrompted = getSharedPreferences("urgent_permissions", MODE_PRIVATE)
-                    .getBoolean("full_screen_prompted_v2", false);
+                    .getBoolean("full_screen_prompted_v3", false);
             if (manager != null && !manager.canUseFullScreenIntent() && !alreadyPrompted) {
                 getSharedPreferences("urgent_permissions", MODE_PRIVATE).edit()
-                        .putBoolean("full_screen_prompted_v2", true).apply();
+                        .putBoolean("full_screen_prompted_v3", true).apply();
                 Intent settings = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                         Uri.parse("package:" + getPackageName()));
                 try {

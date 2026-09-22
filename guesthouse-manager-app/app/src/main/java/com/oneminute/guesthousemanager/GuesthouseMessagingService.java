@@ -10,6 +10,8 @@ import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import androidx.core.app.NotificationCompat;
@@ -21,7 +23,7 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
-    private static final String MESSAGE_CHANNEL_ID = "property_messages_v1";
+    private static final String MESSAGE_CHANNEL_ID = "property_messages_popup_v2";
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
@@ -72,7 +74,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build());
-            channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             manager.createNotificationChannel(channel);
         }
 
@@ -84,27 +86,47 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         if (body == null || body.trim().isEmpty()) body = "메세지 메뉴에서 확인해주세요.";
 
+        int requestCode = (alertId == null ? body : alertId).hashCode();
+        Intent screen = new Intent(this, MessageAlertActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra("alertId", alertId)
+                .putExtra("senderLabel", sender)
+                .putExtra("message", body)
+                .putExtra("notificationId", requestCode);
+        PendingIntent fullScreen = PendingIntent.getActivity(this, requestCode, screen,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse("https://omgworks24.com/messages.html"))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        int requestCode = (alertId == null ? body : alertId).hashCode();
         PendingIntent content = PendingIntent.getActivity(this, requestCode, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_email)
                 .setColor(Color.rgb(36, 103, 189))
-                .setContentTitle("🐕 새 메세지가 도착했습니다")
+                .setContentTitle("새 메세지 도착")
                 .setContentText(sender + " · " + body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setSound(sound)
                 .setVibrate(new long[]{0, 220, 100, 260})
                 .setAutoCancel(true)
+                .setFullScreenIntent(fullScreen, true)
                 .setContentIntent(content)
                 .build();
         manager.notify(requestCode, notification);
+
+        // A full-screen notification wakes the lock screen. Direct launches also
+        // guarantee the same dog popup while the phone is already unlocked.
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable showScreen = () -> {
+            try { startActivity(screen); } catch (Exception ignored) {}
+        };
+        handler.post(showScreen);
+        handler.postDelayed(showScreen, 350L);
 
         Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         if (vibrator != null && vibrator.hasVibrator() && Build.VERSION.SDK_INT >= 26)

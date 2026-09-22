@@ -41,20 +41,21 @@ exports.appUrgent=onRequest({region:"asia-northeast3"},async(req,res)=>{
  if(req.method!=="POST"){res.status(405).json({ok:false,message:"POST only"});return;}
  const accessToken=String(req.body?.access_token||"").trim();
  const messageId=String(req.body?.message_id||"").trim();
- if(!/^[0-9a-f-]{36}$/i.test(accessToken)||!/^[0-9a-f-]{36}$/i.test(messageId)){
-  res.status(400).json({ok:false,message:"잘못된 긴급 메세지 요청입니다."});return;
+  if(!/^[0-9a-f-]{36}$/i.test(accessToken)||!/^[0-9a-f-]{36}$/i.test(messageId)){
+   res.status(400).json({ok:false,message:"잘못된 메세지 알림 요청입니다."});return;
  }
  try{
   const rpcResponse=await fetch(SUPABASE_RPC_URL,{method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({p_access_token:accessToken,p_message_id:messageId})});
   const dispatch=await rpcResponse.json().catch(()=>null);
-  if(!rpcResponse.ok||!dispatch?.ok){res.status(rpcResponse.status||400).json({ok:false,message:dispatch?.message||"긴급 메세지를 확인하지 못했습니다."});return;}
+  if(!rpcResponse.ok||!dispatch?.ok){res.status(rpcResponse.status||400).json({ok:false,message:dispatch?.message||"메세지를 확인하지 못했습니다."});return;}
   if(dispatch.ignored){res.status(200).json({ok:true,ignored:true});return;}
   const property=safeTopicPart(dispatch.management_number);
   const topics=[];
   for(const employeeId of dispatch.recipient_employee_ids||[])topics.push(`property_${property}_employee_${safeTopicPart(employeeId)}`);
   for(const ownerId of dispatch.recipient_owner_ids||[])topics.push(`property_${property}_owner_${safeTopicPart(ownerId)}`);
   const uniqueTopics=[...new Set(topics)];
-  await Promise.all(uniqueTopics.map(topic=>getMessaging().send({topic,data:{alertId:String(dispatch.message_id),message:String(dispatch.message||"긴급 메세지"),mode:"urgent",senderLabel:String(dispatch.sender_label||"사장님")},android:{priority:"high"}})));
-  res.status(200).json({ok:true,sent:uniqueTopics.length});
- }catch(error){console.error("appUrgent failed",error);res.status(500).json({ok:false,message:"긴급 알림 전송 중 오류가 발생했습니다."});}
-});
+  const mode=dispatch.priority==="urgent"?"urgent":"message";
+  await Promise.all(uniqueTopics.map(topic=>getMessaging().send({topic,data:{alertId:String(dispatch.message_id),message:String(dispatch.message||"메세지"),mode,senderLabel:String(dispatch.sender_label||"사장님")},android:{priority:"high"}})));
+  res.status(200).json({ok:true,sent:uniqueTopics.length,mode});
+ }catch(error){console.error("appUrgent failed",error);res.status(500).json({ok:false,message:"메세지 알림 전송 중 오류가 발생했습니다."});}
+ });

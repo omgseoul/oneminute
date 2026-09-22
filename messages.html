@@ -8,6 +8,7 @@
 const PUSH_URL="https://asia-northeast3-guesthouse-manager-ajh.cloudfunctions.net/appUrgent";
 let session=null,current=null,timer=null,priority="normal",lastData=null,activeMailbox="inbox",recipientItems=[];const selected=new Set(),requestedRecipientId=new URLSearchParams(location.search).get("recipient_employee_id");
 const list=document.getElementById("list"),errorNode=document.getElementById("error"),composer=document.getElementById("composer"),notice=document.getElementById("notice"),messageText=document.getElementById("messageText");
+document.addEventListener("click",event=>{const root=document.getElementById("recipients"),panel=root?.querySelector("#recipientPanel"),trigger=root?.querySelector("#recipientTrigger");if(!root||!panel||panel.hidden||root.contains(event.target))return;panel.hidden=true;trigger?.setAttribute("aria-expanded","false");const arrow=trigger?.querySelector("b");if(arrow)arrow.textContent="⌄";});
 composer.classList.add("compose-mode");composer.insertAdjacentHTML("afterbegin",'<div class="compose-head"><span class="compose-kicker">NEW MESSAGE</span><p>받는 사람을 선택하고 내용을 작성해주세요.</p></div>');
 function esc(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);}
 function clean(value){return String(value??"").replace(/\\n/g,"\n").trim();}

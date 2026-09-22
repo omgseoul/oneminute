@@ -24,6 +24,7 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 10;
     private static final int FULL_SCREEN_PERMISSION_REQUEST = 11;
+    private static final int OVERLAY_PERMISSION_REQUEST = 12;
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private LinearLayout root;
@@ -42,10 +43,10 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= 34) {
             NotificationManager manager = getSystemService(NotificationManager.class);
             boolean alreadyPrompted = getSharedPreferences("urgent_permissions", MODE_PRIVATE)
-                    .getBoolean("full_screen_prompted", false);
+                    .getBoolean("full_screen_prompted_v2", false);
             if (manager != null && !manager.canUseFullScreenIntent() && !alreadyPrompted) {
                 getSharedPreferences("urgent_permissions", MODE_PRIVATE).edit()
-                        .putBoolean("full_screen_prompted", true).apply();
+                        .putBoolean("full_screen_prompted_v2", true).apply();
                 Intent settings = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                         Uri.parse("package:" + getPackageName()));
                 try {
@@ -54,6 +55,20 @@ public class MainActivity extends AppCompatActivity {
                 } catch (Exception ignored) {
                     // Some vendor Android builds omit this settings screen.
                 }
+            }
+        }
+        boolean overlayPrompted = getSharedPreferences("urgent_permissions", MODE_PRIVATE)
+                .getBoolean("overlay_prompted_v1", false);
+        if (!Settings.canDrawOverlays(this) && !overlayPrompted) {
+            getSharedPreferences("urgent_permissions", MODE_PRIVATE).edit()
+                    .putBoolean("overlay_prompted_v1", true).apply();
+            Intent settings = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            try {
+                startActivityForResult(settings, OVERLAY_PERMISSION_REQUEST);
+                return;
+            } catch (Exception ignored) {
+                // Some vendor Android builds omit this settings screen.
             }
         }
         // Firebase is used only for native push notifications. A fresh install must
@@ -72,10 +87,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == FULL_SCREEN_PERMISSION_REQUEST) {
-            if (auth.getCurrentUser() == null) openWebApp();
-            else loadUser();
-        }
+        if (requestCode == FULL_SCREEN_PERMISSION_REQUEST
+                || requestCode == OVERLAY_PERMISSION_REQUEST) continueStartup();
     }
 
     private void base() {

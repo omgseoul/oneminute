@@ -22,6 +22,7 @@ import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
     private static final String MESSAGE_CHANNEL_ID = "property_messages_v1";
+    private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
         String uid = FirebaseAuth.getInstance().getUid();
@@ -39,7 +40,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(RemoteMessage message) {
         String mode = message.getData().get("mode");
-        if ("message".equals(mode)) {
+        String body = message.getData().get("message");
+        if ("message".equals(mode) || (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX))) {
             showMessageNotification(message);
             return;
         }
@@ -77,6 +79,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         String alertId = remote.getData().get("alertId");
         String sender = remote.getData().get("senderLabel");
         String body = remote.getData().get("message");
+        if (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX))
+            body = body.substring(NORMAL_MESSAGE_PREFIX.length());
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         if (body == null || body.trim().isEmpty()) body = "메세지 메뉴에서 확인해주세요.";
 

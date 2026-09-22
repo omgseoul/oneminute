@@ -1,0 +1,22 @@
+(function(){
+  const LABELS={work_status:"근무상태",attendance_records:"근무기록",missions:"미션"};
+  let styleReady=false;
+  function addStyle(){if(styleReady)return;styleReady=true;const style=document.createElement("style");style.textContent=`
+    .property-picker{position:relative;margin-left:auto;z-index:12}.property-picker-button{display:flex;align-items:center;gap:5px;max-width:172px;height:38px;padding:0 11px;border:1px solid #cbd8e8;border-radius:11px;background:#fff;color:#183153;font:900 11px/1.2 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.property-picker-button:after{content:"⌄";font-size:14px}.property-picker-panel{position:absolute;top:44px;right:0;width:min(270px,calc(100vw - 28px));padding:10px;border:1px solid #dce6f2;border-radius:15px;background:#fff;box-shadow:0 14px 35px rgba(24,49,83,.18)}.property-picker-panel[hidden]{display:none}.property-picker-title{margin:2px 3px 8px;color:#708095;font-size:10px;font-weight:800}.property-picker-option{display:flex;align-items:center;gap:9px;min-height:40px;padding:7px 8px;border-radius:10px;color:#314764;font-size:12px;font-weight:800}.property-picker-option:hover{background:#f4f8fd}.property-picker-option input{width:17px;height:17px;margin:0;accent-color:#2467bd}.property-picker-id{margin-left:auto;color:#8795a6;font-size:9px;font-weight:700}`;document.head.append(style);}
+  async function rpc(name,args){const{data,error}=await window.omgSupabase.rpc(name,args);if(error||!data?.ok)throw new Error(data?.message||"지점 목록을 불러오지 못했습니다.");return data;}
+  async function mount({accessToken,permission,host,onChange}){
+    addStyle();const data=await rpc("list_property_shares",{p_access_token:accessToken});
+    const properties=(data.properties||[]).filter(item=>item.is_own||(item.permissions||[]).includes(permission));
+    if(properties.length<2)return{properties,selectedIds:()=>properties.map(x=>x.property_id)};
+    const root=document.createElement("div");root.className="property-picker";root.innerHTML=`<button class="property-picker-button" type="button" aria-expanded="false">All</button><div class="property-picker-panel" hidden><p class="property-picker-title">${LABELS[permission]||"지점"} · 복수 선택</p><label class="property-picker-option"><input data-all type="checkbox" checked><b>All</b></label>${properties.map(item=>`<label class="property-picker-option"><input data-id="${item.property_id}" type="checkbox" checked><span>${String(item.property_name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c])}</span><small class="property-picker-id">${item.management_number??""}</small></label>`).join("")}</div>`;
+    host.classList.add("property-picker-mounted");host.append(root);const button=root.querySelector(".property-picker-button"),panel=root.querySelector(".property-picker-panel"),all=root.querySelector("[data-all]"),items=[...root.querySelectorAll("[data-id]")];
+    const selectedIds=()=>items.filter(x=>x.checked).map(x=>x.dataset.id);
+    function label(){const chosen=items.filter(x=>x.checked);button.textContent=chosen.length===items.length?"All":chosen.length===1?properties.find(x=>x.property_id===chosen[0].dataset.id)?.property_name:`${chosen.length}개 지점`;all.checked=chosen.length===items.length;all.indeterminate=chosen.length>0&&chosen.length<items.length;}
+    async function changed(){if(!selectedIds().length){items[0].checked=true;}label();await onChange?.(selectedIds(),properties);}
+    button.onclick=()=>{panel.hidden=!panel.hidden;button.setAttribute("aria-expanded",String(!panel.hidden));};
+    all.onchange=()=>{items.forEach(x=>x.checked=all.checked);if(!all.checked)items[0].checked=true;changed();};items.forEach(x=>x.onchange=changed);
+    document.addEventListener("click",event=>{if(!root.contains(event.target)){panel.hidden=true;button.setAttribute("aria-expanded","false");}});
+    label();return{properties,selectedIds,root};
+  }
+  window.omgPropertySelector={mount};
+})();

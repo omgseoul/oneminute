@@ -69,9 +69,11 @@ public class MessageAlertActivity extends AppCompatActivity {
         scroll.addView(card, new ScrollView.LayoutParams(-1, -2));
 
         ImageView dog = new ImageView(this);
-        dog.setImageBitmap(UrgentAlertActivity.dogBitmap());
+        dog.setImageResource(R.mipmap.message_shiba_wave);
         dog.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        card.addView(dog, new LinearLayout.LayoutParams(dp(148), dp(148)));
+        dog.setPadding(dp(8), dp(8), dp(8), dp(8));
+        dog.setBackground(oval(Color.rgb(237, 245, 255)));
+        card.addView(dog, new LinearLayout.LayoutParams(dp(158), dp(158)));
 
         TextView title = label("새 메세지 도착", 28, NAVY, true, Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
@@ -135,6 +137,13 @@ public class MessageAlertActivity extends AppCompatActivity {
         return background;
     }
 
+    private GradientDrawable oval(int color) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.OVAL);
+        background.setColor(color);
+        return background;
+    }
+
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
@@ -153,9 +162,11 @@ public class MessageAlertActivity extends AppCompatActivity {
         cancelNotification();
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse("https://omgworks24.com/messages.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(open);
-        finishAndRemoveTask();
+        finish();
     }
 
     @Override

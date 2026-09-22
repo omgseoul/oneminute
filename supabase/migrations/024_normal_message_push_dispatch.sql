@@ -42,7 +42,8 @@ begin
     'ok',true,
     'management_number',v_number,
     'message_id',v_message.id,
-    'message',v_message.message,
+    'message',case when v_message.priority='urgent' then v_message.message
+      else '[[OMG_NORMAL_MESSAGE]]'||v_message.message end,
     'priority',v_message.priority,
     'message_type',v_message.message_type,
     'sender_label',case when v_message.sender_type='owner' then '사장님'

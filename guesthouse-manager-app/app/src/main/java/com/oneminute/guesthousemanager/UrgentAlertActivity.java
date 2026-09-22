@@ -40,6 +40,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
     private TextView modeCopy;
     private String alertId;
     private String mode;
+    private String senderLabel;
     private long deadlineEpochMs;
     private boolean receiverRegistered;
 
@@ -100,6 +101,8 @@ public class UrgentAlertActivity extends AppCompatActivity {
     private void readIntent(Intent intent) {
         alertId = intent.getStringExtra("alertId");
         mode = intent.getStringExtra("mode");
+        senderLabel = intent.getStringExtra("senderLabel");
+        if (senderLabel == null || senderLabel.trim().isEmpty()) senderLabel = "사장님";
         if (!"test".equals(mode)) mode = "urgent";
         deadlineEpochMs = intent.getLongExtra("deadlineEpochMs",
                 System.currentTimeMillis() + 60_000L);
@@ -130,7 +133,9 @@ public class UrgentAlertActivity extends AppCompatActivity {
         dog.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         card.addView(dog, new LinearLayout.LayoutParams(dp(112), dp(112)));
 
-        TextView title = label("test".equals(mode) ? "긴급알림 테스트" : "사장님 긴급메시지",
+        String urgentTitle = "사장님".equals(senderLabel)
+                ? "사장님 긴급메세지" : senderLabel + "님의 긴급메세지";
+        TextView title = label("test".equals(mode) ? "긴급알림 테스트" : urgentTitle,
                 27, RED, true, Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.setMargins(0, dp(4), 0, dp(18));
@@ -153,7 +158,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
 
         modeCopy = label("test".equals(mode)
                         ? "테스트 모드 · 지속 알람은 울리지 않습니다."
-                        : "사장메세지는 언제나 즉시 확인하세요.",
+                        : "긴급메세지는 언제나 즉시 확인하세요.",
                 15, Color.rgb(96, 103, 115), false, Gravity.CENTER);
         modeCopy.setPadding(0, dp(8), 0, dp(18));
         card.addView(modeCopy, new LinearLayout.LayoutParams(-1, -2));

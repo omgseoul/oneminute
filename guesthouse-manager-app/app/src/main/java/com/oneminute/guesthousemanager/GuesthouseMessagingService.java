@@ -15,8 +15,12 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         if (uid != null) FirebaseFirestore.getInstance().collection("deviceTokens")
                 .document(uid).update("token", token);
 
-        String topic = getSharedPreferences("omg_push", MODE_PRIVATE).getString("topic", "");
-        if (!topic.isEmpty()) FirebaseMessaging.getInstance().subscribeToTopic(topic);
+        String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("base_topic", "");
+        String memberTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("member_topic", "");
+        if (!baseTopic.isEmpty()) FirebaseMessaging.getInstance().subscribeToTopic(baseTopic);
+        if (!memberTopic.isEmpty()) FirebaseMessaging.getInstance().subscribeToTopic(memberTopic);
     }
 
     @Override
@@ -30,6 +34,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             service.putExtra("alertId", message.getData().get("alertId"));
             service.putExtra("message", message.getData().get("message"));
             service.putExtra("mode", mode == null ? "urgent" : mode);
+            service.putExtra("senderLabel", message.getData().get("senderLabel"));
         }
         ContextCompat.startForegroundService(this, service);
     }

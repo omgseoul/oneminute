@@ -97,15 +97,24 @@ public class MessageAlertActivity extends AppCompatActivity {
         messageBox.setBackground(rounded(Color.rgb(244, 247, 252), 18));
         card.addView(messageBox, new LinearLayout.LayoutParams(-1, -2));
 
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+
         Button open = actionButton("메세지 보기", BLUE, Color.WHITE);
         open.setOnClickListener(view -> openMessages());
-        LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(-1, dp(58));
-        openParams.setMargins(0, dp(18), 0, dp(9));
-        card.addView(open, openParams);
+        LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(0, dp(58), 3f);
+        openParams.setMargins(0, 0, dp(5), 0);
+        actions.addView(open, openParams);
 
         Button close = actionButton("닫기", Color.rgb(234, 241, 250), NAVY);
         close.setOnClickListener(view -> closePopup());
-        card.addView(close, new LinearLayout.LayoutParams(-1, dp(52)));
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(0, dp(58), 1f);
+        closeParams.setMargins(dp(5), 0, 0, 0);
+        actions.addView(close, closeParams);
+
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(58));
+        actionsParams.setMargins(0, dp(18), 0, 0);
+        card.addView(actions, actionsParams);
 
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
         shade.addView(scroll, cardParams);

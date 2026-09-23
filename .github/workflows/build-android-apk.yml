@@ -52,5 +52,6 @@ jobs:
           git add downloads/Guesthouse-Manager-0.10.0.apk
           if ! git diff --cached --quiet; then
             git commit -m "Publish Guesthouse Manager 0.10.0 APK [skip ci]"
+            git pull --rebase origin main
             git push
           fi

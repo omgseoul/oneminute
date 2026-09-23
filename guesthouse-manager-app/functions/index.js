@@ -50,9 +50,12 @@ exports.appUrgent=onRequest({region:"asia-northeast3"},async(req,res)=>{
   if(!rpcResponse.ok||!dispatch?.ok){res.status(rpcResponse.status||400).json({ok:false,message:dispatch?.message||"메세지를 확인하지 못했습니다."});return;}
   if(dispatch.ignored){res.status(200).json({ok:true,ignored:true});return;}
   const property=safeTopicPart(dispatch.management_number);
-  const topics=[];
-  for(const employeeId of dispatch.recipient_employee_ids||[])topics.push(`property_${property}_employee_${safeTopicPart(employeeId)}`);
-  for(const ownerId of dispatch.recipient_owner_ids||[])topics.push(`property_${property}_owner_${safeTopicPart(ownerId)}`);
+  const topics=Array.isArray(dispatch.recipient_topics)
+   ? dispatch.recipient_topics.map(safeTopicPart).filter(Boolean) : [];
+  if(!topics.length){
+   for(const employeeId of dispatch.recipient_employee_ids||[])topics.push(`property_${property}_employee_${safeTopicPart(employeeId)}`);
+   for(const ownerId of dispatch.recipient_owner_ids||[])topics.push(`property_${property}_owner_${safeTopicPart(ownerId)}`);
+  }
   const uniqueTopics=[...new Set(topics)];
   const mode=dispatch.priority==="urgent"?"urgent":"message";
   await Promise.all(uniqueTopics.map(topic=>getMessaging().send({topic,data:{alertId:String(dispatch.message_id),message:String(dispatch.message||"메세지"),mode,senderLabel:String(dispatch.sender_label||"사장님")},android:{priority:"high"}})));

@@ -47,6 +47,14 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             showMessageNotification(message);
             return;
         }
+        String activeRole = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("role", "");
+        if (!"staff".equals(activeRole)) {
+            // Owners may receive ordinary member messages, but employee-only
+            // emergency alarms must never wake or ring an owner session.
+            stopService(new Intent(this, EmergencyAlarmService.class));
+            return;
+        }
         Intent service = new Intent(this, EmergencyAlarmService.class);
         if ("stop".equals(mode)) {
             service.setAction(EmergencyAlarmService.ACTION_STOP);

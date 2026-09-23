@@ -49,8 +49,22 @@ public class AttendanceActivity extends AppCompatActivity {
         getSharedPreferences("omg_push", MODE_PRIVATE).edit()
                 .putString("property_id", safeProperty)
                 .putString("role", safeRole).apply();
-        // Keep the original property-wide topic for Telegram !! alerts.
-        subscribeTopic("base_topic", "property_" + safeProperty + "_staff");
+        String staffTopic = "property_" + safeProperty + "_staff";
+        if ("staff".equals(safeRole)) {
+            // Telegram !! alerts belong only to the employee currently logged in.
+            subscribeTopic("base_topic", staffTopic);
+            return;
+        }
+
+        // Topic subscriptions survive role changes and app restarts. An owner
+        // login must therefore explicitly remove the previous employee topic.
+        String previous = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("base_topic", "");
+        getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                .remove("base_topic").apply();
+        if (!previous.isEmpty()) FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
+        if (!staffTopic.equals(previous))
+            FirebaseMessaging.getInstance().unsubscribeFromTopic(staffTopic);
     }
 
     private void subscribeToMemberTopic(String propertyId, String role, String memberId) {

@@ -43,7 +43,10 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage message) {
         String mode = message.getData().get("mode");
         String body = message.getData().get("message");
-        if ("message".equals(mode) || (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX))) {
+        String priority = message.getData().get("priority");
+        boolean urgent = "urgent".equals(mode) || "urgent".equals(priority);
+        if (!urgent && ("message".equals(mode)
+                || (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX)))) {
             showMessageNotification(message);
             return;
         }

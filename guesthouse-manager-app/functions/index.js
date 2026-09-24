@@ -6,7 +6,9 @@ const {getFirestore}=require("firebase-admin/firestore");
 const {getMessaging}=require("firebase-admin/messaging");
 initializeApp();
 const telegramUrgentSecret=defineSecret("TELEGRAM_URGENT_SECRET");
+const supabaseServiceRoleKey=defineSecret("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_RPC_URL="https://rfcozgyvupvachhhblzn.supabase.co/rest/v1/rpc/get_message_push_dispatch";
+const SUPABASE_TELEGRAM_SAVE_URL="https://rfcozgyvupvachhhblzn.supabase.co/rest/v1/rpc/save_telegram_urgent_message_service";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_Gy0_TtIcJ6xKDEiGWEnXAg_f4_eyXPI";
 const APP_ORIGINS=new Set(["https://omgworks24.com","https://www.omgworks24.com","https://omgseoul.github.io"]);
 function setAppCors(req,res){const origin=req.get("origin");if(APP_ORIGINS.has(origin))res.set("Access-Control-Allow-Origin",origin);res.set("Vary","Origin");res.set("Access-Control-Allow-Headers","Content-Type");res.set("Access-Control-Allow-Methods","POST, OPTIONS");}
@@ -17,7 +19,7 @@ exports.sendUrgentAlert=onDocumentCreated({document:"alerts/{alertId}",region:"a
  await getMessaging().sendEachForMulticast({tokens,data:{alertId:event.params.alertId,message:String(alert.message||"긴급 메시지")},android:{priority:"high"}});
 });
 
-exports.telegramUrgent=onRequest({region:"asia-northeast3",secrets:[telegramUrgentSecret]},async(req,res)=>{
+exports.telegramUrgent=onRequest({region:"asia-northeast3",secrets:[telegramUrgentSecret,supabaseServiceRoleKey]},async(req,res)=>{
  if(req.method!=="POST"){res.status(405).json({ok:false,message:"POST only"});return;}
  if(req.get("x-webhook-secret")!==telegramUrgentSecret.value()){res.status(401).json({ok:false,message:"Unauthorized"});return;}
  const body=req.body||{};
@@ -30,9 +32,18 @@ exports.telegramUrgent=onRequest({region:"asia-northeast3",secrets:[telegramUrge
  let mode="urgent",message=raw.slice(2).trim();
  if(raw.startsWith("!!테스트")){mode="test";message=message||"긴급알림 테스트";}
  if(raw.startsWith("!!정지")){mode="stop";message="긴급알림을 중지합니다.";}
- const alertId=String(body.update_id||source.message_id||Date.now());
- await getMessaging().send({topic:`property_${safeProperty}_staff`,data:{alertId,message:message||"사장님 긴급메시지",mode},android:{priority:"high"}});
- res.status(200).json({ok:true,mode});
+ const externalId=String(body.update_id||`${source.chat?.id||"telegram"}:${source.message_id||Date.now()}`);
+ let savedMessageId="";
+ if(mode==="urgent"){
+  const serviceKey=supabaseServiceRoleKey.value();
+  const savedResponse=await fetch(SUPABASE_TELEGRAM_SAVE_URL,{method:"POST",headers:{apikey:serviceKey,Authorization:`Bearer ${serviceKey}`,"Content-Type":"application/json"},body:JSON.stringify({p_management_number:propertyId,p_message:message||"사장님 긴급메시지",p_external_id:externalId})});
+  const saved=await savedResponse.json().catch(()=>null);
+  if(!savedResponse.ok||!saved?.ok){res.status(savedResponse.status||500).json({ok:false,message:saved?.message||"긴급 메세지를 메세지함에 저장하지 못했습니다."});return;}
+  savedMessageId=String(saved.message_id||"");
+ }
+ const alertId=savedMessageId||externalId;
+ await getMessaging().send({topic:`property_${safeProperty}_staff`,data:{alertId,message:message||"사장님 긴급메시지",mode,priority:mode==="urgent"?"urgent":"normal",messageType:"general"},android:{priority:"high"}});
+ res.status(200).json({ok:true,mode,message_id:savedMessageId||null});
 });
 
 exports.appUrgent=onRequest({region:"asia-northeast3"},async(req,res)=>{
@@ -58,7 +69,7 @@ exports.appUrgent=onRequest({region:"asia-northeast3"},async(req,res)=>{
   }
   const uniqueTopics=[...new Set(topics)];
   const mode=dispatch.priority==="urgent"?"urgent":"message";
-  await Promise.all(uniqueTopics.map(topic=>getMessaging().send({topic,data:{alertId:String(dispatch.message_id),message:String(dispatch.message||"메세지"),mode,senderLabel:String(dispatch.sender_label||"사장님")},android:{priority:"high"}})));
+  await Promise.all(uniqueTopics.map(topic=>getMessaging().send({topic,data:{alertId:String(dispatch.message_id),message:String(dispatch.message||"메세지"),mode,priority:String(dispatch.priority||"normal"),messageType:String(dispatch.message_type||"general"),senderLabel:String(dispatch.sender_label||"사장님")},android:{priority:"high"}})));
   res.status(200).json({ok:true,sent:uniqueTopics.length,mode});
  }catch(error){console.error("appUrgent failed",error);res.status(500).json({ok:false,message:"메세지 알림 전송 중 오류가 발생했습니다."});}
  });

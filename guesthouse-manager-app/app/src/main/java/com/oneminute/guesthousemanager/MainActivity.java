@@ -29,6 +29,8 @@ public class MainActivity extends AppCompatActivity {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private LinearLayout root;
     private boolean openedWebApp;
+    private boolean fullScreenPromptedThisLaunch;
+    private boolean overlayPromptedThisLaunch;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -42,11 +44,9 @@ public class MainActivity extends AppCompatActivity {
     private void continueStartup() {
         if (Build.VERSION.SDK_INT >= 34) {
             NotificationManager manager = getSystemService(NotificationManager.class);
-            boolean alreadyPrompted = getSharedPreferences("urgent_permissions", MODE_PRIVATE)
-                    .getBoolean("full_screen_prompted_v3", false);
-            if (manager != null && !manager.canUseFullScreenIntent() && !alreadyPrompted) {
-                getSharedPreferences("urgent_permissions", MODE_PRIVATE).edit()
-                        .putBoolean("full_screen_prompted_v3", true).apply();
+            if (manager != null && !manager.canUseFullScreenIntent()
+                    && !fullScreenPromptedThisLaunch) {
+                fullScreenPromptedThisLaunch = true;
                 Intent settings = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                         Uri.parse("package:" + getPackageName()));
                 try {
@@ -57,11 +57,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        boolean overlayPrompted = getSharedPreferences("urgent_permissions", MODE_PRIVATE)
-                .getBoolean("overlay_prompted_v1", false);
-        if (!Settings.canDrawOverlays(this) && !overlayPrompted) {
-            getSharedPreferences("urgent_permissions", MODE_PRIVATE).edit()
-                    .putBoolean("overlay_prompted_v1", true).apply();
+        if (!Settings.canDrawOverlays(this) && !overlayPromptedThisLaunch) {
+            overlayPromptedThisLaunch = true;
             Intent settings = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + getPackageName()));
             try {

@@ -164,6 +164,12 @@
     async saveEmployees(accessToken, employees) {
       return rpc("save_employee_accounts", { p_access_token: accessToken, p_employees: employees });
     },
+    async loadEmployeeAttendanceSettings(accessToken) {
+      return rpc("list_employee_attendance_settings", { p_access_token: accessToken });
+    },
+    async saveEmployeeAttendanceSettings(accessToken, employees) {
+      return rpc("save_employee_attendance_settings", { p_access_token: accessToken, p_employees: employees });
+    },
     async loadAttendanceWarnings(accessToken) {
       return rpc("list_attendance_warning_rules", { p_access_token: accessToken });
     },

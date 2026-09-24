@@ -62,9 +62,38 @@ public class AttendanceActivity extends AppCompatActivity {
                 .getString("base_topic", "");
         getSharedPreferences("omg_push", MODE_PRIVATE).edit()
                 .remove("base_topic").apply();
-        if (!previous.isEmpty()) FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
-        if (!staffTopic.equals(previous))
-            FirebaseMessaging.getInstance().unsubscribeFromTopic(staffTopic);
+        if (!previous.isEmpty()) unsubscribeOwnerTopicSafely(previous, staffTopic);
+        if (!staffTopic.equals(previous)) unsubscribeOwnerTopicSafely(staffTopic, staffTopic);
+    }
+
+    private void unsubscribeOwnerTopicSafely(String topic, String staffTopic) {
+        FirebaseMessaging.getInstance().unsubscribeFromTopic(topic).addOnCompleteListener(task -> {
+            // Switching from owner to staff can happen while this asynchronous
+            // unsubscribe is still running. If staff is now the active session,
+            // make the final operation a subscription so the employee never
+            // loses urgent alerts because of that race.
+            String currentRole = getSharedPreferences("omg_push", MODE_PRIVATE)
+                    .getString("role", "");
+            String currentProperty = getSharedPreferences("omg_push", MODE_PRIVATE)
+                    .getString("property_id", "");
+            String expectedTopic = "property_" + currentProperty + "_staff";
+            if ("staff".equals(currentRole) && staffTopic.equals(expectedTopic)) {
+                getSharedPreferences("omg_push", MODE_PRIVATE).edit()
+                        .putString("base_topic", staffTopic).apply();
+                FirebaseMessaging.getInstance().subscribeToTopic(staffTopic);
+            }
+        });
+    }
+
+    private void clearPushSession() {
+        String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("base_topic", "");
+        String memberTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
+                .getString("member_topic", "");
+        getSharedPreferences("omg_push", MODE_PRIVATE).edit().clear().apply();
+        if (!baseTopic.isEmpty()) FirebaseMessaging.getInstance().unsubscribeFromTopic(baseTopic);
+        if (!memberTopic.isEmpty()) FirebaseMessaging.getInstance().unsubscribeFromTopic(memberTopic);
+        stopService(new Intent(this, EmergencyAlarmService.class));
     }
 
     private void subscribeToMemberTopic(String propertyId, String role, String memberId) {
@@ -151,6 +180,11 @@ public class AttendanceActivity extends AppCompatActivity {
         @JavascriptInterface
         public void registerMemberPush(String propertyId, String role, String memberId) {
             subscribeToMemberTopic(propertyId, role, memberId);
+        }
+
+        @JavascriptInterface
+        public void clearPushSession() {
+            AttendanceActivity.this.clearPushSession();
         }
     }
 

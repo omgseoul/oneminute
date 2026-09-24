@@ -105,8 +105,10 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .putExtra("notificationId", requestCode);
         PendingIntent fullScreen = PendingIntent.getActivity(this, requestCode, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String messageUrl = "https://omgworks24.com/messages.html"
+                + (alertId == null || alertId.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(alertId));
         Intent open = new Intent(this, AttendanceActivity.class)
-                .setData(Uri.parse("https://omgworks24.com/messages.html"))
+                .setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, requestCode, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);

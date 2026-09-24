@@ -109,6 +109,21 @@
         if (!response.ok || !result?.ok) throw new Error(result?.message || "보고는 저장됐지만 전달에 실패했습니다.");
         saved.make_accepted = true;
       }
+      try {
+        const warnings = await rpc("evaluate_attendance_warnings", {
+          p_access_token: session.accessToken,
+          p_report_type: context.reportType
+        });
+        for (const messageId of warnings?.message_ids || []) {
+          await fetch("https://asia-northeast3-guesthouse-manager-ajh.cloudfunctions.net/appUrgent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ access_token: session.accessToken, message_id: messageId })
+          });
+        }
+      } catch (_) {
+        // The announcement stays unread and is forced open on the employee's next login.
+      }
       await finish();
       return saved;
     })().catch(error => {

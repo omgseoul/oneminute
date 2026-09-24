@@ -27,7 +27,7 @@ public class EmergencyAlarmService extends Service {
     public static final String ACTION_STOP = "com.oneminute.guesthousemanager.STOP_URGENT_ALERT";
     public static final String ACTION_SCREEN_CLOSE = "com.oneminute.guesthousemanager.URGENT_SCREEN_CLOSE";
 
-    private static final String CHANNEL_ID = "urgent_alerts_countdown_v4";
+    private static final String CHANNEL_ID = "urgent_alerts_countdown_v5_overlay";
     private static final int NOTIFICATION_ID = 9001;
     private static final long COUNTDOWN_MS = 60_000L;
 
@@ -37,6 +37,7 @@ public class EmergencyAlarmService extends Service {
     private TextToSpeech speech;
     private Vibrator vibrator;
     private PowerManager.WakeLock wakeLock;
+    private UrgentOverlayController overlayController;
     private Runnable startPersistentAlarm;
     private String alertId;
     private String message;
@@ -48,6 +49,7 @@ public class EmergencyAlarmService extends Service {
     public void onCreate() {
         super.onCreate();
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+        overlayController = new UrgentOverlayController(this);
         createNotificationChannel();
     }
 
@@ -96,6 +98,13 @@ public class EmergencyAlarmService extends Service {
         acquireWakeLock();
         playFirstStage();
 
+        // On current Android versions, a background activity launch is often
+        // blocked while another app is open. The system overlay is the reliable
+        // unlocked-screen path; the full-screen notification remains the
+        // lock-screen path.
+        boolean overlayShown = overlayController.show(
+                alertId, message, mode, senderLabel, deadlineEpochMs);
+
         // Full-screen intent wakes the lock screen. Direct launch also displays the
         // same dog countdown immediately while the employee is already in the app.
         Runnable showScreen = () -> {
@@ -105,10 +114,10 @@ public class EmergencyAlarmService extends Service {
                 // The full-screen notification remains as fallback.
             }
         };
-        handler.post(showScreen);
+        if (!overlayShown) handler.post(showScreen);
         // Some Android builds only allow the activity launch after the foreground
         // service has become visible. Retry once without changing the deadline.
-        handler.postDelayed(showScreen, 350L);
+        if (!overlayShown) handler.postDelayed(showScreen, 350L);
 
         if ("urgent".equals(mode)) {
             startPersistentAlarm = () -> {
@@ -245,6 +254,7 @@ public class EmergencyAlarmService extends Service {
         if (startPersistentAlarm != null) handler.removeCallbacks(startPersistentAlarm);
         stopOutputs();
         releaseWakeLock();
+        if (overlayController != null) overlayController.dismiss();
         stopForeground(true);
         if (closeScreen) {
             sendBroadcast(new Intent(ACTION_SCREEN_CLOSE).setPackage(getPackageName()));
@@ -281,6 +291,7 @@ public class EmergencyAlarmService extends Service {
         if (startPersistentAlarm != null) handler.removeCallbacks(startPersistentAlarm);
         stopOutputs();
         releaseWakeLock();
+        if (overlayController != null) overlayController.dismiss();
         super.onDestroy();
     }
 

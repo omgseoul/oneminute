@@ -110,10 +110,10 @@
         saved.make_accepted = true;
       }
       try {
-        const warnings = await rpc("evaluate_attendance_warnings", {
+        const warnings = context.reportType === "clock_out" ? await rpc("evaluate_attendance_warnings", {
           p_access_token: session.accessToken,
           p_report_type: context.reportType
-        });
+        }) : { message_ids: [] };
         for (const messageId of warnings?.message_ids || []) {
           await fetch("https://asia-northeast3-guesthouse-manager-ajh.cloudfunctions.net/appUrgent", {
             method: "POST",
@@ -122,7 +122,7 @@
           });
         }
       } catch (_) {
-        // The announcement stays unread and is forced open on the employee's next login.
+        // Unacknowledged attendance alerts remain available on the next login.
       }
       await finish();
       return saved;

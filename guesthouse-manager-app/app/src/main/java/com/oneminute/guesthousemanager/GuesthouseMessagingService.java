@@ -16,8 +16,6 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -27,10 +25,6 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
-        String uid = FirebaseAuth.getInstance().getUid();
-        if (uid != null) FirebaseFirestore.getInstance().collection("deviceTokens")
-                .document(uid).update("token", token);
-
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
         String memberTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
@@ -41,6 +35,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(RemoteMessage message) {
+        String sessionRole = getSharedPreferences("omg_push", MODE_PRIVATE).getString("role", "");
+        if (!"staff".equals(sessionRole) && !"owner".equals(sessionRole)) return;
         String mode = message.getData().get("mode");
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");

@@ -50,5 +50,24 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  await db.query("update public.work_sessions set clock_in_at=(work_date+time '12:00') at time zone 'Asia/Seoul',clock_out_at=(work_date+time '21:00') at time zone 'Asia/Seoul',status='completed' where id=$1",[tomorrow.session_id]);
  const checkout=await rpc('evaluate_attendance_warnings',[tomorrow.access_token,'clock_out']);check(checkout.message_ids.length===2,'late checkout and excess duration both send attendance warnings');
  check((await rpc('evaluate_attendance_warnings',[tomorrow.access_token,'clock_out'])).message_ids.length===0,'repeated checkout evaluation does not duplicate');
+ // Push delivery leases and routing use the same disposable database fixtures.
+ await db.exec(read('migrations/033_supabase_push_delivery.sql'));
+ const claim=(await one("select public.claim_push_delivery('test-key') r")).r;
+ check(claim.claimed,'first push obtains delivery lease');
+ check(!(await one("select public.claim_push_delivery('test-key') r")).r.claimed,'concurrent retry cannot claim active lease');
+ check(!(await one("select public.finish_push_delivery('test-key',gen_random_uuid(),true) r")).r.ok,'wrong lease cannot mark delivery sent');
+ await one("select public.finish_push_delivery('test-key',$1,false)",[claim.lease_id]);
+ const retry=(await one("select public.claim_push_delivery('test-key') r")).r;
+ check(retry.claimed,'rejected push can retry');
+ await one("select public.finish_push_delivery('test-key',$1,true)",[retry.lease_id]);
+ check((await one("select public.claim_push_delivery('test-key') r")).r.status==='sent','successful push never reclaims');
+ await one("select public.claim_push_delivery('expired')");
+ await db.exec("update public.push_delivery_attempts set lease_until=clock_timestamp()-interval '1 second' where delivery_key='expired'");
+ check((await one("select public.claim_push_delivery('expired') r")).r.claimed,'expired ambiguous delivery can retry');
+ let denied=false;try{await rpc('claim_push_delivery',['forbidden']);}catch(e){denied=e.code==='42501';}
+ check(denied,'public client cannot create delivery leases');
+ check(!(await one("select public.get_message_push_dispatch_v2(gen_random_uuid(),$1) r",[msg.id])).r.ok,'invalid session cannot resolve recipients');
+ const dispatch=(await one("select public.get_message_push_dispatch_v2($1,$2) r",[tomorrow.access_token,tomorrow.warning_message_ids[0]])).r;
+ check(dispatch.ok&&dispatch.recipient_topics.some(t=>t.endsWith('_employee_'+ids[0])),'attendance alert resolves authorized recipient topic');
  console.log(`${count} attendance warning checks passed`);await db.close();
 })().catch(async e=>{console.error(e.message,e.detail||'');await db.close();process.exitCode=1;});

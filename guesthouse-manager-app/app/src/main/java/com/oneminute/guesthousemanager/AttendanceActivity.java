@@ -86,6 +86,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private void clearPushSession() {
+        SupabaseMessageReceipt.clear(this);
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
         String memberTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
@@ -172,6 +173,11 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private final class PushBridge {
+        @JavascriptInterface
+        public void bindAppSession(String accessToken, String expiresAt) {
+            SupabaseMessageReceipt.bind(AttendanceActivity.this, accessToken, expiresAt);
+        }
+
         @JavascriptInterface
         public void registerPush(String propertyId, String role) {
             subscribeToUrgentTopic(propertyId, role);

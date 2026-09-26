@@ -1,5 +1,17 @@
 package com.oneminute.guesthousemanager;
-import android.graphics.Color; import android.os.Bundle; import android.widget.*; import androidx.appcompat.app.AppCompatActivity; import com.google.firebase.auth.FirebaseAuth; import com.google.firebase.firestore.*; import java.util.*;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import androidx.appcompat.app.AppCompatActivity;
+/** Compatibility entry point: all business data and authorization live in Supabase. */
 public class EmergencyReportActivity extends AppCompatActivity {
- @Override protected void onCreate(Bundle b){super.onCreate(b); LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);r.setPadding(42,60,42,42);r.setBackgroundColor(Color.rgb(244,247,252)); TextView t=new TextView(this);t.setText("사장님께 긴급보고");t.setTextSize(28);t.setTextColor(Color.rgb(180,35,35));r.addView(t); EditText m=new EditText(this);m.setHint("긴급 내용을 입력해주세요");m.setMinLines(6);r.addView(m,new LinearLayout.LayoutParams(-1,-2));Button s=new Button(this);s.setText("긴급보고 보내기");r.addView(s,new LinearLayout.LayoutParams(-1,150));setContentView(r);s.setOnClickListener(v->{String text=m.getText().toString().trim();if(text.isEmpty()){m.setError("내용을 입력해주세요");return;}s.setEnabled(false);String uid=FirebaseAuth.getInstance().getUid();Map<String,Object>d=new HashMap<>();d.put("senderUid",uid);d.put("targetRole","owner");d.put("branch","oneminute");d.put("message",text);d.put("createdAt",FieldValue.serverTimestamp());d.put("acknowledged",false);FirebaseFirestore.getInstance().collection("alerts").add(d).addOnSuccessListener(x->{Toast.makeText(this,"사장님께 긴급보고를 보냈습니다.",Toast.LENGTH_LONG).show();finish();}).addOnFailureListener(e->{s.setEnabled(true);Toast.makeText(this,"전송하지 못했습니다.",Toast.LENGTH_LONG).show();});});}
+ @Override protected void onCreate(Bundle state) {
+  super.onCreate(state);
+  String url = "https://omgworks24.com/emergency.html";
+  String id = getIntent().getStringExtra("alertId");
+  if (id != null && id.matches("[0-9a-fA-F-]{36}")) url += "?message_id=" + Uri.encode(id);
+  startActivity(new Intent(this, AttendanceActivity.class).setData(Uri.parse(url))
+    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+  finish();
+ }
 }

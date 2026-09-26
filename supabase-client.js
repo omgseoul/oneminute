@@ -48,9 +48,11 @@
     },
     set(session) {
       localStorage.setItem(this.key, JSON.stringify(session));
+      window.OMGNative?.bindAppSession?.(session.accessToken, session.expiresAt || "");
     },
     clear() {
       localStorage.removeItem(this.key);
+      window.OMGNative?.clearPushSession?.();
     },
     fromResponse(data, token) {
       return {

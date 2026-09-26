@@ -17,7 +17,7 @@
 </main>
 <main id="donePage" class="container"><section class="done-card"><div class="check">✓</div><h1 id="doneTitle">보고 완료</h1><p id="doneText">보고가 저장되고 전달되었습니다.</p><a id="doneLink" href="app.html">메인으로</a></section></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="work-config.js"></script>
-<script src="report-session.js"></script>
+<script src="notification-config.js"></script><script src="notification-client.js"></script><script src="report-session.js"></script>
 <script>
 const reportType = new URLSearchParams(location.search).get("type");
 const isClockIn = reportType === "clock_in";

@@ -4,30 +4,17 @@ import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.text.InputType;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.messaging.FirebaseMessaging;
-import java.util.HashMap;
-import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 10;
     private static final int FULL_SCREEN_PERMISSION_REQUEST = 11;
     private static final int OVERLAY_PERMISSION_REQUEST = 12;
-    private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
-    private LinearLayout root;
     private boolean openedWebApp;
     private boolean fullScreenPromptedThisLaunch;
     private boolean overlayPromptedThisLaunch;
@@ -71,8 +58,7 @@ public class MainActivity extends AppCompatActivity {
         // Firebase is used only for native push notifications. A fresh install must
         // never block the Supabase employee/owner login behind the old Firebase
         // device account screen.
-        if (auth.getCurrentUser() == null) openWebApp();
-        else loadUser();
+        openWebApp();
     }
 
     @Override
@@ -86,48 +72,6 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FULL_SCREEN_PERMISSION_REQUEST
                 || requestCode == OVERLAY_PERMISSION_REQUEST) continueStartup();
-    }
-
-    private void base() {
-        root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(42,55,42,42); root.setBackgroundColor(Color.rgb(244,247,252));
-        setContentView(root);
-    }
-
-    private TextView title(String text, int size) {
-        TextView v=new TextView(this); v.setText(text); v.setTextSize(size); v.setTextColor(Color.rgb(24,49,83)); v.setPadding(0,12,0,24); v.setTypeface(null,1); return v;
-    }
-
-    private EditText input(String hint, boolean password) {
-        EditText e=new EditText(this); e.setHint(hint); e.setTextSize(17); e.setPadding(25,18,25,18);
-        if(password)e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        root.addView(e,new LinearLayout.LayoutParams(-1,-2)); return e;
-    }
-
-    private Button button(String text, int color) {
-        Button b=new Button(this); b.setText(text); b.setTextSize(18); b.setTextColor(Color.WHITE); b.setBackgroundColor(color);
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,150); p.setMargins(0,18,0,0); root.addView(b,p); return b;
-    }
-
-    private void showEntry() { if(auth.getCurrentUser()==null) showLogin(); else loadUser(); }
-
-    private void showLogin() {
-        base(); root.addView(title("게하관리",32));
-        TextView sub=title("이 기기에서 알림을 받기 위한 최초 설정입니다.\n한 번 로그인하면 이후에는 직원 PIN 화면이 바로 열립니다.",15); sub.setTextColor(Color.GRAY); root.addView(sub);
-        EditText email=input("이메일",false), password=input("비밀번호",true);
-        Button login=button("기기 설정 로그인",Color.rgb(36,103,189));
-        login.setOnClickListener(v -> { login.setEnabled(false); auth.signInWithEmailAndPassword(email.getText().toString().trim(),password.getText().toString()).addOnCompleteListener(t->{ if(t.isSuccessful())loadUser(); else {login.setEnabled(true);Toast.makeText(this,"로그인 정보를 확인해주세요.",Toast.LENGTH_LONG).show();}}); });
-    }
-
-    private void loadUser() {
-        String uid=auth.getCurrentUser().getUid();
-        db.collection("users").document(uid).get().addOnSuccessListener(doc->{
-            String role=doc.getString("role"); String branch=doc.getString("branch");
-            registerToken(role,branch); openWebApp();
-        }).addOnFailureListener(e->Toast.makeText(this,"사용자 정보를 읽지 못했습니다.",Toast.LENGTH_LONG).show());
-    }
-
-    private void registerToken(String role,String branch) {
-        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token->{ Map<String,Object> d=new HashMap<>(); d.put("token",token); d.put("role",role); d.put("branch",branch==null?"":branch); db.collection("deviceTokens").document(auth.getUid()).set(d); });
     }
 
     private void openWebApp() {

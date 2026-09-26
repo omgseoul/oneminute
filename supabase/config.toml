@@ -1,2 +1,7 @@
 [functions.deliver-report]
 verify_jwt = false
+
+[functions.dispatch-notification]
+# Custom employee/owner session token is validated in the Supabase RPC.
+# Telegram and validation routes require separate server-side secrets.
+verify_jwt = false

@@ -115,11 +115,7 @@
           p_report_type: context.reportType
         }) : { message_ids: [] };
         for (const messageId of warnings?.message_ids || []) {
-          await fetch("https://asia-northeast3-guesthouse-manager-ajh.cloudfunctions.net/appUrgent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ access_token: session.accessToken, message_id: messageId })
-          });
+          await window.omgNotifications.send(session.accessToken, messageId);
         }
       } catch (_) {
         // Unacknowledged attendance alerts remain available on the next login.

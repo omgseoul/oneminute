@@ -76,5 +76,38 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  await db.query("insert into public.guest_chat_rooms(id,property_id,guest_name,check_in,check_out,token_hash,expires_at,ip_hash) values($1,$2,'Other',current_date,current_date,'other',now()+interval '1 day','x')",[other,alien]);
  await rejected(()=>call('messages',{room_id:other}),'unshared branch cannot read guest room');
  await rejected(()=>call('save_preferences',{preferences:prefs.map(p=>({...p,property_ids:[alien]}))}),'unshared branch cannot be selected for alerts');
+
+ // Retention operates on a fixed, platform-authorized preview; never on all tenants.
+ const operator=require('node:crypto').randomUUID();
+ const storage=async(action,data={})=>(await one('select public.platform_message_storage($1,$2) r',[action,JSON.stringify(data)])).r;
+ await rejected(()=>storage('usage'),'storage usage rejects anonymous caller');
+ await db.query("insert into auth.users(id,email) values($1,'operator@test.invalid')",[operator]);
+ await db.query("select set_config('request.jwt.claim.sub',$1,false)",[operator]);
+ await rejected(()=>storage('usage'),'ordinary account cannot access storage');
+ await db.query('insert into public.platform_administrators(user_id) values($1)',[operator]);
+ const usage=await storage('usage');check(usage.properties.length>=2,'platform usage lists each property separately');
+ await rejected(()=>storage('preview',{property_id:staff[0].property_id,months:1,categories:['chat']}),'unsupported retention period rejected');
+ await call('save_settings',{enabled:true,chat_enabled:true,items:[]});
+ const old=await call('send',{room_id:id,client_id:require('node:crypto').randomUUID(),body:'Old text'});
+ await db.query("update public.guest_chat_messages set created_at=now()-interval '7 months' where id=$1",[old.message_id]);
+ const attached=await call('upload_begin',{room_id:id,mime:'image/jpeg'});await call('upload_finish',{room_id:id,asset_id:attached.asset_id});
+ const photoMessage=await call('send',{room_id:id,client_id:require('node:crypto').randomUUID(),body:'Old photo',asset_id:attached.asset_id});
+ await db.query("update public.guest_chat_messages set created_at=now()-interval '7 months' where id=$1",[photoMessage.message_id]);
+ await db.query("update public.guest_support_assets set created_at=now()-interval '7 months' where id=$1",[attached.asset_id]);
+ const preview=await storage('preview',{property_id:staff[0].property_id,months:6,categories:['chat','chat_photos']});
+ check(preview.summary.chat_count===2&&preview.summary.chat_photo_count===1,'preview counts only old content');
+ check(!!(await one('select id from public.guest_chat_messages where id=$1',[old.message_id])),'preview does not delete data');
+ await rejected(()=>storage('execute',{job_id:preview.job_id,confirm_name:'wrong'}),'wrong property confirmation rejected');
+ const job=await storage('execute',{job_id:preview.job_id,confirm_name:preview.summary.property_name});check(job.status==='pending','photo cleanup persists retryable storage queue');
+ check(!(await one('select id from public.guest_chat_messages where id=$1',[old.message_id])),'selected old text is removed');
+ check(!!(await one('select id from public.guest_chat_messages where id=$1',[sent.message_id])),'recent content retained');
+ check(!!(await one('select id from public.guest_chat_rooms where id=$1',[other])),'another property is unaffected');
+ await rejected(()=>call('send',{room_id:id,client_id:require('node:crypto').randomUUID(),asset_id:attached.asset_id}),'queued photo cannot be reused');
+ check((await storage('execute',{job_id:preview.job_id,confirm_name:preview.summary.property_name})).status==='pending','repeat execute is idempotent');
+ const work=async(done=[])=>(await one('select public.platform_message_storage_worker($1,$2,$3) r',[operator,job.job_id,done])).r;
+ check((await work()).files[0].object_path===attached.path,'worker only receives persisted property-scoped paths');
+ check((await work([attached.asset_id])).status==='complete','completed storage deletion finalizes queued job');
+ check((await work([attached.asset_id])).status==='complete','completed worker retry is safe');
+ await rejected(()=>one('select public.platform_message_storage_worker($1,$2) r',[staff[0].id,job.job_id]),'storage worker rejects non-platform user');
  console.log(`${count} guest support checks passed`);await db.close();
 })().catch(async e=>{console.error(e.message,e.detail||'',e.stack);await db.close();process.exitCode=1;});

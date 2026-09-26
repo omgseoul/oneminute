@@ -30,3 +30,12 @@ Turn portal activation OFF to stop guest entry and sending, or disable Chat to k
 `NODE_PATH=<pglite node_modules> node supabase/tests/attendance-login-warnings.test.cjs`
 
 Production acceptance after installation: use a test property and opted-in test employee; verify guest entry, photo exchange, owner alias, cross-branch responder, disabled/time-window notifications, background full-screen urgent notification and acknowledgement volume restoration on the target Android device. Do not test-send messages to real employees without explicit authorization.
+
+## Message hub and manual retention (035)
+- `messages.html`: one hub with guest/staff/alerts tabs. Old guest-chats URLs redirect here.
+- Account cards in staff-management own notification preferences; QR settings only own guest portal content.
+- Platform operator center reports UTF-8 body bytes and private object metadata sizes (not database physical/billing size).
+- 3/6/9/12-month cleanup snapshots selected record IDs, expires after 10 minutes, requires exact property-name confirmation, and audits each job. No automatic cleanup runs.
+- Text and photo categories are independent. QR guide assets are excluded. Internal messages currently have no photo attachment column; their photo category is shown as unavailable/0.
+- Database deletion detaches selected old photos and persists their Storage API deletion queue; failures can be resumed from OMG WORKS. Storage rows are never directly deleted via SQL.
+- Deploy 035 migration and updated guest-support Edge function before publishing UI. No APK replacement required for these web screens.

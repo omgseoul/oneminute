@@ -19,6 +19,8 @@ import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import java.util.Locale;
 
@@ -35,6 +37,9 @@ public class EmergencyAlarmService extends Service {
     private MediaPlayer alarmPlayer;
     private MediaPlayer fallbackTonePlayer;
     private TextToSpeech speech;
+    private int audioGeneration;
+    private boolean introFinished;
+    private Runnable speechWatchdog;
     private Vibrator vibrator;
     private PowerManager.WakeLock wakeLock;
     private UrgentOverlayController overlayController;
@@ -203,43 +208,130 @@ public class EmergencyAlarmService extends Service {
         // 진동과 동일한 강아지 카운터 화면만 표시하고 어떤 소리도 내지 않는다.
         if ("test".equals(mode)) return;
 
-        speech = new TextToSpeech(this, status -> {
-            if (status != TextToSpeech.SUCCESS || speech == null) {
-                playFallbackNotificationTone();
+        final int generation = audioGeneration;
+        introFinished = false;
+        speechWatchdog = () -> failIntro(generation, "tts_start_timeout");
+        handler.postDelayed(speechWatchdog, 8_000L);
+        try {
+            // Always enqueue initialization handling: some engines invoke onInit
+            // before the constructor has returned and assigned the speech field.
+            speech = new TextToSpeech(this,
+                    status -> handler.post(() -> onSpeechReady(generation, status)));
+        } catch (RuntimeException error) {
+            failIntro(generation, "tts_init_exception");
+        }
+    }
+
+    private void onSpeechReady(int generation, int status) {
+        if (generation != audioGeneration || introFinished) return;
+        if (status != TextToSpeech.SUCCESS || speech == null) {
+            failIntro(generation, "tts_init_failed");
+            return;
+        }
+        try {
+            if (speech.setLanguage(Locale.KOREAN) < 0) {
+                failIntro(generation, "korean_voice_unavailable");
                 return;
             }
-            int language = speech.setLanguage(Locale.KOREAN);
-            if (language == TextToSpeech.LANG_MISSING_DATA
-                    || language == TextToSpeech.LANG_NOT_SUPPORTED) {
-                playFallbackNotificationTone();
-                return;
-            }
-            speech.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build());
+            speech.setAudioAttributes(alarmAudioAttributes(AudioAttributes.CONTENT_TYPE_SPEECH));
+            speech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String utteranceId) {
+                    handler.post(() -> {
+                        if (generation == audioGeneration && !introFinished) cancelSpeechWatchdog();
+                    });
+                }
+                @Override public void onDone(String utteranceId) {
+                    handler.post(() -> {
+                        if (generation != audioGeneration || introFinished) return;
+                        introFinished = true;
+                        cancelSpeechWatchdog();
+                        releaseSpeech();
+                    });
+                }
+                @Override public void onError(String utteranceId) {
+                    handler.post(() -> failIntro(generation, "tts_playback_failed"));
+                }
+                @Override public void onError(String utteranceId, int errorCode) {
+                    onError(utteranceId);
+                }
+            });
             Bundle parameters = new Bundle();
             parameters.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f);
-            speech.speak(senderIntro() + ".", TextToSpeech.QUEUE_FLUSH,
-                    parameters, "owner_message_intro");
-        });
+            if (speech.speak(senderIntro() + ".", TextToSpeech.QUEUE_FLUSH,
+                    parameters, "owner_message_intro_" + generation) == TextToSpeech.ERROR) {
+                failIntro(generation, "tts_request_failed");
+            }
+        } catch (RuntimeException error) {
+            failIntro(generation, "tts_setup_failed");
+        }
+    }
+
+    private void failIntro(int generation, String reason) {
+        if (generation != audioGeneration || introFinished) return;
+        introFinished = true;
+        cancelSpeechWatchdog();
+        releaseSpeech();
+        Log.w("UrgentAudio", reason); // No sender, message, or credential in logs.
+        playFallbackNotificationTone();
+    }
+
+    private void cancelSpeechWatchdog() {
+        if (speechWatchdog != null) handler.removeCallbacks(speechWatchdog);
+        speechWatchdog = null;
+    }
+
+    private void releaseSpeech() {
+        TextToSpeech previous = speech;
+        speech = null;
+        if (previous != null) {
+            try { previous.stop(); previous.shutdown(); } catch (RuntimeException ignored) {}
+        }
+    }
+
+    private AudioAttributes alarmAudioAttributes(int contentType) {
+        return new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(contentType).build();
+    }
+
+    private MediaPlayer createAlarmPlayer(Uri tone) {
+        if (tone == null) return null;
+        MediaPlayer player = new MediaPlayer();
+        try {
+            // Set the alarm stream BEFORE preparing. MediaPlayer.create(context, uri)
+            // otherwise uses media volume, which may be muted independently.
+            player.setAudioAttributes(alarmAudioAttributes(AudioAttributes.CONTENT_TYPE_SONIFICATION));
+            player.setDataSource(this, tone);
+            player.prepare();
+            return player;
+        } catch (Exception error) {
+            player.release();
+            Log.w("UrgentAudio", "alarm_tone_unavailable");
+            return null;
+        }
     }
 
     private void playFallbackNotificationTone() {
         Uri tone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        fallbackTonePlayer = MediaPlayer.create(this, tone);
+        if (tone == null) tone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        fallbackTonePlayer = createAlarmPlayer(tone);
         if (fallbackTonePlayer != null) {
             fallbackTonePlayer.setOnCompletionListener(player -> {
                 player.release();
                 if (fallbackTonePlayer == player) fallbackTonePlayer = null;
+            });
+            fallbackTonePlayer.setOnErrorListener((player, what, extra) -> {
+                player.release();
+                if (fallbackTonePlayer == player) fallbackTonePlayer = null;
+                return true;
             });
             fallbackTonePlayer.start();
         }
     }
 
     private void playPersistentAlarm() {
+        stopOutputs();
         Uri tone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-        alarmPlayer = MediaPlayer.create(this, tone);
+        alarmPlayer = createAlarmPlayer(tone);
         if (alarmPlayer != null) {
             alarmPlayer.setLooping(true);
             alarmPlayer.start();
@@ -263,6 +355,9 @@ public class EmergencyAlarmService extends Service {
     }
 
     private void stopOutputs() {
+        audioGeneration++;
+        introFinished = true;
+        cancelSpeechWatchdog();
         if (alarmPlayer != null) {
             try { alarmPlayer.stop(); } catch (Exception ignored) {}
             alarmPlayer.release();
@@ -273,11 +368,7 @@ public class EmergencyAlarmService extends Service {
             fallbackTonePlayer.release();
             fallbackTonePlayer = null;
         }
-        if (speech != null) {
-            speech.stop();
-            speech.shutdown();
-            speech = null;
-        }
+        releaseSpeech();
         if (vibrator != null) vibrator.cancel();
     }
 

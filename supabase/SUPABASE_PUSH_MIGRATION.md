@@ -1,6 +1,24 @@
 # Supabase notification migration
 
-Status: app data/auth already use Supabase. Android 0.11.0 removes legacy Firebase Auth/Firestore. FCM remains the Android notification transport. `notification-config.js` intentionally keeps `provider: "firebase"` until transport validation succeeds.
+Status (2026-09-26): app data/auth use Supabase. Android 0.11.0 removes legacy Firebase Auth/Firestore. FCM remains the Android notification transport. SQL 033 and `dispatch-notification` are deployed; the send-only FCM connection passed validation and `PUSH_DELIVERY_ENABLED=true` is installed. `notification-config.js` now uses `provider: "supabase"`; production Pages deployment was verified. Telegram/Make cutover remains with the owner. Device display still needs an on-device check.
+
+## Owner-operated Make cutover
+The owner will edit Make; do not edit or sign into Make on their behalf.
+
+In the existing Telegram `!!` route, edit its existing HTTP request module (do not add a second sender):
+
+- Method: `POST`.
+- URL: `https://rfcozgyvupvachhhblzn.supabase.co/functions/v1/dispatch-notification/telegram`.
+- Preserve the existing `x-webhook-secret` header and value. The same secret is already installed on Supabase; do not put it in chat or screenshots.
+- Content type: `application/json`.
+- Keep `property_id` as the current numeric branch management number, not the database UUID.
+- Keep `text` mapped to the original Telegram message text, including the `!!` prefix.
+- Add or retain `update_id`, mapped to Telegram's Update ID. Use the real mapped value, not a fixed number or the current timestamp. An alternative accepted shape is `message.chat.id` plus `message.message_id` and `message.text` from the original update.
+- Prefer JSON field mapping/Create JSON so quotes and line breaks in messages are escaped correctly; do not insert raw message text into a hand-built JSON string.
+
+Save the scenario with only one active HTTP sender. A genuine `!!` message should be stored once as urgent and return HTTP 200 with `ok: true`. `!!테스트` only tests the alert path and deliberately does not save an inbox message. `!!정지` stops the alert. A response with `external_id_required` means the Update ID mapping is missing; `invalid_property` means the management number needs checking. Keep the previous HTTP URL for rollback until phone receipt and inbox storage are verified.
+
+No existing Firebase functions or historical data have been deleted. Older Android installations must update to 0.11.0 to remove their Firebase Auth/Firestore dependencies.
 
 ## Apply
 1. Run additive `migrations/033_supabase_push_delivery.sql`.

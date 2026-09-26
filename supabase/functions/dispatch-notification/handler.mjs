@@ -59,7 +59,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
     try {
       const response = await fetcher('https://fcm.googleapis.com/v1/projects/guesthouse-manager-ajh/messages:send', {
         method: 'POST', headers: { Authorization: 'Bearer ' + bearer, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ validate_only: validateOnly, message: { topic, data,
+        body: JSON.stringify({ validate_only: validateOnly, message: { topic, data: data.messageType === 'guest_chat' ? {...data,recipientKey:topic.replace(/^property_[0-9]+_/, '').replace('employee_','employee:').replace('owner_','owner:')} : data,
           android: { priority: 'high', ttl: data.mode === 'stop' ? '60s' : data.mode === 'urgent' ? '300s' : '3600s' } } }),
         signal: AbortSignal.timeout(15000)
       });
@@ -101,8 +101,21 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         await send('property_0_staff', { mode: 'message', message: 'validation' }, 'validation', true);
         return reply({ ok: true, validated: true });
       }
-      let payload, topics, deliveryId;
-      if (path.endsWith('/telegram')) {
+      let payload, topics, deliveryId, recipientDeadlines = {};
+      if (path.endsWith('/guest-chat')) {
+        const secret = env('PUSH_ADMIN_SECRET');
+        if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ok:false,code:'unauthorized'},401);
+        if (!uuid.test(body.event_id || '')) return reply({ok:false,code:'invalid_request'},400);
+        const dispatch = await rpc('get_guest_chat_dispatch',{p_event_id:body.event_id});
+        if (!dispatch.ok) return reply({ok:false,code:'not_found'},404);
+        if (env('PUSH_DELIVERY_ENABLED') !== 'true') return reply({ok:false,code:'not_enabled'},503);
+        deliveryId = dispatch.message_id;
+        topics = dispatch.recipient_topics;
+        recipientDeadlines = dispatch.recipient_deadlines || {};
+        payload = {alertId:String(deliveryId),roomId:String(dispatch.room_id),message:preview(dispatch.message),
+          mode:dispatch.priority === 'urgent' ? 'urgent' : 'message',priority:String(dispatch.priority || 'normal'),
+          messageType:'guest_chat',senderLabel:'현장 게스트',validUntil:String(dispatch.valid_until || now()+300000)};
+      } else if (path.endsWith('/telegram')) {
         const secret = env('TELEGRAM_URGENT_SECRET');
         if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ ok: false, code: 'unauthorized' }, 401);
         const source = body.message && typeof body.message === 'object' ? body.message : {};
@@ -139,17 +152,19 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         topics = dispatch.recipient_topics;
         if (!Array.isArray(topics) || topics.some(t => typeof t !== 'string' || !topicPattern.test(t))) throw new Error('invalid_routing');
       }
+      if (!Array.isArray(topics) || topics.some(t=>typeof t!=='string'||!topicPattern.test(t))) throw new Error('invalid_routing');
       const targets = [...new Set(topics)];
       let sent = 0, duplicates = 0, failed = 0;
       // Bounded concurrency, preserving successful per-recipient deliveries on retry.
       for (let i = 0; i < targets.length; i += 8) {
-        const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => send(t, payload, deliveryId)));
+        const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => send(t, payload.messageType === 'guest_chat' ? {...payload,validUntil:String(recipientDeadlines[t] || payload.validUntil)} : payload, deliveryId)));
         for (const result of results) {
           if (result.status === 'rejected') failed++;
           else if (result.value === 'duplicate') duplicates++;
           else sent++;
         }
       }
+      if (!failed && path.endsWith('/guest-chat')) await rpc('finish_guest_chat_dispatch',{p_event_id:body.event_id});
       return reply({ ok: failed === 0, sent, duplicates, failed, message_id: deliveryId,
         ...(failed ? { message: '메세지는 저장됐지만 일부 알림 발송을 확인하지 못했습니다.' } : {}) }, failed ? 502 : 200);
     } catch (error) {

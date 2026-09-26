@@ -46,12 +46,12 @@ jobs:
       - name: Publish installable APK
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          install -D guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk downloads/Guesthouse-Manager-0.11.1.apk
+          install -D guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk downloads/Guesthouse-Manager-0.12.0.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add downloads/Guesthouse-Manager-0.11.1.apk
+          git add downloads/Guesthouse-Manager-0.12.0.apk
           if ! git diff --cached --quiet; then
-            git commit -m "Publish Guesthouse Manager 0.11.1 APK [skip ci]"
+            git commit -m "Publish Guesthouse Manager 0.12.0 APK [skip ci]"
             git pull --rebase origin main
             git push
           fi

@@ -169,7 +169,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
 
         Button acknowledge = new Button(this);
         acknowledge.setAllCaps(false);
-        acknowledge.setText("확인했습니다");
+        acknowledge.setText(GuestChatAlerts.room(this,alertId)!=null ? "채팅방 열기" : "확인했습니다");
         acknowledge.setTextSize(20);
         acknowledge.setTextColor(Color.WHITE);
         acknowledge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -206,13 +206,14 @@ public class UrgentAlertActivity extends AppCompatActivity {
     }
 
     private void acknowledgeAlert() {
+        boolean guestOpened = GuestChatAlerts.open(this, alertId);
         Intent acknowledge = new Intent(this, AcknowledgeReceiver.class)
                 .putExtra("alertId", alertId);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this,
                 (alertId == null ? 0 : alertId.hashCode()), acknowledge,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         try { pendingIntent.send(); } catch (PendingIntent.CanceledException ignored) {}
-        finishAndRemoveTask();
+        if (guestOpened) finish(); else finishAndRemoveTask();
     }
 
     private void registerCloseReceiver() {

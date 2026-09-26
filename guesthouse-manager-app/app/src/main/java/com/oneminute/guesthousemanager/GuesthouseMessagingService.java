@@ -37,6 +37,11 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage message) {
         String sessionRole = getSharedPreferences("omg_push", MODE_PRIVATE).getString("role", "");
         if (!"staff".equals(sessionRole) && !"owner".equals(sessionRole)) return;
+        boolean guestChat = "guest_chat".equals(message.getData().get("messageType"));
+        if (guestChat) {
+            if (!GuestChatAlerts.accept(this, message.getData())) return;
+            GuestChatAlerts.remember(this, message.getData().get("alertId"), message.getData().get("roomId"));
+        }
         String mode = message.getData().get("mode");
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");
@@ -48,7 +53,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         }
         String activeRole = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("role", "");
-        if (!"staff".equals(activeRole)) {
+        if (!"staff".equals(activeRole) && !guestChat) {
             // Owners may receive ordinary member messages, but employee-only
             // emergency alarms must never wake or ring an owner session.
             stopService(new Intent(this, EmergencyAlarmService.class));
@@ -106,6 +111,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String messageUrl = "https://omgworks24.com/messages.html"
                 + (alertId == null || alertId.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(alertId));
+        if ("guest_chat".equals(remote.getData().get("messageType"))) messageUrl = GuestChatAlerts.url(remote.getData().get("roomId"));
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);

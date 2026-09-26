@@ -26,6 +26,7 @@ final class SupabaseMessageReceipt {
  }
  static synchronized void clear(Context c){prefs(c).edit().clear().apply();}
  static synchronized void acknowledge(Context c,String id){
+  if(GuestChatAlerts.room(c,id)!=null)return;
   if(id==null||!id.matches("[0-9a-fA-F-]{36}"))return;
   SharedPreferences p=prefs(c);Set<String> pending=new HashSet<>(p.getStringSet("pending",new HashSet<>()));
   pending.add(id);p.edit().putStringSet("pending",pending).apply();flush(c.getApplicationContext());

@@ -8,6 +8,8 @@ import android.app.Service;
 import android.content.Intent;
 import android.graphics.Color;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.content.SharedPreferences;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -101,6 +103,7 @@ public class EmergencyAlarmService extends Service {
 
         startForeground(NOTIFICATION_ID, buildNotification(fullScreen, acknowledge, false));
         acquireWakeLock();
+        if ("urgent".equals(mode)) maximizeAlarmVolume();
         playFirstStage();
 
         // On current Android versions, a background activity launch is often
@@ -160,6 +163,7 @@ public class EmergencyAlarmService extends Service {
     }
 
     private String senderIntro() {
+        if (GuestChatAlerts.room(this,alertId)!=null) return "현장 게스트에게 새 메시지가 왔습니다";
         return "사장님".equals(senderLabel)
                 ? "사장님이 보낸 메세지입니다"
                 : senderLabel + "님이 보낸 메세지입니다";
@@ -345,6 +349,7 @@ public class EmergencyAlarmService extends Service {
     private void stopAlert(boolean closeScreen) {
         if (startPersistentAlarm != null) handler.removeCallbacks(startPersistentAlarm);
         stopOutputs();
+        restoreAlarmVolume();
         releaseWakeLock();
         if (overlayController != null) overlayController.dismiss();
         stopForeground(true);
@@ -372,6 +377,25 @@ public class EmergencyAlarmService extends Service {
         if (vibrator != null) vibrator.cancel();
     }
 
+    private void maximizeAlarmVolume() {
+        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (audio == null || audio.isVolumeFixed()) return;
+        SharedPreferences p = getSharedPreferences("omg_urgent_volume", MODE_PRIVATE);
+        try {
+            if (!p.contains("original")) p.edit().putInt("original", audio.getStreamVolume(AudioManager.STREAM_ALARM)).commit();
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+        } catch (SecurityException e) { Log.w("UrgentAlert", "Alarm volume restricted by system"); }
+    }
+
+    private void restoreAlarmVolume() {
+        SharedPreferences p = getSharedPreferences("omg_urgent_volume", MODE_PRIVATE);
+        if (!p.contains("original")) return;
+        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+        try { if (audio != null) audio.setStreamVolume(AudioManager.STREAM_ALARM, p.getInt("original", 0), 0); }
+        catch (SecurityException e) { Log.w("UrgentAlert", "Alarm volume restore restricted"); }
+        finally { p.edit().remove("original").apply(); }
+    }
+
     private void releaseWakeLock() {
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         wakeLock = null;
@@ -381,6 +405,7 @@ public class EmergencyAlarmService extends Service {
     public void onDestroy() {
         if (startPersistentAlarm != null) handler.removeCallbacks(startPersistentAlarm);
         stopOutputs();
+        restoreAlarmVolume();
         releaseWakeLock();
         if (overlayController != null) overlayController.dismiss();
         super.onDestroy();

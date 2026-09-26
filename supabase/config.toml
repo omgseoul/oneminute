@@ -5,3 +5,6 @@ verify_jwt = false
 # Custom employee/owner session token is validated in the Supabase RPC.
 # Telegram and validation routes require separate server-side secrets.
 verify_jwt = false
+
+[functions.guest-support]
+verify_jwt = false

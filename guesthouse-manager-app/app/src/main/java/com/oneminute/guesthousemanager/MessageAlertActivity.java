@@ -175,6 +175,7 @@ public class MessageAlertActivity extends AppCompatActivity {
 
     private void openMessages() {
         cancelNotification();
+        if (GuestChatAlerts.open(this, alertId)) { finish(); return; }
         String messageUrl = "https://omgworks24.com/messages.html"
                 + (alertId == null || alertId.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(alertId));
         Intent open = new Intent(this, AttendanceActivity.class)

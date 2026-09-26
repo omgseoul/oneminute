@@ -105,15 +105,18 @@ final class UrgentOverlayController {
 
         Button acknowledge = new Button(context);
         acknowledge.setAllCaps(false);
-        acknowledge.setText("확인했습니다");
+        acknowledge.setText(GuestChatAlerts.room(context,alertId)!=null ? "채팅방 열기" : "확인했습니다");
         acknowledge.setTextSize(19);
         acknowledge.setTextColor(Color.WHITE);
         acknowledge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         acknowledge.setBackground(rounded(NAVY, 16));
-        acknowledge.setOnClickListener(view -> context.sendBroadcast(
+        acknowledge.setOnClickListener(view -> {
+            GuestChatAlerts.open(context,alertId);
+            context.sendBroadcast(
                 new Intent(context, AcknowledgeReceiver.class)
                         .setPackage(context.getPackageName())
-                        .putExtra("alertId", alertId)));
+                        .putExtra("alertId", alertId));
+        });
         card.addView(acknowledge, new LinearLayout.LayoutParams(-1, dp(60)));
 
         shade.addView(scroll, new FrameLayout.LayoutParams(-1, -1));

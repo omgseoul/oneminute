@@ -17,6 +17,8 @@ function harness(options={}) {
   if(url.endsWith('get_message_push_dispatch_v2'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],message:'한'.repeat(2000),message_type:'attendance_warning',sender_label:'근태관리',priority:'normal'}:{ok:false,code:'invalid_session'});
   if(url.endsWith('claim_push_delivery')){if(claims.has(body.p_key))return Response.json({ok:true,claimed:false,status:claims.get(body.p_key)});claims.set(body.p_key,'sending');return Response.json({ok:true,claimed:true,lease_id:id});}
   if(url.endsWith('finish_push_delivery')){if(body.p_success)claims.set(body.p_key,'sent');else claims.delete(body.p_key);return Response.json({ok:true});}
+  if(url.endsWith('get_guest_chat_dispatch'))return Response.json({ok:true,message_id:id,room_id:id,recipient_topics:[topic],message:'guest',priority:'urgent'});
+  if(url.endsWith('finish_guest_chat_dispatch'))return Response.json(null);
   if(url.endsWith('save_telegram_urgent_message_service'))return Response.json({ok:true,message_id:id});
   throw Error('Unexpected network request');
  };
@@ -36,3 +38,5 @@ test('Telegram requires secret and stable external identifier',async()=>{const h
 test('Telegram saves inbox before transport and namespacing isolates properties',async()=>{const h=harness();assert.equal((await h.request({text:'!!hello',property_id:'123',update_id:42},'/telegram',{'x-webhook-secret':'test-webhook'})).status,200);const save=h.calls.findIndex(c=>c.url.endsWith('save_telegram_urgent_message_service'));const send=h.calls.findIndex(c=>c.url.includes('fcm.googleapis.com'));assert(save<send);assert.equal(h.calls[save].body.p_external_id,'property:123:42');assert.equal(h.calls[send].body.message.topic,'property_123_staff');});
 test('validation never sends a real notification and requires admin secret',async()=>{const h=harness();assert.equal((await h.request({},'/validate')).status,401);assert.equal((await h.request({},'/validate',{'x-webhook-secret':'test-admin'})).status,200);assert.equal(h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.validate_only,true);assert.equal(h.claims.size,0);});
 test('missing credentials cannot produce a false success',async()=>{const h=harness({config:{FCM_SERVICE_ACCOUNT:''}});assert.equal((await h.request()).status,503);});
+
+test('guest chat dispatcher requires server secret and binds recipient identity',async()=>{const h=harness();assert.equal((await h.request({event_id:id},'/guest-chat')).status,401);assert.equal((await h.request({event_id:id},'/guest-chat',{'x-webhook-secret':'test-admin'})).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.recipientKey,'employee:'+id);assert.equal(d.roomId,id);assert.equal(d.messageType,'guest_chat');assert.equal(d.mode,'urgent');assert(h.calls.some(c=>c.url.endsWith('finish_guest_chat_dispatch')));});

@@ -23,7 +23,21 @@
  renderItems();document.getElementById('add').onclick=()=>{if(items.length>=9)return;items.push({title:'',asset_id:null,icon:null});renderItems();list.lastChild.querySelector('input').focus();};
  form.onsubmit=async e=>{e.preventDefault();if(uploading)return;const btn=document.getElementById('save');btn.disabled=true;try{if(items.some(i=>!i.asset_id))throw new Error('각 안내 항목에 파일을 첨부해주세요.');await call('save_settings',{enabled:enabled.checked,chat_enabled:document.getElementById('chatEnabled').checked,items});G.message('안내 설정을 저장했습니다.');}catch(err){G.message(err.message,true);}finally{btn.disabled=false;}};
  const url=new URL('guest.html',location.href);url.searchParams.set('p',state.config.slug);document.getElementById('url').value=url.href;document.getElementById('preview').href=url.href;
- if(typeof qrcode==='function'){const qr=qrcode(0,'M');qr.addData(url.href);qr.make();document.getElementById('qr').innerHTML=qr.createImgTag(5,20,'게스트 안내 QR');document.getElementById('download').onclick=()=>{const a=document.createElement('a');a.href=document.querySelector('#qr img').src;a.download='guest-support-qr.gif';a.click();};}else G.message('QR 생성기를 불러오지 못했습니다. 새로고침해주세요.',true);
+ if(typeof qrcode==='function'){
+  const qr=qrcode(0,'M');qr.addData(url.href);qr.make();
+  const count=qr.getModuleCount(),scale=12,margin=4,canvas=document.createElement('canvas');canvas.width=canvas.height=(count+margin*2)*scale;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#000';
+  for(let y=0;y<count;y++)for(let x=0;x<count;x++)if(qr.isDark(y,x))ctx.fillRect((x+margin)*scale,(y+margin)*scale,scale,scale);
+  const png=canvas.toDataURL('image/png'),img=new Image();img.src=png;img.alt='게스트 안내 QR';document.getElementById('qr').replaceChildren(img);
+  const bytes=Uint8Array.from(atob(png.split(',')[1]),c=>c.charCodeAt(0)),file=new File([bytes],'guest-support-qr.png',{type:'image/png'});
+  document.getElementById('download').onclick=async()=>{
+   try{
+    if(navigator.canShare?.({files:[file]})&&navigator.share){await navigator.share({files:[file],title:'게스트 접속 QR'});return;}
+    const blobUrl=URL.createObjectURL(file),a=document.createElement('a');a.href=blobUrl;a.download=file.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(blobUrl),60000);
+    G.message('QR 이미지 다운로드를 요청했습니다. 다운로드 폴더를 확인해주세요.');
+   }catch(error){if(error.name!=='AbortError')G.message('QR 저장 창을 열지 못했습니다. 브라우저에서 다시 시도해주세요.',true);}
+  };
+ }else G.message('QR 생성기를 불러오지 못했습니다. 새로고침해주세요.',true);
  document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(url.href);G.message('주소를 복사했습니다.');}catch{document.getElementById('url').select();G.message('주소를 길게 눌러 복사해주세요.');}};
  G.message('');
 })().catch(e=>GuestSupport.message(e.message,true));

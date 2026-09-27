@@ -23,8 +23,8 @@
   const day=new Date(m.created_at).toLocaleDateString('ko-KR',{month:'long',day:'numeric'});if(day!==lastDay){const d=document.createElement('div');d.className='day';d.textContent=day;timeline.append(d);lastDay=day;}
   const el=document.createElement('div');
   if(m.sender_kind==='system'){el.className='system-message';el.textContent=m.sender_name+' · '+m.body;timeline.append(el);return;}
-  const mine=isGuest?m.sender_kind==='guest':m.sender_key===actor;el.className='bubble-row'+(mine?' mine':'');
-  const name=document.createElement('div');name.className='bubble-name';name.textContent=mine?'나':m.sender_name;el.append(name);
+  const mine=isGuest?m.sender_kind==='guest':m.sender_kind==='staff';el.className='bubble-row'+(mine?' mine':'');
+  const name=document.createElement('div');name.className='bubble-name';name.textContent=(isGuest?m.sender_kind==='guest':m.sender_key===actor)?'나':m.sender_name;el.append(name);
   const bubble=document.createElement('div');bubble.className='bubble';if(m.asset_id){const a=assets.find(x=>x.id===m.asset_id);if(a){const img=new Image();img.src=a.url;img.alt='첨부 사진';img.loading='lazy';img.onclick=async()=>{try{const fresh=await call('messages',{after_seq:Number(m.seq)-1});G.viewer(fresh.assets.find(x=>x.id===m.asset_id),'첨부 사진');}catch(e){G.message(e.message,true);}};bubble.append(img);}}
   if(m.body)bubble.append(document.createTextNode(m.body));el.append(bubble);const time=document.createElement('time');time.className='bubble-time';time.textContent=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});el.append(time);timeline.append(el);
  }

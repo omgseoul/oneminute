@@ -30,5 +30,31 @@
   }
   document.addEventListener("pointerdown",event=>{document.querySelectorAll(".warning-targets").forEach(root=>{if(!root.contains(event.target))close(root);});});
   document.addEventListener("keydown",event=>{if(event.key==="Escape")document.querySelectorAll(".warning-targets").forEach(close);});
-  window.omgWarningTargets={mount};
+  function mountConditions(row,rule={}){
+    const event=row.querySelector('.warning-event'),comparison=row.querySelector('.warning-comparison');
+    let clockComparison=rule.comparison||'late';
+    function picker(input,title,options,multiple,onChange){
+      const root=document.createElement('div');root.className='warning-targets warning-choice';
+      input.before(root);root.append(input);input.hidden=true;
+      const id='warning-choice-panel-'+(++counter);
+      root.insertAdjacentHTML('beforeend',`<button type="button" class="warning-target-trigger" aria-expanded="false" aria-controls="${id}"><span></span><b aria-hidden="true">⌄</b></button><div class="warning-target-panel" id="${id}" hidden></div>`);
+      const button=root.querySelector('button'),panel=root.querySelector('.warning-target-panel');
+      function sync(){
+        const choices=options(),selected=input.value==='both'?['late','early']:[input.value];
+        button.querySelector('span').textContent=choices.filter(x=>selected.includes(x[0])).map(x=>x[1]).join(' · ');
+        panel.innerHTML=`<p>${title}${multiple?' · 복수 선택':''}</p>`+choices.map(([value,label])=>`<label><span>${label}</span><input type="${multiple?'checkbox':'radio'}" name="${id}" value="${value}" ${selected.includes(value)?'checked':''}></label>`).join('');
+        panel.querySelectorAll('input').forEach(control=>control.onchange=()=>{
+          const values=[...panel.querySelectorAll('input:checked')].map(x=>x.value);
+          if(!values.length){control.checked=true;return;}
+          input.value=values.length===2?'both':values[0];onChange?.();sync();if(!multiple)close(root);
+        });
+      }
+      button.onclick=()=>{const opening=panel.hidden;document.querySelectorAll('.warning-targets').forEach(close);if(opening){panel.hidden=false;button.setAttribute('aria-expanded','true');const rect=button.getBoundingClientRect();root.classList.toggle('open-up',window.innerHeight-rect.bottom<Math.min(panel.scrollHeight,300)&&rect.top>window.innerHeight-rect.bottom);}};
+      sync();return sync;
+    }
+    if(event.value==='work_duration')comparison.value='late';
+    const syncComparison=picker(comparison,'조건',()=>event.value==='work_duration'?[['late','초과하면']]:[['late','늦으면'],['early','빠르면']],true,()=>{if(event.value!=='work_duration')clockComparison=comparison.value;});
+    picker(event,'기준',()=>[['clock_in','출근시간'],['clock_out','퇴근시간'],['work_duration','근무시간']],false,()=>{comparison.value=event.value==='work_duration'?'late':clockComparison;syncComparison();});
+  }
+  window.omgWarningTargets={mount,mountConditions};
 })();

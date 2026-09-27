@@ -60,6 +60,7 @@
 .guest-room .hub-room-status>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .guest-room .hub-room-status.is-complete{color:#40806b}
 :is(.guest-room,.staff-room) .hub-room-meta .hub-count{position:absolute;right:0;top:calc(100% + 3px);bottom:auto;min-width:17px;height:17px;font-size:9px}
-.hub-tabs .hub-actions #searchToggle{color:#537f98}
+.hub-tabs .hub-actions #searchToggle,.hub-tabs .hub-actions #composeToggle{color:#537f98;background:transparent;border-radius:0}
+.hub-tabs .hub-actions #composeToggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7}
 .hub-tabs #searchToggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7}
 @media(max-width:350px){#guestRooms .guest-room,#staffRooms .staff-room{grid-template-columns:60px minmax(0,1fr) 100px;gap:8px}:is(.guest-room,.staff-room) .hub-room-meta{width:100px;max-width:100px;font-size:9px}.guest-room .hub-room-status{font-size:9px}}

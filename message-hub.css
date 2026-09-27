@@ -24,3 +24,22 @@
 #approvalFilter{width:85px;flex-shrink:0;padding:7px 4px;border:1px solid #dce5f1;border-radius:10px;background:white;color:#385776;font-size:11px}
 
 .hub-tabs.owner-hub{gap:clamp(8px,2.8vw,20px)}.owner-hub>[data-hub]{font-size:14px}#approvalFilterHost{display:flex;justify-content:flex-end;margin:8px 0}#approvalFilterHost select{height:30px;width:95px}
+
+/* Keep the guest property filter in the navigation row and guest rows compact. */
+.hub-tabs{gap:clamp(10px,3.2vw,18px)}
+.hub-actions{min-width:0;gap:3px}
+.hub-actions #hubProperty{min-width:0;flex-shrink:1}
+.hub-actions #hubProperty .property-picker{max-width:86px}
+.hub-actions #hubProperty .property-picker-button{max-width:86px;height:34px;padding:0 8px;font-size:11px;font-weight:650;border-radius:11px}
+.hub-actions #hubProperty .property-picker-panel{left:auto;right:0}
+.hub-room:not(.staff-room){display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:12px;padding-top:16px;padding-bottom:16px}
+.hub-room-copy{display:grid;gap:8px;min-width:0}
+.hub-room-copy strong,.hub-room-preview{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hub-room-copy strong{font-size:16px}
+.hub-room-preview{color:#66778e;font-size:14px;line-height:1.35}
+.hub-room-meta{display:grid;justify-items:end;align-content:center;gap:3px;min-width:100px;max-width:125px;color:#6884b4;font-size:10px;line-height:1.2}
+.hub-room-meta>span,.hub-room-meta time{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hub-room-meta time{color:#7e8ba1}
+.hub-room-status{display:flex!important;align-items:center;justify-content:flex-end;gap:5px}
+.hub-room-status .hub-count{display:inline-grid;min-width:17px;height:17px;font-size:9px}
+@media(max-width:350px){.hub-tabs{gap:7px}.hub-tabs>[data-hub]{font-size:14px}.hub-actions #hubProperty .property-picker{max-width:70px}.hub-actions #hubProperty .property-picker-button{max-width:70px;padding:0 6px}.hub-room:not(.staff-room){gap:8px}.hub-room-meta{min-width:88px;max-width:105px;font-size:9px}}

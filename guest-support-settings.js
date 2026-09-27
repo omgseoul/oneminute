@@ -30,12 +30,29 @@
   for(let y=0;y<count;y++)for(let x=0;x<count;x++)if(qr.isDark(y,x))ctx.fillRect((x+margin)*scale,(y+margin)*scale,scale,scale);
   const png=canvas.toDataURL('image/png'),img=new Image();img.src=png;img.alt='게스트 안내 QR';document.getElementById('qr').replaceChildren(img);
   const bytes=Uint8Array.from(atob(png.split(',')[1]),c=>c.charCodeAt(0)),file=new File([bytes],'guest-support-qr.png',{type:'image/png'});
-  document.getElementById('download').onclick=async()=>{
+  let downloadUrl=null,downloadExpires=0;
+  const downloadButton=document.getElementById('download');
+  const downloadStatus=document.createElement('p');downloadStatus.className='help';downloadStatus.setAttribute('role','status');downloadButton.closest('.row').after(downloadStatus);
+  async function downloadThroughBrowser(){
+   downloadStatus.textContent='QR 다운로드를 준비하고 있습니다…';
+   if(!downloadUrl||Date.now()>downloadExpires){
+    const uploaded=await G.call('upload',{},auth,file),asset=uploaded.assets?.find(a=>a.id===uploaded.asset_id);
+    if(!asset?.url)throw new Error('QR 다운로드 주소를 만들지 못했습니다. 다시 눌러주세요.');
+    const link=new URL(asset.url);link.searchParams.set('download',file.name);downloadUrl=link.href;downloadExpires=Date.now()+10*60*1000;
+   }
+   const link=document.createElement('a');link.href=downloadUrl;link.textContent='QR PNG 다운로드 다시 열기';link.className='btn wide';
+   downloadStatus.replaceChildren(document.createTextNode('브라우저에서 QR 이미지를 저장해주세요. '),link);
+   location.assign(downloadUrl);
+  }
+  downloadButton.onclick=async()=>{
+   downloadButton.disabled=true;
    try{
-    if(navigator.canShare?.({files:[file]})&&navigator.share){await navigator.share({files:[file],title:'게스트 접속 QR'});return;}
-    const blobUrl=URL.createObjectURL(file),a=document.createElement('a');a.href=blobUrl;a.download=file.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(blobUrl),60000);
-    G.message('QR 이미지 다운로드를 요청했습니다. 다운로드 폴더를 확인해주세요.');
-   }catch(error){if(error.name!=='AbortError')G.message('QR 저장 창을 열지 못했습니다. 브라우저에서 다시 시도해주세요.',true);}
+    if(!window.OMGNative&&navigator.canShare?.({files:[file]})&&navigator.share){
+     try{await navigator.share({files:[file],title:'게스트 접속 QR'});return;}catch(error){if(error.name==='AbortError')return;}
+    }
+    await downloadThroughBrowser();
+   }catch(error){downloadStatus.textContent=error.message||'QR 저장에 실패했습니다. 다시 눌러주세요.';}
+   finally{downloadButton.disabled=false;}
   };
  }else G.message('QR 생성기를 불러오지 못했습니다. 새로고침해주세요.',true);
  document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(url.href);G.message('주소를 복사했습니다.');}catch{document.getElementById('url').select();G.message('주소를 길게 눌러 복사해주세요.');}};

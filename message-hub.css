@@ -53,8 +53,12 @@
 .guest-room-number{display:block;height:16px;background:#3d6fbb;color:white;text-align:center;font-size:11px;font-weight:500;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px}
 #staffRooms .staff-avatar{font-size:24px}
 :is(.guest-room,.staff-room) .hub-room-copy{display:grid;gap:5px;min-width:0}
-:is(.guest-room,.staff-room) .hub-room-copy strong{font-size:16px;font-weight:700;line-height:1.4}
-:is(.guest-room,.staff-room) .hub-room-preview{font-size:14px;line-height:1.5}
+:is(.guest-room,.staff-room) .hub-room-copy strong,.message-card .sender{font-family:inherit;font-size:16px;font-weight:700;line-height:1.4;color:#19334f}
+:is(.guest-room,.staff-room) .hub-room-preview,.message-card .preview{font-family:inherit;font-size:14px;font-weight:400;line-height:1.5;color:#66778e}
+.message-card{font-family:inherit;font-weight:400}
+.message-card .preview{margin-top:5px}
+.message-card .time{font-family:inherit;font-weight:400;font-size:10px;line-height:12px;color:#7e8ba1}
+.message-card .status-pill{font-family:inherit;font-weight:700;font-style:normal}
 :is(.guest-room,.staff-room) .hub-room-meta{position:relative;min-width:0;width:110px;max-width:110px;gap:2px;font-size:10px;line-height:12px;color:#7b8ca4;align-self:center}
 .guest-room .hub-room-status{justify-content:flex-end;min-width:0;max-width:100%;color:#537f98;font-size:10px;line-height:12px}
 .guest-room .hub-room-status>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

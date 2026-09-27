@@ -6,3 +6,21 @@
 .head{display:none!important}.shell>.top{margin-bottom:18px!important}.message-top-actions{display:flex;align-items:center;gap:8px}.message-top-actions .head-icon{width:36px!important;height:36px!important}.hub-tabs{gap:clamp(16px,5vw,26px);align-items:center}.hub-tabs #searchToggle{margin-left:auto;padding:8px;border:0;border-radius:50%;width:36px!important;height:36px!important;display:grid;place-items:center;color:#294867;background:transparent;flex-shrink:0}.hub-tabs #searchToggle svg{width:21px;height:21px}.hub-toolbar{grid-template-columns:minmax(0,1fr);max-width:240px}.message-search{margin:12px 0!important}#staffRooms{margin:0 -18px}.message-kind small{white-space:nowrap;line-height:1.2}.message-kind[aria-label="근태관리"] small{font-size:9px!important;letter-spacing:-.6px}.detail-identity .message-kind[aria-label="근태관리"] small{font-size:10px!important}#staffError:empty{display:none}#guestError:empty{display:none}
 
 .hub-actions{display:flex;align-items:center;gap:5px;margin-left:auto;flex-shrink:0}.hub-tabs .hub-actions #searchToggle{margin-left:0}.hub-tabs .hub-actions #composeToggle{display:grid;place-items:center;width:36px!important;height:36px!important;padding:8px;border:0;border-radius:50%;background:#19334f;color:white}.hub-actions #composeToggle svg{width:21px;height:21px}@media(max-width:350px){.hub-tabs{gap:15px}.hub-tabs .hub-actions #composeToggle,.hub-tabs .hub-actions #searchToggle{width:32px!important;height:32px!important}.hub-actions{gap:3px}}
+
+/* Shared multi-property picker and compact conversation rows. */
+#hubProperty .property-picker{margin-left:0;width:max-content;max-width:100%}
+#hubProperty .property-picker-panel{left:0;right:auto}
+#hubProperty .property-picker-button{max-width:240px;height:40px;font-size:13px;font-weight:600}
+.staff-room{padding-top:15px;padding-bottom:15px}
+.staff-room-copy{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;row-gap:5px}
+.staff-room .hub-room-top{display:contents}
+.staff-room .hub-room-top strong{grid-column:1;grid-row:1;align-self:center}
+.staff-room-meta{grid-column:2;grid-row:1 / 3;display:flex;flex-direction:column;align-items:flex-end;gap:5px;max-width:140px}
+.staff-room-meta small{font-size:10px;color:#7b8ca4;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.staff-room p{grid-column:1;grid-row:2;margin:0;line-height:1.5}
+.staff-room .hub-count{position:absolute;right:0;bottom:-10px;min-width:17px;height:17px;font-size:10px}
+.mail-tabs{display:flex!important;align-items:center;gap:5px;padding:4px!important}
+.mail-tabs[hidden]{display:none!important}.mail-tabs .mail-tab{flex:1;min-width:0}
+#approvalFilter{width:85px;flex-shrink:0;padding:7px 4px;border:1px solid #dce5f1;border-radius:10px;background:white;color:#385776;font-size:11px}
+
+.hub-tabs.owner-hub{gap:clamp(8px,2.8vw,20px)}.owner-hub>[data-hub]{font-size:14px}#approvalFilterHost{display:flex;justify-content:flex-end;margin:8px 0}#approvalFilterHost select{height:30px;width:95px}

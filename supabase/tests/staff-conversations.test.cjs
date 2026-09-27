@@ -21,6 +21,23 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  const staff=(await db.query("select id,property_id from public.employees where active and role<>'owner' order by id")).rows;
  const worker=await rpc('start_work_session',[staff[0].id,'731482']);
 
+
+ const deviceId=require('node:crypto').randomUUID(), deviceToken='fcm-test-'+ 'x'.repeat(90);
+ const registration=await rpc('register_native_push',[worker.access_token,deviceId,deviceToken]);
+ check(registration.ok,'native device is bound to validated staff session');
+ const targets=async topic=>(await one('select public.resolve_native_push_targets($1::text[]) r',[[topic]])).r;
+ check((await targets(registration.topic))[0].token===deviceToken,'device target resolves to current session token');
+ await assert.rejects(()=>rpc('register_native_push',[require('node:crypto').randomUUID(),deviceId,deviceToken]));
+ check(true,'invalid session cannot register devices');
+ await assert.rejects(()=>rpc('resolve_native_push_targets',[[registration.topic]]));
+ check(true,'clients cannot read FCM device credentials');
+ await rpc('unregister_native_push',[owner.access_token,deviceId]);
+ check((await targets(registration.topic))[0].token===deviceToken,'another session cannot unregister device');
+ await rpc('unregister_native_push',[worker.access_token,deviceId]);
+ check((await targets(registration.topic))[0].token===null,'logout removes direct binding and preserves legacy fallback');
+ const ownerDevice=await rpc('register_native_push',[owner.access_token,deviceId,deviceToken]);
+ check(ownerDevice.actor_key.startsWith('owner:'),'device can switch safely to owner account');
+ await rpc('unregister_native_push',[owner.access_token,deviceId]);
  const crypto=require('node:crypto');
  const first=staff.find(s=>s.property_id===owner.property_id)||staff[0];
  const second=staff.find(s=>s.property_id===first.property_id&&s.id!==first.id);

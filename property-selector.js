@@ -23,9 +23,9 @@
     document.head.append(style);
   }
   async function rpc(name,args){const{data,error}=await window.omgSupabase.rpc(name,args);if(error||!data?.ok)throw new Error(data?.message||"지점 목록을 불러오지 못했습니다.");return data;}
-  function build({properties,permission,host,onChange,defaultSelection="all"}){
+  function build({properties,permission,host,onChange,defaultSelection="all",alwaysShow=false}){
     addStyle();
-    if(properties.length<2)return{properties,selectedIds:()=>properties.map(x=>x.property_id)};
+    if(properties.length<2&&!alwaysShow)return{properties,selectedIds:()=>properties.map(x=>x.property_id)};
     const own=properties.find(item=>item.is_own)||properties[0];
     const isChecked=item=>defaultSelection==="own"?item.property_id===own.property_id:true;
     const root=document.createElement("div");
@@ -50,8 +50,8 @@
     const properties=(data.properties||[]).filter(item=>item.is_own||(item.permissions||[]).includes(permission));
     return build({properties,permission,host,onChange,defaultSelection});
   }
-  function mountStatic({properties,permission,host,onChange,defaultSelection="own"}){
-    return build({properties,permission,host,onChange,defaultSelection});
+  function mountStatic({properties,permission,host,onChange,defaultSelection="own",alwaysShow=false}){
+    return build({properties,permission,host,onChange,defaultSelection,alwaysShow});
   }
   window.omgPropertySelector={mount,mountStatic};
 })();

@@ -15,6 +15,8 @@ function harness(options={}) {
   if(url.endsWith('/token'))return Response.json({access_token:'fake-token',expires_in:3600});
   if(url.includes('fcm.googleapis.com'))return Response.json({}, {status:options.failFcm?500:200});
   if(url.endsWith('get_message_push_dispatch_v2'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],message:'한'.repeat(2000),message_type:'attendance_warning',sender_label:'근태관리',priority:'normal'}:{ok:false,code:'invalid_session'});
+  if(url.endsWith('resolve_native_push_targets'))return Response.json(options.devices||[]);
+  if(url.endsWith('invalidate_native_push'))return Response.json(null);
   if(url.endsWith('claim_push_delivery')){if(claims.has(body.p_key))return Response.json({ok:true,claimed:false,status:claims.get(body.p_key)});claims.set(body.p_key,'sending');return Response.json({ok:true,claimed:true,lease_id:id});}
   if(url.endsWith('finish_push_delivery')){if(body.p_success)claims.set(body.p_key,'sent');else claims.delete(body.p_key);return Response.json({ok:true});}
   if(url.endsWith('get_guest_chat_dispatch'))return Response.json({ok:true,message_id:id,room_id:id,recipient_topics:[topic],message:'guest',priority:'urgent'});
@@ -40,3 +42,13 @@ test('validation never sends a real notification and requires admin secret',asyn
 test('missing credentials cannot produce a false success',async()=>{const h=harness({config:{FCM_SERVICE_ACCOUNT:''}});assert.equal((await h.request()).status,503);});
 
 test('guest chat dispatcher requires server secret and binds recipient identity',async()=>{const h=harness();assert.equal((await h.request({event_id:id},'/guest-chat')).status,401);assert.equal((await h.request({event_id:id},'/guest-chat',{'x-webhook-secret':'test-admin'})).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.recipientKey,'employee:'+id);assert.equal(d.roomId,id);assert.equal(d.messageType,'guest_chat');assert.equal(d.mode,'urgent');assert(h.calls.some(c=>c.url.endsWith('finish_guest_chat_dispatch')));});
+
+test('registered device gets direct high-priority push with recipient binding while legacy topics remain supported',async()=>{
+ const h=harness({devices:[{topic,device_id:id,token:'device-token'}]});
+ assert.equal((await h.request()).status,200);
+ const sent=h.calls.filter(c=>c.url.includes('fcm.googleapis.com')).map(c=>c.body.message);
+ assert.equal(sent.length,2);const direct=sent.find(m=>m.token);assert.equal(direct.token,'device-token');assert.equal(direct.topic,undefined);
+ assert.equal(direct.android.priority,'high');assert.equal(direct.data.recipientKey,'employee:'+id);
+ await h.request();assert.equal(h.calls.filter(c=>c.url.includes('fcm.googleapis.com')).length,2);
+});
+test('device resolver cannot route outside authorized recipients',async()=>{const h=harness({devices:[{topic:'property_999_employee_'+id,device_id:id,token:'x'}]});assert.equal((await h.request()).status,503);assert(!h.calls.some(c=>c.url.includes('fcm.googleapis.com')));});

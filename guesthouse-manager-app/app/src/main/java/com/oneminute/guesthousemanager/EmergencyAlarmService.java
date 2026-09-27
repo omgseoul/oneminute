@@ -31,7 +31,7 @@ public class EmergencyAlarmService extends Service {
     public static final String ACTION_STOP = "com.oneminute.guesthousemanager.STOP_URGENT_ALERT";
     public static final String ACTION_SCREEN_CLOSE = "com.oneminute.guesthousemanager.URGENT_SCREEN_CLOSE";
 
-    private static final String CHANNEL_ID = "urgent_alerts_countdown_v5_overlay";
+    private static final String CHANNEL_ID = "urgent_alerts_countdown_v6_vibration";
     private static final int NOTIFICATION_ID = 9001;
     private static final long COUNTDOWN_MS = 60_000L;
 
@@ -64,7 +64,8 @@ public class EmergencyAlarmService extends Service {
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID, "긴급 메세지", NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("잠금화면을 깨우고 확인할 때까지 표시되는 긴급 알림");
-        channel.enableVibration(false);
+        channel.enableVibration(true);
+        channel.setVibrationPattern(new long[]{0, 650, 180, 650});
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         channel.setBypassDnd(true);
         channel.setSound(null, null);
@@ -206,7 +207,7 @@ public class EmergencyAlarmService extends Service {
     private void playFirstStage() {
         if (vibrator != null && vibrator.hasVibrator()) {
             vibrator.vibrate(VibrationEffect.createWaveform(
-                    new long[]{0, 650, 180, 650}, -1));
+                    new long[]{0, 650, 180, 650}, -1), alarmAudioAttributes(AudioAttributes.CONTENT_TYPE_SONIFICATION));
         }
         // !!테스트는 조용한 장소에서 동작 여부만 확인하는 모드다.
         // 진동과 동일한 강아지 카운터 화면만 표시하고 어떤 소리도 내지 않는다.
@@ -342,7 +343,7 @@ public class EmergencyAlarmService extends Service {
         }
         if (vibrator != null && vibrator.hasVibrator()) {
             vibrator.vibrate(VibrationEffect.createWaveform(
-                    new long[]{0, 1000, 500, 1000, 500}, 0));
+                    new long[]{0, 1000, 500, 1000, 500}, 0), alarmAudioAttributes(AudioAttributes.CONTENT_TYPE_SONIFICATION));
         }
     }
 
@@ -378,22 +379,12 @@ public class EmergencyAlarmService extends Service {
     }
 
     private void maximizeAlarmVolume() {
-        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
-        if (audio == null || audio.isVolumeFixed()) return;
-        SharedPreferences p = getSharedPreferences("omg_urgent_volume", MODE_PRIVATE);
-        try {
-            if (!p.contains("original")) p.edit().putInt("original", audio.getStreamVolume(AudioManager.STREAM_ALARM)).commit();
-            audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
-        } catch (SecurityException e) { Log.w("UrgentAlert", "Alarm volume restricted by system"); }
+        getSharedPreferences("omg_urgent_volume", MODE_PRIVATE).edit().putInt("original", 1).apply();
+        AlertAudioVolume.acquire(this, true);
     }
-
     private void restoreAlarmVolume() {
-        SharedPreferences p = getSharedPreferences("omg_urgent_volume", MODE_PRIVATE);
-        if (!p.contains("original")) return;
-        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
-        try { if (audio != null) audio.setStreamVolume(AudioManager.STREAM_ALARM, p.getInt("original", 0), 0); }
-        catch (SecurityException e) { Log.w("UrgentAlert", "Alarm volume restore restricted"); }
-        finally { p.edit().remove("original").apply(); }
+        getSharedPreferences("omg_urgent_volume", MODE_PRIVATE).edit().remove("original").apply();
+        AlertAudioVolume.release(this, true);
     }
 
     private void releaseWakeLock() {

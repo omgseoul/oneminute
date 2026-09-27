@@ -45,11 +45,11 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
     if (!response.ok) throw new Error('database_failed');
     return value;
   }
-  async function send(topic, data, deliveryId, validateOnly = false) {
+  async function send(topic, data, deliveryId, validateOnly = false, device = null) {
     if (!topicPattern.test(topic)) throw new Error('invalid_topic');
     // Obtain transport authorization before taking a delivery lease.
     const bearer = await oauth();
-    const deliveryKey = deliveryId + ':' + topic;
+    const deliveryKey = deliveryId + ':' + (device ? 'device:' + device.device_id : topic);
     const lease = validateOnly ? { claimed: true } : await rpc('claim_push_delivery', { p_key: deliveryKey });
     if (!lease.claimed) {
       if (lease.status === 'sent') return 'duplicate';
@@ -59,11 +59,13 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
     try {
       const response = await fetcher('https://fcm.googleapis.com/v1/projects/guesthouse-manager-ajh/messages:send', {
         method: 'POST', headers: { Authorization: 'Bearer ' + bearer, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ validate_only: validateOnly, message: { topic, data: data.messageType === 'guest_chat' ? {...data,recipientKey:topic.replace(/^property_[0-9]+_/, '').replace('employee_','employee:').replace('owner_','owner:')} : data,
+        body: JSON.stringify({ validate_only: validateOnly, message: { ...(device ? {token:device.token} : {topic}), data: !topic.endsWith('_staff') ? {...data,recipientKey:topic.replace(/^property_[0-9]+_/, '').replace('employee_','employee:').replace('owner_','owner:')} : data,
           android: { priority: 'high', ttl: data.mode === 'stop' ? '60s' : data.mode === 'urgent' ? '300s' : '3600s' } } }),
         signal: AbortSignal.timeout(15000)
       });
       if (!response.ok) {
+        const errorBody = await response.json().catch(()=>({}));
+        if (device && errorBody.error?.details?.some(d=>d.errorCode === 'UNREGISTERED')) await rpc('invalidate_native_push',{p_device_id:device.device_id,p_fcm_token:device.token});
         if (response.status === 401) { cachedToken = null; tokenUntil = 0; }
         if (!validateOnly) await rpc('finish_push_delivery', { p_key: deliveryKey, p_lease_id: lease.lease_id, p_success: false });
         throw new Error('fcm_rejected');
@@ -153,11 +155,19 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if (!Array.isArray(topics) || topics.some(t => typeof t !== 'string' || !topicPattern.test(t))) throw new Error('invalid_routing');
       }
       if (!Array.isArray(topics) || topics.some(t=>typeof t!=='string'||!topicPattern.test(t))) throw new Error('invalid_routing');
-      const targets = [...new Set(topics)];
+      const uniqueTopics = [...new Set(topics)];
+      const devices = uniqueTopics.length ? await rpc('resolve_native_push_targets',{p_topics:uniqueTopics}) : [];
+      if (!Array.isArray(devices)) throw new Error('invalid_routing');
+      const targets = uniqueTopics.map(topic=>({topic}));
+      for (const device of devices) {
+        if (!device.token) continue;
+        if (!uniqueTopics.includes(device.topic) || !uuid.test(device.device_id || '') || typeof device.token !== 'string' || device.token.length > 4096) throw new Error('invalid_routing');
+        targets.push(device);
+      }
       let sent = 0, duplicates = 0, failed = 0;
       // Bounded concurrency, preserving successful per-recipient deliveries on retry.
       for (let i = 0; i < targets.length; i += 8) {
-        const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => send(t, payload.messageType === 'guest_chat' ? {...payload,validUntil:String(recipientDeadlines[t] || payload.validUntil)} : payload, deliveryId)));
+        const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => send(t.topic, payload.messageType === 'guest_chat' ? {...payload,validUntil:String(recipientDeadlines[t.topic] || payload.validUntil)} : payload, deliveryId, false, t.token ? t : null)));
         for (const result of results) {
           if (result.status === 'rejected') failed++;
           else if (result.value === 'duplicate') duplicates++;

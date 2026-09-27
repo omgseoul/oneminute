@@ -34,12 +34,11 @@ public class AttendanceActivity extends AppCompatActivity {
                 .putString(preferenceKey, topic).apply();
         if (!previous.isEmpty() && !topic.equals(previous))
             FirebaseMessaging.getInstance().unsubscribeFromTopic(previous);
-        FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token ->
-                FirebaseMessaging.getInstance().subscribeToTopic(topic)
+        FirebaseMessaging.getInstance().subscribeToTopic(topic)
                         .addOnFailureListener(error -> runOnUiThread(() ->
                                 Toast.makeText(AttendanceActivity.this,
                                         "긴급 알림 연결에 실패했습니다. 앱을 다시 열어주세요.",
-                                        Toast.LENGTH_LONG).show())));
+                                        Toast.LENGTH_LONG).show()));
     }
 
     private void subscribeToUrgentTopic(String propertyId, String role) {
@@ -86,6 +85,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private void clearPushSession() {
+        NativePushRegistration.clear(this);
         SupabaseMessageReceipt.clear(this);
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
@@ -176,6 +176,7 @@ public class AttendanceActivity extends AppCompatActivity {
         @JavascriptInterface
         public void bindAppSession(String accessToken, String expiresAt) {
             SupabaseMessageReceipt.bind(AttendanceActivity.this, accessToken, expiresAt);
+            NativePushRegistration.refresh(AttendanceActivity.this);
         }
 
         @JavascriptInterface
@@ -197,6 +198,7 @@ public class AttendanceActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        NativePushRegistration.refresh(this);
         String propertyId = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("property_id", "");
         String role = getSharedPreferences("omg_push", MODE_PRIVATE)

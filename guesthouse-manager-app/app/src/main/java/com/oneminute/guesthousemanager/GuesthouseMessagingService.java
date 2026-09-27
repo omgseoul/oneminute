@@ -21,10 +21,11 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
-    private static final String MESSAGE_CHANNEL_ID = "property_messages_popup_v2";
+    private static final String MESSAGE_CHANNEL_ID = "property_messages_alarm_v3";
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
+        NativePushRegistration.tokenChanged(this);
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
         String memberTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
@@ -37,12 +38,24 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage message) {
         String sessionRole = getSharedPreferences("omg_push", MODE_PRIVATE).getString("role", "");
         if (!"staff".equals(sessionRole) && !"owner".equals(sessionRole)) return;
+        String recipient = message.getData().get("recipientKey");
+        String member = getSharedPreferences("omg_push", MODE_PRIVATE).getString("member_id", "");
+        String expected = ("owner".equals(sessionRole) ? "owner:" : "employee:") + member;
+        if (recipient != null && !recipient.equals(expected)) return;
         boolean guestChat = "guest_chat".equals(message.getData().get("messageType"));
         if (guestChat) {
             if (!GuestChatAlerts.accept(this, message.getData())) return;
             GuestChatAlerts.remember(this, message.getData().get("alertId"), message.getData().get("roomId"));
         }
         String mode = message.getData().get("mode");
+        String dedupeId = mode + ":" + message.getData().get("alertId");
+        android.content.SharedPreferences receipts = getSharedPreferences("omg_push_received", MODE_PRIVATE);
+        synchronized (GuesthouseMessagingService.class) {
+            if (receipts.contains(dedupeId)) return;
+            android.content.SharedPreferences.Editor edit = receipts.edit();
+            for (String key : receipts.getAll().keySet()) if (System.currentTimeMillis() - receipts.getLong(key, 0) > 86400000L) edit.remove(key);
+            edit.putLong(dedupeId, System.currentTimeMillis()).commit();
+        }
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");
         boolean urgent = "urgent".equals(mode) || "urgent".equals(priority);
@@ -53,7 +66,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         }
         String activeRole = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("role", "");
-        if (!"staff".equals(activeRole) && !guestChat) {
+        if (!"staff".equals(activeRole) && !guestChat && recipient == null) {
             // Owners may receive ordinary member messages, but employee-only
             // emergency alarms must never wake or ring an owner session.
             stopService(new Intent(this, EmergencyAlarmService.class));
@@ -69,7 +82,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             service.putExtra("mode", mode == null ? "urgent" : mode);
             service.putExtra("senderLabel", message.getData().get("senderLabel"));
         }
-        ContextCompat.startForegroundService(this, service);
+        try { ContextCompat.startForegroundService(this, service); }
+        catch (RuntimeException error) { showMessageNotification(message); }
     }
 
     private void showMessageNotification(RemoteMessage remote) {
@@ -82,8 +96,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             channel.setDescription("사장님과 직원이 주고받는 새 메세지 알림");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 220, 100, 260});
-            channel.setSound(sound, new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            channel.setSound(null, new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build());
             channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
@@ -126,13 +140,21 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setSound(sound)
+                .setSound(null)
                 .setVibrate(new long[]{0, 220, 100, 260})
                 .setAutoCancel(true)
                 .setFullScreenIntent(fullScreen, true)
                 .setContentIntent(content)
                 .build();
         manager.notify(requestCode, notification);
+        if (!getSharedPreferences("omg_urgent_volume", MODE_PRIVATE).contains("original")) {
+            try { ContextCompat.startForegroundService(this, new Intent(this, MessageSoundService.class)
+                    .putExtra("notificationId", requestCode).putExtra("notification", notification)); }
+            catch (RuntimeException ignored) {
+                android.media.Ringtone tone = RingtoneManager.getRingtone(this, sound);
+                if (tone != null) { tone.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()); tone.play(); }
+            }
+        }
 
         // A full-screen notification wakes the lock screen. Direct launches also
         // guarantee the same dog popup while the phone is already unlocked.
@@ -144,7 +166,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         handler.postDelayed(showScreen, 350L);
 
         Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
-        if (vibrator != null && vibrator.hasVibrator() && Build.VERSION.SDK_INT >= 26)
-            vibrator.vibrate(VibrationEffect.createWaveform(new long[]{0, 220, 100, 260}, -1));
+        if (!getSharedPreferences("omg_urgent_volume", MODE_PRIVATE).contains("original") && vibrator != null && vibrator.hasVibrator() && Build.VERSION.SDK_INT >= 26)
+            vibrator.vibrate(VibrationEffect.createWaveform(new long[]{0, 220, 100, 260}, -1), new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
     }
 }

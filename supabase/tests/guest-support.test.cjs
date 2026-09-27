@@ -15,6 +15,7 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  for(const f of fs.readdirSync(path.join(root,'migrations')).filter(f=>f.endsWith('.sql')).sort())await db.exec(read('migrations/'+f));
 
  await db.exec(read('migrations/034_guest_support.sql'));
+ await db.exec(read('migrations/038_guest_qr_design.sql'));
  await db.exec(read('setup/002_register_employee_pins.example.sql').replace(/PIN_([1-4])/g,'731482'));
  await db.exec(read('setup/007_create_owner.example.sql').replace(/OWNER_LOGIN_ID/g,'boss.test').replace(/OWNER_PIN_6_TO_8/g,'517394'));
  const owner=await rpc('start_owner_session',['boss.test','517394']);
@@ -24,10 +25,23 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  const rejected=async(fn,label)=>{await assert.rejects(fn);check(true,label);};
  let cfg=await call('settings');const slug=cfg.config.slug;
  check(!cfg.config.enabled,'new module is opt-in');
+ const aid=require('node:crypto').randomUUID();
+ await db.query("insert into public.guest_support_assets(id,property_id,uploader_key,object_path,mime,ready) values($1,$2,'test',$3,'image/jpeg',true)",[aid,cfg.config.property_id,'test/'+aid]);
+ await call('save_settings',{enabled:true,chat_enabled:true,items:[{title:'휴지',asset_id:aid,icon:'13'}]});
+ check((await call('portal',{slug},null)).items[0].icon==='13','chosen icon persists on public portal');
+ await rejected(()=>call('save_settings',{items:[{title:'bad',asset_id:aid,icon:'51'}]}),'unknown icon rejected');
+ await rejected(()=>call('save_settings',{items:Array.from({length:10},()=>({title:'too many',asset_id:aid}))}),'custom items limited to nine');
+ await call('save_settings',{enabled:false,chat_enabled:false,items:[]});
+
  await rejected(()=>call('portal',{slug},null),'disabled portal cannot be opened');
  await call('save_settings',{enabled:true,chat_enabled:true,items:[]});
  const today=new Date().toISOString().slice(0,10),guest=require('node:crypto').randomUUID();
  const start={slug,name:'Test Guest',check_in:today,check_out:today,new_token:guest};
+ await rejected(()=>call('start',{...start,entry_version:2,email:'bad',room_unknown:true},null),'invalid email rejected');
+ await rejected(()=>call('start',{...start,entry_version:2,email:'test@example.com'},null),'room or explicit unknown required');
+ const contact=await call('start',{...start,new_token:require('node:crypto').randomUUID(),entry_version:2,email:'Test@Example.com',room_unknown:true,room_number:'discarded'},null);
+ const contactRow=await one('select email,room_unknown,room_number from public.guest_chat_rooms where id=$1',[contact.room_id]);
+ check(contactRow.email==='test@example.com'&&contactRow.room_unknown&&contactRow.room_number===null,'contact information saved; unknown room clears room value');
  const room=await call('start',start,null);const id=room.room_id;
  check((await call('start',start,null)).room_id===id,'retried entry creates one room');
  await rejected(()=>call('messages',{room_id:id},null,require('node:crypto').randomUUID()),'invalid guest token rejected');

@@ -2,13 +2,13 @@
  const G=GuestSupport,q=new URLSearchParams(location.search),slug=q.get('p'),isGuest=!!slug;
  let auth,roomId=q.get('room'),seq=0,busy=false,timer,failures=0,actor,room,asset=null,pending=null,lastDay='',lastRead=0,roomLoaded=false,sending=false,uploading=false,lastRetry=0;
  const timeline=document.getElementById('timeline'),body=document.getElementById('body'),send=document.getElementById('send');
- if(isGuest){const s=JSON.parse(localStorage.getItem('omg_guest_'+slug)||'null');if(!s){location.replace('guest.html?p='+encodeURIComponent(slug));return;}auth={guest_token:s.guest_token};roomId=s.room_id;document.getElementById('back').href='guest.html?p='+encodeURIComponent(slug);document.getElementById('back').textContent='‹ 숙소 안내';}
+ if(isGuest){document.body.classList.add('guest-facing-chat');const s=JSON.parse(localStorage.getItem('omg_guest_'+slug)||'null');if(!s){location.replace('guest.html?p='+encodeURIComponent(slug));return;}auth={guest_token:s.guest_token};roomId=s.room_id;document.getElementById('back').href='guest.html?p='+encodeURIComponent(slug);document.getElementById('back').textContent='‹ 숙소 안내';}
  else{const s=await omgSession.require({allowCompleted:true});if(!s)return;auth={access_token:s.accessToken};}
  const call=(action,data={})=>G.call(action,{room_id:roomId,...data},auth);
  const draftKey='omg_chat_draft_'+roomId;body.value=sessionStorage.getItem(draftKey)||'';body.oninput=()=>{pending=null;sessionStorage.setItem(draftKey,body.value);body.style.height='auto';body.style.height=Math.min(body.scrollHeight,110)+'px';};
  function renderMeta(){
   document.getElementById('roomTitle').textContent=isGuest?room.property_name:room.guest_name+' · '+(room.room_number||'객실 미정');
-  document.getElementById('roomInfo').textContent=isGuest?'직원과 대화 · 답변을 확인하려면 이 화면을 열어두세요.':`${room.property_name} · ${room.room_number||'객실 미정'} · ${room.check_in} ~ ${room.check_out}`;
+  document.getElementById('roomInfo').textContent=isGuest?'직원과 대화 · 답변을 확인하려면 이 화면을 열어두세요.':`${room.property_name} · ${room.room_number||'객실 미정'} · ${room.check_in} ~ ${room.check_out}${room.email?' · '+room.email:''}`;
   document.getElementById('assignment').textContent=room.status==='closed'?'대화 종료':room.assigned_name?(isGuest?'직원 대응 중':room.assigned_name+' 대응 중'):'담당자 대기';
   send.disabled=sending||uploading||!room.chat_enabled||room.status==='closed';
   if(!room.chat_enabled)G.message('현재 채팅 운영이 중지되어 있습니다. 기존 대화는 볼 수 있습니다.');

@@ -103,7 +103,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         await send('property_0_staff', { mode: 'message', message: 'validation' }, 'validation', true);
         return reply({ ok: true, validated: true });
       }
-      let payload, topics, deliveryId, recipientDeadlines = {};
+      let payload, topics, deliveryId, recipientDeadlines = {}, recipientModes = {};
       if (path.endsWith('/guest-chat')) {
         const secret = env('PUSH_ADMIN_SECRET');
         if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ok:false,code:'unauthorized'},401);
@@ -114,8 +114,9 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         deliveryId = dispatch.message_id;
         topics = dispatch.recipient_topics;
         recipientDeadlines = dispatch.recipient_deadlines || {};
+        recipientModes = dispatch.recipient_modes || {};
         payload = {alertId:String(deliveryId),roomId:String(dispatch.room_id),message:preview(dispatch.message),
-          mode:dispatch.priority === 'urgent' ? 'urgent' : 'message',priority:String(dispatch.priority || 'normal'),
+          mode:'message',priority:'normal',
           messageType:'guest_chat',senderLabel:'현장 게스트',validUntil:String(dispatch.valid_until || now()+300000)};
       } else if (path.endsWith('/telegram')) {
         const secret = env('TELEGRAM_URGENT_SECRET');
@@ -167,7 +168,14 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
       let sent = 0, duplicates = 0, failed = 0;
       // Bounded concurrency, preserving successful per-recipient deliveries on retry.
       for (let i = 0; i < targets.length; i += 8) {
-        const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => send(t.topic, payload.messageType === 'guest_chat' ? {...payload,validUntil:String(recipientDeadlines[t.topic] || payload.validUntil)} : payload, deliveryId, false, t.token ? t : null)));
+        const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => {
+          const data = payload.messageType === 'guest_chat' ? {
+            ...payload, validUntil:String(recipientDeadlines[t.topic] || payload.validUntil),
+            mode:recipientModes[t.topic] === 'normal' ? 'message' : 'urgent',
+            priority:recipientModes[t.topic] === 'normal' ? 'normal' : 'urgent'
+          } : payload;
+          return send(t.topic, data, deliveryId, false, t.token ? t : null);
+        }));
         for (const result of results) {
           if (result.status === 'rejected') failed++;
           else if (result.value === 'duplicate') duplicates++;

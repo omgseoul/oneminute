@@ -14,8 +14,6 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  create function auth.jwt() returns jsonb language sql stable as $$select '{}'::jsonb$$;`);
  for(const f of fs.readdirSync(path.join(root,'migrations')).filter(f=>f.endsWith('.sql')).sort())await db.exec(read('migrations/'+f));
 
- await db.exec(read('migrations/034_guest_support.sql'));
- await db.exec(read('migrations/038_guest_qr_design.sql'));
  await db.exec(read('setup/002_register_employee_pins.example.sql').replace(/PIN_([1-4])/g,'731482'));
  await db.exec(read('setup/007_create_owner.example.sql').replace(/OWNER_LOGIN_ID/g,'boss.test').replace(/OWNER_PIN_6_TO_8/g,'517394'));
  const owner=await rpc('start_owner_session',['boss.test','517394']);
@@ -65,6 +63,12 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  check((await dispatch(room.event_id)).priority==='normal','new room notification is normal');
  check((await dispatch(sent.event_id)).priority==='urgent','guest message notification is urgent');
  check((await dispatch(sent.event_id)).recipient_topics[0].endsWith(staff[0].id),'enabled worker receives own branch alert');
+ const recipient=(await dispatch(sent.event_id)).recipient_topics[0];
+ check((await dispatch(sent.event_id)).recipient_modes[recipient]==='urgent','existing guest alert defaults to urgent');
+ await call('save_preferences',{preferences:prefs.map(p=>({...p,alert_mode:'normal'}))});
+ check((await dispatch(sent.event_id)).recipient_modes[recipient]==='normal','general guest alert follows account setting');
+ check((await dispatch(room.event_id)).recipient_modes[recipient]==='normal','new room alert follows account setting');
+ await rejected(()=>call('save_preferences',{preferences:prefs.map(p=>({...p,alert_mode:'invalid'}))}),'invalid alert mode rejected');
 
  const zone=(await one('select timezone from public.properties where id=$1',[staff[0].property_id])).timezone;
  const clock=await one("select extract(dow from now() at time zone $1)::int dow,((now() at time zone $1)+interval '1 hour')::time::text future,((now() at time zone $1)+interval '2 hours')::time::text later",[zone]);

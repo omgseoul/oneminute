@@ -22,6 +22,7 @@ import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
     private static final String MESSAGE_CHANNEL_ID = "property_messages_alarm_v3";
+    private static final String GUEST_CHAT_CHANNEL_ID = "guest_chat_normal_v1";
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
@@ -59,6 +60,10 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");
         boolean urgent = "urgent".equals(mode) || "urgent".equals(priority);
+        if (guestChat && !urgent) {
+            showGuestChatNotification(message);
+            return;
+        }
         if (!urgent && ("message".equals(mode)
                 || (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX)))) {
             showMessageNotification(message);
@@ -84,6 +89,42 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         }
         try { ContextCompat.startForegroundService(this, service); }
         catch (RuntimeException error) { showMessageNotification(message); }
+    }
+
+    private void showGuestChatNotification(RemoteMessage remote) {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel channel = new NotificationChannel(GUEST_CHAT_CHANNEL_ID,
+                    "게스트 메세지 (일반)", NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription("현장 게스트 채팅의 일반 알림");
+            channel.setSound(sound, new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            manager.createNotificationChannel(channel);
+        }
+        String id = remote.getData().get("alertId");
+        String body = remote.getData().get("message");
+        if (body == null || body.trim().isEmpty()) body = "채팅방을 확인해주세요.";
+        int notificationId = (id == null ? body : id).hashCode();
+        Intent open = new Intent(this, AttendanceActivity.class)
+                .setData(Uri.parse(GuestChatAlerts.url(remote.getData().get("roomId"))))
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification notification = new NotificationCompat.Builder(this, GUEST_CHAT_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setColor(Color.rgb(36, 103, 189))
+                .setContentTitle("현장 게스트 메세지")
+                .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setContentIntent(content)
+                .build();
+        manager.notify(notificationId, notification);
     }
 
     private void showMessageNotification(RemoteMessage remote) {

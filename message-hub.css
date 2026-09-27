@@ -23,7 +23,7 @@
 .mail-tabs[hidden]{display:none!important}.mail-tabs .mail-tab{flex:1;min-width:0}
 #approvalFilter{width:85px;flex-shrink:0;padding:7px 4px;border:1px solid #dce5f1;border-radius:10px;background:white;color:#385776;font-size:11px}
 
-.hub-tabs.owner-hub{gap:clamp(8px,2.8vw,20px)}.owner-hub>[data-hub]{font-size:14px}#approvalFilterHost{display:flex;justify-content:flex-end;margin:8px 0}#approvalFilterHost select{height:30px;width:95px}
+.hub-tabs.owner-hub{gap:clamp(8px,2.8vw,20px)}.owner-hub>[data-hub]{font-size:14px}#approvalFilterHost{display:flex;align-items:center;margin:0}#approvalFilterHost select{height:34px;width:76px;padding:0 6px;font-size:11px;border-radius:11px}
 
 /* Keep the guest property filter in the navigation row and guest rows compact. */
 .hub-tabs{gap:clamp(10px,3.2vw,18px)}

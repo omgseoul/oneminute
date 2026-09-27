@@ -65,10 +65,10 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  check((await dispatch(sent.event_id)).recipient_topics[0].endsWith(staff[0].id),'enabled worker receives own branch alert');
  const recipient=(await dispatch(sent.event_id)).recipient_topics[0];
  check((await dispatch(sent.event_id)).recipient_modes[recipient]==='urgent','existing guest alert defaults to urgent');
- await call('save_preferences',{preferences:prefs.map(p=>({...p,alert_mode:'normal'}))});
+ await rpc('save_guest_chat_alert_mode',[owner.access_token,prefs[0].actor_key,'normal']);
  check((await dispatch(sent.event_id)).recipient_modes[recipient]==='normal','general guest alert follows account setting');
  check((await dispatch(room.event_id)).recipient_modes[recipient]==='normal','new room alert follows account setting');
- await rejected(()=>call('save_preferences',{preferences:prefs.map(p=>({...p,alert_mode:'invalid'}))}),'invalid alert mode rejected');
+ await rejected(()=>rpc('save_guest_chat_alert_mode',[owner.access_token,prefs[0].actor_key,'invalid']),'invalid alert mode rejected');
 
  const zone=(await one('select timezone from public.properties where id=$1',[staff[0].property_id])).timezone;
  const clock=await one("select extract(dow from now() at time zone $1)::int dow,((now() at time zone $1)+interval '1 hour')::time::text future,((now() at time zone $1)+interval '2 hours')::time::text later",[zone]);

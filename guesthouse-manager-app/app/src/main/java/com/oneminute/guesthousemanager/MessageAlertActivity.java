@@ -54,6 +54,9 @@ public class MessageAlertActivity extends AppCompatActivity {
     private void buildMessageScreen(Intent intent) {
         String sender = intent.getStringExtra("senderLabel");
         String message = intent.getStringExtra("message");
+        String messageType = intent.getStringExtra("messageType");
+        boolean approval = "attendance_approval".equals(messageType)
+                || "property_share_approval".equals(messageType);
         alertId = intent.getStringExtra("alertId");
         notificationId = intent.getIntExtra("notificationId", 9102);
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
@@ -71,6 +74,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setPadding(dp(25), dp(25), dp(25), dp(24));
+        card.setMinimumHeight(dp(520));
         scroll.addView(card, new ScrollView.LayoutParams(-1, -2));
 
         ImageView dog = new ImageView(this);
@@ -81,7 +85,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         dog.setBackground(oval(Color.rgb(237, 245, 255)));
         card.addView(dog, new LinearLayout.LayoutParams(dp(158), dp(158)));
 
-        TextView title = label("새 메세지 도착", 28, NAVY, true, Gravity.CENTER);
+        TextView title = label(approval ? "결재 요청" : "새 메세지 도착", 28, NAVY, true, Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.setMargins(0, dp(5), 0, dp(7));
         card.addView(title, titleParams);
@@ -102,7 +106,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button open = actionButton("메세지 보기", BLUE, Color.WHITE);
+        Button open = actionButton(approval ? "결재 요청 보기" : "메세지 보기", BLUE, Color.WHITE);
         open.setOnClickListener(view -> openMessages());
         LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(0, dp(58), 3f);
         openParams.setMargins(0, 0, dp(5), 0);

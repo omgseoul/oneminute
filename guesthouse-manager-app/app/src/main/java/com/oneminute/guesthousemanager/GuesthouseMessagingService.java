@@ -22,7 +22,7 @@ import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
     private static final String MESSAGE_CHANNEL_ID = "property_messages_alarm_v3";
-    private static final String GUEST_CHAT_CHANNEL_ID = "guest_chat_normal_v1";
+    private static final String GUEST_CHAT_CHANNEL_ID = "guest_chat_weak_v1";
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
@@ -60,7 +60,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");
         boolean urgent = "urgent".equals(mode) || "urgent".equals(priority);
-        if (guestChat && !urgent) {
+        if (guestChat && "weak".equals(mode)) {
             showGuestChatNotification(message);
             return;
         }
@@ -97,8 +97,11 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel = new NotificationChannel(GUEST_CHAT_CHANNEL_ID,
-                    "게스트 메세지 (일반)", NotificationManager.IMPORTANCE_DEFAULT);
-            channel.setDescription("현장 게스트 채팅의 일반 알림");
+                    "게스트 메세지 (약함)", NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("휴대폰의 소리·진동 설정을 따르는 게스트 채팅 알림");
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{0, 220, 100, 260});
+            channel.setShowBadge(false);
             channel.setSound(sound, new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
@@ -119,7 +122,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setContentTitle("현장 게스트 메세지")
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true)
                 .setContentIntent(content)
@@ -137,6 +140,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             channel.setDescription("사장님과 직원이 주고받는 새 메세지 알림");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 220, 100, 260});
+            channel.setShowBadge(false);
             channel.setSound(null, new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -147,6 +151,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
 
         String alertId = remote.getData().get("alertId");
         String sender = remote.getData().get("senderLabel");
+        String messageType = remote.getData().get("messageType");
         String body = remote.getData().get("message");
         if (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX))
             body = body.substring(NORMAL_MESSAGE_PREFIX.length());
@@ -161,6 +166,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .putExtra("alertId", alertId)
                 .putExtra("senderLabel", sender)
                 .putExtra("message", body)
+                .putExtra("messageType", messageType)
                 .putExtra("notificationId", requestCode);
         PendingIntent fullScreen = PendingIntent.getActivity(this, requestCode, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -175,7 +181,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         Notification notification = new NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_email)
                 .setColor(Color.rgb(36, 103, 189))
-                .setContentTitle("새 메세지 도착")
+                .setContentTitle(isApproval(messageType) ? "결재 요청" : "새 메세지 도착")
                 .setContentText(sender + " · " + body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -209,5 +215,10 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         if (!getSharedPreferences("omg_urgent_volume", MODE_PRIVATE).contains("original") && vibrator != null && vibrator.hasVibrator() && Build.VERSION.SDK_INT >= 26)
             vibrator.vibrate(VibrationEffect.createWaveform(new long[]{0, 220, 100, 260}, -1), new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
+    }
+
+    private boolean isApproval(String messageType) {
+        return "attendance_approval".equals(messageType)
+                || "property_share_approval".equals(messageType);
     }
 }

@@ -67,6 +67,7 @@ public class EmergencyAlarmService extends Service {
         channel.enableVibration(true);
         channel.setVibrationPattern(new long[]{0, 650, 180, 650});
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        channel.setShowBadge(true);
         channel.setBypassDnd(true);
         channel.setSound(null, null);
         NotificationManager manager = getSystemService(NotificationManager.class);

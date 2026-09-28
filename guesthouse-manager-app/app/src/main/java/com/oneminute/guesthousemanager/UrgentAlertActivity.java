@@ -129,31 +129,32 @@ public class UrgentAlertActivity extends AppCompatActivity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
-        card.setPadding(dp(26), dp(25), dp(26), dp(24));
+        card.setPadding(dp(25), dp(20), dp(25), dp(20));
+        card.setMinimumHeight(dp(520));
         scroll.addView(card, new ScrollView.LayoutParams(-1, -2));
 
         ImageView dog = new ImageView(this);
         dog.setImageBitmap(dogBitmap());
         dog.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        card.addView(dog, new LinearLayout.LayoutParams(dp(112), dp(112)));
+        card.addView(dog, new LinearLayout.LayoutParams(dp(88), dp(88)));
 
         String urgentTitle = "사장님".equals(senderLabel)
                 ? "사장님 긴급메세지" : senderLabel + "님의 긴급메세지";
         TextView title = label("test".equals(mode) ? "긴급알림 테스트" : urgentTitle,
                 27, RED, true, Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-        titleParams.setMargins(0, dp(4), 0, dp(18));
+        titleParams.setMargins(0, dp(3), 0, dp(10));
         card.addView(title, titleParams);
 
         TextView messageBox = label(message, 20, Color.rgb(55, 58, 64), true, Gravity.CENTER);
-        messageBox.setMinHeight(dp(95));
-        messageBox.setPadding(dp(18), dp(18), dp(18), dp(18));
+        messageBox.setMinHeight(dp(76));
+        messageBox.setPadding(dp(16), dp(13), dp(16), dp(13));
         messageBox.setBackground(rounded(Color.rgb(255, 239, 240), 18));
         card.addView(messageBox, new LinearLayout.LayoutParams(-1, -2));
 
         countdownView = new CountdownView(this);
-        LinearLayout.LayoutParams counterParams = new LinearLayout.LayoutParams(dp(178), dp(178));
-        counterParams.setMargins(0, dp(22), 0, dp(12));
+        LinearLayout.LayoutParams counterParams = new LinearLayout.LayoutParams(dp(102), dp(102));
+        counterParams.setMargins(0, dp(12), 0, dp(5));
         card.addView(countdownView, counterParams);
 
         countdownCopy = label("60초 안에 미확인 시 알람이 울립니다.",
@@ -164,7 +165,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
                         ? "테스트 모드 · 지속 알람은 울리지 않습니다."
                         : "긴급메세지는 언제나 즉시 확인하세요.",
                 15, Color.rgb(96, 103, 115), false, Gravity.CENTER);
-        modeCopy.setPadding(0, dp(8), 0, dp(18));
+        modeCopy.setPadding(0, dp(5), 0, dp(10));
         card.addView(modeCopy, new LinearLayout.LayoutParams(-1, -2));
 
         Button acknowledge = new Button(this);
@@ -175,7 +176,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
         acknowledge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         acknowledge.setBackground(rounded(NAVY, 16));
         acknowledge.setOnClickListener(view -> acknowledgeAlert());
-        card.addView(acknowledge, new LinearLayout.LayoutParams(-1, dp(62)));
+        card.addView(acknowledge, new LinearLayout.LayoutParams(-1, dp(58)));
 
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
                 -1, -2, Gravity.CENTER);

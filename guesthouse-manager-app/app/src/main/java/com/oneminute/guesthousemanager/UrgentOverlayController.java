@@ -62,14 +62,15 @@ final class UrgentOverlayController {
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
-        card.setPadding(dp(24), dp(25), dp(24), dp(24));
+        card.setPadding(dp(24), dp(20), dp(24), dp(20));
+        card.setMinimumHeight(dp(520));
         card.setBackground(rounded(Color.WHITE, 28));
         outer.addView(card, new LinearLayout.LayoutParams(-1, -2));
 
         ImageView dog = new ImageView(context);
         dog.setImageBitmap(UrgentAlertActivity.dogBitmap());
         dog.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        card.addView(dog, new LinearLayout.LayoutParams(dp(108), dp(108)));
+        card.addView(dog, new LinearLayout.LayoutParams(dp(88), dp(88)));
 
         TextView title = label("test".equals(mode) ? "긴급알림 테스트" : "긴급 메세지 도착",
                 26, NAVY, true);
@@ -94,13 +95,13 @@ final class UrgentOverlayController {
         card.addView(messageBox, new LinearLayout.LayoutParams(-1, -2));
 
         CountdownCircle counter = new CountdownCircle(context);
-        LinearLayout.LayoutParams counterParams = new LinearLayout.LayoutParams(dp(142), dp(142));
-        counterParams.setMargins(0, dp(17), 0, dp(7));
+        LinearLayout.LayoutParams counterParams = new LinearLayout.LayoutParams(dp(102), dp(102));
+        counterParams.setMargins(0, dp(12), 0, dp(5));
         card.addView(counter, counterParams);
 
         TextView countdownCopy = label("60초 안에 확인해주세요.", 17, RED, true);
         LinearLayout.LayoutParams countdownParams = new LinearLayout.LayoutParams(-1, -2);
-        countdownParams.setMargins(0, 0, 0, dp(16));
+        countdownParams.setMargins(0, 0, 0, dp(12));
         card.addView(countdownCopy, countdownParams);
 
         Button acknowledge = new Button(context);

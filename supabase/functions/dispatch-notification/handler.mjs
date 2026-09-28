@@ -171,8 +171,8 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => {
           const data = payload.messageType === 'guest_chat' ? {
             ...payload, validUntil:String(recipientDeadlines[t.topic] || payload.validUntil),
-            mode:recipientModes[t.topic] === 'normal' ? 'message' : 'urgent',
-            priority:recipientModes[t.topic] === 'normal' ? 'normal' : 'urgent'
+            mode:recipientModes[t.topic] === 'weak' ? 'weak' : recipientModes[t.topic] === 'normal' ? 'message' : 'urgent',
+            priority:recipientModes[t.topic] === 'urgent' ? 'urgent' : 'normal'
           } : payload;
           return send(t.topic, data, deliveryId, false, t.token ? t : null);
         }));

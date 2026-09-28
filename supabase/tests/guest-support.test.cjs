@@ -66,6 +66,7 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  const recipient=(await dispatch(sent.event_id)).recipient_topics[0];
  check((await dispatch(sent.event_id)).recipient_modes[recipient]==='urgent','existing guest alert defaults to urgent');
  await rpc('save_guest_chat_alert_mode',[owner.access_token,prefs[0].actor_key,'normal']);
+ await rpc('save_guest_chat_alert_mode',[owner.access_token,prefs[0].actor_key,'weak']);
  check((await dispatch(sent.event_id)).recipient_modes[recipient]==='normal','general guest alert follows account setting');
  check((await dispatch(room.event_id)).recipient_modes[recipient]==='normal','new room alert follows account setting');
  await rejected(()=>rpc('save_guest_chat_alert_mode',[owner.access_token,prefs[0].actor_key,'invalid']),'invalid alert mode rejected');

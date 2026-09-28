@@ -149,6 +149,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if (env('PUSH_DELIVERY_ENABLED') !== 'true') return reply({ ok: false, code: 'not_enabled' }, 503);
         credentials();
         deliveryId = dispatch.message_id;
+        recipientModes = dispatch.recipient_modes || {};
         payload = { alertId: String(dispatch.message_id), message: preview(dispatch.message),
           mode: dispatch.priority === 'urgent' ? 'urgent' : 'message', priority: String(dispatch.priority || 'normal'),
           messageType: String(dispatch.message_type || 'general'), senderLabel: String(dispatch.sender_label || '메세지') };
@@ -169,11 +170,16 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
       // Bounded concurrency, preserving successful per-recipient deliveries on retry.
       for (let i = 0; i < targets.length; i += 8) {
         const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => {
-          const data = payload.messageType === 'guest_chat' ? {
-            ...payload, validUntil:String(recipientDeadlines[t.topic] || payload.validUntil),
-            mode:recipientModes[t.topic] === 'weak' ? 'weak' : recipientModes[t.topic] === 'normal' ? 'message' : 'urgent',
-            priority:recipientModes[t.topic] === 'urgent' ? 'urgent' : 'normal'
-          } : payload;
+          const cap = recipientModes[t.topic] || 'urgent';
+          const mode = cap === 'weak' ? 'weak' : cap === 'normal' ? 'message'
+            : payload.messageType === 'guest_chat' ? 'urgent'
+            : payload.priority === 'urgent' ? 'urgent' : 'message';
+          const data = {
+            ...payload,
+            ...(payload.messageType === 'guest_chat' ? { validUntil:String(recipientDeadlines[t.topic] || payload.validUntil) } : {}),
+            mode,
+            priority:mode === 'urgent' ? 'urgent' : 'normal'
+          };
           return send(t.topic, data, deliveryId, false, t.token ? t : null);
         }));
         for (const result of results) {

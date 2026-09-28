@@ -14,7 +14,7 @@ function harness(options={}) {
   const body=url.endsWith('/token')?null:JSON.parse(init.body);calls.push({url,body});
   if(url.endsWith('/token'))return Response.json({access_token:'fake-token',expires_in:3600});
   if(url.includes('fcm.googleapis.com'))return Response.json({}, {status:options.failFcm?500:200});
-  if(url.endsWith('get_message_push_dispatch_v2'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],recipient_modes:options.recipientModes||{},message:'한'.repeat(2000),message_type:options.messageType||'attendance_warning',sender_label:'근태관리',priority:options.priority||'normal'}:{ok:false,code:'invalid_session'});
+  if(url.endsWith('get_message_push_dispatch_v2'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],recipient_modes:options.recipientModes||{},message:options.message||'한'.repeat(2000),message_type:options.messageType||'attendance_warning',sender_label:'근태관리',priority:options.priority||'normal'}:{ok:false,code:'invalid_session'});
   if(url.endsWith('resolve_native_push_targets'))return Response.json(options.devices||[]);
   if(url.endsWith('invalidate_native_push'))return Response.json(null);
   if(url.endsWith('claim_push_delivery')){if(claims.has(body.p_key))return Response.json({ok:true,claimed:false,status:claims.get(body.p_key)});claims.set(body.p_key,'sending');return Response.json({ok:true,claimed:true,lease_id:id});}
@@ -50,6 +50,8 @@ test('account weak mode caps an urgent staff message at weak',async()=>{const h=
 test('account normal mode caps an urgent staff message at normal',async()=>{const h=harness({priority:'urgent',recipientModes:{[topic]:'normal'}});assert.equal((await h.request()).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.mode,'message');assert.equal(d.priority,'normal');});
 
 test('account urgent mode preserves the sender selected staff message level',async()=>{const normal=harness({priority:'normal',recipientModes:{[topic]:'urgent'}});await normal.request();assert.equal(normal.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data.mode,'message');const urgent=harness({priority:'urgent',recipientModes:{[topic]:'urgent'}});await urgent.request();assert.equal(urgent.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data.mode,'urgent');});
+
+test('internal normal-message marker is removed from the visible notification body',async()=>{const h=harness({message:'[[OMG_NORMAL_MESSAGE]]바나나'});assert.equal((await h.request()).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.message,'바나나');});
 
 test('registered device gets direct high-priority push with recipient binding while legacy topics remain supported',async()=>{
  const h=harness({devices:[{topic,device_id:id,token:'device-token'}]});

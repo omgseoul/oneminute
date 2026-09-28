@@ -126,7 +126,7 @@ language plpgsql security definer set search_path='' as $$declare s public.owner
  return omg_private.data_management(null,'owner:'||s.owner_id,s.property_id,p_action,p_data);
 end$$;
 revoke all on function public.owner_message_storage(uuid,text,jsonb) from public,authenticated;
-grant execute on function public.owner_message_storage(uuid,text,jsonb) to anon;
+grant execute on function public.owner_message_storage(uuid,text,jsonb) to anon,authenticated;
 
 create or replace function public.owner_message_storage_worker(p_access_token uuid,p_job uuid,p_done uuid[] default '{}') returns jsonb
 language plpgsql security definer set search_path='' as $$declare s public.owner_sessions%rowtype;result jsonb;begin

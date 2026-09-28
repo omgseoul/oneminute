@@ -23,19 +23,19 @@
     document.head.append(style);
   }
   async function rpc(name,args){const{data,error}=await window.omgSupabase.rpc(name,args);if(error||!data?.ok)throw new Error(data?.message||"지점 목록을 불러오지 못했습니다.");return data;}
-  function build({properties,permission,host,onChange,defaultSelection="all",alwaysShow=false}){
+  function build({properties,permission,host,onChange,defaultSelection="all",alwaysShow=false,allLabel="All"}){
     addStyle();
     if(properties.length<2&&!alwaysShow)return{properties,selectedIds:()=>properties.map(x=>x.property_id)};
     const own=properties.find(item=>item.is_own)||properties[0];
     const isChecked=item=>defaultSelection==="own"?item.property_id===own.property_id:true;
     const root=document.createElement("div");
     root.className="property-picker";
-    root.innerHTML=`<button class="property-picker-button" type="button" aria-expanded="false">${defaultSelection==="own"?own.property_name:"All"}</button><div class="property-picker-panel" hidden><p class="property-picker-title">${LABELS[permission]||"지점"} · 복수 선택</p><label class="property-picker-option"><span>All</span><small class="property-picker-id">모든 지점</small><input data-all type="checkbox" ${defaultSelection==="all"?"checked":""}></label>${properties.map(item=>`<label class="property-picker-option"><span>${String(item.property_name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c])}</span><small class="property-picker-id">${item.is_own?"본지점":item.management_number??""}</small><input data-id="${item.property_id}" type="checkbox" ${isChecked(item)?"checked":""}></label>`).join("")}</div>`;
+    root.innerHTML=`<button class="property-picker-button" type="button" aria-expanded="false">${defaultSelection==="own"?own.property_name:allLabel}</button><div class="property-picker-panel" hidden><p class="property-picker-title">${LABELS[permission]||"지점"} · 복수 선택</p><label class="property-picker-option"><span>All</span><small class="property-picker-id">모든 지점</small><input data-all type="checkbox" ${defaultSelection==="all"?"checked":""}></label>${properties.map(item=>`<label class="property-picker-option"><span>${String(item.property_name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c])}</span><small class="property-picker-id">${item.is_own?"본지점":item.management_number??""}</small><input data-id="${item.property_id}" type="checkbox" ${isChecked(item)?"checked":""}></label>`).join("")}</div>`;
     host.classList.add("property-picker-mounted");
     host.append(root);
     const button=root.querySelector(".property-picker-button"),panel=root.querySelector(".property-picker-panel"),all=root.querySelector("[data-all]"),items=[...root.querySelectorAll("[data-id]")];
     const selectedIds=()=>items.filter(x=>x.checked).map(x=>x.dataset.id);
-    function label(){const chosen=items.filter(x=>x.checked);button.textContent=chosen.length===items.length?"All":chosen.length===1?properties.find(x=>String(x.property_id)===String(chosen[0].dataset.id))?.property_name:`${chosen.length}개 지점`;all.checked=chosen.length===items.length;all.indeterminate=chosen.length>0&&chosen.length<items.length;}
+    function label(){const chosen=items.filter(x=>x.checked);button.textContent=chosen.length===items.length?allLabel:chosen.length===1?properties.find(x=>String(x.property_id)===String(chosen[0].dataset.id))?.property_name:`${chosen.length}개 지점`;all.checked=chosen.length===items.length;all.indeterminate=chosen.length>0&&chosen.length<items.length;}
     async function changed(){if(!selectedIds().length)items.find(x=>String(x.dataset.id)===String(own.property_id)).checked=true;label();await onChange?.(selectedIds(),properties);}
     function close(){panel.hidden=true;root.classList.remove("open-up");button.setAttribute("aria-expanded","false");}
     button.onclick=()=>{const opening=panel.hidden;document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;if(opening){root.classList.remove("open-up");const buttonRect=button.getBoundingClientRect(),panelHeight=Math.min(panel.scrollHeight,360),spaceBelow=window.innerHeight-buttonRect.bottom-16,spaceAbove=buttonRect.top-16;if(spaceBelow<panelHeight&&spaceAbove>spaceBelow)root.classList.add("open-up");}else root.classList.remove("open-up");button.setAttribute("aria-expanded",String(!panel.hidden));};
@@ -45,13 +45,33 @@
     label();
     return{properties,selectedIds,root,close};
   }
-  async function mount({accessToken,permission,host,onChange,defaultSelection="all"}){
+  async function mount({accessToken,permission,host,onChange,defaultSelection="all",allLabel="All"}){
     const data=await rpc("list_property_shares",{p_access_token:accessToken});
     const properties=(data.properties||[]).filter(item=>item.is_own||(item.permissions||[]).includes(permission));
-    return build({properties,permission,host,onChange,defaultSelection});
+    return build({properties,permission,host,onChange,defaultSelection,allLabel});
   }
-  function mountStatic({properties,permission,host,onChange,defaultSelection="own",alwaysShow=false}){
-    return build({properties,permission,host,onChange,defaultSelection,alwaysShow});
+  function mountStatic({properties,permission,host,onChange,defaultSelection="own",alwaysShow=false,allLabel="All"}){
+    return build({properties,permission,host,onChange,defaultSelection,alwaysShow,allLabel});
   }
-  window.omgPropertySelector={mount,mountStatic};
+  function mountSingle({items=[],host,onChange,value="",placeholder="선택",title="선택"}){
+    addStyle();
+    const escape=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+    let options=items,selected=String(value??"");
+    const root=document.createElement("div");
+    root.className="property-picker";
+    host.replaceChildren(root);
+    function close(){const panel=root.querySelector(".property-picker-panel"),button=root.querySelector(".property-picker-button");if(!panel||!button)return;panel.hidden=true;root.classList.remove("open-up");button.setAttribute("aria-expanded","false");}
+    function render(){
+      if(!options.some(item=>String(item.value)===selected))selected="";
+      const current=options.find(item=>String(item.value)===selected);
+      root.innerHTML=`<button class="property-picker-button" type="button" aria-expanded="false">${escape(selected?current?.label:placeholder)}</button><div class="property-picker-panel" hidden><p class="property-picker-title">${escape(title)} · 단일 선택</p>${options.map(item=>`<label class="property-picker-option"><span>${escape(item.label)}</span><small class="property-picker-id">${escape(item.meta||"")}</small><input type="radio" name="${escape(host.id||"single-picker")}" value="${escape(item.value)}" ${String(item.value)===selected?"checked":""}></label>`).join("")}</div>`;
+      const button=root.querySelector(".property-picker-button"),panel=root.querySelector(".property-picker-panel");
+      button.onclick=()=>{const opening=panel.hidden;document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;if(opening){root.classList.remove("open-up");const buttonRect=button.getBoundingClientRect(),panelHeight=Math.min(panel.scrollHeight,360),spaceBelow=window.innerHeight-buttonRect.bottom-16,spaceAbove=buttonRect.top-16;if(spaceBelow<panelHeight&&spaceAbove>spaceBelow)root.classList.add("open-up");}else root.classList.remove("open-up");button.setAttribute("aria-expanded",String(!panel.hidden));};
+      root.querySelectorAll("input[type=radio]").forEach(input=>input.onchange=()=>{selected=input.value;render();onChange?.(selected);});
+    }
+    document.addEventListener("click",event=>{if(!root.contains(event.target))close();});
+    render();
+    return{value:()=>selected,setItems(nextItems,nextValue=selected){options=nextItems;selected=String(nextValue??"");render();},root,close};
+  }
+  window.omgPropertySelector={mount,mountStatic,mountSingle};
 })();

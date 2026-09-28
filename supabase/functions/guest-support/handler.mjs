@@ -36,11 +36,17 @@ export function createGuestSupportHandler({env,fetcher=fetch,cryptoApi=crypto}){
    if(!body||typeof body!=='object')return reply({ok:false},400);
    const {action,data={},access_token:token,guest_token:guest}=body;
    if(action==='cleanup_files'){
-    if(typeof body.platform_token!=='string'||!UUID.test(data.job_id||''))return reply({ok:false,message:'운영자 로그인이 필요합니다.'},401);
-    const userResponse=await fetcher(base()+'/auth/v1/user',{headers:{apikey:key(),Authorization:'Bearer '+body.platform_token},signal:AbortSignal.timeout(10000)});
-    if(!userResponse.ok)return reply({ok:false,message:'운영자 로그인이 만료되었습니다.'},401);
-    const user=await userResponse.json();if(!UUID.test(user.id||''))return reply({ok:false},401);
-    const work=async(done=[])=>{const r=await fetcher(base()+'/rest/v1/rpc/platform_message_storage_worker',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({p_user:user.id,p_job:data.job_id,p_done:done}),signal:AbortSignal.timeout(10000)});if(!r.ok)throw new Error('정리 권한 또는 작업 상태를 확인해주세요.');return r.json();};
+    if(!UUID.test(data.job_id||''))return reply({ok:false,message:'삭제 작업을 확인해주세요.'},401);
+    let rpcName,payload;
+    if(typeof body.platform_token==='string'){
+     const userResponse=await fetcher(base()+'/auth/v1/user',{headers:{apikey:key(),Authorization:'Bearer '+body.platform_token},signal:AbortSignal.timeout(10000)});
+     if(!userResponse.ok)return reply({ok:false,message:'운영자 로그인이 만료되었습니다.'},401);
+     const user=await userResponse.json();if(!UUID.test(user.id||''))return reply({ok:false},401);
+     rpcName='platform_message_storage_worker';payload=done=>({p_user:user.id,p_job:data.job_id,p_done:done});
+    }else if(UUID.test(body.access_token||'')){
+     rpcName='owner_message_storage_worker';payload=done=>({p_access_token:body.access_token,p_job:data.job_id,p_done:done});
+    }else return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
+    const work=async(done=[])=>{const r=await fetcher(base()+'/rest/v1/rpc/'+rpcName,{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify(payload(done)),signal:AbortSignal.timeout(10000)});if(!r.ok)throw new Error('정리 권한 또는 작업 상태를 확인해주세요.');return r.json();};
     const job=await work();if(job.files.length){
      const r=await fetcher(base()+'/storage/v1/object/guest-support',{method:'DELETE',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({prefixes:job.files.map(f=>f.object_path)}),signal:AbortSignal.timeout(20000)});
      if(!r.ok)throw new Error('사진 정리가 중단되었습니다. 다시 시도하면 이어서 처리합니다.');

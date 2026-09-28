@@ -60,8 +60,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");
         boolean urgent = "urgent".equals(mode) || "urgent".equals(priority);
-        if (guestChat && "weak".equals(mode)) {
-            showGuestChatNotification(message);
+        if ("weak".equals(mode)) {
+            showWeakNotification(message);
             return;
         }
         if (!urgent && ("message".equals(mode)
@@ -91,14 +91,14 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         catch (RuntimeException error) { showMessageNotification(message); }
     }
 
-    private void showGuestChatNotification(RemoteMessage remote) {
+    private void showWeakNotification(RemoteMessage remote) {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager == null) return;
         Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel = new NotificationChannel(GUEST_CHAT_CHANNEL_ID,
-                    "게스트 메세지 (약함)", NotificationManager.IMPORTANCE_HIGH);
-            channel.setDescription("휴대폰의 소리·진동 설정을 따르는 게스트 채팅 알림");
+                    "메세지 알림 (약함)", NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("휴대폰의 소리·진동 설정을 따르는 화면 팝업 알림");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 220, 100, 260});
             channel.setShowBadge(false);
@@ -108,26 +108,52 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             manager.createNotificationChannel(channel);
         }
         String id = remote.getData().get("alertId");
+        String sender = remote.getData().get("senderLabel");
+        String messageType = remote.getData().get("messageType");
         String body = remote.getData().get("message");
         if (body == null || body.trim().isEmpty()) body = "채팅방을 확인해주세요.";
+        if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         int notificationId = (id == null ? body : id).hashCode();
+        Intent screen = new Intent(this, MessageAlertActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra("alertId", id)
+                .putExtra("senderLabel", sender)
+                .putExtra("message", body)
+                .putExtra("messageType", messageType)
+                .putExtra("notificationId", notificationId);
+        PendingIntent fullScreen = PendingIntent.getActivity(this, notificationId, screen,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String messageUrl = "guest_chat".equals(messageType)
+                ? GuestChatAlerts.url(remote.getData().get("roomId"))
+                : "https://omgworks24.com/messages.html"
+                    + (id == null || id.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(id));
         Intent open = new Intent(this, AttendanceActivity.class)
-                .setData(Uri.parse(GuestChatAlerts.url(remote.getData().get("roomId"))))
+                .setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, GUEST_CHAT_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_email)
                 .setColor(Color.rgb(36, 103, 189))
-                .setContentTitle("현장 게스트 메세지")
-                .setContentText(body)
+                .setContentTitle(isApproval(messageType) ? "결재 요청"
+                        : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
+                .setContentText(sender + " · " + body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true)
+                .setFullScreenIntent(fullScreen, true)
                 .setContentIntent(content)
                 .build();
         manager.notify(notificationId, notification);
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable showScreen = () -> {
+            try { startActivity(screen); } catch (Exception ignored) {}
+        };
+        handler.post(showScreen);
+        handler.postDelayed(showScreen, 350L);
     }
 
     private void showMessageNotification(RemoteMessage remote) {

@@ -4,8 +4,12 @@ const origins = new Set(['https://omgworks24.com', 'https://www.omgworks24.com',
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const topicPattern = /^property_[0-9]+_(?:staff|employee_[0-9a-f-]{36}|owner_[0-9a-f-]{36})$/i;
 const encoder = new TextEncoder();
+const normalMessagePrefix = '[[OMG_NORMAL_MESSAGE]]';
 function base64url(bytes) { return btoa(String.fromCharCode(...bytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'); }
-function preview(text) { return [...String(text || '메세지')].slice(0, 650).join(''); }
+function preview(text) {
+  const value = String(text || '메세지');
+  return [...(value.startsWith(normalMessagePrefix) ? value.slice(normalMessagePrefix.length) : value)].slice(0, 650).join('');
+}
 
 export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = crypto, now = () => Date.now() }) {
   let cachedToken, tokenUntil = 0;

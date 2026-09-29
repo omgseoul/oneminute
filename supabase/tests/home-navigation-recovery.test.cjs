@@ -23,10 +23,17 @@ test('tap without a click reports independently, while cancelled scroll does not
  const c=setup();c.fire('pointerdown');c.fire('pointercancel');c.fire('pointerup');c.tick();assert.equal(c.w.document.querySelector('[role=dialog]'),null);c.fire('pointerdown');c.fire('pointerup');c.tick();assert.equal(c.navigation.length,1);assert.equal(c.w.document.querySelector('[role=dialog]'),null);c.tick();assert.match(c.w.document.querySelector('[data-nav-code]').textContent,/터치 직접 이동 미완료/);c.dom.window.close();
 });
 test('ordinary browser has no recovery handlers',()=>{const c=setup(false);c.fire('click');assert.equal(c.jobs.size,0);c.dom.window.close();});
-test('deployed inline code matches tested source and menu is not initially inert',()=>{const html=fs.readFileSync('app.html','utf8');assert(html.includes('<script id="nativeNavigationRecovery">\n'+source+'</script>'));assert(!/<nav[^>]+\binert\b/.test(html));});
+test('shared transition bundle includes tested recovery and all links are covered',()=>{const bundle=fs.readFileSync('page-transition.js','utf8');assert(bundle.endsWith(source));assert(!source.includes("#mainMenu a[href]"));});
 
 test('drag out and back, scrolling, and long press never trigger tap recovery',()=>{
  const c=setup();c.fire('pointerdown');c.fire('pointermove',{clientX:60});c.fire('pointermove');c.fire('pointerup');c.tick();assert.equal(c.navigation.length,0);
  c.fire('pointerdown');c.w.document.dispatchEvent(new c.w.Event('scroll'));c.fire('pointerup');c.tick();assert.equal(c.navigation.length,0);
  c.w.Date.now=()=>1000;c.fire('pointerdown');c.w.Date.now=()=>1800;c.fire('pointerup');c.tick();assert.equal(c.navigation.length,0);c.dom.window.close();
+});
+
+test('dynamic chat room and online employee links recover outside main menu',()=>{
+ for(const href of ['guest-chat.html?room=123','staff-chat.html?peer=456','messages.html?compose=1&recipient_employee_id=789']){
+ const c=setup();c.w.document.querySelector('nav').removeAttribute('id');c.w.document.querySelector('a').href=href;
+ c.fire('pointerdown');c.fire('pointerup');c.tick();assert.equal(c.navigation.length,1);c.dom.window.close();
+ }
 });

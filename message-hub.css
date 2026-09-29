@@ -68,3 +68,21 @@
 .hub-tabs .hub-actions #composeToggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7}
 .hub-tabs #searchToggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7}
 @media(max-width:350px){#guestRooms .guest-room,#staffRooms .staff-room{grid-template-columns:60px minmax(0,1fr) 100px;gap:8px}:is(.guest-room,.staff-room) .hub-room-meta{width:100px;max-width:100px;font-size:9px}.guest-room .hub-room-status{font-size:9px}}
+
+/* Consistent mailbox surfaces and high-contrast unread badges. */
+.hub-room,.message-card,.message-card.sent{background:#fff}
+.hub-room.is-unread,.message-card.unread-card,.message-card.sent.unread-card{background:#edf4ff}
+.hub-room{position:relative}
+.hub-room.is-unread::before{content:"";position:absolute;left:5px;top:50%;width:6px;height:6px;border-radius:50%;background:#2d82e8;transform:translateY(-50%)}
+.message-card .dot{width:6px;height:6px}
+.message-side{position:relative}
+.message-side .hub-count{position:absolute;right:20px;top:calc(100% + 3px);min-width:17px;height:17px;padding:0 4px;font-size:9px}
+.hub-count{font-style:normal;font-weight:700;padding:0 4px}
+.hub-tabs>[data-hub]{position:relative}
+.hub-tabs>[data-hub] small:not(:empty){position:absolute;top:5px;right:-9px;display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#2467bd;color:#fff;font-size:10px;font-weight:750;line-height:1;box-shadow:0 0 0 2px #fff;font-variant-numeric:tabular-nums}
+.hub-tabs>[data-hub] small:empty{display:none}
+.approval-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.approval-actions.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.approval-actions .reject{background:#fff0f1;color:#b83e4c;border:1px solid #f1d4d8}
+.status-pill.rejected{background:#fff0f1;color:#b83e4c}
+.ack:disabled{opacity:.65;cursor:default}

@@ -16,10 +16,10 @@ jobs:
           fetch-depth: 0
       - name: Apply patch on current main
         run: |
-          cp android-nav.bundle.b64 /tmp/android-nav.bundle.b64
+          cp android-nav-patch.txt /tmp/android-nav-patch.txt
           git fetch origin main
           git reset --hard origin/main
-          base64 -d /tmp/android-nav.bundle.b64 > /tmp/android-nav.patch
+          base64 -d /tmp/android-nav-patch.txt | gzip -d > /tmp/android-nav.patch
           git apply /tmp/android-nav.patch
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com

@@ -42,7 +42,7 @@ function fmtDueDate(value){return value?new Date(value).toLocaleDateString("ko-K
 function selectedWorkerId(){return workerFilterControl?.value()||"";}
 function isComplete(item){const selected=selectedWorkerId();if(selected)return(item.completion_employee_ids||item.completions?.map(entry=>entry.employee_id)||[]).includes(selected);return Number(item.target_count)>0&&Number(item.completed_count)>=Number(item.target_count);}
 function dateSection(value){const due=toLocalDate(value),today=dateAfterDays(0);if(due<today)return"overdue";if(due===today)return"today";return due<=dateAfterDays(7)?"this_week":"anytime";}
-function sectionKey(item){if(isComplete(item))return"completed";return item.due_at?dateSection(item.due_at):"anytime";}
+function sectionKey(item){if(isComplete(item))return"completed";return item.due_at?dateSection(item.due_at):(["today","this_week","anytime"].includes(item.timing)?item.timing:"anytime");}
 function compareDeadlines(a,b){return (Date.parse(a.due_at)||Infinity)-(Date.parse(b.due_at)||Infinity)||Date.parse(a.created_at)-Date.parse(b.created_at);}
 function completerNames(item){const selected=selectedWorkerId(),entries=(item.completions||[]).filter(entry=>!selected||entry.employee_id===selected),names=entries.map(entry=>entry.employee_name).filter(Boolean);if(!names.length&&item.completed_at&&session?.employeeName)names.push(session.employeeName);return [...new Set(names)].join(", ")||"완료자 정보 없음";}
 function priorityName(value){return({normal:"보통",important:"중요",urgent:"긴급"})[value]||"보통";}

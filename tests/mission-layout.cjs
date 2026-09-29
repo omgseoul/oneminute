@@ -7,6 +7,7 @@ const script=[...w.document.scripts].findLast(s=>!s.src).textContent.split('(asy
 w.setInterval=()=>0;w.eval(script+"\nwindow.testEval=(code)=>eval(code);");
 const run=x=>w.testEval(x);
 run('session={employeeId:"a",employeeName:"니완"};config={property:{name:"Test"}};');
+assert.equal(run('sectionKey({timing:"today"})'),"today");
 for(const [days,key] of [[-1,'overdue'],[0,'today'],[1,'this_week'],[7,'this_week'],[8,'anytime'],[28,'anytime'],[35,'anytime']]){
  assert.equal(run(`sectionKey({due_at:dateAfterDays(${days})+'T23:59:59',target_count:1,completed_count:0})`),key);
 }

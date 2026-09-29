@@ -126,12 +126,12 @@ public class AttendanceActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handleNavigation(request.getUrl());
+                return handleNavigation(view, request.getUrl());
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return handleNavigation(Uri.parse(url));
+                return handleNavigation(view, Uri.parse(url));
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -149,11 +149,9 @@ public class AttendanceActivity extends AppCompatActivity {
                 return true;
             }
         });
-        if (state == null || webView.restoreState(state) == null) {
-            // app.html validates the persisted work session and only returns to login
-            // after an explicit logout or a successful checkout report.
-            webView.loadUrl(appUrlFromIntent(getIntent()));
-        }
+        // Always request the current page. Restoring WebView state can revive an old
+        // document whose click handlers no longer match the deployed site.
+        webView.loadUrl(appUrlFromIntent(getIntent()));
     }
 
     private String appUrlFromIntent(Intent intent) {
@@ -222,7 +220,7 @@ public class AttendanceActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    private boolean handleNavigation(Uri uri) {
+    private boolean handleNavigation(WebView view, Uri uri) {
         if ("guesthouse".equals(uri.getScheme())) {
             String action = uri.getHost();
             if ("emergency".equals(action)) {
@@ -241,7 +239,12 @@ public class AttendanceActivity extends AppCompatActivity {
         boolean isLegacyDomain = "omgseoul.github.io".equals(host)
                 && path != null && path.startsWith("/oneminute/");
         boolean isAppPage = "https".equals(uri.getScheme()) && (isCustomDomain || isLegacyDomain);
-        if (isAppPage) return false;
+        if (isAppPage) {
+            // Explicit loading is more reliable than returning false on Samsung
+            // Android WebView, where a consumed DOM click can otherwise stop here.
+            view.loadUrl(uri.toString());
+            return true;
+        }
 
         if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
             startActivity(new Intent(Intent.ACTION_VIEW, uri));

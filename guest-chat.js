@@ -25,18 +25,18 @@
   if(m.sender_kind==='system'){el.className='system-message';el.textContent=m.sender_name+' · '+m.body;timeline.append(el);return;}
   const mine=isGuest?m.sender_kind==='guest':m.sender_kind==='staff';el.className='bubble-row'+(mine?' mine':'');
   const name=document.createElement('div');name.className='bubble-name';name.textContent=(isGuest?m.sender_kind==='guest':m.sender_key===actor)?'나':m.sender_name;el.append(name);
-  const bubble=document.createElement('div');bubble.className='bubble';if(m.asset_id){const a=assets.find(x=>x.id===m.asset_id);if(a){const img=new Image();img.src=a.url;img.alt='첨부 사진';img.loading='lazy';img.onclick=async()=>{try{const fresh=await call('messages',{after_seq:Number(m.seq)-1});G.viewer(fresh.assets.find(x=>x.id===m.asset_id),'첨부 사진');}catch(e){G.message(e.message,true);}};bubble.append(img);}}
+  const bubble=document.createElement('div');bubble.className='bubble';if(m.asset_id){const a=assets.find(x=>x.id===m.asset_id);if(a){const img=new Image();img.src=a.url;img.alt='첨부 사진';img.loading='lazy';img.width=320;img.style.aspectRatio='4/3';img.style.objectFit='contain';img.onclick=async()=>{try{const fresh=await call('messages',{after_seq:Number(m.seq)-1});G.viewer(fresh.assets.find(x=>x.id===m.asset_id),'첨부 사진');}catch(e){G.message(e.message,true);}};bubble.append(img);}}
   if(m.body)bubble.append(document.createTextNode(m.body));el.append(bubble);const time=document.createElement('time');time.className='bubble-time';time.textContent=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});el.append(time);timeline.append(el);
  }
  async function poll(){
   if(busy||document.hidden)return;busy=true;clearTimeout(timer);
-  try{const nearBottom=timeline.scrollHeight-timeline.scrollTop-timeline.clientHeight<100;const v=await call('messages',{after_seq:seq});room=v.room;actor=v.actor_key;
+  try{const firstLoad=timeline.classList.contains('chat-loading');const nearBottom=timeline.scrollHeight-timeline.scrollTop-timeline.clientHeight<100;const v=await call('messages',{after_seq:seq});room=v.room;actor=v.actor_key;
    if(!roomLoaded){timeline.replaceChildren();roomLoaded=true;}for(const m of v.messages){append(m,v.assets||[]);seq=Math.max(seq,Number(m.seq));}
-   failures=0;if(room.chat_enabled&&room.status==='open')G.message(navigator.onLine?'':'인터넷 연결을 기다리는 중입니다.');renderMeta();if(nearBottom)timeline.scrollTop=timeline.scrollHeight;
+   failures=0;if(room.chat_enabled&&room.status==='open')G.message(navigator.onLine?'':'인터넷 연결을 기다리는 중입니다.');renderMeta();if(nearBottom||firstLoad)timeline.scrollTop=timeline.scrollHeight;if(v.messages.length<100)timeline.classList.remove('chat-loading');
    if(!isGuest&&seq>lastRead&&document.hasFocus()){await call('read',{last_seq:seq});lastRead=seq;}
    timer=setTimeout(poll,v.messages.length===100?50:2000);
    if(Date.now()-lastRetry>95000){lastRetry=Date.now();call('retry_events').catch(()=>{});}
-  }catch(e){failures++;G.message(e.message,true);timer=setTimeout(poll,Math.min(30000,2500*2**failures));}finally{busy=false;}
+  }catch(e){timeline.classList.remove('chat-loading');failures++;G.message(e.message,true);timer=setTimeout(poll,Math.min(30000,2500*2**failures));}finally{busy=false;}
  }
  document.getElementById('photoInput').onchange=async e=>{const file=e.target.files[0];if(!file)return;uploading=true;send.disabled=true;G.message('사진을 올리고 있습니다…');try{const photo=await G.photo(file);const v=await G.call('upload',{room_id:roomId},auth,photo);asset=v.assets[0];pending=null;const el=document.getElementById('photoPending');el.hidden=false;el.innerHTML='<img alt="선택한 사진" src="'+G.esc(asset.url)+'"><span>사진 첨부</span><button class="icon-btn" type="button" aria-label="첨부 취소">×</button>';el.querySelector('button').onclick=()=>{asset=null;pending=null;el.hidden=true;};G.message('');}catch(err){G.message(err.message,true);}finally{uploading=false;send.disabled=sending||room?.status!=='open'||!room?.chat_enabled;e.target.value='';}};
  document.getElementById('composer').onsubmit=async e=>{e.preventDefault();if(send.disabled||(!body.value.trim()&&!asset))return;sending=true;send.disabled=true;body.disabled=true;G.message('보내는 중…');

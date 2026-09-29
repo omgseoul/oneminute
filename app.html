@@ -47,7 +47,7 @@
     layer.innerHTML = '<section style="width:min(100%,350px);box-sizing:border-box;padding:24px;border-radius:25px;background:white;color:#183153;box-shadow:0 18px 45px #18315340"><h2 id="navigationFailureTitle" style="margin:0 0 12px;font-size:21px">화면 이동을 확인해주세요</h2><p style="font-size:15px;line-height:1.6">메뉴 이동을 완료하지 못했습니다.<br>아래 진단 내용을 화면으로 보내주세요.</p><p data-nav-code style="padding:12px;background:#f4f7fc;border-radius:12px;font-size:13px;overflow-wrap:anywhere"></p><div style="display:flex;gap:10px"><button type="button" data-nav-close style="flex:1;padding:13px;border:0;border-radius:13px;background:#eaf2ff;color:#183153;font:inherit">닫기</button><button type="button" data-nav-retry style="flex:1;padding:13px;border:0;border-radius:13px;background:#2467bd;color:white;font:inherit">다시 이동</button></div></section>';
     // Only engine version and page path; never include session tokens or messages.
     var engine = (navigator.userAgent.match(/Chrome\/([\d.]+)/) || [])[1] || 'unknown';
-    layer.querySelector('[data-nav-code]').textContent = 'N3 · ' + code + ' · WebView ' + engine + ' · ' + new URL(link.href).pathname;
+    layer.querySelector('[data-nav-code]').textContent = 'N4 · ' + code + ' · WebView ' + engine + ' · ' + new URL(link.href).pathname;
     layer.querySelector('[data-nav-close]').onclick = function () { layer.remove(); cancel(); };
     layer.querySelector('[data-nav-retry]').onclick = function () { layer.remove(); location.assign(link.href); };
     document.body.appendChild(layer);
@@ -55,14 +55,24 @@
   }
   document.addEventListener('pointerdown', function (event) {
     var link = menuLink(event.target);
-    down = link && event.isPrimary !== false ? {link:link,x:event.clientX,y:event.clientY} : null;
+    down = link && event.isPrimary !== false && event.button === 0 ? {link:link,x:event.clientX,y:event.clientY,time:Date.now(),id:event.pointerId} : null;
   }, true);
+  document.addEventListener('pointermove', function (event) {
+    if (down && (event.pointerId !== down.id || Math.hypot(event.clientX-down.x,event.clientY-down.y) > 10)) down = null;
+  }, true);
+  document.addEventListener('scroll', function () { down = null; cancel(); }, true);
+  document.addEventListener('contextmenu', function () { down = null; cancel(); }, true);
   document.addEventListener('pointercancel', function () { down = null; }, true);
   document.addEventListener('pointerup', function (event) {
     var start = down; down = null;
-    if (!start || menuLink(event.target) !== start.link || Math.hypot(event.clientX-start.x,event.clientY-start.y) > 10) return;
+    if (!start || event.pointerId !== start.id || Date.now()-start.time > 700 || menuLink(event.target) !== start.link || Math.hypot(event.clientX-start.x,event.clientY-start.y) > 10) return;
     cancel(); pending = start.link;
-    timer = setTimeout(function () { if (pending === start.link) showFailure(start.link, '터치 후 클릭 없음'); }, 2500);
+    // Let a normal click win first; recover a completed tap if WebView drops it.
+    timer = setTimeout(function () {
+      if (pending !== start.link) return;
+      location.assign(start.link.href);
+      timer = setTimeout(function () { if (pending === start.link) showFailure(start.link, '터치 직접 이동 미완료'); }, 5000);
+    }, 400);
   }, true);
   document.addEventListener('click', function (event) {
     var link = menuLink(event.target);

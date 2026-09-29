@@ -19,7 +19,7 @@ function harness(options={}) {
   if(url.endsWith('invalidate_native_push'))return Response.json(null);
   if(url.endsWith('claim_push_delivery')){if(claims.has(body.p_key))return Response.json({ok:true,claimed:false,status:claims.get(body.p_key)});claims.set(body.p_key,'sending');return Response.json({ok:true,claimed:true,lease_id:id});}
   if(url.endsWith('finish_push_delivery')){if(body.p_success)claims.set(body.p_key,'sent');else claims.delete(body.p_key);return Response.json({ok:true});}
-  if(url.endsWith('get_guest_chat_dispatch'))return Response.json({ok:true,message_id:id,room_id:id,recipient_topics:[topic],message:'guest',priority:'urgent',recipient_modes:options.recipientModes||{}});
+  if(url.endsWith('get_guest_chat_dispatch'))return Response.json({ok:true,message_id:id,room_id:id,recipient_topics:[topic],message:'guest',sender_label:options.guestName,priority:'urgent',recipient_modes:options.recipientModes||{}});
   if(url.endsWith('finish_guest_chat_dispatch'))return Response.json(null);
   if(url.endsWith('save_telegram_urgent_message_service'))return Response.json({ok:true,message_id:id});
   throw Error('Unexpected network request');
@@ -62,3 +62,5 @@ test('registered device gets direct high-priority push with recipient binding wh
  await h.request();assert.equal(h.calls.filter(c=>c.url.includes('fcm.googleapis.com')).length,2);
 });
 test('device resolver cannot route outside authorized recipients',async()=>{const h=harness({devices:[{topic:'property_999_employee_'+id,device_id:id,token:'x'}]});assert.equal((await h.request()).status,503);assert(!h.calls.some(c=>c.url.includes('fcm.googleapis.com')));});
+
+test('guest notification includes the guest name',async()=>{const h=harness({guestName:'나야나'});assert.equal((await h.request({event_id:id},'/guest-chat',{'x-webhook-secret':'test-admin'})).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.senderLabel,'현장게스트 나야나');});

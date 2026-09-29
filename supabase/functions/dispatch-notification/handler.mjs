@@ -121,7 +121,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         recipientModes = dispatch.recipient_modes || {};
         payload = {alertId:String(deliveryId),roomId:String(dispatch.room_id),message:preview(dispatch.message),
           mode:'message',priority:'normal',
-          messageType:'guest_chat',senderLabel:'현장 게스트',validUntil:String(dispatch.valid_until || now()+300000)};
+          messageType:'guest_chat',senderLabel:dispatch.sender_label && dispatch.sender_label !== '현장 게스트' ? '현장게스트 '+String(dispatch.sender_label) : '현장게스트',validUntil:String(dispatch.valid_until || now()+300000)};
       } else if (path.endsWith('/telegram')) {
         const secret = env('TELEGRAM_URGENT_SECRET');
         if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ ok: false, code: 'unauthorized' }, 401);

@@ -27,16 +27,9 @@
   window.omgTransition = { ready: ready, leave: leave };
   scheduleBrand();
 
-  document.addEventListener("click", function (event) {
-    const link = event.target.closest("a[href]");
-    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (link.target || link.hasAttribute("download")) return;
-    const url = new URL(link.href, location.href);
-    if (url.origin !== location.origin || (url.pathname === location.pathname && url.search === location.search && url.hash)) return;
-    event.preventDefault();
-    leave();
-    requestAnimationFrame(function () { location.assign(url.href); });
-  });
+  // Keep anchor navigation native. Cancelling clicks and scheduling location.assign
+  // in requestAnimationFrame can strand navigation inside Android WebView.
+  // The destination page owns its entry transition; outgoing links need no mask.
 
   addEventListener("pageshow", function () {
     if (root.classList.contains("omg-leaving")) ready();

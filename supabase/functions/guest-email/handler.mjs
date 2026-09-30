@@ -71,10 +71,16 @@ export function createGuestEmailHandler({env,sendMail,fetcher=fetch,cryptoApi=cr
   if(req.method!=='POST')return reply({ok:false},405);
   const action=new URL(req.url).pathname.split('/').pop();
   if(!['dispatch','open'].includes(action))return reply({ok:false},404);
-  if(action==='dispatch'&&(!env('GUEST_EMAIL_WORKER_SECRET')||req.headers.get('x-worker-secret')!==env('GUEST_EMAIL_WORKER_SECRET')))return reply({ok:false},401);
+  const workerToken=req.headers.get('x-worker-secret');
+  const workerSecret=env('GUEST_EMAIL_WORKER_SECRET');
+  if(action==='dispatch'&&(!workerToken||(workerSecret&&workerToken!==workerSecret)))return reply({ok:false},401);
   if(!base()||!service())return reply({ok:false,message:'서버 연결 설정이 필요합니다.'},503);
   try{
    if(action==='dispatch'){
+    if(!workerSecret){
+     if(!/^[a-f0-9]{64}$/.test(workerToken))return reply({ok:false},401);
+     if(await rpc('verify_guest_email_worker',{p_secret:workerToken})!==true)return reply({ok:false},401);
+    }
     if(!env('SMTP_HOST')||!env('SMTP_USER')||!env('SMTP_PASSWORD'))return reply({ok:false,error:'smtp_not_configured'},503);
     return reply(await dispatch());
    }

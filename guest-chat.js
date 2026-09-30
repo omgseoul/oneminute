@@ -1,4 +1,5 @@
 (async()=>{
+ await window.openGuestEmailLink?.();
  const G=GuestSupport,q=new URLSearchParams(location.search),slug=q.get('p'),isGuest=!!slug;
  let auth,roomId=q.get('room'),seq=0,busy=false,timer,failures=0,actor,room,asset=null,pending=null,lastDay='',lastRead=0,roomLoaded=false,sending=false,uploading=false,lastRetry=0;
  const timeline=document.getElementById('timeline'),body=document.getElementById('body'),send=document.getElementById('send');

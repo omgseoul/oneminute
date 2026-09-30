@@ -1,82 +1,59 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Webhook} from 'svix';
-import {createGuestEmailHandler,emailPayload,replyText,replyAlias} from '../../functions/guest-email/handler.mjs';
-const id='00000000-0000-4000-8000-000000000001',alias=id.replaceAll('-','');
-const secret='whsec_'+Buffer.from('test-webhook-secret-32-bytes-long!').toString('base64');
-const vars={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'service-test',RESEND_API_KEY:'test-key',RESEND_WEBHOOK_SECRET:secret,GUEST_EMAIL_WORKER_SECRET:'worker-test',PUSH_ADMIN_SECRET:'push-test'};
-const job={id,lease:id,payload:{alias,to:'guest@example.com',name:'One Minute',body:'바나나 <img src=x>',slug:id}};
-const email={id,from:'Guest <guest@example.com>',to:[`reply-${alias}@reply.omgworks24.com`],text:'답장입니다',authentication:{dmarc:'pass'},headers:{},attachments:[]};
+import {webcrypto} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+import {createGuestEmailHandler,emailPayload} from '../../functions/guest-email/handler.mjs';
+const id='00000000-0000-4000-8000-000000000001',token='a'.repeat(64);
+const vars={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'service-test',SMTP_HOST:'smtp.test',SMTP_USER:'user',SMTP_PASSWORD:'test',GUEST_EMAIL_FROM:'notify@example.com',GUEST_EMAIL_WORKER_SECRET:'worker-test'};
+const job={id,lease:id,payload:{to:'guest@example.com',name:'One Minute',body:'바나나 <img src=x>',link_token:token}};
 function setup(options={}){
- const calls=[];const handle=createGuestEmailHandler({env:k=>vars[k],wait:async()=>{},
- verifyWebhook:(raw,headers,key)=>{new Webhook(key).verify(raw,headers);return JSON.parse(raw);},
+ const calls=[],sent=[];
+ const handle=createGuestEmailHandler({env:k=>({...vars,...options.env})[k],cryptoApi:webcrypto,
+ sendMail:async payload=>{sent.push(payload);if(options.smtpFails)throw Error('timeout');return {accepted:['guest@example.com']};},
  fetcher:async(url,init={})=>{
   const body=typeof init.body==='string'?JSON.parse(init.body):init.body;calls.push({url,init,body});
   if(url.endsWith('/claim_guest_emails'))return Response.json([structuredClone(job)]);
-  if(url.endsWith('/finish_guest_email'))return new Response(null,{status:204});
-  if(url==='https://api.resend.com/emails')return Response.json(options.sendFails?{error:'rate_limit'}:{id:'sent-id'},{status:options.sendFails?429:200});
-  if(url.includes('/emails/receiving/'))return Response.json({...email,...options.email});
-  if(url.endsWith('/resolve_guest_email'))return Response.json(options.denied?null:{room_id:id,property_id:id});
-  if(url.endsWith('/receive_guest_email'))return Response.json({ok:true,event_id:id,duplicate:!!options.duplicate});
-  if(url.includes('/dispatch-notification/'))return Response.json({ok:true},{status:options.pushFails?503:200});
-  throw Error('unexpected call: '+url);
+  if(url.endsWith('/finish_guest_email')||url.endsWith('/fail_guest_email'))return new Response(null,{status:204});
+  if(url.endsWith('/open_guest_email'))return Response.json({ok:true,room_id:id,slug:id,guest_token:body.p_new_token,expires:Date.now()+3600000});
+  throw Error('unexpected call');
  }});
- const webhook=async(tampered=false,old=false)=>{
-  const raw=JSON.stringify({type:'email.received',data:{email_id:id}}),date=new Date(Date.now()-(old?3600000:0));
-  const sig=new Webhook(secret).sign('msg_test',date,raw);
-  return handle(new Request('https://edge.test/guest-email/webhook',{method:'POST',headers:{'svix-id':'msg_test','svix-timestamp':String(Math.floor(+date/1000)),'svix-signature':sig},body:tampered?raw+' ':raw}));
- };
- return {calls,handle,webhook,dispatch:(key='worker-test')=>handle(new Request('https://edge.test/guest-email/dispatch',{method:'POST',headers:{'x-worker-secret':key}}))};
+ return {calls,sent,handle,dispatch:(key='worker-test')=>handle(new Request('https://edge.test/guest-email/dispatch',{method:'POST',headers:{'x-worker-secret':key}}))};
 }
-test('From and Reply-To use exactly the same conversation address; HTML is escaped',()=>{
- const p=emailPayload(job);assert.equal(p.from,`One Minute <reply-${alias}@reply.omgworks24.com>`);assert.equal(p.reply_to,`reply-${alias}@reply.omgworks24.com`);
- assert(p.html.includes('&lt;img src=x&gt;'));assert(!p.html.includes('<img src=x>'));assert(p.text.includes(job.payload.body));
+test('mail contains exact host answer and reply button to a secret room link; no inbound address',()=>{
+ const p=emailPayload(job,'notify@example.com');assert.equal(p.from.address,'notify@example.com');assert.equal(p.from.name,'One Minute');
+ assert(p.html.includes('답변하기'));assert(p.html.includes('#reply='+token));assert(p.text.includes(job.payload.body));
+ assert(p.html.includes('&lt;img src=x&gt;'));assert(!p.html.includes('<img src=x>'));
+ assert.equal(p.reply_to,undefined);assert(!JSON.stringify(p).includes('reply.omgworks24.com'));
+ assert(p.text.includes('이 이메일에 회신하지 말고 아래 링크를 눌러주세요.'));
+ assert(p.html.indexOf('Please do not reply to this email.')<p.html.indexOf('<a href='));
 });
-test('opaque route accepts exactly one conversation; never guesses among tenants',()=>{
- assert.equal(replyAlias(email.to),id);assert.equal(replyAlias([...email.to,'reply-'+('a'.repeat(32))+'@reply.omgworks24.com']),null);assert.equal(replyAlias(['reply-'+alias+'@evil.example']),null);
+test('dispatch uses SMTP without any Resend keys or API calls',async()=>{
+ const s=setup();const r=await s.dispatch();assert.equal(r.status,200);assert.equal((await r.json()).sent,1);assert.equal(s.sent.length,1);
+ assert(s.calls.every(c=>c.url.startsWith(vars.SUPABASE_URL)));
 });
-test('signed reply enters existing guest chat and dispatches its event',async()=>{
- const s=setup();assert.equal((await s.webhook()).status,200);const receive=s.calls.find(c=>c.url.endsWith('/receive_guest_email'));
- assert.equal(receive.body.p_body,'답장입니다');assert.equal(receive.body.p_sender,'guest@example.com');assert.equal(receive.body.p_alias,id);assert.equal(receive.body.p_provider,id);
- assert(s.calls.some(c=>c.url.includes('/dispatch-notification/')));
+test('SMTP uncertainty is failed for review instead of automatically duplicated',async()=>{
+ const s=setup({smtpFails:true});await s.dispatch();assert(s.calls.some(c=>c.url.endsWith('/fail_guest_email')));assert(!s.calls.some(c=>c.url.endsWith('/finish_guest_email')));
 });
-test('tampered and expired webhook signatures have no network side effects',async()=>{
- for(const args of [[true,false],[false,true]]){const s=setup();assert.equal((await s.webhook(...args)).status,401);assert.equal(s.calls.length,0);}
+test('public callers cannot dispatch and old incoming webhook no longer exists',async()=>{
+ const s=setup();assert.equal((await s.dispatch('wrong')).status,401);
+ assert.equal((await s.handle(new Request('https://edge.test/guest-email/webhook',{method:'POST',body:'{}'}))).status,404);assert.equal(s.calls.length,0);
 });
-test('spoofed sender auth, unrelated guest and autoresponder never create messages',async()=>{
- for(const options of [{email:{authentication:{dmarc:'fail',dkim:'pass'}}},{email:{authentication:{}}},{denied:true},{email:{headers:{'Auto-Submitted':'auto-replied'}}}]){
-  const s=setup(options);assert.equal((await s.webhook()).status,200);assert(!s.calls.some(c=>c.url.endsWith('/receive_guest_email')));
- }
+test('link exchange works independently of SMTP and creates server-chosen session',async()=>{
+ const s=setup({env:{SMTP_HOST:undefined}});const r=await s.handle(new Request('https://edge.test/guest-email/open',{method:'POST',headers:{Origin:'https://omgworks24.com'},body:JSON.stringify({token,room_id:'forged',guest_token:'forged'})}));
+ assert.equal(r.status,200);const v=await r.json();assert.equal(v.room_id,id);assert.notEqual(v.guest_token,'forged');assert.equal(s.calls[0].body.p_link,token);assert.equal(s.calls[0].body.room_id,undefined);
+ assert.equal(r.headers.get('Access-Control-Allow-Origin'),'https://omgworks24.com');
 });
-test('worker endpoint refuses public dispatch',async()=>{const s=setup();assert.equal((await s.dispatch('wrong')).status,401);assert.equal(s.calls.length,0);});
-test('send retries use identical content and the same provider idempotency key',async()=>{
- const s=setup();await s.dispatch();await s.dispatch();const sends=s.calls.filter(c=>c.url==='https://api.resend.com/emails');assert.deepEqual(sends[0].body,sends[1].body);
- assert.equal(sends[0].init.headers['Idempotency-Key'],'guest-message/'+id);assert.equal(sends[1].init.headers['Idempotency-Key'],'guest-message/'+id);
+test('malformed links and foreign origins are rejected before database access',async()=>{
+ const s=setup();for(const [body,origin,status] of [[{token:'bad'},'https://omgworks24.com',400],[{token},'https://evil.test',403]]){
+ const r=await s.handle(new Request('https://edge.test/open',{method:'POST',headers:{Origin:origin},body:JSON.stringify(body)}));assert.equal(r.status,status);
+ }assert.equal(s.calls.length,0);
 });
-test('provider failure records a retry instead of reporting sent',async()=>{
- const s=setup({sendFails:true});assert.equal((await (await s.dispatch()).json()).sent,0);const f=s.calls.find(c=>c.url.endsWith('/finish_guest_email'));assert.equal(f.body.p_error,'provider_429');assert.equal(f.body.p_provider,undefined);
-});
-test('push failure returns retryable status, duplicate receipt can retry notification',async()=>{
- const s=setup({duplicate:true,pushFails:true});assert.equal((await s.webhook()).status,503);assert(s.calls.some(c=>c.url.includes('/dispatch-notification/')));
-});
-test('quoted original is trimmed but unrecognized email is preserved',()=>{
- assert.equal(replyText({text:'감사합니다\n\nOn Wed, Host wrote:\nold text'}),'감사합니다');
- assert.equal(replyText({text:'First line\nSecond line'}),'First line\nSecond line');
- assert.equal(replyText({html:'<script>bad()</script><p>안녕 &amp; hi</p>'}),'안녕 & hi');
-});
-test('photo reply fetches only provider attachment URL and stores in resolved property/room',async()=>{
- const calls=[],png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0]);
- const handler=createGuestEmailHandler({env:k=>vars[k],wait:async()=>{},verifyWebhook:()=>({type:'email.received',data:{email_id:id}}),fetcher:async(url,init={})=>{
-  const body=typeof init.body==='string'?JSON.parse(init.body):init.body;calls.push({url,body,init});
-  if(url.includes('?html_format=cid'))return Response.json({...email,text:'사진입니다',attachments:[{id,content_type:'image/png',size:png.length}]});
-  if(url.includes('/attachments/'))return Response.json({download_url:'https://inbound-cdn.resend.com/photo'});
-  if(url==='https://inbound-cdn.resend.com/photo')return new Response(png);
-  if(url.endsWith('/resolve_guest_email'))return Response.json({room_id:id,property_id:id});
-  if(url.includes('/storage/'))return Response.json({ok:true});
-  if(url.endsWith('/receive_guest_email'))return Response.json({ok:true});
-  throw Error('unexpected');
- }});
- const r=await handler(new Request('https://edge.test/webhook',{method:'POST',body:'{}'}));assert.equal(r.status,200);
- const received=calls.find(c=>c.url.endsWith('/receive_guest_email'));assert.deepEqual(received.body.p_assets,[{path:`${id}/${id}/email/${id}/${id}`,mime:'image/png'}]);
- assert.equal(calls.find(c=>c.url.startsWith('https://inbound-cdn')).init.redirect,'error');
+test('fresh browser uses returned original room and removes secret from URL',async()=>{
+ const source=await readFile(new URL('../../../guest-email-link.js',import.meta.url),'utf8');const saved=new Map(),urls=[],requests=[];
+ const context={window:{OMG_SUPABASE:{url:'https://database.test',publishableKey:'public'}},URLSearchParams,AbortSignal,
+ location:{hash:'#reply='+token,pathname:'/guest-chat.html'},localStorage:{setItem:(k,v)=>saved.set(k,JSON.parse(v))},history:{replaceState:(_a,_b,url)=>urls.push(url)},
+ fetch:async(url,init)=>{requests.push({url,init});return Response.json({ok:true,room_id:id,slug:id,guest_token:id,expires:Date.now()+3600000});}};
+ vm.runInNewContext(source,context);await context.window.openGuestEmailLink();
+ assert.equal(saved.get('omg_guest_'+id).room_id,id);assert.equal(urls[0],'/guest-chat.html?p='+id);assert(!requests[0].url.includes(token));assert.equal(JSON.parse(requests[0].init.body).token,token);
 });

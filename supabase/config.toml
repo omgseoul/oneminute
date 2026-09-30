@@ -10,5 +10,5 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.guest-email]
-# /webhook requires a verified Resend/Svix signature; /dispatch a private worker secret.
+# /open exchanges a scoped email link; /dispatch requires a private worker secret.
 verify_jwt = false

@@ -1,4 +1,4 @@
--- Run after deploying guest-email and adding its four secrets. This does NOT enable sending.
+-- Run after deploying guest-email and adding SMTP and worker secrets. This does NOT enable sending.
 -- Store the SAME GUEST_EMAIL_WORKER_SECRET in Vault as omg_guest_email_worker_secret
 -- using the Dashboard Vault form; never commit it to SQL or put it in browser JS.
 create extension if not exists pg_cron;
@@ -16,7 +16,7 @@ select cron.schedule('omg-guest-email-dispatch','* * * * *',$job$
   body:='{}'::jsonb,timeout_milliseconds:=60000
  ) where exists(select 1 from public.guest_email_config where enabled);
 $job$);
--- Final activation after the domain is verified for BOTH sending and receiving:
+-- Final activation after SMTP and the reply link have been verified:
 -- update public.guest_email_config set enabled=true where singleton;
 -- Emergency stop (webchat itself keeps working):
 -- update public.guest_email_config set enabled=false where singleton;

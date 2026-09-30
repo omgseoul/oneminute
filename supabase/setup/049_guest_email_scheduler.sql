@@ -1,6 +1,8 @@
--- Run after deploying guest-email and adding SMTP and worker secrets. This does NOT enable sending.
--- Store the SAME GUEST_EMAIL_WORKER_SECRET in Vault as omg_guest_email_worker_secret
--- using the Dashboard Vault form; never commit it to SQL or put it in browser JS.
+-- Run after deploying guest-email and configuring SMTP. This does NOT enable sending.
+-- The guest_email_worker_vault migration generates the encrypted worker token.
+-- The Edge Function validates it through a service-role-only RPC; no duplicate
+-- Edge Function secret is required. Legacy GUEST_EMAIL_WORKER_SECRET installs
+-- must still use the same token in Vault. Never commit credentials to SQL.
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 do $$begin

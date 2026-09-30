@@ -13,10 +13,12 @@ export function emailPayload(job){
  const name=String(p.name||'OMG WORKS').replace(/[\r\n<>"\\]/g,' ').trim().slice(0,100);
  const link='https://omgworks24.com/guest-chat.html#reply='+p.link_token;
  const body=String(p.body||'')+(p.asset_path?'\n[사진 첨부 / Photo attached]':'');
- return {from:{name,address:from},to:p.to,subject:`${name}에서 답변이 도착했습니다`,
+ const intro='숙소 채팅으로 문의하신 내용에 답변드립니다.';
+ const introEn='Here is the reply to your message in our guest chat.';
+ return {from:{name,address:from},to:p.to,subject:`${name} — 문의하신 내용에 대한 답변 / Guest chat reply`,
  messageId:`<guest-${job.id}@${from.split('@')[1]}>`,
- text:`${name}\n\n${body}\n\n이 이메일에 회신하지 말고 아래 링크를 눌러주세요.\nPlease do not reply to this email. Click the link below to reply.\n\n답변하기 / Reply: ${link}`,
- html:`<!doctype html><html><body style="margin:0;background:#f3f6fb;font-family:Arial,sans-serif;color:#193349"><div style="max-width:560px;margin:24px auto;background:white;border-radius:24px;padding:32px"><p style="font-size:13px;color:#718397">OMG WORKS</p><h1 style="font-size:24px">${escape(name)}</h1><div style="padding:24px;background:#f3f6fb;border-radius:18px;font-size:17px;line-height:1.7;white-space:pre-wrap">${escape(body)}</div><p style="font-size:14px;line-height:1.7;color:#63758a;margin:24px 0 16px">이 이메일에 회신하지 말고 아래 링크를 눌러주세요.<br>Please do not reply to this email. Click the link below to reply.</p><a href="${escape(link)}" style="display:inline-block;padding:14px 28px;border-radius:14px;background:#286bc0;color:#fff;text-decoration:none;font-weight:bold">답변하기 / Reply</a></div></body></html>`,
+ text:`${name}\n\n${intro}\n${introEn}\n\n${body}\n\n채팅방에서 답변하기 / Reply in guest chat:\n${link}\n\n이 이메일은 숙소 채팅의 답변 알림입니다. 이메일 회신은 확인하지 않습니다.\nThis is a guest chat reply notification. Email replies are not monitored.`,
+ html:`<!doctype html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#222;background:#fff"><p><strong>${escape(name)}</strong></p><p>${intro}<br>${introEn}</p><div style="white-space:pre-wrap">${escape(body)}</div><p><a href="${escape(link)}">채팅방에서 답변하기 / Reply in guest chat</a></p><p style="font-size:13px;color:#555">이 이메일은 숙소 채팅의 답변 알림입니다. 이메일 회신은 확인하지 않습니다.<br>This is a guest chat reply notification. Email replies are not monitored.</p></body></html>`,
  headers:{'Auto-Submitted':'auto-generated','X-Auto-Response-Suppress':'All'}};
 }
 export function photoMime(b){

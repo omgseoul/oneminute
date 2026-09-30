@@ -86,3 +86,6 @@
 .approval-actions .reject{background:#fff0f1;color:#b83e4c;border:1px solid #f1d4d8}
 .status-pill.rejected{background:#fff0f1;color:#b83e4c}
 .ack:disabled{opacity:.65;cursor:default}
+
+/* Keep the back/refresh row compact while retaining usable touch targets. */
+.shell{padding-top:6px!important}.shell>.top{min-height:40px;margin-bottom:5px!important;align-items:center}.shell>.top .back{display:inline-flex;align-items:center;min-height:40px}.shell>.top .refresh{min-height:36px;padding:7px 11px;font-size:11px}

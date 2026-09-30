@@ -26,8 +26,11 @@ test('mail contains exact host answer and reply button to a secret room link; no
  assert(p.html.includes('답변하기'));assert(p.html.includes('#reply='+token));assert(p.text.includes(job.payload.body));
  assert(p.html.includes('&lt;img src=x&gt;'));assert(!p.html.includes('<img src=x>'));
  assert.equal(p.reply_to,undefined);assert(!JSON.stringify(p).includes('reply.omgworks24.com'));
- assert(p.text.includes('이 이메일에 회신하지 말고 아래 링크를 눌러주세요.'));
- assert(p.html.indexOf('Please do not reply to this email.')<p.html.indexOf('<a href='));
+ assert(p.text.includes('숙소 채팅으로 문의하신 내용에 답변드립니다.'));
+ assert(p.subject.includes('문의하신 내용에 대한 답변'));
+ assert.equal((p.html.match(/<a href=/g)||[]).length,1);
+ assert(p.html.includes('Email replies are not monitored.'));
+ assert(p.html.indexOf('Here is the reply')<p.html.indexOf('&lt;img src=x&gt;'));
 });
 test('dispatch uses SMTP without any Resend keys or API calls',async()=>{
  const s=setup();const r=await s.dispatch();assert.equal(r.status,200);assert.equal((await r.json()).sent,1);assert.equal(s.sent.length,1);assert.equal(s.sent[0].from.address,'notifications@omgworks24.com');

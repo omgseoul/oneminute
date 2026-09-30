@@ -8,3 +8,7 @@ verify_jwt = false
 
 [functions.guest-support]
 verify_jwt = false
+
+[functions.guest-email]
+# /webhook requires a verified Resend/Svix signature; /dispatch a private worker secret.
+verify_jwt = false

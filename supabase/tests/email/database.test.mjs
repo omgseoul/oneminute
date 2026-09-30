@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+const id='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002';
+test('actual PostgreSQL functions: feature gate, tenant routing, leases, deduplication and no email loop',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec('create role anon; create role authenticated; create role service_role; create schema omg_private; create table public.properties(id uuid primary key,name text);');
+  const schema=await readFile(new URL('../../migrations/034_guest_support.sql',import.meta.url),'utf8');
+  await db.exec(schema.slice(0,schema.indexOf('create or replace function omg_private.guest_actor'))+'commit;');
+  await db.exec('alter table guest_chat_rooms add column email text;');
+  await db.exec(schema.slice(schema.indexOf('create or replace function omg_private.guest_limit'),schema.indexOf('-- All actions go through')));
+  await db.exec(await readFile(new URL('../../migrations/049_guest_email_relay.sql',import.meta.url),'utf8'));
+  await db.query('insert into properties values($1,$2),($3,$4)',[id,'One Minute',other,'Other Property']);
+  await db.query('insert into guest_support_config(property_id,enabled,chat_enabled) values($1,true,true),($2,true,true)',[id,other]);
+  await db.query("insert into guest_chat_rooms(id,property_id,guest_name,check_in,check_out,token_hash,expires_at,ip_hash,email) values($1,$1,'Guest',current_date,current_date+2,'hash',now()+interval '2 days','ip','guest@example.com'),($2,$2,'Other',current_date,current_date+2,'otherhash',now()+interval '2 days','ip','other@example.com')",[id,other]);
+  const send=async(kind='staff')=>(await db.query("insert into guest_chat_messages(room_id,client_id,sender_key,sender_name,sender_kind,body) values($1,gen_random_uuid(),$2,'Host',$3,'바나나') returning id",[id,kind==='staff'?'owner:test':'guest:'+id,kind])).rows[0].id;
+  await send();assert.equal((await db.query('select count(*)::int n from guest_email_outbox')).rows[0].n,0);
+  await db.exec('update guest_email_config set enabled=true');const message=await send();
+  const queued=(await db.query('select * from guest_email_outbox')).rows;assert.equal(queued.length,1);assert.equal(queued[0].payload.to,'guest@example.com');
+  const route=(await db.query('select alias from guest_email_routes where room_id=$1',[id])).rows[0].alias;
+  const resolve=async(sender)=>(await db.query('select resolve_guest_email($1,$2) r',[route,sender])).rows[0].r;
+  assert.equal((await resolve('guest@example.com')).property_id,id);assert.equal(await resolve('other@example.com'),null);
+  const claim=async()=>(await db.query('select claim_guest_emails() jobs')).rows[0].jobs;
+  const jobs=await claim();assert.equal(jobs.length,1);assert.equal((await claim()).length,0);
+  await db.query('select finish_guest_email($1,$2,$3)',[message,other,'forged-lease']);
+  assert.equal((await db.query('select status from guest_email_outbox')).rows[0].status,'sending');
+  await db.query('select finish_guest_email($1,$2,$3)',[message,jobs[0].lease,'provider-id']);
+  assert.equal((await db.query('select status from guest_email_outbox')).rows[0].status,'sent');
+  const receive=async()=> (await db.query("select receive_guest_email($1,$2,'guest@example.com','이메일 답장','[]') r",[other,route])).rows[0].r;
+  const first=await receive(),repeat=await receive();assert.equal(first.ok,true);assert.equal(repeat.duplicate,true);assert.equal(first.event_id,repeat.event_id);
+  assert.equal((await db.query("select count(*)::int n from guest_chat_messages where sender_kind='guest'")).rows[0].n,1);
+  assert.equal((await db.query('select count(*)::int n from guest_email_outbox')).rows[0].n,1);
+  // A retention cleanup must not let the provider replay resurrect a deleted reply.
+  await db.exec("delete from guest_chat_messages where sender_kind='guest'");
+  assert.equal((await receive()).duplicate,true);
+  assert.equal((await db.query("select count(*)::int n from guest_chat_messages where sender_kind='guest'")).rows[0].n,0);
+  const photoProvider='00000000-0000-4000-8000-000000000003';
+  const photoPath=`${id}/${id}/email/${photoProvider}/photo`;
+  const photoReply=(await db.query("select receive_guest_email($1,$2,'guest@example.com','사진 답장',$3::jsonb) r",[photoProvider,route,JSON.stringify([{path:photoPath,mime:'image/png'}])])).rows[0].r;
+  assert.equal(photoReply.ok,true);
+  assert.equal((await db.query("select count(*)::int n from guest_chat_messages where sender_kind='guest'")).rows[0].n,2);
+  assert.equal((await db.query('select object_path from guest_support_assets')).rows[0].object_path,photoPath);
+  const retryMessage=await send();
+  await db.query("update guest_email_outbox set created_at=now()-interval '25 hours' where message_id=$1",[retryMessage]);
+  assert.equal((await claim()).length,0);
+  assert.equal((await db.query('select status from guest_email_outbox where message_id=$1',[retryMessage])).rows[0].status,'failed');
+  await db.query("update guest_chat_rooms set status='closed' where id=$1",[id]);assert.equal(await resolve('guest@example.com'),null);
+  assert.equal((await db.query("select receive_guest_email(gen_random_uuid(),$1,'guest@example.com','closed reply','[]') r",[route])).rows[0].r.rejected,true);
+  assert.equal((await db.query("select has_function_privilege('anon','public.receive_guest_email(uuid,uuid,text,text,jsonb)','execute') allowed")).rows[0].allowed,false);
+  assert.equal((await db.query("select has_function_privilege('authenticated','public.claim_guest_emails()','execute') allowed")).rows[0].allowed,false);
+ }finally{await db.close();}
+});

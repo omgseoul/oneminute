@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {createGuestEmailHandler,emailPayload} from '../../functions/guest-email/handler.mjs';
 const id='00000000-0000-4000-8000-000000000001',token='a'.repeat(64);
-const vars={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'service-test',SMTP_HOST:'smtp.test',SMTP_USER:'user',SMTP_PASSWORD:'test',GUEST_EMAIL_FROM:'notify@example.com',GUEST_EMAIL_WORKER_SECRET:'worker-test'};
+const vars={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'service-test',SMTP_HOST:'smtp.test',SMTP_USER:'user',SMTP_PASSWORD:'test',GUEST_EMAIL_WORKER_SECRET:'worker-test'};
 const job={id,lease:id,payload:{to:'guest@example.com',name:'One Minute',body:'바나나 <img src=x>',link_token:token}};
 function setup(options={}){
  const calls=[],sent=[];
@@ -21,7 +21,7 @@ function setup(options={}){
  return {calls,sent,handle,dispatch:(key='worker-test')=>handle(new Request('https://edge.test/guest-email/dispatch',{method:'POST',headers:{'x-worker-secret':key}}))};
 }
 test('mail contains exact host answer and reply button to a secret room link; no inbound address',()=>{
- const p=emailPayload(job,'notify@example.com');assert.equal(p.from.address,'notify@example.com');assert.equal(p.from.name,'One Minute');
+ const p=emailPayload(job);assert.equal(p.from.address,'notifications@omgworks24.com');assert.equal(p.from.name,'One Minute');
  assert(p.html.includes('답변하기'));assert(p.html.includes('#reply='+token));assert(p.text.includes(job.payload.body));
  assert(p.html.includes('&lt;img src=x&gt;'));assert(!p.html.includes('<img src=x>'));
  assert.equal(p.reply_to,undefined);assert(!JSON.stringify(p).includes('reply.omgworks24.com'));
@@ -29,7 +29,7 @@ test('mail contains exact host answer and reply button to a secret room link; no
  assert(p.html.indexOf('Please do not reply to this email.')<p.html.indexOf('<a href='));
 });
 test('dispatch uses SMTP without any Resend keys or API calls',async()=>{
- const s=setup();const r=await s.dispatch();assert.equal(r.status,200);assert.equal((await r.json()).sent,1);assert.equal(s.sent.length,1);
+ const s=setup();const r=await s.dispatch();assert.equal(r.status,200);assert.equal((await r.json()).sent,1);assert.equal(s.sent.length,1);assert.equal(s.sent[0].from.address,'notifications@omgworks24.com');
  assert(s.calls.every(c=>c.url.startsWith(vars.SUPABASE_URL)));
 });
 test('SMTP uncertainty is failed for review instead of automatically duplicated',async()=>{

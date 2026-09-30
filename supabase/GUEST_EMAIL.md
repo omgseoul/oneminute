@@ -7,7 +7,9 @@ Resend와 이메일 답장 수신 연동을 제거했습니다. 숙소에서 게
 게스트는 버튼을 누르면 원래 대화방에서 답변합니다. 이메일 자체에 회신한 내용은 채팅에 등록되지 않습니다.
 이 안내도 이메일에 함께 표시합니다.
 
-표시 이름은 숙소명이며 실제 발신 주소는 SMTP에서 허용한 `GUEST_EMAIL_FROM`입니다.
+표시 이름은 각 숙소명이며 실제 발신 주소는 모든 숙소에 공통인 `notifications@omgworks24.com`으로 고정합니다.
+이 주소에 받은편지함을 만들지 않습니다. 숙소 가입 이메일은 계정·연락용으로 유지하며 발신 주소로 사용하지 않습니다.
+호스트마다 이메일 계정을 연결할 필요 없이 OMG WORKS 운영자가 발송 서버와 도메인을 한 번 인증합니다.
 `reply-...@reply.omgworks24.com` 주소를 더 이상 사용하지 않으며 수신 MX/webhook도 필요하지 않습니다.
 Resend 가입 또는 키는 필요 없습니다. 그러나 실제 메일 발송에는 SMTP 발송 계정이 필요합니다.
 단순히 Supabase Pro로 올린다고 업무용 이메일 발송 계정이 생기지는 않습니다.
@@ -35,7 +37,6 @@ Resend 가입 또는 키는 필요 없습니다. 그러나 실제 메일 발송�
 2. 운영자가 사용할 SMTP 발송 계정을 결정하고 서버 비밀값을 설정합니다.
    - `SMTP_HOST`, `SMTP_PORT` (465 기본, 587 또는 2525도 TLS 필수)
    - `SMTP_USER`, `SMTP_PASSWORD` (해당 제공업체가 허용한 SMTP 자격증명/앱 비밀번호)
-   - `GUEST_EMAIL_FROM` (SMTP에서 발신을 허용한 실제 이메일 주소)
    - `GUEST_EMAIL_WORKER_SECRET` (무작위 서버 비밀값)
    개인 Outlook 등 OAuth가 필요한 계정은 일반 비밀번호로 연결할 수 없습니다.
    해당 계정을 선택하면 OAuth 연결을 별도로 구성해야 합니다. 일반 계정 비밀번호를 소스에 저장하지 않습니다.
@@ -43,7 +44,9 @@ Resend 가입 또는 키는 필요 없습니다. 그러나 실제 메일 발송�
    `supabase functions deploy guest-email --project-ref rfcozgyvupvachhhblzn --no-verify-jwt`
 4. Supabase Vault의 `omg_guest_email_worker_secret`에 위 worker secret과 같은 값을 저장하고
    `setup/049_guest_email_scheduler.sql`을 적용합니다. 매분 최대 5건을 처리합니다.
-5. SMTP 제공업체 발신주소 인증 및 필요한 DNS를 완료한 다음 활성화합니다.
+5. SMTP 제공업체에서 `omgworks24.com`의 발송 권한과 필요한 DNS(SPF/DKIM 등)를 인증하여
+   `notifications@omgworks24.com` 발신을 허용한 다음 활성화합니다.
+   주소 문자열만 설정하거나 개인 Gmail/Outlook의 From만 바꾸는 것으로는 도메인 발송 인증이 되지 않습니다.
    `update public.guest_email_config set enabled=true where singleton;`
 6. 운영자 소유 테스트 이메일로 새 QR 대화를 만듭니다. 직원의 답변 이메일을 받고,
    다른 브라우저에서 **답변하기**를 눌러 동일한 room_id와 기존 대화가 보이는지 확인합니다.

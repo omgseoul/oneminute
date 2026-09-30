@@ -1,11 +1,13 @@
 // Outbound-only SMTP mail. Guests reply through a scoped webchat link.
+export const GUEST_EMAIL_FROM='notifications@omgworks24.com';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LINK=/^[a-f0-9]{64}$/;
 const PHOTO_LIMIT=4*1024*1024;
 const ORIGINS=new Set(['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io']);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function mailbox(value){return typeof value==='string'&&/^[^\s<>@,]+@[^\s<>@,]+\.[^\s<>@,]+$/.test(value)?value:null;}
-export function emailPayload(job,from){
+export function emailPayload(job){
+ const from=GUEST_EMAIL_FROM;
  const p=job.payload;
  if(!LINK.test(p.link_token)||!mailbox(p.to)||!mailbox(from)||!UUID.test(job.id))throw Error('invalid_job');
  const name=String(p.name||'OMG WORKS').replace(/[\r\n<>"\\]/g,' ').trim().slice(0,100);
@@ -42,7 +44,7 @@ export function createGuestEmailHandler({env,sendMail,fetcher=fetch,cryptoApi=cr
   const jobs=await rpc('claim_guest_emails');let sent=0,failed=0;
   for(const job of jobs){let smtpStarted=false;
    try{
-    const payload=emailPayload(job,env('GUEST_EMAIL_FROM'));
+    const payload=emailPayload(job);
     if(job.payload.asset_path){
      const path=job.payload.asset_path.split('/').map(encodeURIComponent).join('/');
      const r=await fetcher(base()+'/storage/v1/object/authenticated/guest-support/'+path,{headers:dbHeaders(),signal:AbortSignal.timeout(15000)});
@@ -73,7 +75,7 @@ export function createGuestEmailHandler({env,sendMail,fetcher=fetch,cryptoApi=cr
   if(!base()||!service())return reply({ok:false,message:'서버 연결 설정이 필요합니다.'},503);
   try{
    if(action==='dispatch'){
-    if(!env('GUEST_EMAIL_FROM')||!env('SMTP_HOST')||!env('SMTP_USER')||!env('SMTP_PASSWORD'))return reply({ok:false,error:'smtp_not_configured'},503);
+    if(!env('SMTP_HOST')||!env('SMTP_USER')||!env('SMTP_PASSWORD'))return reply({ok:false,error:'smtp_not_configured'},503);
     return reply(await dispatch());
    }
    const raw=new TextDecoder().decode(await bytesLimited(req,2048));const body=JSON.parse(raw);

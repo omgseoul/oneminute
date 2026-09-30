@@ -14,6 +14,7 @@ function setup(options={}){
  fetcher:async(url,init={})=>{
   const body=typeof init.body==='string'?JSON.parse(init.body):init.body;calls.push({url,init,body});
   if(url.endsWith('/claim_guest_emails'))return Response.json([structuredClone(job)]);
+  if(url.endsWith('/verify_guest_email_worker'))return Response.json(options.workerValid===true);
   if(url.endsWith('/finish_guest_email')||url.endsWith('/fail_guest_email'))return new Response(null,{status:204});
   if(url.endsWith('/open_guest_email'))return Response.json({ok:true,room_id:id,slug:id,guest_token:body.p_new_token,expires:Date.now()+3600000});
   throw Error('unexpected call');
@@ -43,6 +44,17 @@ test('link exchange works independently of SMTP and creates server-chosen sessio
  const s=setup({env:{SMTP_HOST:undefined}});const r=await s.handle(new Request('https://edge.test/guest-email/open',{method:'POST',headers:{Origin:'https://omgworks24.com'},body:JSON.stringify({token,room_id:'forged',guest_token:'forged'})}));
  assert.equal(r.status,200);const v=await r.json();assert.equal(v.room_id,id);assert.notEqual(v.guest_token,'forged');assert.equal(s.calls[0].body.p_link,token);assert.equal(s.calls[0].body.room_id,undefined);
  assert.equal(r.headers.get('Access-Control-Allow-Origin'),'https://omgworks24.com');
+});
+test('Vault worker authentication allows only verified tokens before claiming jobs',async()=>{
+ const key='b'.repeat(64),env={GUEST_EMAIL_WORKER_SECRET:undefined};
+ const valid=setup({env,workerValid:true});
+ assert.equal((await valid.dispatch(key)).status,200);assert.equal(valid.sent.length,1);
+ assert(valid.calls[0].url.endsWith('/verify_guest_email_worker'));
+ const denied=setup({env,workerValid:false});
+ assert.equal((await denied.dispatch(key)).status,401);assert.equal(denied.sent.length,0);
+ assert.equal(denied.calls.length,1);
+ const malformed=setup({env});
+ assert.equal((await malformed.dispatch('wrong')).status,401);assert.equal(malformed.calls.length,0);
 });
 test('malformed links and foreign origins are rejected before database access',async()=>{
  const s=setup();for(const [body,origin,status] of [[{token:'bad'},'https://omgworks24.com',400],[{token},'https://evil.test',403]]){

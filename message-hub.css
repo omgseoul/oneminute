@@ -89,3 +89,5 @@
 
 /* Keep the back/refresh row compact while retaining usable touch targets. */
 .shell{padding-top:6px!important}.shell>.top{min-height:40px;margin-bottom:5px!important;align-items:center}.shell>.top .back{display:inline-flex;align-items:center;min-height:40px}.shell>.top .refresh{min-height:36px;padding:7px 11px;font-size:11px}
+
+#guestError,#staffError,#error{color:#7d8998;font-size:12px} .hub-room-status.is-pending{color:#738696}

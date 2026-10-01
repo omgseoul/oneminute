@@ -1,0 +1,10 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),assert=require('node:assert/strict');
+const dom=new JSDOM('<nav></nav><small id="reportCount"></small>',{url:'https://omgworks24.com/messages.html',runScripts:'outside-only',pretendToBeVisual:true});
+const w=dom.window,wait=()=>new Promise(resolve=>setTimeout(resolve,25));
+w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};
+w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')};
+w.GuestSupport={esc:s=>String(s??'')};w.StaffChat={avatar:()=>'<span class="staff-avatar"></span>'};
+const report={report_id:'r1',report_type:'clock_in',employee_name:'Worker',property_name:'Property',submitted_at:new Date().toISOString(),unread:true,payload:{text:'Saved report'}};
+let reads=0;w.omgSupabase={rpc:async(name,args)=>{if(name==='mark_work_report_read'){reads++;report.unread=false;return{data:{ok:true}};}return{data:{ok:true,reports:args.p_report_id?[report]:[report],unread_count:report.unread?1:0}};}};
+w.eval(fs.readFileSync('report-inbox.js','utf8'));
+(async()=>{w.ReportInbox.init({accessToken:'owner',sessionKind:'owner'},w.document.querySelector('nav'));w.ReportInbox.show(true);await wait();assert.equal(w.document.getElementById('reportCount').textContent,'1');assert(w.document.querySelector('.report-row').classList.contains('is-unread'));w.document.querySelector('.report-row').click();await wait();assert.match(w.document.getElementById('reportDetailBody').textContent,/Saved report/);assert.equal(reads,1);assert(!w.document.querySelector('.report-row').classList.contains('is-unread'));assert.equal(w.document.getElementById('reportCount').textContent,'');w.ReportInbox.show(false);w.close();console.log('PASS owner unread badge and per-report read receipt');})().catch(e=>{console.error(e);w.close();process.exitCode=1});

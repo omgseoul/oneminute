@@ -1,19 +1,12 @@
 (function () {
-  const reportFields = [
-    { key: "clean_rooms", label: "청소할 객실", help: "오늘 청소할 객실을 선택합니다." },
-    { key: "inspect_rooms", label: "점검할 객실", help: "청소하지 않지만 확인할 객실을 선택합니다." },
-    { key: "no_show", label: "노쇼", help: "노쇼 수량을 입력하면 객실을 선택할 수 있습니다.", kind: "room_count" },
-    { key: "bedding_stain", label: "침구류 오염", help: "오염된 침구류 수량을 숫자로 선택합니다.", kind: "number" },
-    { key: "cleaned_rooms", label: "청소 완료 객실", help: "청소를 완료한 객실을 선택합니다." },
-    { key: "inspected_rooms", label: "점검 완료 객실", help: "점검을 완료한 객실을 선택합니다." }
-  ];
+  const reportFields = [];
   const fieldGroups = {
     clock_in: reportFields,
     clock_out: reportFields
   };
   const defaults = {
-    clock_in: ["clean_rooms", "inspect_rooms", "no_show", "bedding_stain", "reminder_cards"],
-    clock_out: ["cleaned_rooms", "inspected_rooms"],
+    clock_in: [],
+    clock_out: [],
     reminder_cards: [
       {
         id: "watch",
@@ -61,13 +54,15 @@
       label: String(field?.label || "").trim().slice(0, 40),
       help: "",
       kind: ["text", "numeric", "counter", "rooms", "photo"].includes(field?.kind) ? field.kind : "text",
+      size: field?.size === "half" ? "half" : "full",
+      required: field?.required === true,
       custom: true
     })).filter(field => /^custom_[a-z0-9_-]{1,50}$/.test(field.key) && field.label && !seen.has(field.key) && seen.add(field.key));
   }
 
   function fieldsFor(property) {
     const custom = normalizeCustomFields(property?.custom_report_fields);
-    return property?.business_type === "lodging" ? [...reportFields, ...custom] : custom;
+    return custom;
   }
 
   function normalizeReportConfig(config, property) {
@@ -154,7 +149,7 @@
         p_rooms: normalizedRoomTypes.flatMap(group => group.rooms),
         p_room_types: normalizedRoomTypes,
         p_business_type: businessType || null,
-        p_custom_report_fields: normalizeCustomFields(customFields).map(({ key, label, kind }) => ({ key, label, kind })),
+        p_custom_report_fields: normalizeCustomFields(customFields).map(({ key, label, kind, size, required }) => ({ key, label, kind, size, required })),
         p_employee_configs: employeeConfigs
       });
     },

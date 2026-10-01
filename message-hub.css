@@ -118,4 +118,3 @@
 #approvalFilterHost .property-picker-button{max-width:136px}
 @media(max-width:350px){.hub-tabs,.hub-tabs.owner-hub{padding:0 8px}.hub-tabs>[data-hub],.hub-tabs.owner-hub>[data-hub]{font-size:11px}.hub-tabs .hub-actions{flex-basis:33px;margin-left:2px}.message-top-actions{gap:2px}.message-top-actions #hubProperty .property-picker-button{max-width:115px}}
 
-.hub-tabs .hub-actions:has(#composeToggle[hidden]){display:none}

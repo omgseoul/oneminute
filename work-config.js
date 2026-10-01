@@ -59,8 +59,8 @@
     return (Array.isArray(fields) ? fields : []).slice(0, 20).map(field => ({
       key: String(field?.key || "").trim().slice(0, 57),
       label: String(field?.label || "").trim().slice(0, 40),
-      help: "내용을 입력해주세요.",
-      kind: "text",
+      help: "",
+      kind: ["text", "numeric", "counter", "rooms", "photo"].includes(field?.kind) ? field.kind : "text",
       custom: true
     })).filter(field => /^custom_[a-z0-9_-]{1,50}$/.test(field.key) && field.label && !seen.has(field.key) && seen.add(field.key));
   }
@@ -122,6 +122,7 @@
   window.omgWorkConfig = {
     fieldGroups,
     fieldsFor,
+    orderedFields(property, keys) { const fields = new Map(fieldsFor(property).map(field => [field.key, field])); return (keys || []).map(key => fields.get(key)).filter(Boolean); },
     normalizeCustomFields,
     defaults,
     normalizeReportConfig,
@@ -153,7 +154,7 @@
         p_rooms: normalizedRoomTypes.flatMap(group => group.rooms),
         p_room_types: normalizedRoomTypes,
         p_business_type: businessType || null,
-        p_custom_report_fields: normalizeCustomFields(customFields).map(({ key, label }) => ({ key, label })),
+        p_custom_report_fields: normalizeCustomFields(customFields).map(({ key, label, kind }) => ({ key, label, kind })),
         p_employee_configs: employeeConfigs
       });
     },

@@ -11,8 +11,7 @@
   },
   async photo(file){
    if(!file.type.startsWith('image/')){if(file.type==='application/pdf'&&file.size<=4194304)return file;throw new Error('사진 또는 4MB 이하 PDF를 선택해주세요.');}
-   const image=await createImageBitmap(file);const ratio=Math.min(1,1600/Math.max(image.width,image.height));const canvas=document.createElement('canvas');canvas.width=Math.round(image.width*ratio);canvas.height=Math.round(image.height*ratio);canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);image.close();
-   const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.85));if(!blob||blob.size>4194304)throw new Error('더 작은 사진을 선택해주세요.');return new File([blob],'photo.jpg',{type:'image/jpeg'});
+   return window.OMGPhoto.photo(file);
   },
   message(text,error=false){const el=document.getElementById('status');if(el){el.textContent=text;el.className='status'+(error?' error':'');}},
   viewer(asset,title='안내'){

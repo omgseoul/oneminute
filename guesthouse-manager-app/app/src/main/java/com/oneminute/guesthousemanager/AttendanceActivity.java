@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.webkit.ValueCallback;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -14,13 +15,16 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.firebase.messaging.FirebaseMessaging;
+import java.io.OutputStream;
 
 public class AttendanceActivity extends AppCompatActivity {
     private static final String APP_URL = "https://omgworks24.com/app.html";
     private static final String MISSION_URL = "https://omgworks24.com/mission.html";
     private static final int FILE_CHOOSER_REQUEST = 2201;
+    private static final int EXCEL_SAVE_REQUEST = 2202;
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
+    private byte[] pendingExcel;
 
     private String safeTopicPart(String value) {
         return value == null ? "" : value.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
@@ -172,6 +176,34 @@ public class AttendanceActivity extends AppCompatActivity {
 
     private final class PushBridge {
         @JavascriptInterface
+        public void saveAttendanceExcel(String filename, String content) {
+            runOnUiThread(() -> {
+                Uri current = Uri.parse(webView == null || webView.getUrl() == null ? "" : webView.getUrl());
+                boolean trusted = "https".equals(current.getScheme())
+                        && ("omgworks24.com".equals(current.getHost()) || "www.omgworks24.com".equals(current.getHost())
+                            || ("omgseoul.github.io".equals(current.getHost()) && "/oneminute/attendance.html".equals(current.getPath())))
+                        && current.getPath() != null && current.getPath().endsWith("/attendance.html");
+                if (!trusted || pendingExcel != null || content == null || content.length() > 16 * 1024 * 1024) return;
+                try {
+                    byte[] bytes = Base64.decode(content, Base64.DEFAULT);
+                    if (bytes.length < 4 || bytes[0] != 0x50 || bytes[1] != 0x4b || bytes[2] != 3 || bytes[3] != 4)
+                        throw new IllegalArgumentException("Invalid workbook");
+                    pendingExcel = bytes;
+                    String safeName = filename == null ? "출퇴근기록.xlsx" : filename.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+                    if (!safeName.endsWith(".xlsx")) safeName += ".xlsx";
+                    Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    save.addCategory(Intent.CATEGORY_OPENABLE);
+                    save.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                    save.putExtra(Intent.EXTRA_TITLE, safeName);
+                    startActivityForResult(save, EXCEL_SAVE_REQUEST);
+                } catch (Exception error) {
+                    pendingExcel = null;
+                    Toast.makeText(AttendanceActivity.this, "엑셀 저장 화면을 열지 못했습니다. 다시 눌러주세요.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void bindAppSession(String accessToken, String expiresAt) {
             SupabaseMessageReceipt.bind(AttendanceActivity.this, accessToken, expiresAt);
             NativePushRegistration.refresh(AttendanceActivity.this);
@@ -210,6 +242,23 @@ public class AttendanceActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == EXCEL_SAVE_REQUEST) {
+            final byte[] bytes = pendingExcel;
+            pendingExcel = null;
+            if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null && bytes != null) {
+                final Uri destination = data.getData();
+                new Thread(() -> {
+                    try (OutputStream output = getContentResolver().openOutputStream(destination)) {
+                        if (output == null) throw new IllegalStateException("No destination");
+                        output.write(bytes);
+                        runOnUiThread(() -> Toast.makeText(this, "엑셀 파일을 저장했습니다.", Toast.LENGTH_SHORT).show());
+                    } catch (Exception error) {
+                        runOnUiThread(() -> Toast.makeText(this, "엑셀 저장에 실패했습니다. 다시 눌러주세요.", Toast.LENGTH_LONG).show());
+                    }
+                }).start();
+            }
+            return;
+        }
         if (requestCode == FILE_CHOOSER_REQUEST && fileCallback != null) {
             Uri[] result = resultCode == Activity.RESULT_OK
                     ? WebChromeClient.FileChooserParams.parseResult(resultCode, data) : null;

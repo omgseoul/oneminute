@@ -12,6 +12,15 @@
     const lateDays=[...days.values()].filter(day=>(day.first?.attendance_labels||[]).includes('지각')).length;
     return {workDays,lateDays,averageMinutes:workDays?Math.round(total/workDays):0};
   }
+  summarize.lateItems=function(items){
+    const first=new Map();
+    for(const item of items){
+      if(!item.clock_in_at)continue;
+      const key=`${item.property_id||''}:${item.employee_id||item.employee_name}:${item.work_date}`;
+      if(!first.has(key)||Date.parse(item.clock_in_at)<Date.parse(first.get(key).clock_in_at))first.set(key,item);
+    }
+    return [...first.values()].filter(item=>(item.attendance_labels||[]).includes('지각'));
+  };
   root.omgAttendanceSummary=summarize;
   if(typeof module!=='undefined'&&module.exports)module.exports=summarize;
 })(typeof window==='undefined'?globalThis:window);

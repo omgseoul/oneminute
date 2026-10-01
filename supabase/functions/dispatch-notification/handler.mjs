@@ -108,7 +108,18 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         return reply({ ok: true, validated: true });
       }
       let payload, topics, deliveryId, recipientDeadlines = {}, recipientModes = {};
-      if (path.endsWith('/guest-chat')) {
+      if (path.endsWith('/report')) {
+        if (!uuid.test(body.access_token || '') || !uuid.test(body.report_id || '')) return reply({ok:false,code:'invalid_request'},400);
+        const dispatch = await rpc('get_report_push_dispatch',{p_access_token:body.access_token,p_report_id:body.report_id});
+        if (!dispatch.ok) return reply({ok:false,code:dispatch.code||'unauthorized'},403);
+        if (env('PUSH_DELIVERY_ENABLED') !== 'true') return reply({ok:false,code:'not_enabled'},503);
+        credentials();
+        deliveryId = dispatch.report_id;
+        topics = dispatch.recipient_topics;
+        recipientModes = Object.fromEntries((topics||[]).map(topic=>[topic,'weak']));
+        payload = {alertId:String(dispatch.report_id),reportId:String(dispatch.report_id),message:preview(dispatch.message),
+          mode:'weak',priority:'normal',messageType:'work_report',senderLabel:'출퇴근 보고',route:'messages.html?tab=reports'};
+      } else if (path.endsWith('/guest-chat')) {
         const secret = env('PUSH_ADMIN_SECRET');
         if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.event_id || '')) return reply({ok:false,code:'invalid_request'},400);
@@ -175,7 +186,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
       for (let i = 0; i < targets.length; i += 8) {
         const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => {
           const cap = recipientModes[t.topic] || 'urgent';
-          const mode = cap === 'weak' ? 'weak' : cap === 'normal' ? 'message'
+          const mode = payload.messageType === 'work_report' || cap === 'weak' ? 'weak' : cap === 'normal' ? 'message'
             : payload.messageType === 'guest_chat' ? 'urgent'
             : payload.priority === 'urgent' ? 'urgent' : 'message';
           const data = {

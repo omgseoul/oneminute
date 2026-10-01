@@ -1,0 +1,10 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),assert=require('node:assert/strict');
+const html=fs.readFileSync('messages.html','utf8'),dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/messages.html?message_id=00000000-0000-4000-8000-000000000001',runScripts:'outside-only',pretendToBeVisual:true});
+const w=dom.window;w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')};
+w.omgTransition={ready(){}};w.omgSession={require:async()=>({accessToken:'owner',sessionKind:'owner',propertyId:'p',ownerId:'o'})};
+const report={report_id:'00000000-0000-4000-8000-000000000001',report_type:'clock_in',employee_name:'Worker',property_name:'Property',submitted_at:new Date().toISOString(),unread:true,payload:{text:'Submitted report'}};
+w.omgSupabase={rpc:async(name,args)=>({data:name==='work_report_inbox'?{ok:true,reports:args.p_report_id?[report]:[report],unread_count:1}:name==='mark_work_report_read'?{ok:true}:name==='staff_chat_rpc'?{ok:true,rooms:[]}:{ok:true,can_manage:true,messages:[],recipients:[],unread_count:0}})};
+w.GuestSupport={esc:value=>String(value??''),call:async()=>({ok:true,actor:{key:'owner:o'},properties:[{id:'p',name:'Property'}],rooms:[]})};
+for(const file of ['property-selector.js','staff-chat-client.js','guest-reply-status.js','report-inbox.js','message-hub.js'])w.eval(fs.readFileSync(file,'utf8'));
+for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))if(match[1].includes('let session=null'))w.eval(match[1]);
+setTimeout(()=>{try{assert.equal(w.document.querySelector('[data-hub].active').dataset.hub,'reports');assert.match(w.document.getElementById('reportDetailBody').textContent,/Submitted report/);assert(w.document.getElementById('reportDetail').open);console.log('PASS installed app message_id report link opens report detail');}catch(error){console.error(error);process.exitCode=1}finally{w.close()}},160);

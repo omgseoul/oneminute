@@ -45,6 +45,11 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  check(own.reports.length===2&&own.reports.every(r=>r.employee_name===worker.employee_name),'staff sees only own arrival and departure as separate rows');
  check(own.reports.every(r=>r.payload===null),'list excludes large payload/photo data');
  const ownerInbox=await rpc('work_report_inbox',[owner.access_token]);check(ownerInbox.reports.length===3,'owner sees submitted reports from both workers');
+ const push=(await one('select public.get_report_push_dispatch($1,$2) r',[worker.access_token,a.report_id])).r;
+ check(push.ok&&push.recipient_topics.length>0&&push.recipient_topics.every(t=>t.includes('_owner_')),'new report push targets owners only');
+ check(!(await one('select public.get_report_push_dispatch($1,$2) r',[worker2.access_token,a.report_id])).r.ok,'other worker cannot dispatch report');
+ check(!(await one('select public.get_report_push_dispatch($1,$2) r',[owner.access_token,a.report_id])).r.ok,'owner token cannot impersonate report author');
+ check(!(await one("select has_function_privilege('anon','public.get_report_push_dispatch(uuid,uuid)','execute') allowed")).allowed,'browser roles cannot call report push target resolver');
  check(ownerInbox.unread_count===3&&ownerInbox.reports.every(r=>r.unread),'new reports count as unread for owner');
  check(own.unread_count===0&&own.reports.every(r=>!r.unread),'staff reports do not have owner unread badges');
  check(!(await rpc('mark_work_report_read',[worker.access_token,a.report_id])).ok,'staff cannot mark owner reports read');

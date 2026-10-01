@@ -73,5 +73,14 @@
     render();
     return{value:()=>selected,setItems(nextItems,nextValue=selected){options=nextItems;selected=String(nextValue??"");render();},root,close};
   }
-  window.omgPropertySelector={mount,mountStatic,mountSingle};
+  function mountMulti({items=[],host,onChange,title="선택",allLabel="전체"}){
+    addStyle();const selected=new Set(items.map(item=>String(item.value))),escape=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+    const root=document.createElement("div");root.className="property-picker";host.replaceChildren(root);root.innerHTML=`<button class="property-picker-button" type="button" aria-expanded="false"></button><div class="property-picker-panel" hidden><p class="property-picker-title">${escape(title)} · 복수 선택</p><label class="property-picker-option"><span>${escape(allLabel)}</span><input data-all type="checkbox" checked></label>${items.map(item=>`<label class="property-picker-option"><span>${escape(item.label)}</span><input data-value="${escape(item.value)}" type="checkbox" checked></label>`).join("")}</div>`;
+    const button=root.querySelector("button"),panel=root.querySelector(".property-picker-panel"),all=root.querySelector("[data-all]"),boxes=[...root.querySelectorAll("[data-value]")];
+    function update(){boxes.forEach(box=>box.checked=selected.has(box.dataset.value));all.checked=selected.size===items.length;all.indeterminate=selected.size>0&&selected.size<items.length;button.textContent=all.checked?allLabel:selected.size===1?items.find(item=>selected.has(String(item.value))).label:selected.size?`${selected.size}개 선택`:"선택 없음";}
+    function close(){panel.hidden=true;button.setAttribute("aria-expanded","false");}
+    button.onclick=()=>{document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;button.setAttribute("aria-expanded",String(!panel.hidden));};
+    all.onchange=()=>{selected.clear();if(all.checked)items.forEach(item=>selected.add(String(item.value)));update();onChange?.([...selected]);};boxes.forEach(box=>box.onchange=()=>{box.checked?selected.add(box.dataset.value):selected.delete(box.dataset.value);update();onChange?.([...selected]);});document.addEventListener("click",event=>{if(!root.contains(event.target))close();});update();return{root,close,values:()=>[...selected]};
+  }
+  window.omgPropertySelector={mount,mountStatic,mountSingle,mountMulti};
 })();

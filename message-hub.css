@@ -21,7 +21,7 @@
 .staff-room .hub-count{position:absolute;right:0;bottom:-10px;min-width:17px;height:17px;font-size:10px}
 .mail-tabs{display:flex!important;align-items:center;gap:5px;padding:4px!important}
 .mail-tabs[hidden]{display:none!important}.mail-tabs .mail-tab{flex:1;min-width:0}
-#approvalFilter{width:85px;flex-shrink:0;padding:7px 4px;border:1px solid #dce5f1;border-radius:10px;background:white;color:#385776;font-size:11px}
+#approvalFilter{width:auto;flex-shrink:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font-size:inherit}
 
 .hub-tabs.owner-hub{gap:clamp(8px,2.8vw,20px)}.owner-hub>[data-hub]{font-size:14px}#approvalFilterHost{display:flex;align-items:center;margin:0}#approvalFilterHost select{height:34px;width:76px;padding:0 6px;font-size:11px;border-radius:11px}
 
@@ -42,7 +42,7 @@
 .hub-room-meta time{color:#7e8ba1}
 .hub-room-status{display:flex!important;align-items:center;justify-content:flex-end;gap:5px}
 .hub-room-status .hub-count{display:inline-grid;min-width:17px;height:17px;font-size:9px}
-@media(max-width:350px){.hub-tabs{gap:7px}.hub-tabs>[data-hub]{font-size:14px}.hub-actions #hubProperty .property-picker{max-width:70px}.hub-actions #hubProperty .property-picker-button{max-width:70px;padding:0 6px}.hub-room:not(.staff-room){gap:8px}.hub-room-meta{min-width:88px;max-width:105px;font-size:9px}}
+@media(max-width:350px){.hub-tabs{gap:7px}.hub-tabs>[data-hub]{font-size:14px}.hub-actions #hubProperty .property-picker,.hub-actions #approvalFilterHost .property-picker{max-width:70px}.hub-actions #hubProperty .property-picker-button,.hub-actions #approvalFilterHost .property-picker-button{max-width:70px;padding:0 6px}.hub-room:not(.staff-room){gap:8px}.hub-room-meta{min-width:88px;max-width:105px;font-size:9px}}
 
 /* One shared list layout for guest and staff conversations. */
 #guestRooms .guest-room,#staffRooms .staff-room{display:grid;grid-template-columns:60px minmax(0,1fr) 110px;align-items:center;gap:12px;min-height:94px;padding:16px 18px;box-sizing:border-box}

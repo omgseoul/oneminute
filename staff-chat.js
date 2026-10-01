@@ -1,6 +1,6 @@
 (async()=>{
  const $=id=>document.getElementById(id),e=GuestSupport.esc,peer=new URLSearchParams(location.search).get('peer');let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false;
- const line=$('timeline'),input=$('body');if(new URLSearchParams(location.search).get('from')==='home'){document.querySelector('.back').href='app.html';document.querySelector('.back').textContent='‹ 메인으로';}let draftKey='';
+ const line=$('timeline'),input=$('body');if(new URLSearchParams(location.search).get('from')==='home'){document.querySelector('.back').href='app.html';document.querySelector('.back').textContent='← Home';}let draftKey='';
  const call=(a,d={})=>StaffChat.call(session,a,{peer,...d});
  function status(t='',bad=false){$('status').textContent=t;$('status').className='status'+(bad?' error':'');}
  function keepDraft(){try{sessionStorage.setItem(draftKey,JSON.stringify({body:input.value,priority,pending,photo}));}catch{}}

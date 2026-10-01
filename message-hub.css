@@ -94,3 +94,28 @@
 
 /* Reports use the same avatar/title rows, each submission is its own entry. */
 #reportRows{margin:0 -18px}.hub-room.report-row{width:100%;display:grid;grid-template-columns:60px minmax(0,1fr) 94px;gap:12px;align-items:center;min-height:94px;padding:16px 18px;border:0;border-bottom:1px solid #e2e9f3;text-align:left;font:inherit}.report-row .staff-avatar{width:60px;height:60px;font-size:24px}.report-row .hub-room-meta{min-width:0;max-width:94px;font-size:10px}.report-row .hub-room-copy{gap:5px}#reportError{color:#7d8998;font-size:12px}#reportError:empty{display:none}#reportDetail{border:0;border-radius:22px;width:calc(100% - 28px);max-width:620px;max-height:85dvh;padding:20px;color:#19334f;background:#fff}#reportDetail::backdrop{background:#18315377}.report-detail-top{display:flex;align-items:center;gap:10px;justify-content:space-between}.report-detail-top h2{font-size:20px;margin:0}.report-detail-top button{width:34px;height:34px;border:0;border-radius:50%;background:#eef3fa;color:#19334f;font-size:24px}#reportDetailMeta{font-size:11px;color:#7d8998;margin:10px 0 18px}.report-value-row{display:grid;grid-template-columns:minmax(70px,1fr) minmax(0,1.4fr);gap:12px;padding:13px 0;border-bottom:1px solid #e8edf5;font-size:13px;overflow-wrap:anywhere}.report-value-row>div{text-align:right;white-space:pre-wrap}.report-photo{max-width:100%;max-height:280px;border-radius:10px}.report-text{white-space:pre-wrap;font-size:14px;line-height:1.6}.hub-tabs,.hub-tabs.owner-hub{gap:clamp(7px,2vw,14px)}.hub-tabs>[data-hub]{font-size:14px;flex-shrink:0}#approvalFilterHost .property-picker{margin:0;max-width:86px}#approvalFilterHost .property-picker-button{max-width:86px;height:34px;padding:0 8px;font-size:11px;font-weight:650;border-radius:11px}#approvalFilterHost .property-picker-panel{right:0;left:auto}@media(max-width:370px){.hub-tabs.owner-hub{flex-wrap:wrap;column-gap:14px;row-gap:0}.owner-hub .hub-actions{margin-left:auto}.report-row .hub-room-copy strong{font-size:14px}}
+
+/* Message navigation: keep the controls below the phone status area. */
+.shell{padding-top:calc(max(28px, env(safe-area-inset-top)) + 8px)!important}
+.shell>.top{display:flex;gap:8px;min-height:44px;margin-bottom:10px!important}
+.shell>.top .back{flex:0 0 auto;min-height:40px;color:#2a5a94;font-size:14px;font-weight:800}
+.message-top-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0;margin-left:auto}
+.message-top-actions #hubProperty{min-width:0;max-width:min(155px,38vw)}
+.message-top-actions #hubProperty .property-picker{max-width:100%;margin:0}
+.message-top-actions #hubProperty .property-picker-button{max-width:min(155px,38vw);height:36px;padding:0 9px;border-radius:11px;font-size:11px}
+.message-top-actions #hubProperty .property-picker-panel{left:auto;right:0}
+.message-top-actions #searchToggle,.message-top-actions #refresh{display:grid;flex:0 0 36px;width:36px!important;height:36px;min-height:36px;padding:7px!important;place-items:center;border:0;border-radius:10px;background:transparent;color:#537f98}
+.message-top-actions #searchToggle svg,.message-top-actions #refresh svg{width:22px;height:22px}
+.hub-tabs,.hub-tabs.owner-hub{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap!important;margin:0 -18px;padding:0 14px;border-bottom:1px solid #cbd9e9;background:#edf3fa}
+.hub-tabs>[data-hub],.hub-tabs.owner-hub>[data-hub]{flex:1 1 0;min-width:0;padding:11px 1px 10px;border:1px solid #d2deec;border-bottom:0;border-radius:10px 10px 0 0;background:#e4edf8;color:#647993;text-align:center;font-size:clamp(11px,3.4vw,15px);line-height:1.35}
+.hub-tabs>[data-hub]+[data-hub]{margin-left:-1px}
+.hub-tabs>[data-hub].active{position:relative;z-index:1;margin-bottom:-1px;padding-bottom:11px;border-color:#cbd9e9;border-bottom:1px solid white;background:white;color:#245fa9;box-shadow:0 -2px 8px rgba(43,83,129,.06)}
+.hub-tabs>[data-hub] small:not(:empty){top:-7px;right:0;z-index:2}
+.hub-tabs .hub-actions{flex:0 0 39px;align-self:center;justify-content:center;gap:0;margin:0 0 0 5px}
+.hub-tabs .hub-actions #composeToggle{width:34px!important;height:34px!important;padding:6px}
+#approvalFilterHost:not([hidden]){display:flex;justify-content:flex-end;margin:8px 0 0}
+#approvalFilterHost .property-picker{max-width:136px}
+#approvalFilterHost .property-picker-button{max-width:136px}
+@media(max-width:350px){.hub-tabs,.hub-tabs.owner-hub{padding:0 8px}.hub-tabs>[data-hub],.hub-tabs.owner-hub>[data-hub]{font-size:11px}.hub-tabs .hub-actions{flex-basis:33px;margin-left:2px}.message-top-actions{gap:2px}.message-top-actions #hubProperty .property-picker-button{max-width:115px}}
+
+.hub-tabs .hub-actions:has(#composeToggle[hidden]){display:none}

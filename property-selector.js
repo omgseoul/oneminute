@@ -1,5 +1,5 @@
 (function(){
-  const LABELS={attendance:"근태",missions:"미션",messages:"메세지",work_status:"근태",attendance_records:"근태"};
+  const LABELS={attendance:"근태",missions:"To do",messages:"메세지",work_status:"근태",attendance_records:"근태"};
   let styleReady=false;
   function addStyle(){
     if(styleReady)return;

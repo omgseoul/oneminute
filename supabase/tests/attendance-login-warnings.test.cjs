@@ -12,8 +12,9 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  create schema auth;create table auth.users(id uuid primary key,email text not null);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create function auth.jwt() returns jsonb language sql stable as $$select '{}'::jsonb$$;`);
- for(const f of fs.readdirSync(path.join(root,'migrations')).filter(f=>f.endsWith('.sql')).sort())await db.exec(read('migrations/'+f));
+ for(const f of fs.readdirSync(path.join(root,'migrations')).filter(f=>/^\d{3}_.*\.sql$/.test(f)).sort())await db.exec(read('migrations/'+f));
  await db.exec(read('migrations/032_attendance_login_warning_targets.sql'));
+ await db.exec(read('migrations/20261001110453_allow_untargeted_attendance_warning.sql'));
  check(true,'migration installs and can run twice');
  await db.exec(read('setup/002_register_employee_pins.example.sql').replace(/PIN_([1-4])/g,'731482'));
  await db.exec(read('setup/007_create_owner.example.sql').replace(/OWNER_LOGIN_ID/g,'boss.test').replace(/OWNER_PIN_6_TO_8/g,'517394'));
@@ -22,6 +23,7 @@ async function rpc(name,args){await db.exec('set role anon');try{return(await on
  const ids=staff.map(s=>s.id),token=owner.access_token;
  await db.exec("update public.employees set scheduled_clock_in='12:00',scheduled_clock_out='20:00'");
  const base={employee_ids:ids.slice(0,2),target_all:false,event_type:'clock_in',comparison:'both',threshold_minutes:0,message:'{이름} / {예정시간} / {실제시간} / {차이분}',active:true};
+ const dormant=await rpc('save_attendance_warning_rules',[token,JSON.stringify([{...base,employee_ids:[]}])]);check(dormant.ok&&dormant.rules[0].employee_ids.length===0&&!dormant.rules[0].target_all,'untargeted condition can be kept without recipients');
  let result=await rpc('save_attendance_warning_rules',[token,JSON.stringify([base])]);check(result.ok&&result.rules[0].employee_ids.length===2,'multiple targets save and reload');
  const rule=result.rules[0];
  const first=await rpc('start_work_session',[ids[0],'731482']);check(first.ok&&first.warning_message_ids.length===1,'first login sends warning before report');

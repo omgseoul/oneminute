@@ -29,6 +29,17 @@
     if (error) throw new Error("연결을 확인하고 다시 시도해주세요.");
     return data;
   }
+  async function notifyNewReport(accessToken,reportId){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+    try{
+      const response=await fetch(`${window.OMG_SUPABASE.url}/functions/v1/dispatch-notification/report`,{
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${window.OMG_SUPABASE.publishableKey}`,'apikey':window.OMG_SUPABASE.publishableKey},
+        body:JSON.stringify({access_token:accessToken,report_id:reportId}),signal:controller.signal
+      });
+      if(!response.ok)console.warn('Report notification could not be delivered');
+    }catch(_){console.warn('Report notification could not be delivered');}
+    finally{clearTimeout(timer);}
+  }
   function showPending(message) {
     notice.hidden = false;
     notice.replaceChildren(document.createTextNode(message || "보고는 저장됐습니다. 저장된 내용으로 전달을 다시 시도해주세요."));
@@ -83,6 +94,7 @@
       if (!record?.ok) throw new Error(record?.message || "보고를 저장하지 못했습니다. 다시 로그인해주세요.");
       saved = record;
       editing = false;
+      if(record.already_saved===false)await notifyNewReport(session.accessToken,record.report_id);
       notice.hidden = false;
       notice.textContent = "보고가 저장됐습니다. 전달 상태를 확인하고 있습니다…";
       if (!saved.make_accepted) {

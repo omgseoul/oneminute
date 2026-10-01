@@ -69,9 +69,10 @@
       button.onclick=()=>{const opening=panel.hidden;document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;if(opening){root.classList.remove("open-up");const buttonRect=button.getBoundingClientRect(),panelHeight=Math.min(panel.scrollHeight,360),spaceBelow=window.innerHeight-buttonRect.bottom-16,spaceAbove=buttonRect.top-16;if(spaceBelow<panelHeight&&spaceAbove>spaceBelow)root.classList.add("open-up");}else root.classList.remove("open-up");button.setAttribute("aria-expanded",String(!panel.hidden));};
       root.querySelectorAll("input[type=radio]").forEach(input=>input.onchange=()=>{selected=input.value;render();onChange?.(selected);});
     }
-    document.addEventListener("click",event=>{if(!root.contains(event.target))close();});
+    const outside=event=>{if(!root.contains(event.target))close();};
+    document.addEventListener("click",outside);
     render();
-    return{value:()=>selected,setItems(nextItems,nextValue=selected){options=nextItems;selected=String(nextValue??"");render();},root,close};
+    return{value:()=>selected,setItems(nextItems,nextValue=selected){options=nextItems;selected=String(nextValue??"");render();},root,close,destroy(){document.removeEventListener("click",outside);}};
   }
   function mountMulti({items=[],host,onChange,title="선택",allLabel="전체"}){
     addStyle();const selected=new Set(items.map(item=>String(item.value))),escape=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);

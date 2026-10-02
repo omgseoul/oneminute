@@ -118,3 +118,12 @@
 #approvalFilterHost .property-picker-button{max-width:136px}
 @media(max-width:350px){.hub-tabs,.hub-tabs.owner-hub{padding:0 8px}.hub-tabs>[data-hub],.hub-tabs.owner-hub>[data-hub]{font-size:11px}.hub-tabs .hub-actions{flex-basis:33px;margin-left:2px}.message-top-actions{gap:2px}.message-top-actions #hubProperty .property-picker-button{max-width:115px}}
 
+
+/* Full-screen report attachment viewer. */
+.report-photo-open{display:inline-block;max-width:100%;padding:0;border:0;border-radius:10px;background:transparent;cursor:zoom-in}
+.report-photo-open:focus-visible{outline:2px solid #2467bd;outline-offset:3px}
+#reportPhotoViewer{width:calc(100% - 24px);max-width:900px;max-height:95dvh;margin:auto;padding:12px;border:0;border-radius:18px;background:#102038;color:#fff;box-shadow:0 24px 70px #07162788}
+#reportPhotoViewer::backdrop{background:#061326d9}
+.report-photo-viewer-top{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;padding:0 4px 10px;font-size:14px}
+#reportPhotoClose{display:grid;place-items:center;width:42px;height:42px;border:0;border-radius:12px;background:#ffffff22;color:#fff;font-size:28px;cursor:pointer}
+#reportPhotoFull{display:block;width:100%;max-height:calc(95dvh - 76px);object-fit:contain;border-radius:8px}

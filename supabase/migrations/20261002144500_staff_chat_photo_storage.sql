@@ -1,0 +1,105 @@
+-- Include staff chat photos in usage, preview, and category-specific retention.
+-- No existing photo is removed by applying this migration.
+begin;
+alter table public.message_cleanup_jobs add column if not exists message_photo_ids uuid[] not null default '{}';
+create or replace function omg_private.data_management(
+ p_actor_id uuid,p_actor_key text,p_property_scope uuid,p_action text,p_data jsonb default '{}'
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+ prop uuid; months int; cutoff timestamptz; range_start timestamptz; tz text;
+ cats text[]; mid uuid[]; cid uuid[]; aid uuid[]; sid uuid[]; rid uuid[]; pid uuid[];
+ result jsonb; j public.message_cleanup_jobs%rowtype; start_date date; end_date date;
+begin
+ if p_action='usage' then
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.property_name),'[]') into result from(
+   select p.id property_id,p.name property_name,p.management_number,
+    (select count(*) from public.guest_chat_rooms r where r.property_id=p.id) rooms,
+    (select count(*) from public.guest_chat_messages m join public.guest_chat_rooms r on r.id=m.room_id where r.property_id=p.id) chat_count,
+    (select coalesce(sum(octet_length(m.body)),0) from public.guest_chat_messages m join public.guest_chat_rooms r on r.id=m.room_id where r.property_id=p.id) chat_bytes,
+    (select count(*) from public.property_messages m where m.property_id=p.id) message_count,
+    (select coalesce(sum(octet_length(m.message)),0) from public.property_messages m where m.property_id=p.id) message_bytes,
+    (select count(*) from public.guest_support_assets a where a.property_id=p.id and a.room_id is not null) chat_photo_count,
+    (select coalesce(sum(omg_private.guest_asset_bytes(a.object_path)),0) from public.guest_support_assets a where a.property_id=p.id and a.room_id is not null) chat_photo_bytes,
+    (select coalesce(sum(omg_private.guest_asset_bytes(a.object_path)),0) from public.guest_support_assets a where a.property_id=p.id and a.room_id is null) guide_bytes,
+    (select count(*) from public.work_sessions s where s.property_id=p.id) attendance_count,
+    (select coalesce(sum(pg_column_size(to_jsonb(s))),0) from public.work_sessions s where s.property_id=p.id) attendance_bytes,
+    (select count(*) from omg_private.staff_chat_photos f join public.property_messages m on m.id=f.message_id where m.property_id=p.id) message_photo_count,
+     (select coalesce(sum(octet_length(f.image_bytes)),0) from omg_private.staff_chat_photos f join public.property_messages m on m.id=f.message_id where m.property_id=p.id) message_photo_bytes
+   from public.properties p where p_property_scope is null or p.id=p_property_scope
+  )x;
+  return jsonb_build_object('ok',true,'properties',result,'pending_jobs',(
+   select coalesce(jsonb_agg(jsonb_build_object('id',id,'property_id',property_id,'summary',summary)),'[]')
+   from public.message_cleanup_jobs where status='pending'
+    and (p_actor_id is null or actor_id=p_actor_id) and (p_actor_key is null or actor_key=p_actor_key)
+  ));
+ elsif p_action='preview' then
+  prop:=(p_data->>'property_id')::uuid;
+  if prop is null or (p_property_scope is not null and prop<>p_property_scope)
+   or not exists(select 1 from public.properties where id=prop) then raise exception '숙소를 확인해주세요.'; end if;
+  select timezone into tz from public.properties where id=prop;
+  if coalesce(p_data->>'period_mode','preset')='custom' then
+   begin start_date:=(p_data->>'start_date')::date;end_date:=(p_data->>'end_date')::date;
+   exception when others then raise exception '삭제 기간을 확인해주세요.';end;
+   if start_date is null or end_date is null or start_date>end_date or end_date>current_date then raise exception '삭제 기간을 확인해주세요.';end if;
+   range_start:=start_date::timestamp at time zone tz;
+   cutoff:=(end_date+1)::timestamp at time zone tz;
+   months:=null;
+  else
+   months:=(p_data->>'months')::int;
+   if months is null or months not in(3,6,9,12) then raise exception '보관 기간을 선택해주세요.';end if;
+   cutoff:=now()-make_interval(months=>months);range_start:=null;
+  end if;
+  select array_agg(value) into cats from jsonb_array_elements_text(p_data->'categories');
+  if cardinality(cats) is null or cardinality(cats)=0 or not cats<@array['chat','messages','chat_photos','message_photos','attendance'] then raise exception '정리 항목을 선택해주세요.';end if;
+  select coalesce(array_agg(m.id),'{}') into mid from public.property_messages m where m.property_id=prop and (range_start is null or m.created_at>=range_start) and m.created_at<cutoff and 'messages'=any(cats);
+  select coalesce(array_agg(m.id),'{}') into cid from public.guest_chat_messages m join public.guest_chat_rooms r on r.id=m.room_id where r.property_id=prop and (range_start is null or m.created_at>=range_start) and m.created_at<cutoff and 'chat'=any(cats);
+  select coalesce(array_agg(a.id),'{}') into aid from public.guest_support_assets a where a.property_id=prop and a.room_id is not null and (range_start is null or a.created_at>=range_start) and a.created_at<cutoff and 'chat_photos'=any(cats)
+   and not exists(select 1 from public.guest_chat_messages m where m.asset_id=a.id and not ((range_start is null or m.created_at>=range_start) and m.created_at<cutoff))
+   and not exists(select 1 from public.message_cleanup_files f where f.asset_id=a.id);
+  select coalesce(array_agg(f.message_id),'{}') into pid
+   from omg_private.staff_chat_photos f join public.property_messages m on m.id=f.message_id
+   where m.property_id=prop and
+    (f.message_id=any(mid) or ('message_photos'=any(cats) and (range_start is null or f.created_at>=range_start) and f.created_at<cutoff));
+  select coalesce(array_agg(s.id),'{}') into sid from public.work_sessions s where s.property_id=prop and s.clock_out_at is not null and (range_start is null or s.clock_in_at>=range_start) and s.clock_in_at<cutoff and 'attendance'=any(cats);
+  result:=jsonb_build_object('property_name',(select name from public.properties where id=prop),'cutoff',cutoff,'range_start',range_start,
+   'chat_count',cardinality(cid),'message_count',cardinality(mid),'chat_photo_count',cardinality(aid),'message_photo_count',cardinality(pid),
+   'attendance_count',cardinality(sid),'photo_bytes',(select coalesce(sum(omg_private.guest_asset_bytes(a.object_path)),0) from public.guest_support_assets a where a.id=any(aid)) + (select coalesce(sum(octet_length(f.image_bytes)),0) from omg_private.staff_chat_photos f where f.message_id=any(pid)));
+  insert into public.message_cleanup_jobs(actor_id,actor_key,property_id,months,range_start,cutoff,categories,message_ids,chat_ids,asset_ids,attendance_ids,message_photo_ids,summary)
+   values(p_actor_id,p_actor_key,prop,months,range_start,cutoff,cats,mid,cid,aid,sid,pid,result) returning * into j;
+  return jsonb_build_object('ok',true,'job_id',j.id,'summary',result);
+ elsif p_action='execute' then
+  select * into j from public.message_cleanup_jobs where id=(p_data->>'job_id')::uuid
+   and actor_id is not distinct from p_actor_id and actor_key is not distinct from p_actor_key for update;
+  if not found then raise exception '삭제 요청을 확인할 수 없습니다.';end if;
+  if p_property_scope is not null and j.property_id<>p_property_scope then raise exception '현재 숙소의 내역만 정리할 수 있습니다.';end if;
+  if j.status<>'preview' then return jsonb_build_object('ok',true,'job_id',j.id,'status',j.status);end if;
+  if j.created_at<now()-interval '10 minutes' then raise exception '삭제 확인이 만료되었습니다. 다시 실행해주세요.';end if;
+  if p_data->>'confirm_name' is distinct from j.summary->>'property_name' then raise exception '숙소명을 정확히 입력해주세요.';end if;
+  perform 1 from public.guest_support_assets where id=any(j.asset_ids) for update;
+  select coalesce(array_agg(a.id),'{}') into aid from public.guest_support_assets a where a.id=any(j.asset_ids) and a.property_id=j.property_id
+   and not exists(select 1 from public.guest_chat_messages m where m.asset_id=a.id and not ((j.range_start is null or m.created_at>=j.range_start) and m.created_at<j.cutoff));
+  update public.guest_support_assets set ready=false where id=any(aid);
+  insert into public.message_cleanup_files(asset_id,job_id,object_path) select id,j.id,object_path from public.guest_support_assets where id=any(aid) on conflict do nothing;
+  update public.guest_chat_messages set asset_id=null,body=case when body='' then '[삭제된 사진]' else body end where asset_id=any(aid);
+  delete from public.guest_chat_events where message_id=any(j.chat_ids);
+  delete from public.guest_chat_messages where id=any(j.chat_ids) and asset_id is null and (j.range_start is null or created_at>=j.range_start) and created_at<j.cutoff;
+  update public.guest_chat_messages set body='' where id=any(j.chat_ids) and asset_id is not null and (j.range_start is null or created_at>=j.range_start) and created_at<j.cutoff;
+  select coalesce(array_agg(r.id),'{}') into rid from public.attendance_adjustment_requests r where r.work_session_id=any(j.attendance_ids);
+  delete from omg_private.staff_chat_photos f using public.property_messages m
+   where m.id=f.message_id and m.property_id=j.property_id and f.message_id=any(j.message_photo_ids)
+    and ((f.message_id=any(j.message_ids) and (j.range_start is null or m.created_at>=j.range_start) and m.created_at<j.cutoff)
+     or ('message_photos'=any(j.categories) and (j.range_start is null or f.created_at>=j.range_start) and f.created_at<j.cutoff));
+  delete from public.property_messages where property_id=j.property_id and (id=any(j.message_ids) or attendance_request_id=any(rid));
+  delete from public.urgent_messages where attendance_request_id=any(rid);
+  delete from public.attendance_adjustment_requests where id=any(rid);
+  delete from public.work_reports where work_session_id=any(j.attendance_ids);
+  delete from public.work_sessions where id=any(j.attendance_ids) and property_id=j.property_id and clock_out_at is not null
+   and (j.range_start is null or clock_in_at>=j.range_start) and clock_in_at<j.cutoff;
+  update public.message_cleanup_jobs set status=case when cardinality(aid)>0 then 'pending' else 'complete' end,
+   completed_at=case when cardinality(aid)=0 then now() end where id=j.id returning * into j;
+  return jsonb_build_object('ok',true,'job_id',j.id,'status',j.status);
+ end if;
+ raise exception '지원하지 않는 요청입니다.';
+end$$;
+revoke all on function omg_private.data_management(uuid,text,uuid,text,jsonb) from public,anon,authenticated;
+commit;

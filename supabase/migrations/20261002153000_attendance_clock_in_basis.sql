@@ -120,7 +120,7 @@ begin
     'employees',v_items
   );
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.save_work_report(p_access_token uuid, p_report_type text, p_payload jsonb)
  RETURNS jsonb
@@ -192,4 +192,4 @@ begin
     'already_saved', v_existing, 'make_accepted', v_report.make_accepted_at is not null,
     'payload', v_report.payload);
 end;
-$function$
+$function$;

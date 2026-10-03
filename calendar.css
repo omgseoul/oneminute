@@ -95,3 +95,9 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
   .calendar-toolbar h1,.calendar-toolbar.week-mode h1{font-size:16px}
   .calendar-toolbar .calendar-toolbar-actions > button,.calendar-toolbar.week-mode .calendar-toolbar-actions > button{min-width:25px}
 }
+
+/* Day cards: type and title first, time or To do source below. */
+.calendar-day-primary{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px}
+.calendar-day-type{font-weight:900}
+.calendar-day-title{font-weight:800}
+.calendar-day-view .calendar-day-entry small{margin-top:6px}

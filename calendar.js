@@ -118,7 +118,23 @@
     $('eventForm').querySelectorAll('input:not([type=hidden]),textarea').forEach(input=>input.disabled=readonly);
     $('targetPickerButton').disabled=readonly;
     $('saveEvent').hidden=readonly;$('deleteEvent').hidden=!event||readonly;
-    $('eventDialog').showModal();
+    const dialog=$('eventDialog');
+    dialog.style.top='';
+    dialog.style.bottom='';
+    dialog.style.left='';
+    dialog.style.right='';
+    dialog.style.margin='';
+    dialog.style.maxHeight='';
+    dialog.showModal();
+    // Keep the opening top edge in place while optional time fields expand below.
+    const top=Math.max(16,Math.round(dialog.getBoundingClientRect().top));
+    dialog.style.top=`${top}px`;
+    dialog.style.bottom='auto';
+    dialog.style.left='0';
+    dialog.style.right='0';
+    dialog.style.margin='0 auto';
+    dialog.style.maxHeight=`calc(100dvh - ${top+16}px)`;
+    dialog.scrollTop=0;
   }
   function closeEditor(){closeTargetPanel();if($('eventDialog').open)$('eventDialog').close();}
   $('viewButtons').onclick=event=>{const button=event.target.closest('[data-view]');if(!button||button.dataset.view===view)return;view=button.dataset.view;if(view==='week')focusDate=today();refresh();};

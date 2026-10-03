@@ -48,7 +48,6 @@
   function renderHeader(){
     $('rangeTitle').textContent=view==='month'?`${focusDate.getFullYear()}년 ${focusDate.getMonth()+1}월`:view==='week'?'이번 주 일정':`${focusDate.getMonth()+1}월 ${focusDate.getDate()}일 ${dayNames[focusDate.getDay()]}요일`;
     document.querySelector('.calendar-toolbar').classList.toggle('week-mode',view==='week');
-    $('rangeSub').textContent=view==='month'?'캘린더':view==='week'?'':'하루 일정';
     document.querySelectorAll('#viewButtons [data-view]').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
   }
   function renderMonth(){

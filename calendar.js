@@ -88,29 +88,39 @@
       events=result.events||[];tasks=result.tasks||[];employees=result.employees||[];renderTargets();render();
     }catch(error){$('calendarMessage').textContent=error.message;render();}
   }
+  function updateTargetLabel(){
+    const chosen=[...document.querySelectorAll('#targetOptions input:checked')];
+    const names=chosen.map(input=>input.value==='owner'?'본인':employees.find(e=>String(e.id)===input.value)?.name||'직원');
+    $('targetPickerButton').textContent=names.length===1?names[0]:names.length?`${names.length}명 선택`:'대상 선택';
+  }
+  function closeTargetPanel(){
+    $('targetPanel').hidden=true;
+    $('targetPickerButton').setAttribute('aria-expanded','false');
+  }
   function renderTargets(){
     if(!isOwner)return;
-    const host=$('targetOptions');
-    host.innerHTML=`<label><input type="checkbox" value="owner" checked>본인</label>`+employees.map(e=>`<label><input type="checkbox" value="${escape(e.id)}">${escape(e.name)}</label>`).join('');
+    $('targetOptions').innerHTML=`<label class="calendar-target-option"><span>본인</span><input type="checkbox" value="owner" checked></label>`+employees.map(e=>`<label class="calendar-target-option"><span>${escape(e.name)}</span><input type="checkbox" value="${escape(e.id)}"></label>`).join('');
+    updateTargetLabel();
   }
   function openEditor(date,event=null){
     $('eventForm').reset();$('eventFormMessage').textContent='';$('eventId').value=event?.id||'';
     $('dialogTitle').textContent=event?'일정 수정':'일정 추가';
     $('eventDate').value=event?zonedKey(event.start_at):date;
     $('eventTitle').value=event?.title||'';$('eventDetails').value=event?.details||'';
-    $('allDay').checked=!!event?.all_day;
+    $('allDay').checked=event?!!event.all_day:true;
     if(event){const start=zonedParts(event.start_at),end=zonedParts(event.end_at);$('startTime').value=`${pad(start.hour)}:${pad(start.minute)}`;$('endTime').value=`${pad(end.hour)}:${pad(end.minute)}`;}
     else{$('startTime').value='09:00';$('endTime').value='10:00';}
     $('timeFields').hidden=$('allDay').checked;
     $('startTime').required=$('endTime').required=!$('allDay').checked;
-    if(isOwner){document.querySelectorAll('#targetOptions input').forEach(input=>input.checked=input.value==='owner'?event?!!event.owner_target:true:!!event?.target_employee_ids?.includes(input.value));}
+    if(isOwner){document.querySelectorAll('#targetOptions input').forEach(input=>input.checked=input.value==='owner'?event?!!event.owner_target:true:!!event?.target_employee_ids?.includes(input.value));updateTargetLabel();closeTargetPanel();}
     const readonly=!!event&&!event.can_edit;
     $('dialogTitle').textContent=readonly?'일정 보기':event?'일정 수정':'일정 추가';
     $('eventForm').querySelectorAll('input:not([type=hidden]),textarea').forEach(input=>input.disabled=readonly);
+    $('targetPickerButton').disabled=readonly;
     $('saveEvent').hidden=readonly;$('deleteEvent').hidden=!event||readonly;
     $('eventDialog').showModal();
   }
-  function closeEditor(){if($('eventDialog').open)$('eventDialog').close();}
+  function closeEditor(){closeTargetPanel();if($('eventDialog').open)$('eventDialog').close();}
   $('viewButtons').onclick=event=>{const button=event.target.closest('[data-view]');if(!button||button.dataset.view===view)return;view=button.dataset.view;if(view==='week')focusDate=today();refresh();};
   $('todayButton').onclick=()=>{focusDate=today();refresh();};
   function move(direction){if(view==='month')focusDate=new Date(focusDate.getFullYear(),focusDate.getMonth()+direction,Math.min(focusDate.getDate(),28));else focusDate=addDays(focusDate,direction*(view==='week'?7:1));refresh();}
@@ -122,6 +132,9 @@
     const date=event.target.closest('[data-create-date]')?.dataset.createDate||event.target.closest('[data-date]')?.dataset.date;
     if(date){if(view==='day')focusDate=parseKey(date);openEditor(date);}
   };
+  $('targetPickerButton').onclick=()=>{const panel=$('targetPanel');panel.hidden=!panel.hidden;$('targetPickerButton').setAttribute('aria-expanded',String(!panel.hidden));};
+  $('targetOptions').onchange=updateTargetLabel;
+  document.addEventListener('click',event=>{if(!event.target.closest('.calendar-target-selector'))closeTargetPanel();});
   $('closeDialog').onclick=closeEditor;
   $('eventDialog').onclick=event=>{if(event.target===$('eventDialog'))closeEditor();};
   $('allDay').onchange=()=>{$('timeFields').hidden=$('allDay').checked;$('startTime').required=$('endTime').required=!$('allDay').checked;};

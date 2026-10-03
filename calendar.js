@@ -115,7 +115,7 @@
     const item=event.target.closest('[data-kind]');
     if(item){if(item.dataset.kind==='task'){location.href='mission.html';return;}const record=events.find(e=>e.id===item.dataset.id);if(record)openEditor(zonedKey(record.start_at),record);return;}
     const date=event.target.closest('[data-create-date]')?.dataset.createDate||event.target.closest('[data-date]')?.dataset.date;
-    if(date){focusDate=parseKey(date);openEditor(date);}
+    if(date){if(view==='day')focusDate=parseKey(date);openEditor(date);}
   };
   $('closeDialog').onclick=closeEditor;
   $('eventDialog').onclick=event=>{if(event.target===$('eventDialog'))closeEditor();};
@@ -128,7 +128,7 @@
     const selected=isOwner?[...document.querySelectorAll('#targetOptions input:checked')].map(input=>input.value):[];
     if(isOwner&&!selected.length){$('eventFormMessage').textContent='일정 대상을 선택해주세요.';return;}
     const button=$('saveEvent');button.disabled=true;$('eventFormMessage').textContent='';
-    try{await rpc('save',{id:$('eventId').value||null,title:$('eventTitle').value.trim(),details:$('eventDetails').value.trim(),start_at:start,end_at:end,all_day:allDay,owner_target:selected.includes('owner'),target_employee_ids:selected.filter(value=>value!=='owner')});closeEditor();focusDate=parseKey(date);await refresh();}
+    try{await rpc('save',{id:$('eventId').value||null,title:$('eventTitle').value.trim(),details:$('eventDetails').value.trim(),start_at:start,end_at:end,all_day:allDay,owner_target:selected.includes('owner'),target_employee_ids:selected.filter(value=>value!=='owner')});closeEditor();if(view==='day')focusDate=parseKey(date);await refresh();}
     catch(error){$('eventFormMessage').textContent=error.message;}finally{button.disabled=false;}
   };
   $('deleteEvent').onclick=async()=>{if(!confirm('이 일정을 삭제할까요?'))return;const button=$('deleteEvent');button.disabled=true;try{await rpc('delete',{id:$('eventId').value});closeEditor();await refresh();}catch(error){$('eventFormMessage').textContent=error.message;}finally{button.disabled=false;}};

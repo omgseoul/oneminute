@@ -85,3 +85,13 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
   .calendar-week-items{gap:4px 5px}
   .calendar-week-entry{font-size:10px}
 }
+
+/* Keep the month, week and day headers at a consistent height. */
+.calendar-toolbar,.calendar-toolbar.week-mode{align-items:center;min-height:38px;margin:24px 2px 13px}
+.calendar-toolbar h1,.calendar-toolbar.week-mode h1{margin:0;font-size:clamp(16px,4.3vw,21px);line-height:1.25;letter-spacing:-.04em;white-space:nowrap}
+.calendar-toolbar .calendar-toolbar-actions{gap:1px}
+.calendar-toolbar .calendar-toolbar-actions > button,.calendar-toolbar.week-mode .calendar-toolbar-actions > button{min-width:27px;padding:0 2px}
+@media(max-width:390px){
+  .calendar-toolbar h1,.calendar-toolbar.week-mode h1{font-size:16px}
+  .calendar-toolbar .calendar-toolbar-actions > button,.calendar-toolbar.week-mode .calendar-toolbar-actions > button{min-width:25px}
+}

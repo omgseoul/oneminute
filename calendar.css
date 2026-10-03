@@ -65,3 +65,23 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 .calendar-add::before,.calendar-add::after{content:"";position:absolute;left:50%;top:50%;width:25px;height:3px;border-radius:2px;background:#fff;transform:translate(-50%,-50%)}
 .calendar-add::after{width:3px;height:25px}
 @media(max-width:390px){.calendar-toolbar.week-mode h1{font-size:14px}.calendar-toolbar.week-mode .calendar-toolbar-actions button{min-width:28px}.calendar-week-card{padding:9px}.calendar-week-card h2{font-size:11px}.calendar-week-card:first-child h2{font-size:13px}.calendar-week-card .calendar-item{font-size:10px}}
+
+/* Always-visible view controls and compact, two-column weekly entries. */
+.calendar-toolbar.week-mode #rangeSub{display:none}
+.calendar-toolbar.week-mode h1{font-size:clamp(17px,4.3vw,21px);letter-spacing:-.04em}
+.calendar-view-buttons{display:flex;align-items:center;gap:2px;margin-left:3px}
+.calendar-toolbar-actions .calendar-view-buttons button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:30px;min-width:30px;height:38px;padding:2px 0;border-radius:8px;font-size:16px;line-height:1;background:transparent}
+.calendar-view-buttons button small{font-size:9px;line-height:1.1;font-weight:800}
+.calendar-toolbar-actions .calendar-view-buttons button.active{background:var(--soft);color:var(--blue)}
+.calendar-week-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 8px;align-items:start}
+.calendar-week-entry{display:block;min-width:0;width:100%;padding:2px 0;border:0;background:transparent;color:var(--navy);text-align:left;font-size:11px;line-height:1.4;overflow-wrap:anywhere;cursor:pointer}
+.calendar-week-bullet{margin-right:3px;color:var(--blue);font-weight:900}
+.calendar-week-type{margin-right:4px;color:var(--blue);font-weight:900;white-space:nowrap}
+.calendar-week-entry.task .calendar-week-bullet,.calendar-week-entry.task .calendar-week-type{color:#7772b8}
+.calendar-week-title{font-weight:700}
+@media(max-width:390px){
+  .calendar-toolbar.week-mode h1{font-size:16px}
+  .calendar-toolbar-actions .calendar-view-buttons button{width:28px;min-width:28px}
+  .calendar-week-items{gap:4px 5px}
+  .calendar-week-entry{font-size:10px}
+}

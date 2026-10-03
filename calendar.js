@@ -36,14 +36,19 @@
       ...tasks.filter(item=>new Date(item.due_at).getTime()>=start&&new Date(item.due_at).getTime()<end).map(item=>({...item,kind:'task',sort:new Date(item.due_at).getTime()}))
     ].sort((a,b)=>a.sort-b.sort);
   }
-  function itemMarkup(item,full=false){
-    const task=item.kind==='task',p=zonedParts(task?item.due_at:item.start_at);
-    const time=task?'To do':item.all_day?'종일':`${pad(p.hour)}:${pad(p.minute)}`;
-    return `<button type="button" class="calendar-item ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}">${full?`${escape(time)} · `:''}${escape(item.title)}${full?`<small>${task?'To do 목록에서 확인':item.target_names?.length?escape(item.target_names.join(', ')):item.owner_target?'내 일정':'내 일정'}</small>`:''}</button>`;
+  function itemMarkup(item){
+    const task=item.kind==='task';
+    return `<button type="button" class="calendar-item ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}">${escape(item.title)}</button>`;
+  }
+  function dayItemMarkup(item){
+    const task=item.kind==='task';
+    const p=task||item.all_day?null:zonedParts(item.start_at);
+    const detail=task?'To do 메뉴에서 확인':item.all_day?'종일':`${pad(p.hour)}:${pad(p.minute)}`;
+    return `<button type="button" class="calendar-item calendar-day-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}"><span class="calendar-day-primary"><span class="calendar-day-type">${task?'To do':'일정'}</span><span class="calendar-day-title">${escape(item.title)}</span></span><small>${detail}</small></button>`;
   }
   function weekItemMarkup(item){
     const task=item.kind==='task';
-    return `<button type="button" class="calendar-week-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}"><span class="calendar-week-bullet" aria-hidden="true">•</span><span class="calendar-week-type">${task?'To do':'할일'}</span><span class="calendar-week-title">${escape(item.title)}</span></button>`;
+    return `<button type="button" class="calendar-week-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}"><span class="calendar-week-bullet" aria-hidden="true">•</span><span class="calendar-week-type">${task?'To do':'일정'}</span><span class="calendar-week-title">${escape(item.title)}</span></button>`;
   }
   function renderHeader(){
     $('rangeTitle').textContent=view==='month'?`${focusDate.getFullYear()}년 ${focusDate.getMonth()+1}월`:view==='week'?'이번 주 일정':`${focusDate.getMonth()+1}월 ${focusDate.getDate()}일 ${dayNames[focusDate.getDay()]}요일`;
@@ -69,7 +74,7 @@
   }
   function renderDay(){
     const items=itemsFor(focusDate);
-    $('calendarBoard').innerHTML=`<div class="calendar-day-view" data-date="${key(focusDate)}">${items.length?items.map(item=>itemMarkup(item,true)).join(''):'<div class="calendar-empty">일정이 없습니다. 날짜를 눌러 추가하세요.</div>'}<button class="calendar-item" type="button" data-create-date="${key(focusDate)}">+ 일정 추가</button></div>`;
+    $('calendarBoard').innerHTML=`<div class="calendar-day-view" data-date="${key(focusDate)}">${items.length?items.map(dayItemMarkup).join(''):'<div class="calendar-empty">일정이 없습니다.</div>'}</div>`;
   }
   function render(){renderHeader();if(view==='month')renderMonth();else if(view==='week')renderWeek();else renderDay();}
   async function rpc(action,event){

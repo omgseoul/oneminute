@@ -24,7 +24,7 @@
   function dayStart(date){return zonedISO(key(date),'00:00');}
   function range(){
     if(view==='day')return [focusDate,addDays(focusDate,1)];
-    if(view==='week'){const first=monday(focusDate);return [first,addDays(first,7)];}
+    if(view==='week')return [focusDate,addDays(focusDate,7)];
     const first=monday(new Date(focusDate.getFullYear(),focusDate.getMonth(),1));
     const last=new Date(focusDate.getFullYear(),focusDate.getMonth()+1,0);
     return [first,addDays(monday(last),7)];
@@ -42,8 +42,9 @@
     return `<button type="button" class="calendar-item ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}">${full?`${escape(time)} · `:''}${escape(item.title)}${full?`<small>${task?'To do 목록에서 확인':item.target_names?.length?escape(item.target_names.join(', ')):item.owner_target?'내 일정':'내 일정'}</small>`:''}</button>`;
   }
   function renderHeader(){
-    const first=monday(focusDate),last=addDays(first,6);
-    $('rangeTitle').textContent=view==='month'?`${focusDate.getFullYear()}년 ${focusDate.getMonth()+1}월`:view==='week'?`${first.getMonth()+1}월 ${first.getDate()}일 — ${last.getMonth()+1}월 ${last.getDate()}일`:`${focusDate.getMonth()+1}월 ${focusDate.getDate()}일 ${dayNames[focusDate.getDay()]}요일`;
+    const first=view==='week'?focusDate:monday(focusDate),last=addDays(first,6);
+    $('rangeTitle').textContent=view==='month'?`${focusDate.getFullYear()}년 ${focusDate.getMonth()+1}월`:view==='week'?`${first.getMonth()+1}월 ${first.getDate()}일~${last.getMonth()+1}월 ${last.getDate()}일`:`${focusDate.getMonth()+1}월 ${focusDate.getDate()}일 ${dayNames[focusDate.getDay()]}요일`;
+    document.querySelector('.calendar-toolbar').classList.toggle('week-mode',view==='week');
     $('rangeSub').textContent=view==='month'?'캘린더':view==='week'?'이번 주 일정':'하루 일정';
     $('viewButton').innerHTML=(view==='month'?'▦':view==='week'?'▤':'▥')+' <span>⌄</span>';
     document.querySelectorAll('[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
@@ -57,10 +58,11 @@
     $('calendarBoard').innerHTML=`<div class="calendar-weekdays">${['월','화','수','목','금','토','일'].map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-month">${cells.join('')}</div>`;
   }
   function renderWeek(){
-    const first=monday(focusDate),now=today(),cards=[];
+    const first=focusDate,now=today(),cards=[];
     for(let i=0;i<7;i++){
-      const date=addDays(first,i),items=itemsFor(date);
-      cards.push(`<div class="calendar-week-card${sameDay(date,now)?' today':''}" data-date="${key(date)}"><h2>${dayNames[date.getDay()]}요일 ${date.getMonth()+1}월 ${date.getDate()}일</h2>${items.length?items.map(item=>itemMarkup(item)).join(''):'<span class="calendar-empty">일정 없음 · 눌러서 추가</span>'}</div>`);
+      const date=addDays(first,i),items=itemsFor(date),isToday=sameDay(date,now);
+      const heading=`<h2>${isToday?'<span class="calendar-today-label">Today</span>':''}<span>${date.getMonth()+1}월 ${date.getDate()}일 ${dayNames[date.getDay()]}요일</span></h2>`;
+      cards.push(`<div class="calendar-week-card${isToday?' today':''}" data-date="${key(date)}">${heading}${items.length?items.map(item=>itemMarkup(item)).join(''):'<span class="calendar-empty">일정 없음 · 눌러서 추가</span>'}</div>`);
     }
     $('calendarBoard').innerHTML=`<div class="calendar-week-grid">${cards.join('')}</div>`;
   }
@@ -104,7 +106,7 @@
   }
   function closeEditor(){if($('eventDialog').open)$('eventDialog').close();}
   $('viewButton').onclick=()=>{const menu=$('viewMenu');menu.hidden=!menu.hidden;$('viewButton').setAttribute('aria-expanded',String(!menu.hidden));};
-  $('viewMenu').onclick=event=>{const button=event.target.closest('[data-view]');if(!button)return;view=button.dataset.view;$('viewMenu').hidden=true;$('viewButton').setAttribute('aria-expanded','false');refresh();};
+  $('viewMenu').onclick=event=>{const button=event.target.closest('[data-view]');if(!button)return;view=button.dataset.view;if(view==='week')focusDate=today();$('viewMenu').hidden=true;$('viewButton').setAttribute('aria-expanded','false');refresh();};
   $('todayButton').onclick=()=>{focusDate=today();refresh();};
   function move(direction){if(view==='month')focusDate=new Date(focusDate.getFullYear(),focusDate.getMonth()+direction,Math.min(focusDate.getDate(),28));else focusDate=addDays(focusDate,direction*(view==='week'?7:1));refresh();}
   $('prevButton').onclick=()=>move(-1);$('nextButton').onclick=()=>move(1);

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f7fc">
   <title>캘린더 · 게하관리</title>
   <link rel="stylesheet" href="page-transition.css">
-  <link rel="stylesheet" href="calendar.css?v=20261003e">
+  <link rel="stylesheet" href="calendar.css?v=20261003f">
   <script src="page-transition.js?v=20260929-chat-taps"></script>
 </head>
 <body>
@@ -36,14 +36,23 @@
       <div class="calendar-dialog-head"><h2 id="dialogTitle">일정 추가</h2><button id="closeDialog" type="button" aria-label="닫기">×</button></div>
       <input id="eventId" type="hidden">
       <label>제목<input id="eventTitle" required maxlength="120" placeholder="일정 제목"></label>
-      <label>날짜<input id="eventDate" type="date" required></label>
-      <label class="calendar-all-day"><input id="allDay" type="checkbox">종일</label>
-      <div id="timeFields" class="calendar-time-fields">
+      <div class="calendar-date-heading"><label for="eventDate">날짜</label><label class="calendar-all-day"><input id="allDay" type="checkbox" checked>종일</label></div>
+      <input id="eventDate" type="date" required>
+      <div id="timeFields" class="calendar-time-fields" hidden>
         <label>시작<input id="startTime" type="time" value="09:00" required></label>
         <label>종료<input id="endTime" type="time" value="10:00" required></label>
       </div>
       <label>내용<textarea id="eventDetails" maxlength="2000" rows="3" placeholder="필요한 내용을 적어주세요"></textarea></label>
-      <fieldset id="targetFieldset" hidden><legend>일정 대상 · 여러 명 선택 가능</legend><div id="targetOptions"></div></fieldset>
+      <div id="targetFieldset" class="calendar-target-field" hidden>
+        <label for="targetPickerButton">대상</label>
+        <div class="calendar-target-selector">
+          <button id="targetPickerButton" type="button" class="calendar-target-button" aria-expanded="false" aria-controls="targetPanel">본인</button>
+          <div id="targetPanel" class="calendar-target-panel" hidden>
+            <p>일정 대상 · 여러 명 선택 가능</p>
+            <div id="targetOptions"></div>
+          </div>
+        </div>
+      </div>
       <div id="eventFormMessage" role="alert"></div>
       <div class="calendar-form-actions"><button id="deleteEvent" class="delete-event" type="button" hidden>삭제</button><button id="saveEvent" class="save-event" type="submit">저장</button></div>
     </form>
@@ -51,6 +60,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="supabase-client.js"></script>
-  <script src="calendar.js?v=20261003e"></script>
+  <script src="calendar.js?v=20261003f"></script>
 </body>
 </html>

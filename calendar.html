@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko" class="omg-booting" data-omg-ready="manual">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fc">
+  <title>캘린더 · 게하관리</title>
+  <link rel="stylesheet" href="page-transition.css">
+  <link rel="stylesheet" href="calendar.css?v=20261003a">
+  <script src="page-transition.js?v=20260929-chat-taps"></script>
+</head>
+<body>
+  <main class="calendar-shell">
+    <header class="calendar-top"><a href="app.html">← Home</a><span id="propertyName"></span></header>
+    <div class="calendar-toolbar">
+      <div><p id="rangeSub"></p><h1 id="rangeTitle">캘린더</h1></div>
+      <div class="calendar-toolbar-actions">
+        <button id="todayButton" type="button">오늘</button>
+        <button id="prevButton" type="button" aria-label="이전 기간">‹</button>
+        <button id="nextButton" type="button" aria-label="다음 기간">›</button>
+        <div class="calendar-view-wrap">
+          <button id="viewButton" type="button" aria-label="일 주 월 보기 선택" aria-expanded="false">▦ <span>⌄</span></button>
+          <div id="viewMenu" class="calendar-view-menu" hidden>
+            <button type="button" data-view="day">일</button>
+            <button type="button" data-view="week">주</button>
+            <button type="button" data-view="month">월</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="calendarMessage" role="status"></div>
+    <section id="calendarBoard" aria-label="일정"></section>
+    <div class="calendar-legend"><span><i class="legend-event"></i>일정</span><span><i class="legend-task"></i>To do</span></div>
+    <button id="addEvent" class="calendar-add" type="button" aria-label="일정 추가">+</button>
+  </main>
+
+  <dialog id="eventDialog" class="calendar-dialog">
+    <form id="eventForm">
+      <div class="calendar-dialog-head"><h2 id="dialogTitle">일정 추가</h2><button id="closeDialog" type="button" aria-label="닫기">×</button></div>
+      <input id="eventId" type="hidden">
+      <label>제목<input id="eventTitle" required maxlength="120" placeholder="일정 제목"></label>
+      <label>날짜<input id="eventDate" type="date" required></label>
+      <label class="calendar-all-day"><input id="allDay" type="checkbox">종일</label>
+      <div id="timeFields" class="calendar-time-fields">
+        <label>시작<input id="startTime" type="time" value="09:00" required></label>
+        <label>종료<input id="endTime" type="time" value="10:00" required></label>
+      </div>
+      <label>내용<textarea id="eventDetails" maxlength="2000" rows="3" placeholder="필요한 내용을 적어주세요"></textarea></label>
+      <fieldset id="targetFieldset" hidden><legend>일정 대상 · 여러 명 선택 가능</legend><div id="targetOptions"></div></fieldset>
+      <div id="eventFormMessage" role="alert"></div>
+      <div class="calendar-form-actions"><button id="deleteEvent" class="delete-event" type="button" hidden>삭제</button><button id="saveEvent" class="save-event" type="submit">저장</button></div>
+    </form>
+  </dialog>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="calendar.js?v=20261003a"></script>
+</body>
+</html>

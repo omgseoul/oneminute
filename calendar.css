@@ -46,3 +46,22 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 .calendar-form-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:10px}.calendar-form-actions button{min-width:84px;min-height:44px;padding:8px 16px;border:0;border-radius:11px;font-weight:900}
 .delete-event{margin-right:auto;background:#fff0f0;color:#b93636}.save-event{background:var(--blue);color:#fff}
 @media(max-width:390px){.calendar-shell{padding-left:11px;padding-right:11px}.calendar-toolbar{margin-top:24px}.calendar-toolbar h1{font-size:26px}.calendar-toolbar-actions{gap:0}.calendar-toolbar-actions button{min-width:30px}.calendar-day{min-height:78px;padding:4px 2px}.calendar-item{font-size:9px}.calendar-week-grid{gap:7px}.calendar-week-card{padding:10px}.calendar-week-card .calendar-item{font-size:11px}}
+
+/* Compact week header and rolling seven-day view. */
+.calendar-toolbar h1{font-size:clamp(22px,5vw,29px)}
+.calendar-toolbar.week-mode{align-items:center;margin-top:24px}
+.calendar-toolbar.week-mode h1{font-size:clamp(14px,4vw,19px);line-height:1.25;letter-spacing:-.075em;white-space:nowrap}
+.calendar-toolbar.week-mode .calendar-toolbar-actions{gap:1px}
+.calendar-toolbar.week-mode .calendar-toolbar-actions button{min-width:30px;padding:0 3px}
+.calendar-toolbar.week-mode #viewButton{min-width:39px}
+.calendar-week-card{min-height:106px;padding:10px}
+.calendar-week-card:first-child{min-height:120px;padding:13px}
+.calendar-week-card h2{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:0 0 7px;font-size:12px;line-height:1.35;letter-spacing:-.035em}
+.calendar-week-card:first-child h2{font-size:14px}
+.calendar-today-label{display:inline-block;padding:3px 6px;border-radius:6px;background:#2467bd;color:#fff;font-size:10px;line-height:1.1;letter-spacing:0}
+.calendar-week-card .calendar-item{margin:4px 0;padding:6px 7px;font-size:11px}
+.calendar-week-card:first-child .calendar-item{font-size:11px}
+.calendar-add{font-size:0;line-height:0}
+.calendar-add::before,.calendar-add::after{content:"";position:absolute;left:50%;top:50%;width:25px;height:3px;border-radius:2px;background:#fff;transform:translate(-50%,-50%)}
+.calendar-add::after{width:3px;height:25px}
+@media(max-width:390px){.calendar-toolbar.week-mode h1{font-size:14px}.calendar-toolbar.week-mode .calendar-toolbar-actions button{min-width:28px}.calendar-week-card{padding:9px}.calendar-week-card h2{font-size:11px}.calendar-week-card:first-child h2{font-size:13px}.calendar-week-card .calendar-item{font-size:10px}}

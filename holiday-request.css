@@ -37,3 +37,5 @@
 .holiday-settings textarea[hidden]{display:none}
 .holiday-switch{min-width:54px;height:30px;border:0;border-radius:999px;background:#2467bd;color:white;font-size:12px;font-weight:900}
 .holiday-switch[aria-checked=false]{background:#dfe6ee;color:#617187}
+
+.holiday-toggle{display:inline-flex;flex-shrink:0;padding:3px;border-radius:11px;background:#edf3fa}.holiday-toggle button{min-width:42px;min-height:29px;border:0;border-radius:8px;background:transparent;color:#728198;font-size:12px;font-weight:800}.holiday-toggle button[aria-pressed=true]{background:#fff;color:#2467bd;box-shadow:0 2px 7px #1734521c}

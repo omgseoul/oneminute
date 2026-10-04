@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const db=new PGlite();
 const root=new URL('../../',import.meta.url).pathname;
 await db.exec(fs.readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
-await db.exec(fs.readFileSync(root+'/supabase/migrations/20261004025003_holiday_requests_approval_calendar.sql','utf8'));
+await db.exec(fs.readFileSync(root+'/supabase/migrations/20261004025433_holiday_requests_approval_calendar.sql','utf8'));
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 for(let p=1;p<=2;p++){
  await db.query('insert into properties(id,name) values($1,$2)',[id(p),'Test '+p]);

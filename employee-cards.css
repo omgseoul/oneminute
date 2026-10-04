@@ -1,0 +1,29 @@
+.employee-section { margin-top: 22px; }
+.employee-section-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 2px 10px; }
+.employee-section-head h2 { margin:0; color:var(--navy); font-size:19px; }
+.employee-add { flex:0 0 auto; border:0; background:transparent; color:var(--blue); font-size:13px; font-weight:800; padding:9px 2px; }
+#employeeAccounts { display:grid; gap:11px; }
+.employee-account { display:block; margin:0; padding:16px; border:1px solid var(--line); border-radius:20px; background:#fff; box-shadow:0 6px 20px rgba(42,78,120,.055); }
+.employee-account .account-head { display:flex; align-items:center; gap:9px; min-width:0; }
+.employee-account .account-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.employee-account .profile-editor { display:block; flex:0 0 42px; width:42px; padding:0; border-radius:50%; background:transparent; }
+.employee-account .profile-preview { width:42px; height:42px; min-height:42px; padding:0; border:0; background:#eaf3ff; color:var(--navy); cursor:pointer; }
+.employee-account .profile-preview:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
+.employee-summary { display:flex; align-items:baseline; gap:5px; flex:1; min-width:0; overflow:hidden; white-space:nowrap; }
+.employee-summary-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--navy); font-size:15px; }
+.employee-summary-job { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; color:#7c8999; font-size:12px; }
+.employee-account .delete-account { flex:0 0 auto; min-height:30px; padding:4px 6px; }
+.employee-toggle { flex:0 0 32px; width:32px; height:36px; margin:0 -4px 0 -2px; border:0; background:transparent; color:#6f86a0; font-size:20px; line-height:1; cursor:pointer; }
+.employee-toggle:focus-visible { outline:2px solid var(--blue); border-radius:8px; }
+.employee-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px 9px; margin-top:21px; }
+.employee-fields[hidden] { display:none; }
+.employee-fields label { display:grid; gap:6px; min-width:0; color:#7b899a; font-size:11px; font-weight:800; }
+.employee-fields input { min-width:0; height:45px; padding:10px; color:var(--ink); font-size:13px; }
+.employee-duration { grid-column:1/-1; margin:0; color:#7b899a; font-size:11px; }
+.employee-duration output { color:var(--navy); font-weight:800; }
+.employee-account:not(.expanded) > .cp-settings { display:none; }
+.employee-account > .cp-settings { margin-top:15px; }
+.avatar-choice-none { width:100%; aspect-ratio:1; border-radius:50%; background:#f1f5fa; color:#6c7e92; font-size:12px; font-weight:800; }
+@media(max-width:360px) { .employee-account { padding:13px; } .employee-summary-name { font-size:14px; } .employee-summary-job { font-size:11px; } }
+.employee-account .profile-preview.profile-change { min-width:0; }
+.employee-account .profile-preview { min-width:42px; }

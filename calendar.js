@@ -36,19 +36,25 @@
       ...tasks.filter(item=>new Date(item.due_at).getTime()>=start&&new Date(item.due_at).getTime()<end).map(item=>({...item,kind:'task',sort:new Date(item.due_at).getTime()}))
     ].sort((a,b)=>a.sort-b.sort);
   }
+  function calendarTitle(item){
+    if(!item.holiday_request_id)return item.title;
+    const names=isOwner?(item.target_names||[]).filter(Boolean).join(", "):"";
+    const pending=item.title.includes("미결재");
+    return `휴일${names?` · ${names}`:""}${pending?" (미결재)":""}`;
+  }
   function itemMarkup(item){
-    const task=item.kind==='task';
-    return `<button type="button" class="calendar-item ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}">${escape(item.title)}</button>`;
+    const task=item.kind==='task',title=calendarTitle(item);
+    return `<button type="button" class="calendar-item ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}">${escape(title)}</button>`;
   }
   function dayItemMarkup(item){
-    const task=item.kind==='task';
+    const task=item.kind==='task',title=calendarTitle(item);
     const p=task||item.all_day?null:zonedParts(item.start_at);
     const detail=task?'To do 메뉴에서 확인':item.all_day?'종일':`${pad(p.hour)}:${pad(p.minute)}`;
-    return `<button type="button" class="calendar-item calendar-day-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}"><span class="calendar-day-primary"><span class="calendar-day-type">${task?'To do':'일정'}</span><span class="calendar-day-title">${escape(item.title)}</span></span><small>${detail}</small></button>`;
+    return `<button type="button" class="calendar-item calendar-day-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}"><span class="calendar-day-primary"><span class="calendar-day-type">${task?'To do':'일정'}</span><span class="calendar-day-title">${escape(title)}</span></span><small>${detail}</small></button>`;
   }
   function weekItemMarkup(item){
-    const task=item.kind==='task';
-    return `<button type="button" class="calendar-week-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(item.title)}"><span class="calendar-week-bullet" aria-hidden="true">•</span><span class="calendar-week-type">${task?'To do':'일정'}</span><span class="calendar-week-title">${escape(item.title)}</span></button>`;
+    const task=item.kind==='task',title=calendarTitle(item);
+    return `<button type="button" class="calendar-week-entry ${task?'task':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}"><span class="calendar-week-bullet" aria-hidden="true">•</span><span class="calendar-week-type">${task?'To do':'일정'}</span><span class="calendar-week-title">${escape(title)}</span></button>`;
   }
   function renderHeader(){
     $('rangeTitle').textContent=view==='month'?`${focusDate.getFullYear()}년 ${focusDate.getMonth()+1}월`:view==='week'?'이번 주 일정':`${focusDate.getMonth()+1}월 ${focusDate.getDate()}일 ${dayNames[focusDate.getDay()]}요일`;
@@ -106,7 +112,7 @@
     $('eventForm').reset();$('eventFormMessage').textContent='';$('eventId').value=event?.id||'';
     $('dialogTitle').textContent=event?'일정 수정':'일정 추가';
     $('eventDate').value=event?zonedKey(event.start_at):date;
-    $('eventTitle').value=event?.title||'';$('eventDetails').value=event?.details||'';
+    $('eventTitle').value=event?calendarTitle(event):'';$('eventDetails').value=event?.details||'';
     $('allDay').checked=event?!!event.all_day:true;
     if(event){const start=zonedParts(event.start_at),end=zonedParts(event.end_at);$('startTime').value=`${pad(start.hour)}:${pad(start.minute)}`;$('endTime').value=`${pad(end.hour)}:${pad(end.minute)}`;}
     else{$('startTime').value='09:00';$('endTime').value='10:00';}
@@ -173,3 +179,4 @@
     await refresh();window.omgTransition.ready();
   })().catch(error=>{$('calendarMessage').textContent=error.message;window.omgTransition.ready();});
 })();
+

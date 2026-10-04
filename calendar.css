@@ -123,3 +123,7 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 #targetOptions .calendar-target-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:42px;padding:7px 9px;border-radius:12px;color:#314764;font-size:12px;font-weight:900}
 #targetOptions .calendar-target-option:has(input:checked){background:#edf5ff;color:var(--blue)}
 #targetOptions .calendar-target-option input{width:18px;height:18px;margin:0;accent-color:var(--blue)}
+
+
+/* Match the Today card to the other white week cards. */
+.calendar-week-card.today{background:#fff}

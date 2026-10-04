@@ -1,0 +1,26 @@
+/* Shared vertical position for the first navigation row in WebView and browser. */
+main.shell, main.container, main.calendar-shell {
+  padding-top: 20px !important;
+}
+main.shell > .top, main.container > .top, main.calendar-shell > .calendar-top,
+.chat-page > .chat-head > .top {
+  min-height: 40px !important;
+  align-items: center;
+}
+main.shell > .back, main.shell > .top .back,
+main.container > .top .back, main.calendar-shell > .calendar-top a,
+.chat-page > .chat-head > .top .back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px !important;
+}
+.chat-page > .chat-head {
+  padding-top: 20px !important;
+}
+@media (max-width: 380px) {
+  .chat-page > .chat-head { padding-top: 20px !important; }
+}
+main:not([class]) { padding-top: 20px !important; }
+main:not([class]) > .top { min-height: 40px !important; align-items: center; }
+main:not([class]) > .top .back { display: inline-flex; align-items: center; min-height: 40px; }
+main.shell > .top .refresh { height: 40px; min-height: 40px; }

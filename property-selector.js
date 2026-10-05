@@ -9,7 +9,7 @@
       .property-picker{position:relative;margin-left:auto;z-index:12}
       .property-picker:has(.property-picker-panel:not([hidden])){z-index:19}
       .property-picker-button{display:flex;align-items:center;gap:7px;max-width:172px;height:38px;padding:0 12px;border:1px solid #d6e1ee;border-radius:13px;background:#fff;color:#183153;font-family:inherit;font-size:11px;font-weight:900;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 14px rgba(32,67,105,.07)}
-      .property-picker-mounted .property-picker-button{max-width:min(138px,38vw)}
+      .property-picker-mounted .property-picker-button{max-width:min(164px,46vw);font-weight:700}
       .property-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .property-picker-extra{flex:none;white-space:nowrap}
       .property-picker-button:after{content:"⌄";flex:none;color:#2467bd;font-size:14px}

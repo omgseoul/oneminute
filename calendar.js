@@ -177,8 +177,7 @@
   (async()=>{session=await window.omgSession.require({allowCompleted:true});if(!session)return;
     isOwner=session.sessionKind==='owner';timezone=session.timezone||'Asia/Seoul';focusDate=today();
     $('targetFieldset').hidden=!isOwner;
-    if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),allLabel:'숙소선택',onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=!ids.includes(ownPropertyId);await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=!selectedPropertyIds.includes(ownPropertyId);}
+    if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=!ids.includes(ownPropertyId);await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=!selectedPropertyIds.includes(ownPropertyId);}
     await refresh();window.omgTransition.ready();
   })().catch(error=>{$('calendarMessage').textContent=error.message;window.omgTransition.ready();});
 })();
-

@@ -24,3 +24,22 @@ main:not([class]) { padding-top: 20px !important; }
 main:not([class]) > .top { min-height: 40px !important; align-items: center; }
 main:not([class]) > .top .back { display: inline-flex; align-items: center; min-height: 40px; }
 main.shell > .top .refresh { height: 40px; min-height: 40px; }
+
+/* Compact only the branch selector in the page header.  The picker injects its
+   base styles after page CSS, so !important is required to keep this physical
+   height on mobile without shrinking form pickers elsewhere. */
+main.shell > .top .property-picker-button,
+main.container > .top .property-picker-button,
+main.calendar-shell > .calendar-top .property-picker-button,
+.settings-top .property-picker-button,
+.account-top .property-picker-button,
+.attendance-top .property-picker-button,
+.message-top-actions .property-picker-button {
+  height: 28px !important;
+  min-height: 28px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  border-radius: 10px !important;
+}

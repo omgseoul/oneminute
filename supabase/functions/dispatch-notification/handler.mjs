@@ -108,7 +108,19 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         return reply({ ok: true, validated: true });
       }
       let payload, topics, deliveryId, recipientDeadlines = {}, recipientModes = {};
-      if (path.endsWith('/report')) {
+      if (path.endsWith('/reminder')) {
+        const secret = env('GUEST_EMAIL_WORKER_SECRET');
+        if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ok:false,code:'unauthorized'},401);
+        if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);
+        const dispatch = await rpc('get_reminder_push_dispatch',{p_message_id:body.message_id});
+        if (!dispatch.ok) return reply({ok:false,code:'not_found'},404);
+        if (env('PUSH_DELIVERY_ENABLED') !== 'true') return reply({ok:false,code:'not_enabled'},503);
+        deliveryId = dispatch.message_id;
+        topics = dispatch.recipient_topics;
+        recipientModes = Object.fromEntries((topics||[]).map(topic=>[topic,'weak']));
+        payload = {alertId:String(deliveryId),message:preview(dispatch.message),mode:'weak',
+          priority:'normal',messageType:'general',senderLabel:'일정 알림',route:'messages.html?tab=alerts'};
+      } else if (path.endsWith('/report')) {
         if (!uuid.test(body.access_token || '') || !uuid.test(body.report_id || '')) return reply({ok:false,code:'invalid_request'},400);
         const dispatch = await rpc('get_report_push_dispatch',{p_access_token:body.access_token,p_report_id:body.report_id});
         if (!dispatch.ok) return reply({ok:false,code:dispatch.code||'unauthorized'},403);

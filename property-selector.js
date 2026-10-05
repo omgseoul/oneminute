@@ -1,5 +1,5 @@
 (function(){
-  const LABELS={attendance:"근태",missions:"To do",messages:"메세지",work_status:"근태",attendance_records:"근태"};
+  const LABELS={property_settings:"숙소설정",account_settings:"계정 설정",attendance:"근태",missions:"To do",messages:"메세지",work_status:"근태",attendance_records:"근태"};
   let styleReady=false;
   function addStyle(){
     if(styleReady)return;
@@ -83,5 +83,12 @@
     button.onclick=()=>{document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;button.setAttribute("aria-expanded",String(!panel.hidden));};
     all.onchange=()=>{selected.clear();if(all.checked)items.forEach(item=>selected.add(String(item.value)));update();onChange?.([...selected]);};boxes.forEach(box=>box.onchange=()=>{box.checked?selected.add(box.dataset.value):selected.delete(box.dataset.value);update();onChange?.([...selected]);});document.addEventListener("click",event=>{if(!root.contains(event.target))close();});update();return{root,close,values:()=>[...selected]};
   }
-  window.omgPropertySelector={mount,mountStatic,mountSingle,mountMulti};
+  async function mountPropertySingle({accessToken,permission,host,onChange}){
+    const data=await rpc("list_property_shares",{p_access_token:accessToken});
+    const properties=(data.properties||[]).filter(item=>item.is_own||(item.permissions||[]).includes(permission));
+    const own=properties.find(item=>item.is_own)||properties[0];
+    const control=mountSingle({host,items:properties.map(item=>({value:item.property_id,label:item.property_name,meta:item.is_own?"본지점":String(item.management_number||"")})),value:own.property_id,title:"지점 선택",onChange});
+    return {...control,properties};
+  }
+  window.omgPropertySelector={mount,mountStatic,mountSingle,mountMulti,mountPropertySingle};
 })();

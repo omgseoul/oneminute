@@ -127,3 +127,6 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 
 /* Match the Today card to the other white week cards. */
 .calendar-week-card.today{background:#fff}
+
+
+.calendar-top #calendarPropertyPicker{margin-left:auto}.calendar-top .property-picker-button{height:38px;font-size:11px}

@@ -7,8 +7,12 @@
     const style=document.createElement("style");
     style.textContent=`
       .property-picker{position:relative;margin-left:auto;z-index:12}
+      .property-picker:has(.property-picker-panel:not([hidden])){z-index:19}
       .property-picker-button{display:flex;align-items:center;gap:7px;max-width:172px;height:38px;padding:0 12px;border:1px solid #d6e1ee;border-radius:13px;background:#fff;color:#183153;font-family:inherit;font-size:11px;font-weight:900;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 14px rgba(32,67,105,.07)}
-      .property-picker-button:after{content:"⌄";color:#2467bd;font-size:14px}
+      .property-picker-mounted .property-picker-button{max-width:min(138px,38vw)}
+      .property-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .property-picker-extra{flex:none;white-space:nowrap}
+      .property-picker-button:after{content:"⌄";flex:none;color:#2467bd;font-size:14px}
       .property-picker.open-up .property-picker-button:after{content:"⌃"}
       .property-picker-panel{position:absolute;top:44px;right:0;width:min(250px,calc(100vw - 28px));max-height:min(360px,calc(100dvh - 32px));padding:8px;border:1px solid #dce6f2;border-radius:16px;background:#fff;box-shadow:0 16px 38px rgba(24,49,83,.18);overflow-y:auto;overscroll-behavior:contain}
       .property-picker.open-up .property-picker-panel{top:auto;bottom:44px}
@@ -35,7 +39,20 @@
     host.append(root);
     const button=root.querySelector(".property-picker-button"),panel=root.querySelector(".property-picker-panel"),all=root.querySelector("[data-all]"),items=[...root.querySelectorAll("[data-id]")];
     const selectedIds=()=>items.filter(x=>x.checked).map(x=>x.dataset.id);
-    function label(){const chosen=items.filter(x=>x.checked);button.textContent=chosen.length===items.length?allLabel:chosen.length===1?properties.find(x=>String(x.property_id)===String(chosen[0].dataset.id))?.property_name:`${chosen.length}개 지점`;all.checked=chosen.length===items.length;all.indeterminate=chosen.length>0&&chosen.length<items.length;}
+    function label(){
+      const selected=new Set(items.filter(x=>x.checked).map(x=>String(x.dataset.id)));
+      const chosen=properties.filter(x=>selected.has(String(x.property_id))).sort((a,b)=>{
+        const first=Number(a.management_number),second=Number(b.management_number);
+        return (Number.isFinite(first)&&first>0?first:Infinity)-(Number.isFinite(second)&&second>0?second:Infinity);
+      });
+      const isAll=chosen.length===items.length,name=isAll?allLabel:chosen[0]?.property_name||own.property_name,extra=isAll?0:Math.max(0,chosen.length-1);
+      const nameNode=document.createElement("span");nameNode.className="property-picker-name";nameNode.textContent=name;
+      button.replaceChildren(nameNode);
+      if(extra){const extraNode=document.createElement("span");extraNode.className="property-picker-extra";extraNode.textContent=`+${extra}`;button.append(extraNode);}
+      button.title=extra?`${name} +${extra}`:name;
+      button.setAttribute("aria-label",extra?`${name} 외 ${extra}개 지점`:name);
+      all.checked=isAll;all.indeterminate=chosen.length>0&&!isAll;
+    }
     async function changed(){if(!selectedIds().length)items.find(x=>String(x.dataset.id)===String(own.property_id)).checked=true;label();await onChange?.(selectedIds(),properties);}
     function close(){panel.hidden=true;root.classList.remove("open-up");button.setAttribute("aria-expanded","false");}
     button.onclick=()=>{const opening=panel.hidden;document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;if(opening){root.classList.remove("open-up");const buttonRect=button.getBoundingClientRect(),panelHeight=Math.min(panel.scrollHeight,360),spaceBelow=window.innerHeight-buttonRect.bottom-16,spaceAbove=buttonRect.top-16;if(spaceBelow<panelHeight&&spaceAbove>spaceBelow)root.classList.add("open-up");}else root.classList.remove("open-up");button.setAttribute("aria-expanded",String(!panel.hidden));};

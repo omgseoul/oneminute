@@ -18,7 +18,10 @@ window.MessageHub=(()=>{
    if(older)paged=true;if(older||!paged){cursor=batch.at(-1);$('guestOlder').hidden=batch.length<50;}
    if(!$('hubProperty').dataset.loaded){
     properties=pages[0].properties;
-    omgPropertySelector.mountStatic({properties:properties.map(p=>({property_id:p.id,property_name:p.name,is_own:p.id===state.propertyId})),permission:'messages',alwaysShow:true,host:$('hubProperty'),defaultSelection:'all',onChange:ids=>{propertyIds=ids;selectionVersion++;rows=[];cursor=null;paged=false;StaffConversations.setProperties(ids);ReportInbox.setProperties(ids);render();callbacks?.render();load();}});
+    const {data:shared}=await window.omgSupabase.rpc('list_property_shares',{p_access_token:state.accessToken});
+    if(version!==selectionVersion)return;
+    const numbers=new Map((shared?.properties||[]).map(p=>[String(p.property_id),p.management_number]));
+    omgPropertySelector.mountStatic({properties:properties.map(p=>({property_id:p.id,property_name:p.name,management_number:numbers.get(String(p.id))??p.management_number,is_own:p.id===state.propertyId})),permission:'messages',alwaysShow:true,host:$('hubProperty'),defaultSelection:'all',onChange:ids=>{propertyIds=ids;selectionVersion++;rows=[];cursor=null;paged=false;StaffConversations.setProperties(ids);ReportInbox.setProperties(ids);render();callbacks?.render();load();}});
     $('hubProperty').dataset.loaded='1';
    }
    $('guestError').textContent='';render();
@@ -33,4 +36,3 @@ window.MessageHub=(()=>{
  const pane=document.createElement('section');pane.id='guestPane';pane.innerHTML='<div id="guestError" role="status">데이터를 불러오는 중입니다.</div><div id="guestRooms"></div><button id="guestOlder" type="button" hidden>이전 대화 더 보기</button>';$('messageSearch').after(pane);
  nav.querySelectorAll('[data-hub]').forEach(b=>b.onclick=()=>setTab(b.dataset.hub));$('guestOlder').onclick=()=>load(true);$('refresh').onclick=()=>{c.load();load();StaffConversations.load();ReportInbox.load();};document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)load();});window.addEventListener('pagehide',()=>clearTimeout(timer));const p=new URLSearchParams(location.search);setTab(p.has('compose')||p.has('recipient_employee_id')||p.has('message_id')?'staff':p.get('tab')||'guest');}};
 })();
-

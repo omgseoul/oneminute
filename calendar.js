@@ -37,10 +37,14 @@
     ].sort((a,b)=>a.sort-b.sort);
   }
   function calendarTitle(item){
-    if(!item.holiday_request_id)return selectedPropertyIds.length>1&&item.property_name?`${item.property_name} · ${item.title}`:item.title;
-    const names=isOwner?(item.target_names||[]).filter(Boolean).join(", "):"";
-    const pending=item.title.includes("미결재");
-    return `휴일${names?` · ${names}`:""}${pending?" (미결재)":""}`;
+    let title;
+    if(!item.holiday_request_id)title=item.title;
+    else{
+      const names=isOwner?(item.target_names||[]).filter(Boolean).join(", "):"";
+      const pending=item.title.includes("미결재");
+      title=`휴일${names?` · ${names}`:""}${pending?" (미결재)":""}`;
+    }
+    return selectedPropertyIds.length>1&&item.property_name?`${title} · ${item.property_name}`:title;
   }
   function itemMarkup(item){
     const task=item.kind==='task',title=calendarTitle(item);

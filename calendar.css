@@ -74,11 +74,11 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 .calendar-view-buttons button small{font-size:9px;line-height:1.1;font-weight:800}
 .calendar-toolbar-actions .calendar-view-buttons button.active{background:var(--soft);color:var(--blue)}
 .calendar-week-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 8px;align-items:start}
-.calendar-week-entry{display:block;min-width:0;width:100%;padding:2px 0;border:0;background:transparent;color:var(--navy);text-align:left;font-size:11px;line-height:1.4;overflow-wrap:anywhere;cursor:pointer}
+.calendar-week-entry{display:flex;align-items:center;min-width:0;width:100%;padding:2px 0;border:0;background:transparent;color:var(--navy);text-align:left;font-size:11px;line-height:1.4;white-space:nowrap;overflow:hidden;cursor:pointer}
 .calendar-week-bullet{margin-right:3px;color:var(--blue);font-weight:900}
 .calendar-week-type{margin-right:4px;color:var(--blue);font-weight:900;white-space:nowrap}
 .calendar-week-entry.task .calendar-week-bullet,.calendar-week-entry.task .calendar-week-type{color:#7772b8}
-.calendar-week-title{font-weight:700}
+.calendar-week-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
 @media(max-width:390px){
   .calendar-toolbar.week-mode h1{font-size:16px}
   .calendar-toolbar-actions .calendar-view-buttons button{width:28px;min-width:28px}

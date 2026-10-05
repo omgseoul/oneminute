@@ -7,7 +7,7 @@
     const style=document.createElement("style");
     style.textContent=`
       .property-picker{position:relative;margin-left:auto;z-index:12}
-      .property-picker-button{display:flex;align-items:center;gap:7px;max-width:172px;height:38px;padding:0 12px;border:1px solid #d6e1ee;border-radius:13px;background:#fff;color:#183153;font:900 11px/1.2 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 14px rgba(32,67,105,.07)}
+      .property-picker-button{display:flex;align-items:center;gap:7px;max-width:172px;height:38px;padding:0 12px;border:1px solid #d6e1ee;border-radius:13px;background:#fff;color:#183153;font-family:inherit;font-size:11px;font-weight:900;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 14px rgba(32,67,105,.07)}
       .property-picker-button:after{content:"⌄";color:#2467bd;font-size:14px}
       .property-picker.open-up .property-picker-button:after{content:"⌃"}
       .property-picker-panel{position:absolute;top:44px;right:0;width:min(250px,calc(100vw - 28px));max-height:min(360px,calc(100dvh - 32px));padding:8px;border:1px solid #dce6f2;border-radius:16px;background:#fff;box-shadow:0 16px 38px rgba(24,49,83,.18);overflow-y:auto;overscroll-behavior:contain}

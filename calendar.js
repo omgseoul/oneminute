@@ -1,7 +1,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const dayNames=['일','월','화','수','목','금','토'];
-  let session,isOwner=false,timezone='Asia/Seoul',view='month',focusDate,events=[],tasks=[],employees=[];
+  let session,isOwner=false,timezone='Asia/Seoul',view='month',focusDate,events=[],tasks=[],employees=[],selectedPropertyIds=[],ownPropertyId=null;
   const pad=value=>String(value).padStart(2,'0');
   const key=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
   const parseKey=value=>{const [y,m,d]=value.split('-').map(Number);return new Date(y,m-1,d);};
@@ -37,7 +37,7 @@
     ].sort((a,b)=>a.sort-b.sort);
   }
   function calendarTitle(item){
-    if(!item.holiday_request_id)return item.title;
+    if(!item.holiday_request_id)return selectedPropertyIds.length>1&&item.property_name?`${item.property_name} · ${item.title}`:item.title;
     const names=isOwner?(item.target_names||[]).filter(Boolean).join(", "):"";
     const pending=item.title.includes("미결재");
     return `휴일${names?` · ${names}`:""}${pending?" (미결재)":""}`;
@@ -90,7 +90,8 @@
   }
   async function refresh(){
     const [start,end]=range();$('calendarMessage').textContent='';
-    try{const result=await rpc('list',{range_start:dayStart(start),range_end:dayStart(end)});
+    try{let result=await rpc('list',{range_start:dayStart(start),range_end:dayStart(end)});
+      if(isOwner&&selectedPropertyIds.length){const {data,error}=await window.omgSupabase.rpc('list_shared_calendar_board',{p_access_token:session.accessToken,p_property_ids:selectedPropertyIds,p_from:dayStart(start),p_to:dayStart(end)});if(error||!data?.ok)throw new Error(data?.message||error?.message||'캘린더를 불러오지 못했습니다.');result={...result,events:data.events,tasks:data.tasks};}
       events=result.events||[];tasks=result.tasks||[];employees=result.employees||[];renderTargets();render();
     }catch(error){$('calendarMessage').textContent=error.message;render();}
   }
@@ -152,7 +153,7 @@
     const item=event.target.closest('[data-kind]');
     if(item){if(item.dataset.kind==='task'){location.href='mission.html';return;}const record=events.find(e=>e.id===item.dataset.id);if(record)openEditor(zonedKey(record.start_at),record);return;}
     const date=event.target.closest('[data-create-date]')?.dataset.createDate||event.target.closest('[data-date]')?.dataset.date;
-    if(date){if(view==='day')focusDate=parseKey(date);openEditor(date);}
+    if(date){if(view==='day')focusDate=parseKey(date);if(!isOwner||selectedPropertyIds.includes(ownPropertyId))openEditor(date);else $('calendarMessage').textContent='일정 추가는 본지점을 선택해주세요.';}
   };
   $('targetPickerButton').onclick=()=>{const panel=$('targetPanel');panel.hidden=!panel.hidden;$('targetPickerButton').setAttribute('aria-expanded',String(!panel.hidden));};
   $('targetOptions').onchange=updateTargetLabel;
@@ -175,7 +176,8 @@
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)refresh();});
   (async()=>{session=await window.omgSession.require({allowCompleted:true});if(!session)return;
     isOwner=session.sessionKind==='owner';timezone=session.timezone||'Asia/Seoul';focusDate=today();
-    $('propertyName').textContent=session.propertyName||'One Minute';$('targetFieldset').hidden=!isOwner;
+    $('targetFieldset').hidden=!isOwner;
+    if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),allLabel:'숙소선택',onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=!ids.includes(ownPropertyId);await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=!selectedPropertyIds.includes(ownPropertyId);}
     await refresh();window.omgTransition.ready();
   })().catch(error=>{$('calendarMessage').textContent=error.message;window.omgTransition.ready();});
 })();

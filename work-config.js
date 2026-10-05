@@ -127,8 +127,8 @@
         p_property_code: window.OMG_SUPABASE.propertyCode
       });
     },
-    async load(accessToken) {
-      const data = await rpc("get_work_app_config", { p_access_token: accessToken });
+    async load(accessToken, propertyId, scope) {
+      const data = await rpc(propertyId ? "shared_get_work_app_config" : "get_work_app_config", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId,p_scope:scope} : {}) });
       data.property.business_type = ["lodging", "general", "other"].includes(data.property.business_type) ? data.property.business_type : null;
       data.property.custom_report_fields = normalizeCustomFields(data.property.custom_report_fields);
       data.report_config = normalizeReportConfig(data.report_config, data.property);
@@ -141,10 +141,9 @@
       }
       return data;
     },
-    async save(accessToken, propertyName, businessType, roomTypes, customFields, employeeConfigs) {
+    async save(accessToken, propertyName, businessType, roomTypes, customFields, employeeConfigs, propertyId) {
       const normalizedRoomTypes = businessType === "lodging" ? normalizeRoomTypes(roomTypes) : [];
-      return rpc("save_property_settings", {
-        p_access_token: accessToken,
+      return rpc(propertyId ? "shared_save_property_settings" : "save_property_settings", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}),
         p_property_name: propertyName,
         p_rooms: normalizedRoomTypes.flatMap(group => group.rooms),
         p_room_types: normalizedRoomTypes,
@@ -154,32 +153,33 @@
       });
     },
     normalizeRoomTypes,
-    async saveNotice(accessToken, notice) {
-      return rpc("save_property_notice", { p_access_token: accessToken, p_notice: notice });
+    async saveNotice(accessToken, notice, propertyId) {
+      return rpc(propertyId ? "shared_save_property_notice" : "save_property_notice", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_notice: notice });
     },
-    async saveEmployees(accessToken, employees) {
-      return rpc("save_employee_accounts", { p_access_token: accessToken, p_employees: employees });
+    async saveEmployees(accessToken, employees, propertyId) {
+      return rpc(propertyId ? "shared_save_employee_accounts" : "save_employee_accounts", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_employees: employees });
     },
-    async loadEmployeeAttendanceSettings(accessToken) {
-      return rpc("list_employee_attendance_settings", { p_access_token: accessToken });
+    async loadEmployeeAttendanceSettings(accessToken, propertyId) {
+      return rpc(propertyId ? "shared_list_employee_attendance_settings" : "list_employee_attendance_settings", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), });
     },
-    async saveEmployeeAttendanceSettings(accessToken, employees) {
-      return rpc("save_employee_attendance_settings", { p_access_token: accessToken, p_employees: employees });
+    async saveEmployeeAttendanceSettings(accessToken, employees, propertyId) {
+      return rpc(propertyId ? "shared_save_employee_attendance_settings" : "save_employee_attendance_settings", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_employees: employees });
     },
-    async loadAttendanceWarnings(accessToken) {
-      return rpc("list_attendance_warning_rules", { p_access_token: accessToken });
+    async loadAttendanceWarnings(accessToken, propertyId) {
+      return rpc(propertyId ? "shared_list_attendance_warning_rules" : "list_attendance_warning_rules", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), });
     },
-    async saveAttendanceWarnings(accessToken, rules) {
-      return rpc("save_attendance_warning_rules", { p_access_token: accessToken, p_rules: rules });
+    async saveAttendanceWarnings(accessToken, rules, propertyId) {
+      return rpc(propertyId ? "shared_save_attendance_warning_rules" : "save_attendance_warning_rules", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_rules: rules });
     },
-    async deleteEmployee(accessToken, employeeId) {
-      return rpc("delete_employee_account", { p_access_token: accessToken, p_employee_id: employeeId });
+    async deleteEmployee(accessToken, employeeId, propertyId) {
+      return rpc(propertyId ? "shared_delete_employee_account" : "delete_employee_account", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_employee_id: employeeId });
     },
-    async saveAdministrators(accessToken, administrators) {
-      return rpc("save_admin_accounts", { p_access_token: accessToken, p_administrators: administrators });
+    async saveAdministrators(accessToken, administrators, propertyId) {
+      return rpc(propertyId ? "shared_save_admin_accounts" : "save_admin_accounts", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_administrators: administrators });
     },
-    async deleteAdministrator(accessToken, ownerId) {
-      return rpc("delete_admin_account", { p_access_token: accessToken, p_owner_id: ownerId });
+    async deleteAdministrator(accessToken, ownerId, propertyId) {
+      return rpc(propertyId ? "shared_delete_admin_account" : "delete_admin_account", { p_access_token: accessToken, ...(propertyId ? {p_property_id:propertyId} : {}), p_owner_id: ownerId });
     }
   };
 })();
+

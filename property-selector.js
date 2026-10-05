@@ -8,8 +8,8 @@
     style.textContent=`
       .property-picker{position:relative;margin-left:auto;z-index:12}
       .property-picker:has(.property-picker-panel:not([hidden])){z-index:19}
-      .property-picker-button{display:flex;align-items:center;gap:7px;max-width:172px;height:38px;padding:0 12px;border:1px solid #d6e1ee;border-radius:13px;background:#fff;color:#183153;font-family:inherit;font-size:11px;font-weight:900;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 14px rgba(32,67,105,.07)}
-      .property-picker-mounted .property-picker-button{max-width:min(164px,46vw);font-weight:700}
+      .property-picker-button{display:flex;align-items:center;gap:7px;max-width:172px;height:34px;padding:0 12px;border:1px solid #d6e1ee;border-radius:12px;background:#fff;color:#183153;font-family:inherit;font-size:11px;font-weight:900;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 5px 14px rgba(32,67,105,.07)}
+      .property-picker-mounted .property-picker-button{max-width:min(164px,46vw);height:34px;font-weight:700}
       .property-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .property-picker-extra{flex:none;white-space:nowrap}
       .property-picker-button:after{content:"⌄";flex:none;color:#2467bd;font-size:14px}
@@ -91,14 +91,14 @@
     render();
     return{value:()=>selected,setItems(nextItems,nextValue=selected){options=nextItems;selected=String(nextValue??"");render();},root,close,destroy(){document.removeEventListener("click",outside);}};
   }
-  function mountMulti({items=[],host,onChange,title="선택",allLabel="전체"}){
-    addStyle();const selected=new Set(items.map(item=>String(item.value))),escape=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  function mountMulti({items=[],host,onChange,title="선택",allLabel="전체",selectedValues=null}){
+    addStyle();const initial=Array.isArray(selectedValues)?selectedValues:items.map(item=>item.value),selected=new Set(initial.map(String)),escape=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
     const root=document.createElement("div");root.className="property-picker";host.replaceChildren(root);root.innerHTML=`<button class="property-picker-button" type="button" aria-expanded="false"></button><div class="property-picker-panel" hidden><p class="property-picker-title">${escape(title)} · 복수 선택</p><label class="property-picker-option"><span>${escape(allLabel)}</span><input data-all type="checkbox" checked></label>${items.map(item=>`<label class="property-picker-option"><span>${escape(item.label)}</span><input data-value="${escape(item.value)}" type="checkbox" checked></label>`).join("")}</div>`;
     const button=root.querySelector("button"),panel=root.querySelector(".property-picker-panel"),all=root.querySelector("[data-all]"),boxes=[...root.querySelectorAll("[data-value]")];
     function update(){boxes.forEach(box=>box.checked=selected.has(box.dataset.value));all.checked=selected.size===items.length;all.indeterminate=selected.size>0&&selected.size<items.length;button.textContent=all.checked?allLabel:selected.size===1?items.find(item=>selected.has(String(item.value))).label:selected.size?`${selected.size}개 선택`:"선택 없음";}
     function close(){panel.hidden=true;button.setAttribute("aria-expanded","false");}
     button.onclick=()=>{document.querySelectorAll(".property-picker-panel:not([hidden])").forEach(open=>{if(open!==panel)open.hidden=true;});panel.hidden=!panel.hidden;button.setAttribute("aria-expanded",String(!panel.hidden));};
-    all.onchange=()=>{selected.clear();if(all.checked)items.forEach(item=>selected.add(String(item.value)));update();onChange?.([...selected]);};boxes.forEach(box=>box.onchange=()=>{box.checked?selected.add(box.dataset.value):selected.delete(box.dataset.value);update();onChange?.([...selected]);});document.addEventListener("click",event=>{if(!root.contains(event.target))close();});update();return{root,close,values:()=>[...selected]};
+    all.onchange=()=>{selected.clear();if(all.checked)items.forEach(item=>selected.add(String(item.value)));update();onChange?.([...selected]);};boxes.forEach(box=>box.onchange=()=>{box.checked?selected.add(box.dataset.value):selected.delete(box.dataset.value);update();onChange?.([...selected]);});document.addEventListener("click",event=>{if(!root.contains(event.target))close();});update();return{root,close,values:()=>[...selected],setValues(values,notify=true){selected.clear();(values||[]).map(String).filter(value=>items.some(item=>String(item.value)===value)).forEach(value=>selected.add(value));update();if(notify)onChange?.([...selected]);}};
   }
   async function mountPropertySingle({accessToken,permission,host,onChange}){
     const data=await rpc("list_property_shares",{p_access_token:accessToken});

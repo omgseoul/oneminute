@@ -35,6 +35,10 @@
 .holiday-settings input[type=checkbox]{width:18px;height:18px;accent-color:#2467bd}
 .holiday-settings textarea,.holiday-settings input[type=text]{width:100%;padding:10px 12px;border:1px solid #cbd8e8;border-radius:11px;font-size:14px;color:#183153}
 .holiday-settings textarea[hidden]{display:none}
+.holiday-help{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:3px;padding:0;border:1px solid #b9cbe0;border-radius:50%;background:#f4f8fd;color:#2467bd;font-size:11px;font-weight:900;line-height:1;vertical-align:2px}
+.holiday-help[aria-expanded=true]{background:#2467bd;color:#fff}
+.holiday-inline-help{margin:-4px 0 10px;padding:8px 10px;border-radius:9px;background:#f2f7fd;color:#617187;font-size:11px;line-height:1.5}
+.holiday-inline-help[hidden]{display:none}
 .holiday-switch{min-width:54px;height:30px;border:0;border-radius:999px;background:#2467bd;color:white;font-size:12px;font-weight:900}
 .holiday-switch[aria-checked=false]{background:#dfe6ee;color:#617187}
 

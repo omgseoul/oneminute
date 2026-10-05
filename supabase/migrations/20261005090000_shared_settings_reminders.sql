@@ -572,7 +572,7 @@ BEGIN
           OR v_item.kind='calendar' AND to_jsonb(e.id)<@v_item.targets)
        ON CONFLICT DO NOTHING;
      END IF;
-     IF v_setting.notify_owner AND v_item.owner_target THEN
+     IF v_setting.notify_owner THEN
        INSERT INTO public.property_message_recipients(message_id,recipient_key,recipient_type,owner_id)
        SELECT v_message_id,'owner:'||o.id,'owner',o.id FROM public.owners o WHERE o.property_id=v_setting.property_id AND o.active
        ON CONFLICT DO NOTHING;

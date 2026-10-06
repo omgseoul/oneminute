@@ -1,3 +1,72 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>메세지</title><link rel="stylesheet" href="guest-support.css?v=20261001-compact"><link rel="stylesheet" href="staff-chat.css?v=20260929-composer-v3"><link rel="stylesheet" href="home-link.css?v=20261001"><link rel="stylesheet" href="top-layout.css?v=20261005b">
-</head><body><div class="chat-page"><header class="chat-head"><div class="top"><a class="back" href="messages.html?tab=staff">‹ 목록</a><span class="badge">직원 대화</span></div><div class="staff-identity"><span id="peerAvatar"></span><h1 id="roomTitle">대화 불러오는 중</h1></div></header><div id="timeline" class="timeline chat-loading" aria-live="polite" aria-relevant="additions"><button id="older" class="btn subtle" type="button" hidden>이전 대화 더 보기</button><div id="bubbles"></div></div><form id="composer" class="composer"><div id="photoPending" class="photo-pending" hidden></div><div class="row"><button id="priority" type="button" aria-label="일반·긴급 선택" aria-pressed="false">일반⌄</button><label class="photo-button" for="photoInput" aria-label="사진 첨부"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg></label><input id="photoInput" type="file" accept="image/*" hidden><textarea id="body" placeholder="메세지 입력" maxlength="2000" rows="1" aria-label="메세지 내용"></textarea><button class="btn primary" id="send" type="submit" aria-label="보내기">➤</button></div><div id="status" class="status" role="status"></div></form></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="notification-config.js"></script><script src="notification-client.js"></script><script src="photo-codec.js?v=20261001"></script><script src="guest-support-client.js?v=20261001-ui"></script><script src="staff-chat-client.js?v=20261001-ui"></script><script src="staff-chat.js?v=20261001-home"></script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>메세지</title>
+  <link rel="stylesheet" href="guest-support.css?v=20261001-compact">
+  <link rel="stylesheet" href="staff-chat.css?v=20261006-gallery">
+  <link rel="stylesheet" href="home-link.css?v=20261001">
+  <link rel="stylesheet" href="top-layout.css?v=20261005b">
+</head>
+<body>
+  <div class="chat-page">
+    <header class="chat-head">
+      <div class="top"><a class="back" href="messages.html?tab=staff">‹ 목록</a><span class="badge">직원 대화</span></div>
+      <button id="peerIdentity" class="staff-identity" type="button" aria-label="근무자 프로필 보기">
+        <span id="peerAvatar"></span><h1 id="roomTitle">대화 불러오는 중</h1>
+      </button>
+    </header>
+    <div id="timeline" class="timeline chat-loading" aria-live="polite" aria-relevant="additions">
+      <button id="older" class="btn subtle" type="button" hidden>이전 대화 더 보기</button><div id="bubbles"></div>
+    </div>
+    <form id="composer" class="composer">
+      <div id="photoPending" class="photo-pending" hidden></div>
+      <div class="row">
+        <button id="priority" type="button" aria-label="일반·긴급 선택" aria-pressed="false">일반⌄</button>
+        <label class="photo-button" for="photoInput" aria-label="사진 첨부"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg></label>
+        <input id="photoInput" type="file" accept="image/*" hidden>
+        <textarea id="body" placeholder="메세지 입력" maxlength="2000" rows="1" aria-label="메세지 내용"></textarea>
+        <button class="btn primary" id="send" type="submit" aria-label="보내기">➤</button>
+      </div>
+      <div id="status" class="status" role="status"></div>
+    </form>
+  </div>
 
+  <dialog id="peerProfileDialog" class="peer-profile-dialog" aria-labelledby="peerProfileName">
+    <div class="profile-sheet-head"><h2>근무자 정보</h2><button id="peerProfileClose" type="button" aria-label="닫기">×</button></div>
+    <div class="profile-hero"><span id="peerProfileAvatar"></span><strong id="peerProfileName"></strong></div>
+    <dl class="profile-fields">
+      <div><dt>이름</dt><dd id="peerProfileDisplayName">-</dd></div>
+      <div><dt>직무</dt><dd id="peerProfileJobTitle">-</dd></div>
+      <div><dt>지점 (소속)</dt><dd id="peerProfileProperty">-</dd></div>
+      <div><dt>연락처</dt><dd id="peerProfilePhone">-</dd></div>
+    </dl>
+  </dialog>
+
+  <section id="photoViewer" class="photo-viewer" hidden aria-modal="true" role="dialog" aria-label="사진 전체화면">
+    <header class="photo-viewer-head">
+      <button id="photoViewerClose" class="viewer-icon" type="button" aria-label="사진 닫기">‹</button>
+      <div class="photo-viewer-title"><strong id="photoViewerName">사진</strong><span id="photoViewerDate"></span></div>
+      <button id="photoGalleryOpen" class="viewer-icon grid-icon" type="button" aria-label="대화 사진첩 보기"><i></i><i></i><i></i><i></i></button>
+    </header>
+    <div id="photoStage" class="photo-stage">
+      <button id="photoPrevious" class="photo-arrow previous" type="button" aria-label="이전 사진">‹</button>
+      <img id="photoViewerImage" alt="대화 첨부 사진">
+      <button id="photoNext" class="photo-arrow next" type="button" aria-label="다음 사진">›</button>
+    </div>
+    <footer class="photo-viewer-foot"><div id="photoThumbs" class="photo-thumbs"></div><strong id="photoCount"></strong></footer>
+  </section>
+
+  <section id="photoGallery" class="photo-gallery" hidden aria-modal="true" role="dialog" aria-label="대화 사진첩">
+    <header><button id="photoGalleryClose" type="button" aria-label="사진첩 닫기">‹</button><h2>대화 사진</h2><span id="galleryCount"></span></header>
+    <div id="galleryStatus" class="gallery-status" role="status"></div><div id="photoGrid" class="photo-grid"></div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script><script src="supabase-client.js"></script>
+  <script src="notification-config.js"></script><script src="notification-client.js"></script>
+  <script src="photo-codec.js?v=20261001"></script><script src="guest-support-client.js?v=20261001-ui"></script>
+  <script src="staff-chat-client.js?v=20261006-profile"></script><script src="staff-chat.js?v=20261006-gallery"></script>
+</body>
+</html>

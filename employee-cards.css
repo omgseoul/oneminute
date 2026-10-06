@@ -21,7 +21,7 @@
 .employee-fields label{display:grid;gap:4px;min-width:0;color:#7b899a;font-size:10px;font-weight:800}
 .employee-fields input{min-width:0;height:39px;padding:8px 9px;border-radius:10px;color:var(--ink);font-size:12px}
 .employee-duration-field .scheduled-duration{display:grid;min-width:0;height:39px;padding:8px 9px;place-items:center start;border:1px solid #cbd8e8;border-radius:10px;background:#f5f8fc;color:var(--navy);font-size:12px;font-weight:800}
-.employee-pin-field{grid-column:1/-1}
+.employee-pin-field{grid-column:auto}
 .employee-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-top:10px;padding-top:9px;border-top:1px solid #e6edf5}
 .employee-actions[hidden]{display:none}
 .employee-action-status{min-width:0;margin-right:auto;color:#71839b;font-size:10px;overflow-wrap:anywhere}
@@ -29,7 +29,11 @@
 .employee-delete{background:#fff1f1;color:#a84c4c}
 .employee-save{background:#eaf2ff;color:#3065a8}
 .employee-delete:disabled,.employee-save:disabled{opacity:.55}
-.employee-account:not(.expanded)>.cp-settings{display:none}
-.employee-account>.cp-settings{margin-top:10px}
+.employee-account .cp-settings,.employee-account .cp-cards,.employee-account .chat-pref{display:contents}
+.employee-account .cp-master{align-self:end;min-width:0;min-height:39px;padding:0 2px;border:0;background:transparent;color:#7b899a!important}
+.employee-account .cp-title{flex:0 1 auto;font-size:10px;font-weight:800}
+.employee-account .cp-expand{flex:0 0 17px;padding:0!important;border-radius:4px}
+.employee-account .cp-body{grid-column:1/-1;margin-top:2px;padding:10px 0 2px;border-top:1px solid #e6edf5}
+.employee-account .cp-global-status{grid-column:1/-1}
 .avatar-choice-none{width:100%;aspect-ratio:1;border-radius:50%;background:#f1f5fa;color:#6c7e92;font-size:12px;font-weight:800}
 @media(max-width:360px){.employee-section{padding:15px}.employee-list-shell{padding-right:27px}.employee-add{width:21px;font-size:21px}.employee-account{padding:10px}.employee-summary-name{font-size:13px}.employee-summary-job{font-size:11px}.employee-fields input,.employee-duration-field .scheduled-duration{padding:8px 7px;font-size:11px}.employee-delete,.employee-save{padding:8px 9px}}

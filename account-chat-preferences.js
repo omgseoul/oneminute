@@ -31,7 +31,7 @@ window.AccountChatPreferences=(()=>{
  }
  function renderHost(host,key,account){const rule=account.schedules[0]||baseRule(account);host.innerHTML=`<div class="cp-cards">${card(rule,key)}</div><small class="cp-global-status" role="status"></small>`;bind(host,key,account);}
  async function mount(token,refresh=false){auth={access_token:token};if(refresh){state=null;loading=null;}if(!state){if(!loading)loading=load(token).then(v=>state=v).finally(()=>loading=null);await loading;}
-  document.querySelectorAll('.account-row').forEach(row=>{if(row.querySelector('.cp-settings'))return;const key=row.dataset.employeeId?'employee:'+row.dataset.employeeId:row.dataset.ownerId?'owner:'+row.dataset.ownerId:null;if(!key)return;const account=state.accounts.find(a=>a.actor_key===key);if(!account)return;const host=document.createElement('section');host.className='cp-settings';host.hidden=!row.classList.contains('expanded');renderHost(host,key,account);const actions=row.querySelector('.employee-actions');actions?row.insertBefore(host,actions):row.append(host);});
+  document.querySelectorAll('.account-row').forEach(row=>{if(row.querySelector('.cp-settings'))return;const key=row.dataset.employeeId?'employee:'+row.dataset.employeeId:row.dataset.ownerId?'owner:'+row.dataset.ownerId:null;if(!key)return;const account=state.accounts.find(a=>a.actor_key===key);if(!account)return;const host=document.createElement('section');host.className='cp-settings';host.hidden=row.classList.contains('employee-account')&&!row.classList.contains('expanded');renderHost(host,key,account);const actions=row.querySelector('.employee-actions');actions?row.insertBefore(host,actions):row.append(host);});
  }
  return{mount};
 })();

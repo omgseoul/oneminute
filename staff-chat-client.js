@@ -1,5 +1,6 @@
 window.StaffChat={
  async call(session,action,data={}){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data});if(error||!value?.ok)throw new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');return value;},
+ async profile(session,peer){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_peer_profile',{p_access_token:session.accessToken,p_peer:peer});if(error||!value?.ok)throw new Error(value?.message||error?.message||'근무자 정보를 불러오지 못했습니다.');return value.profile;},
  url:peer=>'staff-chat.html?peer='+encodeURIComponent(peer),
  avatar(name,url){const e=GuestSupport.esc;return `<span class="staff-avatar">${url?`<img src="${e(url)}" alt="">`:e(String(name||'?').charAt(0))}</span>`;}
 };

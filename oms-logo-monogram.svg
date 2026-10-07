@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="256" viewBox="0 0 1290 256" role="img" aria-labelledby="title desc">
+  <title id="title">OMS Operations Management System</title>
+  <desc id="desc">파란색 3분의 1 조각이 포함된 원 안에 MS가 배치된 OMS 로고</desc>
+  <g fill="none"><circle cx="128" cy="128" r="96" stroke="#142d46" stroke-width="36"/><circle cx="128" cy="128" r="96" stroke="#2767d8" stroke-width="36" pathLength="100" stroke-dasharray="33.333 66.667" transform="rotate(150 128 128)"/></g>
+  <text x="128" y="151" fill="#142d46" font-family="Inter, Pretendard, Arial, sans-serif" font-size="68" font-weight="900" letter-spacing="-6" text-anchor="middle">MS</text>
+  <g fill="#142d46" font-family="Inter, Pretendard, Arial, sans-serif" font-size="61" font-weight="520" letter-spacing="-2"><text x="278" y="73">Operations</text><text x="278" y="142">Management</text><text x="278" y="211">System</text></g>
+</svg>

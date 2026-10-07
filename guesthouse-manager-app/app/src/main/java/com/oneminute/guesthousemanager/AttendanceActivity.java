@@ -9,6 +9,10 @@ import android.webkit.ValueCallback;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceResponse;
+import android.graphics.Bitmap;
+import android.widget.FrameLayout;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -23,6 +27,7 @@ public class AttendanceActivity extends AppCompatActivity {
     private static final int FILE_CHOOSER_REQUEST = 2201;
     private static final int EXCEL_SAVE_REQUEST = 2202;
     private WebView webView;
+    private WebViewRecovery recovery;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExcel;
 
@@ -116,7 +121,10 @@ public class AttendanceActivity extends AppCompatActivity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         webView = new WebView(this);
-        setContentView(webView);
+        FrameLayout root = new FrameLayout(this);
+        root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
+        setContentView(root);
+        recovery = new WebViewRecovery(this, webView, root, appUrlFromIntent(getIntent()));
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -128,6 +136,15 @@ public class AttendanceActivity extends AppCompatActivity {
         webView.addJavascriptInterface(new PushBridge(), "OMGNative");
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { recovery.started(url); }
+            @Override public void onPageFinished(WebView view, String url) { recovery.finished(url); }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) recovery.fail(request.getUrl().toString());
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame() && response.getStatusCode() >= 400) recovery.fail(request.getUrl().toString());
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return handleNavigation(view, request.getUrl());
@@ -329,7 +346,14 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() { super.onResume(); if (recovery != null) recovery.resume(); }
+
+    @Override
+    protected void onPause() { if (recovery != null) recovery.pause(); super.onPause(); }
+
+    @Override
     protected void onDestroy() {
+        if (recovery != null) recovery.destroy();
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();

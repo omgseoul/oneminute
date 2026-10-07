@@ -198,7 +198,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
       for (let i = 0; i < targets.length; i += 8) {
         const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => {
           const cap = recipientModes[t.topic] || 'urgent';
-          const mode = payload.messageType === 'work_report' || cap === 'weak' ? 'weak' : cap === 'normal' ? 'message'
+          const mode = payload.messageType === 'work_report' || cap === 'weak' ? 'weak' : cap === 'normal' ? 'normal' : cap === 'strong' ? 'strong'
             : payload.messageType === 'guest_chat' ? 'urgent'
             : payload.priority === 'urgent' ? 'urgent' : 'message';
           const data = {

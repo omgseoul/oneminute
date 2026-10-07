@@ -270,6 +270,14 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private boolean handleNavigation(WebView view, Uri uri) {
+        if ("mailto".equals(uri.getScheme())) {
+            try {
+                startActivity(new Intent(Intent.ACTION_SENDTO, uri));
+            } catch (Exception error) {
+                Toast.makeText(this, "메일 앱을 열 수 없습니다.", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        }
         if ("guesthouse".equals(uri.getScheme())) {
             String action = uri.getHost();
             if ("emergency".equals(action)) {

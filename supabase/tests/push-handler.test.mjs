@@ -50,7 +50,9 @@ test('report push needs valid author token and report ID before contacting FCM',
 
 test('account weak mode caps an urgent staff message at weak',async()=>{const h=harness({priority:'urgent',recipientModes:{[topic]:'weak'}});assert.equal((await h.request()).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.mode,'weak');assert.equal(d.priority,'normal');});
 
-test('account normal mode caps an urgent staff message at normal',async()=>{const h=harness({priority:'urgent',recipientModes:{[topic]:'normal'}});assert.equal((await h.request()).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.mode,'message');assert.equal(d.priority,'normal');});
+test('account normal mode uses the phone-default popup level',async()=>{const h=harness({priority:'urgent',recipientModes:{[topic]:'normal'}});assert.equal((await h.request()).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.mode,'normal');assert.equal(d.priority,'normal');});
+
+test('account strong mode uses forced sound, vibration and popup without urgent voice',async()=>{const h=harness({priority:'urgent',recipientModes:{[topic]:'strong'}});assert.equal((await h.request()).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.mode,'strong');assert.equal(d.priority,'normal');});
 
 test('account urgent mode preserves the sender selected staff message level',async()=>{const normal=harness({priority:'normal',recipientModes:{[topic]:'urgent'}});await normal.request();assert.equal(normal.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data.mode,'message');const urgent=harness({priority:'urgent',recipientModes:{[topic]:'urgent'}});await urgent.request();assert.equal(urgent.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data.mode,'urgent');});
 

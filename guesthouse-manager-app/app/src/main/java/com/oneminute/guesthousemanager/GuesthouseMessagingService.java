@@ -21,8 +21,9 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
-    private static final String MESSAGE_CHANNEL_ID = "property_messages_alarm_v3";
-    private static final String GUEST_CHAT_CHANNEL_ID = "guest_chat_weak_v1";
+    private static final String MESSAGE_CHANNEL_ID = "property_messages_strong_v4";
+    private static final String NORMAL_MESSAGE_CHANNEL_ID = "property_messages_normal_popup_v2";
+    private static final String WEAK_MESSAGE_CHANNEL_ID = "property_messages_weak_status_v2";
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
@@ -64,8 +65,12 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             showWeakNotification(message);
             return;
         }
-        if (!urgent && ("message".equals(mode)
-                || (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX)))) {
+        if ("normal".equals(mode)) {
+            showNormalNotification(message);
+            return;
+        }
+        if ("strong".equals(mode) || (!urgent && ("message".equals(mode)
+                || (body != null && body.startsWith(NORMAL_MESSAGE_PREFIX))))) {
             showMessageNotification(message);
             return;
         }
@@ -96,8 +101,54 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         if (manager == null) return;
         Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel(GUEST_CHAT_CHANNEL_ID,
-                    "메세지 알림 (약함)", NotificationManager.IMPORTANCE_HIGH);
+            NotificationChannel channel = new NotificationChannel(WEAK_MESSAGE_CHANNEL_ID,
+                    "메세지 알림 (약함)", NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription("휴대폰 설정을 따르며 상단 알림줄에만 표시되는 알림");
+            channel.enableVibration(true);
+            channel.setShowBadge(false);
+            channel.setSound(sound, new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            manager.createNotificationChannel(channel);
+        }
+        String id = remote.getData().get("alertId");
+        String sender = remote.getData().get("senderLabel");
+        String messageType = remote.getData().get("messageType");
+        String body = remote.getData().get("message");
+        if (body == null || body.trim().isEmpty()) body = "채팅방을 확인해주세요.";
+        if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
+        int notificationId = (id == null ? body : id).hashCode();
+        String messageUrl = "guest_chat".equals(messageType)
+                ? GuestChatAlerts.url(remote.getData().get("roomId"))
+                : "https://omgworks24.com/messages.html"
+                    + (id == null || id.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(id));
+        Intent open = new Intent(this, AttendanceActivity.class)
+                .setData(Uri.parse(messageUrl))
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification notification = new NotificationCompat.Builder(this, WEAK_MESSAGE_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setColor(Color.rgb(36, 103, 189))
+                .setContentTitle(isApproval(messageType) ? "결재 요청"
+                        : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
+                .setContentText(sender + " · " + body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setContentIntent(content)
+                .build();
+        manager.notify(notificationId, notification);
+    }
+
+    private void showNormalNotification(RemoteMessage remote) {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel channel = new NotificationChannel(NORMAL_MESSAGE_CHANNEL_ID,
+                    "메세지 알림 (일반)", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("휴대폰의 소리·진동 설정을 따르는 화면 팝업 알림");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 220, 100, 260});
@@ -115,45 +166,30 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         int notificationId = (id == null ? body : id).hashCode();
         Intent screen = new Intent(this, MessageAlertActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra("alertId", id)
-                .putExtra("senderLabel", sender)
-                .putExtra("message", body)
-                .putExtra("messageType", messageType)
-                .putExtra("notificationId", notificationId);
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra("alertId", id).putExtra("senderLabel", sender).putExtra("message", body)
+                .putExtra("messageType", messageType).putExtra("notificationId", notificationId);
         PendingIntent fullScreen = PendingIntent.getActivity(this, notificationId, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String messageUrl = "guest_chat".equals(messageType)
                 ? GuestChatAlerts.url(remote.getData().get("roomId"))
                 : "https://omgworks24.com/messages.html"
                     + (id == null || id.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(id));
-        Intent open = new Intent(this, AttendanceActivity.class)
-                .setData(Uri.parse(messageUrl))
+        Intent open = new Intent(this, AttendanceActivity.class).setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new NotificationCompat.Builder(this, GUEST_CHAT_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_email)
-                .setColor(Color.rgb(36, 103, 189))
+        Notification notification = new NotificationCompat.Builder(this, NORMAL_MESSAGE_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_email).setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
-                .setContentText(sender + " · " + body)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setAutoCancel(true)
-                .setFullScreenIntent(fullScreen, true)
-                .setContentIntent(content)
-                .build();
+                .setContentText(sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH).setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(content).build();
         manager.notify(notificationId, notification);
         Handler handler = new Handler(Looper.getMainLooper());
-        Runnable showScreen = () -> {
-            try { startActivity(screen); } catch (Exception ignored) {}
-        };
-        handler.post(showScreen);
-        handler.postDelayed(showScreen, 350L);
+        Runnable showScreen = () -> { try { startActivity(screen); } catch (Exception ignored) {} };
+        handler.post(showScreen);handler.postDelayed(showScreen, 350L);
     }
 
     private void showMessageNotification(RemoteMessage remote) {
@@ -162,7 +198,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel = new NotificationChannel(MESSAGE_CHANNEL_ID,
-                    "새 메세지", NotificationManager.IMPORTANCE_HIGH);
+                    "메세지 알림 (강함)", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("사장님과 직원이 주고받는 새 메세지 알림");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 220, 100, 260});

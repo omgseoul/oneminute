@@ -13,7 +13,7 @@
         <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
     </queries>
 
-    <application android:allowBackup="false" android:theme="@style/AppTheme" android:label="게하관리" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:usesCleartextTraffic="false">
+    <application android:allowBackup="false" android:theme="@style/AppTheme" android:label="OMS" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:usesCleartextTraffic="false">
         <activity android:name=".EmergencyReportActivity" />
         <activity android:name=".OwnerInboxActivity" />
         <activity android:name=".AttendanceActivity" android:launchMode="singleTop" />

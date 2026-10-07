@@ -32,7 +32,8 @@ final class WebViewRecovery {
     private boolean networkValidated;
     private long lastAttempt;
     private final Runnable scheduledRetry = () -> reconnect(false);
-    private final Runnable timeout = () -> { if (loading) { web.stopLoading(); fail(target); } };
+    private final Runnable timeout = this::onTimeout;
+    private void onTimeout() { if (loading) { web.stopLoading(); fail(target); } }
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
             final boolean valid = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);

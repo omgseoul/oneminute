@@ -11,19 +11,19 @@
   const image=await decode(file),width=image.width||image.naturalWidth,height=image.height||image.naturalHeight;
   try{
    if(!width||!height)throw new Error('사진을 읽지 못했습니다. 다른 사진을 선택해주세요.');
-   const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
-   let scale=Math.min(1,1600/Math.max(width,height)),blob;
+   const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d'),targetBytes=700*1024,maxBytes=Math.round(1.5*1024*1024);
+   let scale=Math.min(1,1920/Math.max(width,height)),blob;
    for(let pass=0;pass<7;pass++){
     canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
     ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);
-    for(const quality of [.78,.66,.54]){
+    for(const quality of [.86,.78,.7,.62,.54]){
      blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
      if(!blob)throw new Error('사진 변환에 실패했습니다. 다시 선택해주세요.');
-     if(blob.size<=300*1024)return new File([blob],'photo.jpg',{type:'image/jpeg',lastModified:Date.now()});
+     if(blob.size<=targetBytes)return new File([blob],'photo.jpg',{type:'image/jpeg',lastModified:Date.now()});
     }
-    scale*=.8;
+    scale*=.86;
    }
-   if(blob.size>768*1024)throw new Error('사진을 압축하지 못했습니다. 다른 사진을 선택해주세요.');
+   if(blob.size>maxBytes)throw new Error('사진을 1.5MB 이하로 압축하지 못했습니다. 다른 사진을 선택해주세요.');
    return new File([blob],'photo.jpg',{type:'image/jpeg',lastModified:Date.now()});
   }finally{image.close?.();}
  }

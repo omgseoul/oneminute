@@ -46,6 +46,18 @@ test('payroll persists settings, scopes owners, calculates cycles, and protects 
  assert.equal((await save({...settings,pay_type:'monthly'})).ok,true);assert.equal((await list()).employees[0].expected_pay,2500000);
  assert.equal((await save({...settings,hourly_rate:0})).ok,true);assert.equal((await list()).employees[0].expected_pay,0);
  for(const bad of [{hourly_rate:-1},{hourly_rate:1.5},{cycle_start_day:29},{pay_day:0},{pay_day:32},{pay_type:'invalid'},{pay_month_offset:2},{monthly_salary:1000000001},{cycle_start_day:null}])assert.equal((await save({...settings,...bad})).ok,false);
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261007170144_payroll_date_range.sql'),'utf8'));
+ const range=async(from,to,token=id(100),ids=null)=>(await db.query('select list_employee_payroll_range($1,$2,$3,$4) data',[token,from,to,ids])).rows[0].data;
+ await save({...settings,pay_type:'monthly',cycle_start_day:1});
+ assert.equal((await range('2024-02-01','2024-02-29')).employees[0].expected_pay,2500000);
+ assert.equal((await range('2024-02-05','2024-02-29')).employees[0].expected_pay,null);
+ assert.equal((await range('2024-02-01','2024-03-31')).employees[0].expected_pay,5000000);
+ assert.equal((await range('2024-03-02','2024-03-01')).ok,false);
+ assert.equal((await range('2024-02-01','2026-02-01')).ok,false);
+ assert.equal((await range('2024-02-01','2024-02-29',id(999))).ok,false);
+ assert.equal((await range('2024-02-01','2024-02-29',id(100),[])).employees.length,0);
+ await save({...settings,pay_type:'hourly',hourly_rate:12000});
+ assert.equal((await range('2024-02-01','2024-02-28')).employees[0].expected_pay,18000);
  const security=(await db.query("select relrowsecurity from pg_class where relname='employee_payroll_settings'")).rows[0];assert.equal(security.relrowsecurity,true);
  assert.equal((await db.query("select has_table_privilege('anon','public.employee_payroll_settings','SELECT') allowed")).rows[0].allowed,false);
  await db.exec('set role anon');await assert.rejects(db.query('select * from public.employee_payroll_settings'));await db.exec('reset role');

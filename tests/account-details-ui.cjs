@@ -1,0 +1,20 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const tick=()=>new Promise(r=>setTimeout(r,15));
+test('actual account screen saves exclusive salary, retains original notification fields and saved status',async()=>{
+ const html=fs.readFileSync('staff-management.html','utf8'),dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/staff-management.html',runScripts:'outside-only'}),w=dom.window;let propertyChange;const calls=[];
+ const employee={employee_id:'e1',display_name:'문정국',job_title:'매니저'};const config={can_manage:true,property:{property_id:'p1'},employees:[employee],administrators:[{owner_id:'o1',display_name:'사장',is_current:true}]};let pay={employee_id:'e1',pay_type:'monthly',monthly_salary:3000000};let schedules=[{id:'rule1',enabled:true,alert_mode:'strong',property_ids:['p1'],days:[1,2,3],start_time:'09:00',end_time:'18:00'}];
+ w.omgSession={require:async()=>({sessionKind:'owner',accessToken:'token'})};w.omgTransition={ready(){}};w.omgWarningTargets={mount(){},mountConditions(){}};w.omgPropertySelector={mountPropertySingle:async x=>{propertyChange=x.onChange;}};
+ w.omgWorkConfig={load:async()=>config,loadEmployeeAttendanceSettings:async()=>({settings:[]}),loadAttendanceWarnings:async()=>({rules:[]}),saveEmployees:async()=>config,saveEmployeeAttendanceSettings:async()=>({settings:[]})};
+ w.GuestSupport={esc:s=>String(s??''),call:async()=>({properties:[{id:'p1',name:'서울역',own:true}],accounts:[{actor_key:'employee:e1',preferences:{schedules}}]})};
+ w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});if(name==='get_employee_account_pay')return{data:{ok:true,employees:[pay]}};if(name==='save_employee_account_pay'){pay={employee_id:'e1',pay_type:args.p_monthly!==null?'monthly':'hourly',hourly_rate:args.p_hourly,monthly_salary:args.p_monthly};return{data:{ok:true}};}if(name==='save_guest_chat_alert_schedules'){schedules=args.p_schedules;return{data:{schedules}};}return{data:{}};}};
+ for(const file of ['employee-account-details.js','account-chat-preferences.js'])w.eval(fs.readFileSync(file,'utf8'));
+ for(const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g))if(!/\bsrc=/.test(m[1]||''))w.eval(m[2]);await tick();
+ let row=w.document.querySelector('.employee-account');row.querySelector('.employee-toggle').click();
+ assert.equal(row.querySelector('.employee-monthly').value,'3000000');assert.equal(row.querySelector('.cp-saved-state').textContent,'설정됨');
+ const labelOrder=[...row.querySelectorAll('.employee-fields>label')].map(x=>x.textContent);assert.match(labelOrder.slice(-4).join('|'),/시급.*월급.*로그인 PIN.*관련문서/);
+ row.querySelector('.cp-disclosure').click();assert.equal(row.querySelector('.cp-body').hidden,false);assert.equal(row.querySelectorAll('.cp-mode input').length,4);assert.equal(row.querySelectorAll('.cp-day').length,7);assert.equal(row.querySelector('.cp-start').value,'09:00');
+ row.querySelector('.employee-hourly').value='12000';row.querySelector('.employee-hourly').dispatchEvent(new w.Event('input'));assert.equal(row.querySelector('.employee-monthly').value,'');
+ row.querySelector('.employee-save').click();await tick();await tick();row=w.document.querySelector('.employee-account');assert.equal(row.querySelector('.employee-hourly').value,'12000');assert.equal(row.querySelector('.cp-saved-state').textContent,'설정됨');assert.equal(row.querySelector('.cp-body').hidden,true);assert.equal(row.querySelector('.cp-start').value,'09:00');assert.equal(schedules[0].alert_mode,'strong');
+ await propertyChange('p2');await tick();assert.equal(calls.filter(x=>x.name==='get_employee_account_pay').at(-1).args.p_property_id,'p2');
+ w.close();
+});

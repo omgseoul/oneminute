@@ -1,0 +1,18 @@
+const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'apikey,authorization,content-type','Access-Control-Allow-Methods':'POST,OPTIONS'};
+const respond=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
+const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
+export function createContractHandler({db,pdf}){
+ async function rpc(token,action,data){const result=await db.rpc('employment_contract_rpc',{p_access_token:token,p_action:action,p_data:data});if(result.error)throw Error(result.error.message||'계약서 요청에 실패했습니다.');return result.data;}
+ async function ensurePdf(c){if(c.status!=='signed')throw Error('서명 완료 후 PDF를 받을 수 있습니다.');if(c.pdf_path)return c.pdf_path;const bytes=await pdf.render(c),path=`contracts/${c.id}/${c.content_hash}.pdf`,bucket=db.storage.from('employee-documents');const upload=await bucket.upload(path,bytes,{contentType:'application/pdf',upsert:false});const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(b=>b.toString(16).padStart(2,'0')).join('');if(upload.error){const previous=await bucket.download(path);if(previous.error)throw Error('PDF 저장에 실패했습니다. PDF 버튼을 눌러 다시 시도해주세요.');const stored=new Uint8Array(await previous.data.arrayBuffer());const existingHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',stored))).map(b=>b.toString(16).padStart(2,'0')).join('');const saved=await db.from('employment_contracts').update({pdf_path:path,pdf_hash:existingHash}).eq('id',c.id).eq('status','signed');if(saved.error)throw saved.error;}else{const saved=await db.from('employment_contracts').update({pdf_path:path,pdf_hash:hash}).eq('id',c.id).eq('status','signed');if(saved.error)throw saved.error;}return path;}
+ return async req=>{if(req.method==='OPTIONS')return new Response(null,{headers:cors});if(req.method!=='POST')return respond({ok:false,message:'잘못된 요청입니다.'},405);try{
+ // Bound request bodies before JSON parsing, including chunked uploads.
+ const reader=req.body?.getReader();let size=0,chunks=[];if(!reader)throw Error('요청 내용이 없습니다.');while(true){const{done,value}=await reader.read();if(done)break;size+=value.length;if(size>500000){await reader.cancel();return respond({ok:false,message:'계약서 또는 서명 크기가 너무 큽니다.'},413);}chunks.push(value);}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const body=JSON.parse(new TextDecoder().decode(bytes)),token=body.access_token,action=body.action,data=body.data||{};
+ if(!uuid(token))return respond({ok:false,message:'관리자 또는 근무자 로그인이 필요합니다.'},401);
+ if(!['list','get','draft','template_save','send','cancel','request_change','sign','pdf'].includes(action))throw Error('지원하지 않는 요청입니다.');
+ if(action==='send'||action==='sign'){const current=await rpc(token,'get',{id:data.id});await pdf.validate(current.contract,data.signature);}
+ if(action==='pdf'){const current=await rpc(token,'get',{id:data.id});const path=await ensurePdf(current.contract);const link=await db.storage.from('employee-documents').createSignedUrl(path,120,{download:'근로계약서.pdf'});if(link.error)throw link.error;return respond({ok:true,url:link.data.signedUrl});}
+ const result=await rpc(token,action,data);
+ if(action==='sign'&&result.contract?.status==='signed'){try{await ensurePdf(result.contract);result.pdf_ready=true;}catch{result.pdf_ready=false;result.pdf_message='서명은 완료되었습니다. PDF 버튼으로 보관을 다시 시도해주세요.';}}
+ return respond(result);
+ }catch(error){return respond({ok:false,message:error instanceof Error?error.message:'계약서를 처리하지 못했습니다.'},400);}};
+}

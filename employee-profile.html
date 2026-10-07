@@ -8,7 +8,7 @@
 <label>출근<input id="clockIn" type="time"></label><label>퇴근<input id="clockOut" type="time"></label>
 <label>근무시간<span id="duration" class="duration">-</span></label><label>지각 기준(분)<input id="lateness" type="number" min="0" max="720" inputmode="numeric" placeholder="0"></label>
 <button id="saveButton" class="save" type="submit">내 정보 저장</button><div id="message" class="message" role="alert"></div>
-</form></main>
+</form><a href="contracts.html" style="display:block;margin-top:16px;padding:18px;border:1px solid var(--line);border-radius:15px;background:#fff;color:var(--navy);font-weight:800;text-decoration:none">내 문서 · 근로계약서 <span style="float:right">›</span></a></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script>
 const form=document.getElementById("profileForm"),message=document.getElementById("message"),clockIn=document.getElementById("clockIn"),clockOut=document.getElementById("clockOut");let session=null;
 function duration(){if(!clockIn.value||!clockOut.value){document.getElementById("duration").textContent="-";return;}const[a,b]=clockIn.value.split(":").map(Number),[c,d]=clockOut.value.split(":").map(Number);let minutes=c*60+d-(a*60+b);if(minutes<=0)minutes+=1440;document.getElementById("duration").textContent=`${Math.floor(minutes/60)}시간${minutes%60?` ${minutes%60}분`:""}`;}

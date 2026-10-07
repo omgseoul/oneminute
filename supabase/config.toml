@@ -12,3 +12,11 @@ verify_jwt = false
 [functions.guest-email]
 # /open exchanges a scoped email link; /dispatch requires a private worker secret.
 verify_jwt = false
+
+[functions.employee-documents]
+# Custom OMS owner session checked by service-role-only authorization RPC.
+verify_jwt = false
+
+[functions.employment-contracts]
+# Every operation validates a custom OMS owner/worker session and contract ownership.
+verify_jwt = false

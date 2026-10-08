@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f7fc">
   <title>캘린더 · 게하관리</title>
   <link rel="stylesheet" href="page-transition.css">
-  <link rel="stylesheet" href="calendar.css?v=20261008-controls">
+  <link rel="stylesheet" href="calendar.css?v=20261008-connected-icons">
   <script src="page-transition.js?v=20260929-chat-taps"></script>
 <link rel="stylesheet" href="top-layout.css?v=20261005b">
 </head>
@@ -26,9 +26,9 @@
     <div class="calendar-legend"><span><i class="legend-event"></i>일정</span><span><i class="legend-task"></i>To do</span></div>
     <div class="calendar-floating-actions">
       <div id="viewButtons" class="calendar-view-buttons" role="group" aria-label="캘린더 보기">
-        <button type="button" data-view="month" aria-label="월간 보기" title="월간 보기" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15M3.5 12h17"/></svg></button>
-        <button type="button" data-view="week" aria-label="주간 보기" title="주간 보기" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17"/></svg></button>
-        <button type="button" data-view="day" aria-label="일간 보기" title="일간 보기" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/></svg></button>
+        <button type="button" data-view="month" aria-label="월간 보기" title="월간 보기" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="30" height="30" rx="1"/><path d="M7 1v30M13 1v30M19 1v30M25 1v30M1 7h30M1 13h30M1 19h30M1 25h30"/></svg></button>
+        <button type="button" data-view="week" aria-label="주간 보기" title="주간 보기" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="30" height="30" rx="1"/><path d="M1 8.5h30M1 16h30M1 23.5h30"/></svg></button>
+        <button type="button" data-view="day" aria-label="일간 보기" title="일간 보기" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="30" height="30" rx="1"/></svg></button>
       </div>
       <button id="addEvent" class="calendar-add" type="button" aria-label="일정 추가">+</button>
     </div>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="OMS 앱 아이콘">
+  <rect width="192" height="192" fill="#fff"/>
+  <rect x="15" y="15" width="162" height="162" rx="28" fill="#fff" stroke="#dbe8fa" stroke-width="1.5"/>
+  <circle cx="96" cy="96" r="52" fill="none" stroke="#102d4d" stroke-width="32"/>
+  <circle cx="96" cy="96" r="52" fill="none" stroke="#2467d9" stroke-width="32" stroke-dasharray="108.909 217.817" transform="rotate(150 96 96)"/>
+</svg>

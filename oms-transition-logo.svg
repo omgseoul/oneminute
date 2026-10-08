@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="88" viewBox="0 0 260 88" role="img" aria-label="OMS by OMG works">
+  <circle cx="44" cy="44" r="29" fill="none" stroke="#102d4d" stroke-width="20"/>
+  <circle cx="44" cy="44" r="29" fill="none" stroke="#2467d9" stroke-width="20" stroke-dasharray="60.737 121.475" transform="rotate(150 44 44)"/>
+  <text x="96" y="53" fill="#102d4d" font-family="Inter, Pretendard, Noto Sans KR, Arial, sans-serif" font-size="49" font-weight="900" letter-spacing="-3">OMS</text>
+  <text x="96" y="73" fill="#63809f" font-family="Inter, Pretendard, Noto Sans KR, Arial, sans-serif" font-size="14" font-weight="500">by <tspan fill="#31577d" font-weight="800">OMG works</tspan></text>
+</svg>

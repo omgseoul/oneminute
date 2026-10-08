@@ -12,6 +12,15 @@ test('calendar opens in weekly view and bottom icons switch month, week, day',as
  assert.equal(d.querySelector('.calendar-week-grid').children.length,7);
  assert.equal(actions.querySelector('[data-view=week]').getAttribute('aria-pressed'),'true');
  assert.equal(actions.querySelector('[data-view=day] svg path'),null);
+ const monthPath=actions.querySelector('[data-view=month] svg path').getAttribute('d');
+ const vertical=[1,...[...monthPath.matchAll(/M([\d.]+) 1v30/g)].map(match=>Number(match[1])),31];
+ const horizontal=[1,...[...monthPath.matchAll(/M1 ([\d.]+)h30/g)].map(match=>Number(match[1])),31];
+ const weekPath=actions.querySelector('[data-view=week] svg path').getAttribute('d');
+ const weekRows=[1,...[...weekPath.matchAll(/M1 ([\d.]+)h30/g)].map(match=>Number(match[1])),31];
+ const widths=positions=>positions.slice(1).map((value,index)=>value-positions[index]);
+ assert.deepEqual(widths(vertical),[6,6,6,6,6]);
+ assert.deepEqual(widths(horizontal),[6,6,6,6,6]);
+ assert.deepEqual(widths(weekRows),[7.5,7.5,7.5,7.5]);
  actions.querySelector('[data-view=month]').click();await tick();assert.ok(d.querySelector('.calendar-month'));
  actions.querySelector('[data-view=day]').click();await tick();assert.ok(d.querySelector('.calendar-day-view'));
  actions.querySelector('[data-view=week]').click();await tick();assert.ok(d.querySelector('.calendar-week-grid'));

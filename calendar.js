@@ -1,7 +1,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const dayNames=['일','월','화','수','목','금','토'];
-  let session,isOwner=false,timezone='Asia/Seoul',view='month',focusDate,events=[],tasks=[],employees=[],selectedPropertyIds=[],ownPropertyId=null;
+  let session,isOwner=false,timezone='Asia/Seoul',view='week',focusDate,events=[],tasks=[],employees=[],selectedPropertyIds=[],ownPropertyId=null;
   const pad=value=>String(value).padStart(2,'0');
   const key=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
   const parseKey=value=>{const [y,m,d]=value.split('-').map(Number);return new Date(y,m-1,d);};

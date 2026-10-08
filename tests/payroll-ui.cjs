@@ -28,3 +28,19 @@ test('actual attendance initialization only exposes payroll to owners and retain
   w.close();
  }
 });
+test('default order follows home branch and branch numbers, while name headers toggle 가나다 sorting',async()=>{
+ const dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/attendance.html',runScripts:'outside-only'}),w=dom.window;
+ const rows=[
+  {employee_id:'third',property_id:'p3',property_name:'3번 지점',display_name:'나무',work_minutes:30,expected_pay:1000,pay_type:'hourly',hourly_rate:2000},
+  {employee_id:'second',property_id:'p2',property_name:'2번 지점',display_name:'가람',work_minutes:60,expected_pay:2000,pay_type:'hourly',hourly_rate:2000},
+  {employee_id:'home',property_id:'home',property_name:'본점',display_name:'다솜',work_minutes:90,expected_pay:3000,pay_type:'hourly',hourly_rate:2000}
+ ];
+ w.omgSupabase={rpc:async()=>({data:{ok:true,employees:rows}})};
+ w.eval(fs.readFileSync('property-selector.js','utf8'));w.eval(fs.readFileSync('payroll.js','utf8'));
+ w.OMSPayroll.init({accessToken:'token',getPropertyIds:()=>['p2','p3','home'],getPropertyNumber:id=>({p2:2,p3:3,home:10})[id],ownPropertyId:'home'});
+ w.document.getElementById('openPayroll').click();await tick();const host=w.document.getElementById('payrollView'),names=()=>[...host.querySelectorAll('.payroll-person-name strong')].map(x=>x.textContent);
+ assert.deepEqual(names(),['다솜','가람','나무']);assert.equal(host.querySelector('.payroll-sort'),null);
+ const name=host.querySelector('.payroll-columns [data-sort=name]');assert.match(name.textContent,/이름.*↕/);name.click();assert.deepEqual(names(),['가람','나무','다솜']);assert.equal(name.getAttribute('aria-pressed'),'true');name.click();assert.deepEqual(names(),['다솜','나무','가람']);
+ const work=host.querySelector('.payroll-columns [data-sort=work]');work.click();assert.equal(work.getAttribute('aria-pressed'),'true');assert.deepEqual(names(),['다솜','가람','나무']);
+ host.querySelector('.payroll-columns [data-sort=pay]').click();assert.deepEqual(names(),['다솜','가람','나무']);w.close();
+});

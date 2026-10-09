@@ -16,10 +16,14 @@ insert into owner_sessions values('${id(10)}','${id(1)}','${id(100)}',now()+inte
 insert into employees(id,property_id,role,active,display_name) values('${id(11)}','${id(1)}','staff',true,'근무자 A'),('${id(12)}','${id(1)}','staff',true,'근무자 B');
 insert into work_sessions values('${id(11)}','${id(110)}',now()+interval '1h','working'),('${id(12)}','${id(120)}',now()+interval '1h','completed');`);
 await db.exec(fs.readFileSync('supabase/migrations/20261007170134_employment_contracts.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261009020502_contract_workflow_v2.sql','utf8'));
+await assert.rejects(db.query('select contract_business_info($1,$2)',[id(200),id(1)]),/권한/);
+await db.query('select contract_business_info($1,$2,$3,$4)',[id(100),id(1),'save',{business_name:'사업장',employer_name:'사업주',phone:'010',address:'서울'}]);
 const rpc=async(action,data={},token=id(100))=>(await db.query('select employment_contract_rpc($1,$2,$3) data',[token,action,data])).rows[0].data;
-const draft={id:id(500),employee_id:id(11),title:'계약서',content:'계약 내용',employer_name:'대표자',version:0};
+assert.equal((await rpc('list',{employee_id:id(11)})).defaults.business_info.employer_name,'사업주');
+const draft={contract_fields:{kind:'standard',pay_type:'annual',amount:36000000},contract_ready:true,id:id(500),employee_id:id(11),title:'계약서',content:'계약 내용',employer_name:'대표자',version:0};
 await assert.rejects(rpc('list',{employee_id:id(11)},id(200)),/권한/);await assert.rejects(rpc('list',{employee_id:id(11)},id(120)),/권한/);
-let c=(await rpc('draft',draft)).contract;assert.equal(c.version,1);
+let c=(await rpc('draft',draft)).contract;assert.equal(c.version,1);assert.equal(c.contract_fields.amount,36000000);assert.equal(c.contract_ready,true);
 await assert.rejects(rpc('get',{id:c.id},id(200)),/권한/);await assert.rejects(rpc('get',{id:c.id},id(110)),/권한/);
 await assert.rejects(rpc('draft',{...draft,version:0}),/변경/);
 const signature='data:image/png;base64,'+'A'.repeat(200);

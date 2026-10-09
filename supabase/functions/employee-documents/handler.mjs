@@ -15,16 +15,17 @@ export const createDocumentHandler = (db) => async req=>{
   const bucket=db.storage.from('employee-documents');
   if(body.action==='list'){
    const {data,error}=await db.from('employee_documents').select('id,filename,size,created_at').eq('employee_id',body.employee_id).order('created_at',{ascending:false});
-   if(error)throw error;return reply({ok:true,documents:data});
+   if(error)throw error;const usage=await db.rpc('employee_document_usage',{p_access_token:body.access_token,p_employee_id:body.employee_id});if(usage.error)throw usage.error;return reply({ok:true,documents:data,used_bytes:Number(usage.data),max_bytes:52428800});
   }
   if(body.action==='upload'){
    const file=form?.get('file');
    if(!(file instanceof File)||file.size<5||file.size>10485760||!file.name.toLowerCase().endsWith('.pdf'))return reply({ok:false,message:'10MB 이하의 PDF를 선택해주세요.'},400);
+   const usage=await db.rpc('employee_document_usage',{p_access_token:body.access_token,p_employee_id:body.employee_id});if(usage.error)throw usage.error;if(Number(usage.data)+file.size>52428800)return reply({ok:false,message:'문서보관함은 근무자별 총 50MB까지 사용할 수 있습니다. 불필요한 첨부 문서를 삭제한 후 다시 시도해주세요.'},400);
    const bytes=new Uint8Array(await file.arrayBuffer());
    if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')return reply({ok:false,message:'올바른 PDF 파일이 아닙니다.'},400);
    const path=`${property}/${body.employee_id}/${crypto.randomUUID()}.pdf`;
    const filename=file.name.replace(/[\x00-\x1f/\\]/g,'_').slice(0,200);
-   const {error:uploadError}=await bucket.upload(path,bytes,{contentType:'application/pdf',upsert:false});if(uploadError)throw uploadError;
+   const {error:uploadError}=await bucket.upload(path,bytes,{contentType:'application/pdf',upsert:false});if(uploadError){if(String(uploadError.message).includes('50MB'))return reply({ok:false,message:'문서보관함은 근무자별 총 50MB까지 사용할 수 있습니다.'},400);throw uploadError;}
    const {error}=await db.from('employee_documents').insert({employee_id:body.employee_id,filename,object_path:path,size:file.size});
    if(error){await bucket.remove([path]);throw error;}return reply({ok:true});
   }

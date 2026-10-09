@@ -4,7 +4,7 @@ window.EmployeeAccountDetails=(()=>{
  function mountRow(row,employee,token){
   const pin=row.querySelector('.employee-pin-field');
   pin.insertAdjacentHTML('beforebegin','<label>시급 · 원<input class="employee-hourly" type="number" min="0" max="1000000000" step="1" inputmode="numeric" placeholder="시급 입력"></label><label>월급 · 원<input class="employee-monthly" type="number" min="0" max="1000000000" step="1" inputmode="numeric" placeholder="월급 입력"></label>');
-  pin.insertAdjacentHTML('afterend','<label>관련문서<button class="employee-documents" type="button">관련문서</button></label>');
+  pin.insertAdjacentHTML('afterend','<div class="employee-documents-field"><button class="employee-documents" type="button" aria-label="문서함 열기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2M3 9h18l-2 11H5L3 9Z"/></svg><span>문서함</span></button></div>');
   const context={loaded:!employee,dirty:false};contexts.set(row,context);
   for(const kind of ['hourly','monthly'])row.querySelector('.employee-'+kind).oninput=()=>{context.dirty=true;if(row.querySelector('.employee-'+kind).value!=='')row.querySelector('.employee-'+(kind==='hourly'?'monthly':'hourly')).value='';};
   row.querySelector('.employee-documents').onclick=()=>{if(!row.dataset.employeeId){alert('먼저 근무자 계정을 저장해주세요.');return;}openDocuments(row,token());};

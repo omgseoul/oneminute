@@ -15,7 +15,7 @@ window.OMSContractPaper=(()=>{
   tableRow(terms,'계약기간',body(period));
   if(work){tableRow(terms,'근무장소',work.lines.find(line=>line.startsWith('근무장소:'))?.replace(/^근무장소:\s*/,''));tableRow(terms,'업무 내용',work.lines.find(line=>line.startsWith('업무 내용:'))?.replace(/^업무 내용:\s*/,''));}
   tableRow(terms,'근무시간',body(time));tableRow(terms,'임금',body(pay));if(terms.rows.length)host.append(terms);
-  for(const group of parsed.sections.filter(group=>!['1','2','3','5','7'].includes(group.number))){const section=make('section','formal-paper-clause');section.append(make('b','',`제${group.number}조`));const copy=make('div');copy.append(make('h3','',group.title),make('p','',group.lines.join(' ')));section.append(copy);host.append(section);}
+  let clauseNumber=0;for(const group of parsed.sections.filter(group=>!['1','2','3','5','7'].includes(group.number))){const section=make('section','formal-paper-clause');section.append(make('b','',`제${++clauseNumber}조`));const copy=make('div');copy.append(make('h3','',group.title),make('p','',group.lines.join(' ')));section.append(copy);host.append(section);}
   const parties=find(parsed.sections,7),partyInfo={};for(const line of parties?.lines||[]){const split=line.indexOf(':');if(split>0)partyInfo[line.slice(0,split).trim()]=line.slice(split+1).trim();}
   if(signatures&&(c.employer_signature||c.employee_signature)){host.append(make('p','formal-paper-closing','양 당사자는 계약 내용을 충분히 확인하였으며 전자서명으로 계약을 체결합니다.'));
    host.append(make('p','formal-paper-date',c.contract_fields?.written_date||date(c.signed_at)));

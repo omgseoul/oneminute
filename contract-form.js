@@ -9,10 +9,10 @@ window.OMSContractForm = (() => {
   const host=document.createElement('div');host.className='contract-fields';
   body.closest('label').before(host);
   const input=(key,label,type='text',full=false)=>`<label class="${full?'field-wide':''}">${label}<input data-field="${key}" type="${type}" value="${esc(f[key])}" ${type==='number'?'min="0" step="1" inputmode="numeric"':''} maxlength="500"></label>`;
-  const choice=(key,label,options)=>`<fieldset class="field-wide"><legend>${label}</legend><div class="contract-segments">${options.map(([value,name])=>`<label><input type="radio" name="contract-${key}" data-field="${key}" value="${value}" ${f[key]===value?'checked':''}><span>${name}</span></label>`).join('')}</div></fieldset>`;
+  const choice=(key,label,options)=>`<fieldset class="field-wide contract-choice-${key}"><legend>${label}</legend><div class="contract-segments">${options.map(([value,name])=>`<label><input type="radio" name="contract-${key}" data-field="${key}" value="${value}" ${f[key]===value?'checked':''}><span>${name}</span></label>`).join('')}</div></fieldset>`;
   const checks=(key,label,options)=>`<fieldset class="field-wide"><legend>${label}</legend><div class="contract-checks">${options.map(name=>`<label><input type="checkbox" data-set="${key}" value="${name}" ${f[key].includes(name)?'checked':''}><span>${name}</span></label>`).join('')}</div></fieldset>`;
-  host.innerHTML=`<div class="contract-steps"><span>1 · 근로조건 작성</span><span>2 · 확인 및 전송</span><span>3 · 근무자 서명</span></div><div class="contract-form-grid">
-   ${choice('kind','계약 유형',[['standard','표준 근로계약서'],['parttime','단시간 근로계약서']])}<h2>근로조건</h2>
+  host.innerHTML=`<div class="contract-form-grid">
+   ${choice('kind','계약 유형',[['standard','표준 근로계약서'],['parttime','단시간 근로계약서'],['other','기타 계약서']])}<h2>근로조건</h2>
    ${choice('term','계약기간',[['open','기간의 정함 없음'],['fixed','기간 정함']])}${input('start','근로 시작일','date')}${input('end','계약 종료일','date')}
    ${input('place','근무장소','text',true)}${input('job','업무 내용','text',true)}${input('start_time','출근','time')}${input('end_time','퇴근','time')}${input('break_minutes','휴게시간 · 분','number')}${input('holiday','주휴일 (예: 일요일)')}
    ${checks('days','근무요일',['월','화','수','목','금','토','일'])}<label class="field-wide">요일별 근무시간 / 휴게시간 보충<input data-field="schedule_note" value="${esc(f.schedule_note)}" maxlength="1000" placeholder="요일마다 시간이 다르면 각각 입력"></label>
@@ -25,7 +25,7 @@ window.OMSContractForm = (() => {
   const bodyLabel=body.closest('label'),ownerLabel=employer.closest('label');ownerLabel.hidden=mode==='structured';
   const details=document.createElement('details');details.className='contract-text-editor';details.innerHTML='<summary>계약서 전문 확인·직접 수정</summary>';bodyLabel.before(details);details.append(bodyLabel);details.open=mode==='manual';
   const read=()=>{host.querySelectorAll('[data-field]').forEach(el=>{if(el.type!=='radio'||el.checked)f[el.dataset.field]=el.value;});['days','insurance'].forEach(k=>f[k]=[...host.querySelectorAll(`[data-set="${k}"]:checked`)].map(el=>el.value));return f;};
-  function text(){read();const pay={hourly:'시급',monthly:'월급',annual:'연봉'}[f.pay_type];return `${f.kind==='parttime'?'단시간':'표준'} 근로계약서
+  function text(){read();const pay={hourly:'시급',monthly:'월급',annual:'연봉'}[f.pay_type],kind={standard:'표준',parttime:'단시간',other:'기타'}[f.kind]||'표준';return `${kind} 근로계약서
 
 ${f.business_name}의 사업주 ${f.employer_name}와 근로자 ${f.employee_name}는 다음과 같이 근로계약을 체결합니다.
 

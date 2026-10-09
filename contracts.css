@@ -3,3 +3,17 @@
 .contract-owner-signature{display:block;width:210px;max-width:100%;height:auto}
 
 .contract-fields h2{grid-column:1/-1;margin:25px 0 0;padding-top:20px;border-top:1px solid var(--line)}.contract-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}.field-wide{grid-column:1/-1}.contract-fields fieldset{border:0;padding:0;margin:15px 0;min-width:0}.contract-fields legend{color:var(--muted);font-size:13px;margin-bottom:8px}.contract-segments,.contract-checks{display:flex;gap:7px;flex-wrap:wrap}.contract-segments label{flex:1;margin:0;position:relative;min-width:75px}.contract-checks label{margin:0;position:relative}.contract-segments input,.contract-checks input{position:absolute;opacity:0;width:1px;height:1px}.contract-segments span,.contract-checks span{display:block;padding:12px 9px;border:1px solid var(--line);border-radius:12px;text-align:center;background:#f4f7fc;color:var(--navy);font-size:13px}.contract-segments input:checked+span,.contract-checks input:checked+span{background:#eaf2ff;border-color:var(--blue);color:var(--blue);font-weight:800}.contract-segments input:focus-visible+span,.contract-checks input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}.contract-fields textarea{min-height:110px}.contract-steps{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0;font-size:11px;color:var(--blue)}.contract-steps span{background:#eaf2ff;border-radius:8px;padding:8px}.contract-text-editor{margin-top:20px}.contract-text-editor summary{font-size:14px;font-weight:750;color:var(--blue);padding:12px 0;cursor:pointer}.contract-fields input:disabled{background:#f4f7fc;color:#8a97a9}
+
+/* Compact contract typography, matching the existing OMS form hierarchy. */
+.contract-shell{font-size:13px;line-height:1.55}
+.contract-shell h1{font-size:25px;margin:20px 0 16px}
+.contract-shell h2{font-size:17px}
+.contract-shell label,.contract-fields legend{font-size:11px}
+.contract-shell input,.contract-shell select,.contract-shell textarea{font-size:13px;padding:10px 11px}
+.contract-shell button,.contract-shell .action-link{font-size:12px}
+.contract-segments span,.contract-checks span{font-size:12px;padding:10px 8px}
+.contract-shell .contract-confirm,.contract-shell pre{font-size:12px}
+.contract-note,.contract-state,#contractStatus{font-size:11px}
+.contract-shell .native-picker-host .property-picker-button{height:44px;font-size:13px;font-weight:600}
+.contract-shell .native-picker-host .property-picker-panel{font-size:13px}
+@media(max-width:380px){.contract-shell h1{font-size:23px}.contract-shell h2{font-size:16px}.contract-shell .contract-actions button{font-size:12px}}

@@ -27,3 +27,6 @@
 .formal-paper-entry{word-break:keep-all;overflow-wrap:break-word}.formal-paper-entry+.formal-paper-entry{margin-top:5px}.formal-paper-entry strong{font-weight:700}.formal-paper-clause p+p{margin-top:3px}.formal-paper-terms{line-height:1.5}.formal-paper-intro{margin:14px 0 12px;line-height:1.6}.formal-paper-clause{margin-top:10px;line-height:1.5}
 .contract-shell .contract-segments label,.contract-shell .contract-checks label{margin:0}
 @media(max-width:380px){.contract-box{padding:14px}.contract-day-head,.contract-day-row{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 56px;gap:3px}.contract-day-row input{font-size:10px}}
+.contract-break-holiday{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
+.contract-break-holiday:has(label[hidden]){grid-template-columns:1fr}
+.contract-choice-schedule_mode .contract-segments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}

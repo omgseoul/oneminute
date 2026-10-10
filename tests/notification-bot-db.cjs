@@ -1,0 +1,48 @@
+const {PGlite}=require('@electric-sql/pglite'),fs=require('node:fs'),assert=require('node:assert/strict');
+const db=new PGlite();const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+(async()=>{
+await db.exec(`create role anon;create role authenticated;create role service_role;create schema omg_private;
+create function omg_private.token_hash(uuid) returns text language sql immutable as $$select $1::text$$;
+create table public.properties(id uuid primary key,name text,management_number int,timezone text default 'Asia/Seoul');
+create table public.owners(id uuid primary key,property_id uuid,active boolean default true);
+create table public.employees(id uuid primary key,property_id uuid,active boolean default true);
+create table public.owner_sessions(owner_id uuid,property_id uuid,login_token_hash text,token_expires_at timestamptz);
+create table public.work_sessions(employee_id uuid,property_id uuid,login_token_hash text,token_expires_at timestamptz,status text);
+create table public.property_share_requests(requester_property_id uuid,target_property_id uuid,status text,requested_permissions text[]);
+create table public.property_messages(id uuid primary key,property_id uuid,sender_type text,sender_owner_id uuid,sender_employee_id uuid,message text,message_type text,source text,priority text,created_at timestamptz default now());
+create table public.property_message_recipients(message_id uuid,owner_id uuid,employee_id uuid,recipient_key text,recipient_type text,read_at timestamptz);
+create table public.guest_chat_alert_preferences(actor_key text,home_property_id uuid,schedules jsonb);
+create function public.get_message_push_dispatch(p_access_token uuid,p_message_id uuid) returns jsonb language sql as $$select coalesce((select jsonb_build_object('ok',true,'priority',priority,'message',message,'message_id',id) from public.property_messages where id=p_message_id and p_access_token='${id(101)}'::uuid),'{"ok":false}'::jsonb)$$;
+`);
+await db.exec(fs.readFileSync('tests/fixtures/bot-shared-permission.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261010162050_notification_bot.sql','utf8'));
+await db.exec(`insert into properties(id,name,management_number)values('${id(1)}','본점',1),('${id(2)}','공유점',2),('${id(3)}','타인',3);
+insert into owners(id,property_id)values('${id(11)}','${id(1)}'),('${id(12)}','${id(3)}');
+insert into employees(id,property_id)values('${id(21)}','${id(1)}');
+insert into owner_sessions values('${id(11)}','${id(1)}','${id(101)}',now()+interval '1 hour'),('${id(12)}','${id(3)}','${id(102)}',now()+interval '1 hour');
+insert into work_sessions values('${id(21)}','${id(1)}','${id(201)}',now()+interval '1 hour','working');
+insert into property_share_requests values('${id(1)}','${id(2)}','approved',array['messages','account_settings']);`);
+async function rpc(token,action,property=null,data={}){return(await db.query('select notification_bot_settings($1,$2,$3,$4) r',[token,action,property,JSON.stringify(data)])).rows[0].r;}
+assert.equal((await rpc(id(999),'list')).ok,false);assert.equal((await rpc(id(101),'list')).bots.length,2);assert.equal((await rpc(id(201),'save',id(1),{display_name:'해킹',alert_mode:'urgent'})).ok,false);assert.equal((await rpc(id(101),'save',id(3),{display_name:'타인',alert_mode:'urgent'})).ok,false);
+assert.equal((await rpc(id(101),'save',id(2),{display_name:'공유 알림',alert_mode:'strong'})).ok,true);assert.equal((await rpc(id(101),'save',id(1),{display_name:'테스트 봇',alert_mode:'urgent'})).ok,true);assert.equal((await rpc(id(101),'save',id(1),{display_name:'',alert_mode:'urgent'})).ok,false);assert.equal((await rpc(id(101),'save',id(1),{display_name:'봇',alert_mode:'urgent',profile_image:'javascript:alert(1)'})).ok,false);
+await db.exec(`insert into property_messages(id,property_id,sender_type,sender_owner_id,message,message_type,priority)values('${id(31)}','${id(1)}','owner','${id(11)}','공지','announcement','normal'),('${id(32)}','${id(1)}','owner','${id(11)}','일반 대화','general','normal'),('${id(33)}','${id(1)}','owner','${id(11)}','계약서 [OMS-CONTRACT:${id(51)}]','general','normal');
+insert into property_message_recipients(message_id,employee_id,recipient_type,recipient_key) select id,'${id(21)}','staff','employee:${id(21)}' from property_messages;`);
+async function dispatch(mid=31){return(await db.query('select get_message_push_dispatch_v2($1,$2) r',[id(101),id(mid)])).rows[0].r;}
+let d=await dispatch();assert.equal(d.priority,'urgent');assert.equal(d.sender_label,'테스트 봇');assert.equal(Object.values(d.recipient_modes)[0],'urgent');assert.equal((await dispatch(32)).is_bot,undefined);
+await db.query('insert into guest_chat_alert_preferences values($1,$2,$3)',['employee:'+id(21),id(1),JSON.stringify([{enabled:true,alert_mode:'weak',property_ids:[id(1)],days:[0,1,2,3,4,5,6],start_time:'',end_time:''}])]);
+assert.equal(Object.values((await dispatch()).recipient_modes)[0],'weak');await db.exec(`update guest_chat_alert_preferences set schedules='[]'`);assert.equal((await dispatch()).recipient_topics.length,0);
+assert.equal((await db.query('select * from omg_private.staff_conversation_items($1)',['employee:'+id(21)])).rows.length,1);
+await db.exec(`set role anon;`);await assert.rejects(()=>db.exec('select * from notification_bots'));await db.exec('reset role');
+await db.exec(`alter table owners add display_name text;alter table employees add display_name text;
+alter table work_sessions add id uuid;alter table work_sessions add work_date date;
+alter table property_messages add attendance_request_id uuid;alter table property_messages add property_share_request_id uuid;alter table property_messages add holiday_request_id uuid;
+alter table property_message_recipients add id uuid default gen_random_uuid();alter table property_message_recipients add acknowledged_at timestamptz;alter table property_message_recipients add acknowledged_name text;
+alter table property_share_requests add id uuid;create table holiday_requests(id uuid,status text);
+create table attendance_adjustment_requests(id uuid,status text,work_session_id uuid,original_clock_in_at timestamptz,original_clock_out_at timestamptz,requested_clock_in_at timestamptz,requested_clock_out_at timestamptz);`);
+const feed=(await db.query('select list_notification_bot_messages($1) r',[id(201)])).rows[0].r;
+assert.equal(feed.ok,true);assert.equal(feed.messages.length,2);assert.equal(feed.unread_count,2);assert.equal(feed.unread_by_property[id(1)],2);
+assert.equal((await db.query('select list_notification_bot_messages($1) r',[id(102)])).rows[0].r.messages.length,0);
+const older=(await db.query('select list_notification_bot_messages($1,$2,$3) r',[id(201),feed.messages[0].created_at,feed.messages[0].message_id])).rows[0].r;
+assert.equal(older.messages.length,1);assert.notEqual(older.messages[0].message_id,feed.messages[0].message_id);
+console.log('PASS: invalid session, staff write denial, cross-property isolation, authorized shared editing, profile validation, bot outgoing mode, recipient cap, disabled schedule, ordinary chat preservation, contract duplication prevention, RLS.');await db.close();
+})().catch(e=>{console.error(e);process.exit(1)});

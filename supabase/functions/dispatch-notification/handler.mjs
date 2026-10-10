@@ -117,9 +117,9 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if (env('PUSH_DELIVERY_ENABLED') !== 'true') return reply({ok:false,code:'not_enabled'},503);
         deliveryId = dispatch.message_id;
         topics = dispatch.recipient_topics;
-        recipientModes = Object.fromEntries((topics||[]).map(topic=>[topic,'weak']));
-        payload = {alertId:String(deliveryId),message:preview(dispatch.message),mode:'weak',
-          priority:'normal',messageType:'general',senderLabel:'일정 알림',route:'messages.html?tab=alerts'};
+        recipientModes = dispatch.recipient_modes || Object.fromEntries((topics||[]).map(topic=>[topic,'weak']));
+        payload = {alertId:String(deliveryId),message:preview(dispatch.message),mode:'message',
+          priority:dispatch.priority || 'normal',messageType:'general',senderLabel:dispatch.sender_label || 'OMS 알림',route:'messages.html?tab=staff&message_id='+encodeURIComponent(deliveryId)};
       } else if (path.endsWith('/report')) {
         if (!uuid.test(body.access_token || '') || !uuid.test(body.report_id || '')) return reply({ok:false,code:'invalid_request'},400);
         const dispatch = await rpc('get_report_push_dispatch',{p_access_token:body.access_token,p_report_id:body.report_id});

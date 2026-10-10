@@ -3,6 +3,29 @@
  let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false;
  let peerProfile=null,viewerIndex=0,touchStartX=null,galleryLoading=false,galleryComplete=false;
  const line=$('timeline'),input=$('body');
+ let searchVersion=0,searchIds=[],searchIndex=-1,searchQuery='',searchLoading=false;
+ function paintSearch(){
+  const q=searchQuery.trim().toLowerCase();searchIds=q?messages.filter(m=>StaffChat.cleanText(m.body).toLowerCase().includes(q)).map(m=>m.id):[];
+  if(searchIndex<0||searchIndex>=searchIds.length)searchIndex=searchIds.length-1;
+  $('bubbles').querySelectorAll('.bubble-row').forEach(row=>{row.classList.toggle('search-match',searchIds.includes(row.dataset.id));row.classList.toggle('search-current',row.dataset.id===searchIds[searchIndex]);});
+  $('chatSearchStatus').textContent=searchLoading?'이전 대화에서 검색 중…':q?(searchIds.length?`${searchIndex+1} / ${searchIds.length}`:'검색 결과가 없습니다.'):'검색어를 입력해주세요.';
+  $('chatSearchPrev').disabled=searchIndex<=0;$('chatSearchNext').disabled=searchIndex<0||searchIndex>=searchIds.length-1;
+ }
+ function focusMatch(){paintSearch();const id=searchIds[searchIndex];if(!id)return;const node=[...$('bubbles').querySelectorAll('[data-id]')].find(row=>row.dataset.id===id);node?.scrollIntoView({block:'center',behavior:'smooth'});}
+ async function runSearch(){
+  const version=++searchVersion;searchQuery=$('chatSearchInput').value.trim();searchIndex=-1;
+  if(!searchQuery){paintSearch();return;}if(!session)return;searchLoading=true;paintSearch();
+  try{let pages=0;while(version===searchVersion&&!galleryComplete&&messages.length&&pages<20){const first=messages[0],v=await call('messages',{before_time:first.created_at,before_id:first.id});if(version!==searchVersion)return;mergeMessages(v.messages);pages++;if(v.messages.length<50)galleryComplete=true;render(true);}
+   if(version!==searchVersion)return;searchLoading=false;searchIndex=-1;render(true);focusMatch();if(!galleryComplete){$('chatSearchStatus').textContent+=' · 검색을 다시 누르면 이전 대화도 검색';}
+  }catch(error){if(version===searchVersion){searchLoading=false;paintSearch();$('chatSearchStatus').textContent='검색을 완료하지 못했습니다. 다시 눌러주세요.';}}
+ }
+ function closeSearch(){searchVersion++;searchLoading=false;searchQuery='';searchIds=[];searchIndex=-1;$('chatSearchPanel').hidden=true;$('chatSearchToggle').setAttribute('aria-expanded','false');paintSearch();}
+ $('chatSearchToggle').onclick=()=>{if(!$('chatSearchPanel').hidden){closeSearch();return;}$('chatSearchPanel').hidden=false;$('chatSearchToggle').setAttribute('aria-expanded','true');$('chatSearchInput').focus();};
+ $('chatSearchClose').onclick=closeSearch;$('chatSearchRun').onclick=runSearch;
+ $('chatSearchInput').oninput=()=>{searchVersion++;searchLoading=false;searchQuery=$('chatSearchInput').value.trim();searchIndex=-1;paintSearch();focusMatch();};
+ $('chatSearchInput').onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();runSearch();}if(ev.key==='Escape')closeSearch();};
+ $('chatSearchPrev').onclick=()=>{if(searchIndex>0){searchIndex--;focusMatch();}};$('chatSearchNext').onclick=()=>{if(searchIndex<searchIds.length-1){searchIndex++;focusMatch();}};
+
  if(params.get('from')==='home'){document.querySelector('.back').href='app.html';document.querySelector('.back').textContent='← Home';}
  let draftKey='';
  const call=(a,d={})=>StaffChat.call(session,a,{peer,...d});
@@ -27,11 +50,11 @@
   $('bubbles').innerHTML=messages.map(m=>{const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="bubble">${m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</div></div>`;}).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
   if(older)line.scrollTop+=line.scrollHeight-prev;else if(near||!started)line.scrollTop=line.scrollHeight;
   started=true;line.classList.remove('chat-loading');
-  $('bubbles').querySelectorAll('[data-photo]').forEach(img=>img.onclick=()=>openViewerById(img.dataset.photo));
+  $('bubbles').querySelectorAll('[data-photo]').forEach(img=>img.onclick=()=>openViewerById(img.dataset.photo));paintSearch();
  }
  async function markRead(){const ids=messages.filter(m=>!m.mine&&!m.read_at).map(m=>m.id);if(ids.length&&!document.hidden){await call('read',{ids});messages.forEach(m=>{if(ids.includes(m.id))m.read_at=new Date().toISOString();});}}
  async function load(older=false){
-  if(busy||document.hidden)return;busy=true;clearTimeout(timer);
+  if(busy||document.hidden||searchLoading){clearTimeout(timer);timer=setTimeout(load,2000);return;}busy=true;clearTimeout(timer);
   try{
    const last=messages.at(-1),first=messages[0];
    const v=await call('messages',older&&first?{before_time:first.created_at,before_id:first.id}:last?{after_time:last.created_at,after_id:last.id}:{});

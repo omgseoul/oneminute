@@ -1,0 +1,23 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+const tick=()=>new Promise(r=>setTimeout(r,0));
+(async()=>{
+ const html=fs.readFileSync('messages.html','utf8').replace(/<script[\s\S]*?<\/script>/g,'');
+ const w=new JSDOM(html,{url:'https://omgworks24.com/messages.html',runScripts:'outside-only'}).window;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ w.eval(fs.readFileSync('message-profiles.js','utf8'));
+ const session={accessToken:'test'},profile={display_name:'니완',profile_image:'https://example.com/photo.jpg',job_title:'매니저',property_name:'서울점',contact_phone:'010-0000-0000'};
+ let calls=[],fail=false,pending;
+ w.StaffChat={profile:async(s,peer)=>{calls.push([s,peer]);if(pending)return pending;if(fail)throw Error('권한이 없습니다.');return profile;}};
+ const meta=w.document.getElementById('detailMeta');const reset=()=>{meta.innerHTML='<span class="detail-avatar">니</span><span class="detail-who"><b>니완</b><small>10월 11일</small></span>';};
+ reset();w.MessageProfiles.bind({sender_employee_id:'one',sender_label:'니완'},session);await tick();
+ assert.equal(calls[0][1],'employee:one');assert.equal(meta.querySelector('img').src,profile.profile_image);assert.equal(meta.querySelector('button').getAttribute('aria-label'),'니완 근무자 정보 보기');
+ w.history.replaceState({omgMessageLayer:true},'');meta.querySelector('button').click();await tick();assert(w.document.getElementById('messageProfile').open);assert.match(w.document.getElementById('messageProfile').textContent,/매니저/);assert.match(w.document.getElementById('messageProfile').textContent,/서울점/);assert.match(w.document.getElementById('messageProfile').textContent,/010-0000-0000/);
+ w.addEventListener('popstate',()=>w.MessageProfiles.restore());w.document.getElementById('messageProfileClose').click();await new Promise(r=>setTimeout(r,30));assert(!w.document.getElementById('messageProfile').open);assert.equal(w.history.state.omgMessageLayer,true);
+ fail=true;meta.querySelector('button').click();await tick();assert.equal(w.document.getElementById('messageProfileStatus').textContent,'권한이 없습니다.');assert(!w.document.getElementById('messageProfileRetry').hidden);
+ fail=false;w.document.getElementById('messageProfileRetry').click();await tick();assert.equal(w.document.getElementById('messageProfileStatus').textContent,'');w.MessageProfiles.restore();
+ let resolve;pending=new Promise(r=>resolve=r);reset();w.MessageProfiles.bind({sender_employee_id:'old',sender_label:'이전 근무자'},session);reset();w.MessageProfiles.bind({sender_type:'system',sender_label:'시스템'},session);resolve(profile);pending=null;await tick();assert.equal(meta.querySelector('button'),null);assert.equal(meta.querySelector('img'),null);
+ reset();w.MessageProfiles.bind({is_sender:true,recipient_labels:['니완','지훈']},session,[{display_name:'니완',recipient_key:'employee:one'},{display_name:'지훈',recipient_key:'employee:two'}]);assert.equal(meta.querySelectorAll('button').length,2);await tick();
+ reset();w.MessageProfiles.bind({is_sender:true,recipient_labels:['동명이인']},session,[{display_name:'동명이인',recipient_key:'employee:one'},{display_name:'동명이인',recipient_key:'employee:two'}]);assert.equal(meta.querySelector('button'),null);
+ reset();w.MessageProfiles.bind({sender_owner_id:'owner',sender_label:'사장님'},session);await tick();assert.equal(calls.at(-1)[1],'owner:owner');
+ console.log('Latest avatar, profile fields, modal back navigation, permission retry, stale lookup isolation, multiple recipients and owner identity passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

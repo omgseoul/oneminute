@@ -1,0 +1,68 @@
+/* OMS 정돈된 카드: shared notice, request and approval presentation. */
+#detail.dc-dialog .sheet{padding:10px 21px calc(22px + env(safe-area-inset-bottom));border-radius:26px 26px 0 0;background:#fff;height:auto;overflow:hidden}
+#detail.dc-dialog .sheet-handle{margin:0 auto 19px;width:38px;height:4px;background:#dce3ec;border-radius:8px;position:static;transform:none;flex-shrink:0}
+#detail.dc-dialog .sheet-top{position:relative;top:auto;right:auto;display:flex;align-items:flex-start;margin-bottom:15px;padding-right:42px;flex-shrink:0}
+#detail.dc-dialog .close{position:absolute;right:0;top:0;width:34px;height:34px;min-width:34px;border-radius:50%;background:#f2f5f9;font-size:22px;font-weight:400}
+#detail.dc-dialog #detailTitle{display:block;font-size:23px;line-height:1.35;letter-spacing:-.045em;font-weight:750}
+.dc-heading{min-width:0}.dc-kicker{display:block;margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#235ba0}
+#detail .dc-state{display:inline-block;padding:4px 9px;margin-left:6px;border-radius:20px;background:#eef4fc;color:#235ba0;font-size:11px;font-weight:650;letter-spacing:0}
+#detail .dc-state.complete{background:#eaf6f0;color:#26765e}
+#detail .dc-state[hidden]{display:none}
+#detail.dc-dialog .detail-identity{gap:9px;margin:0 0 18px;padding:0;border:0;min-height:32px;align-items:center;grid-template-columns:32px minmax(0,1fr)}
+#detail.dc-dialog .detail-avatar{width:32px;height:32px;min-width:32px;font-size:15px}
+#detail.dc-dialog .detail-avatar img{width:32px;height:32px}
+#detail.dc-dialog .detail-who b{font-size:14px;font-weight:700}
+#detail.dc-dialog .detail-who small{font-size:11px;color:#65748a;margin-top:3px}
+#detail.dc-dialog .detail-identity>.message-kind{display:none}
+#detail.dc-dialog .body{margin-top:0;border:1px solid #e5ebf2;border-radius:15px;padding:17px;font-size:15px;line-height:1.75;background:#f5f7fa}
+#detail.dc-dialog .body[hidden]{display:none}
+#detail.dc-notice .body{background:#f3effb;color:#283c59;border:0}
+#detail.dc-dialog .attendance{margin-top:0;gap:11px}
+#detail.dc-dialog .attendance-row{display:block;padding:14px 15px;background:#fff;border:1px solid #e5ebf2;border-radius:15px}
+#detail.dc-dialog .attendance-row>b{display:block;color:#65748a;font-size:11px;font-weight:500;margin-bottom:9px}
+#detail.dc-dialog .attendance-row.dc-work-date{display:flex;align-items:center;justify-content:space-between;padding:0 1px 13px;border:0;border-radius:0}
+#detail.dc-dialog .dc-work-date>b{margin:0}#detail.dc-dialog .dc-work-date>span{font-size:12px;font-weight:650;color:#183153}
+#detail.dc-dialog .attendance-row.dc-requested{background:#f3f6fa;border-color:transparent}
+.dc-range{display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:6px;align-items:center;color:#183153}
+.dc-range>span{min-width:0}.dc-range small{display:block;font-size:11px;line-height:1.4;color:#65748a;margin-bottom:4px;overflow-wrap:anywhere}
+.dc-range strong{display:block;font-size:22px;line-height:1.3;font-weight:750;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.dc-range i{font-style:normal;color:#8794a6;text-align:center;font-size:16px}
+.dc-note{color:#65748a;font-size:12px;line-height:1.55;margin:4px 0 0;padding:0 1px}.dc-note[hidden]{display:none}
+#detail.dc-dialog .announcement-confirm{margin-top:18px;padding:0;border:0;background:transparent;gap:12px}
+#detail.dc-dialog .understood{font-size:13px;font-weight:500;line-height:1.55;align-items:flex-start}
+#detail.dc-dialog .understood input{flex:none;margin:0;width:19px;height:19px;accent-color:#204f89}
+#detail.dc-dialog #ackName{padding:12px;border:1px solid #dce4ed;border-radius:11px;font-size:16px;min-height:46px;background:#fff;color:#183153}
+#detail.dc-dialog .ack-name-label{display:block;font-size:12px;color:#65748a;margin-bottom:7px}
+#detail.dc-dialog .approval-actions{gap:9px;margin-top:20px;flex-shrink:0}
+#detail.dc-dialog .ack{margin-top:0;min-height:48px;height:auto;padding:12px;border-radius:13px;font-size:14px;font-weight:650;background:#204f89}
+#detail.dc-dialog .ack.reject{background:#f3f6fa;color:#53657e;border:0}
+#detail.dc-dialog .ack.done{background:#eaf6f0;color:#26765e}
+#detail.dc-dialog .approval-actions.two{grid-template-columns:1fr 2fr}
+#detail.dc-dialog .ack-status{padding:14px;border-radius:14px;background:#f3f6fa;font-size:12px;gap:8px}
+#detail.dc-dialog #decisionError:empty{display:none}
+#editOverlay .dialog{padding:12px 21px calc(23px + env(safe-area-inset-bottom));border-radius:26px 26px 0 0;max-height:calc(100dvh - 24px);overflow-y:auto;background:#fff}
+#editOverlay .dc-edit-handle{height:4px;width:38px;border-radius:8px;margin:0 auto 20px;background:#dce3ec}
+#editOverlay .dialog-top{align-items:flex-start;gap:12px}
+#editOverlay h2{font-size:23px;line-height:1.35;letter-spacing:-.045em;font-weight:750}
+#editOverlay .close{border-radius:50%;background:#f3f6fa;font-size:22px;font-weight:400;width:34px;height:34px;flex:none}
+#editOverlay .edit-meta{font-size:12px;color:#65748a;margin:12px 0 17px}
+#editOverlay .dc-edit-card{padding:14px 15px;border:1px solid #e5ebf2;border-radius:15px;margin-bottom:16px}
+#editOverlay .dc-edit-card>small{display:block;font-size:11px;color:#65748a;margin-bottom:9px}
+#editOverlay #editPreview{background:#f3f6fa;border-color:transparent;margin:17px 0 0}
+#editOverlay #editPreview[hidden]{display:none}
+#editOverlay .time-grid{gap:10px}#editOverlay .time-grid label{font-size:12px;color:#65748a;font-weight:600}
+#editOverlay .time-grid input{height:48px;border-radius:11px;border:1px solid #dce4ed;font-size:16px;color:#183153}
+#editOverlay .dc-edit-actions{display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:20px}
+#editOverlay .dc-edit-actions button{min-height:48px;margin:0;padding:12px;border:0;border-radius:13px;font-size:14px;font-weight:650}
+#editOverlay #cancelEdit{background:#f3f6fa;color:#53657e}#editOverlay #submitEdit{background:#204f89;color:#fff;width:100%;height:auto}
+#editOverlay #editError:empty{display:none}#editOverlay #editError{font-size:12px;line-height:1.5}
+.holiday-dialog{border:0!important;border-radius:24px!important;padding:22px 21px!important;color:#183153}
+.holiday-dialog .holiday-head{margin-bottom:19px;align-items:flex-start}.holiday-dialog h2{font-size:23px;letter-spacing:-.045em;font-weight:750}
+.holiday-dialog .holiday-head button{width:34px;height:34px;border-radius:50%;background:#f3f6fa;font-weight:400}
+.holiday-dialog .holiday-notice{padding:17px;background:#f3effb;border-radius:15px;font-size:15px;line-height:1.75}
+.holiday-dialog .holiday-ack{font-weight:500}.holiday-dialog .holiday-field{color:#65748a;font-size:12px;font-weight:600}
+.holiday-dialog .holiday-actions .holiday-primary{width:100%;border-radius:13px;background:#204f89;min-height:48px;font-size:14px;font-weight:650}
+@media(max-width:380px){#detail.dc-dialog .sheet,#editOverlay .dialog{padding-left:17px;padding-right:17px}.dc-range strong{font-size:20px}#detail.dc-dialog #detailTitle,#editOverlay h2{font-size:21px}}
+
+#detail.dc-dialog .detail-scroll{margin-top:0}
+#detail.dc-dialog #close[hidden],#detail.dc-dialog #ack[hidden],#detail.dc-dialog #reject[hidden]{display:none!important}

@@ -1,0 +1,20 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+const tick=()=>new Promise(r=>setTimeout(r,30));
+(async()=>{
+ const w=new JSDOM('<nav id="nav"></nav>',{url:'https://omgworks24.com/messages.html',runScripts:'outside-only',pretendToBeVisual:true}).window;
+ w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')};
+ w.GuestSupport={esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};
+ w.StaffChat={avatar:()=>''};let payload={report_fields:[{key:'a',kind:'photo',label:'첫 사진'},{key:'missing',kind:'photo',label:'빈 사진'},{key:'text',kind:'text',label:'내용',value:'OK'},{key:'b',kind:'photo',label:'둘째 사진'},{key:'c',kind:'photo',label:'셋째 사진'}],a:'data:image/jpeg;base64,AAAA',b:'data:image/jpeg;base64,BBBB',c:'data:image/jpeg;base64,CCCC'};
+ w.omgSupabase={rpc:async()=>({data:{ok:true,reports:[{report_type:'clock_in',employee_name:'근무자',property_name:'본점',submitted_at:'2026-10-11T14:00Z',payload}]}})};
+ w.eval(fs.readFileSync('report-inbox.js','utf8'));w.ReportInbox.init({accessToken:'x',sessionKind:'staff'},w.document.getElementById('nav'));
+ await w.ReportInbox.open('one');let buttons=w.document.querySelectorAll('.report-photo-open');assert.equal(buttons.length,3);buttons[1].click();
+ const $=id=>w.document.getElementById(id);assert($('reportPhotoViewer').open);assert.equal($('reportPhotoLabel').textContent,'둘째 사진');assert.equal($('reportPhotoCount').textContent,'3장 중 2번째');assert.equal($('reportPhotoThumbs').children.length,3);
+ $('reportPhotoNext').click();assert.equal($('reportPhotoLabel').textContent,'셋째 사진');assert($('reportPhotoNext').disabled);$('reportPhotoPrevious').click();$('reportPhotoViewer').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowLeft'}));assert.equal($('reportPhotoLabel').textContent,'첫 사진');assert($('reportPhotoPrevious').disabled);
+ const touch=(type,x,y)=>{const event=new w.Event(type);Object.defineProperty(event,type==='touchstart'?'touches':'changedTouches',{value:[{clientX:x,clientY:y}]});$('reportPhotoStage').dispatchEvent(event);};touch('touchstart',220,100);touch('touchend',100,103);assert.equal($('reportPhotoLabel').textContent,'둘째 사진');touch('touchstart',100,100);touch('touchend',110,230);assert.equal($('reportPhotoLabel').textContent,'둘째 사진');
+ $('reportPhotoGallery').click();assert(!$('reportPhotoGrid').hidden);assert($('reportPhotoStage').hidden);$('reportPhotoGrid').children[2].click();assert($('reportPhotoGrid').hidden);assert.equal($('reportPhotoLabel').textContent,'셋째 사진');
+ $('reportPhotoClose').click();await tick();assert(!$('reportPhotoViewer').open);assert($('reportDetail').open);assert.equal(w.history.state.reportDetail,true);assert(!$('reportPhotoFull').hasAttribute('src'));assert.equal($('reportPhotoThumbs').children.length,0);
+ payload={report_fields:[{key:'only',kind:'photo',label:'한 장'}],only:'data:image/jpeg;base64,DDDD'};await w.ReportInbox.open('two');w.document.querySelector('.report-photo-open').click();assert.equal($('reportPhotoCount').textContent,'1장 중 1번째');assert($('reportPhotoPrevious').disabled&&$('reportPhotoNext').disabled);assert.equal($('reportPhotoThumbs').children.length,1);
+ w.history.back();await tick();assert(!$('reportPhotoViewer').open);assert($('reportDetail').open);w.close();
+ const app=new JSDOM(fs.readFileSync('app.html','utf8')).window.document;const icon=app.querySelector('#settings .quick-visual');assert.equal(icon.dataset.icon,'house');assert.equal(icon.querySelector('svg').getAttribute('viewBox'),'0 0 24 24');assert.equal(icon.querySelector('path').getAttribute('stroke-width'),app.querySelector('#accountManagement path').getAttribute('stroke-width'));
+ console.log('Report-wide photos, boundaries, thumbnails, gallery, keyboard, swipes, Back, report isolation and matching house icon passed.');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,22 @@
+/* Shared zoom and swipe gestures for staff, guest and report photo viewers. */
+window.OMSPhotoZoom={attach(stage,img,{onSwipe=()=>{}}={}){
+ let scale=1,x=0,y=0,key=null,gesture=null,usedMulti=false,lastTap=null;
+ const pointers=new Map(),bar=document.createElement('div');bar.className='photo-zoom-tools';bar.setAttribute('aria-label','사진 확대 조절');
+ bar.innerHTML='<button type="button" aria-label="사진 축소">−</button><button type="button" aria-label="사진 원래 크기로" class="photo-zoom-reset">100%</button><button type="button" aria-label="사진 확대">+</button>';
+ stage.classList.add('photo-zoom-stage');stage.append(bar);const [minus,resetButton,plus]=bar.children;
+ function bounds(){const r=stage.getBoundingClientRect(),ratio=img.naturalWidth&&img.naturalHeight?Math.min(r.width/img.naturalWidth,r.height/img.naturalHeight):1;return {w:r.width,h:r.height,bx:Math.max(0,((img.naturalWidth?img.naturalWidth*ratio:r.width)*scale-r.width)/2),by:Math.max(0,((img.naturalHeight?img.naturalHeight*ratio:r.height)*scale-r.height)/2)};}
+ function paint(){const b=bounds();x=Math.max(-b.bx,Math.min(b.bx,x));y=Math.max(-b.by,Math.min(b.by,y));img.style.transform=`translate(${x}px, ${y}px) scale(${scale})`;img.style.transformOrigin='center';stage.classList.toggle('photo-is-zoomed',scale>1.01);resetButton.textContent=Math.round(scale*100)+'%';minus.disabled=scale<=1;plus.disabled=scale>=5;}
+ function point(cx,cy){const r=stage.getBoundingClientRect();return {x:cx-r.left-r.width/2,y:cy-r.top-r.height/2};}
+ function zoom(next,p={x:0,y:0}){next=Math.max(1,Math.min(5,next));const ratio=next/scale;x=p.x-(p.x-x)*ratio;y=p.y-(p.y-y)*ratio;scale=next;if(scale===1)x=y=0;paint();}
+ function reset(){pointers.clear();gesture=null;usedMulti=false;lastTap=null;scale=1;x=y=0;paint();}
+ function begin(){const a=[...pointers.values()];if(a.length>=2){const p=point((a[0].x+a[1].x)/2,(a[0].y+a[1].y)/2);gesture={kind:'pinch',distance:Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y)||1,scale,x,y,anchor:p};usedMulti=true;lastTap=null;}else if(a.length===1)gesture={kind:'drag',start:a[0],x,y,scale};else gesture=null;}
+ stage.addEventListener('pointerdown',event=>{if(event.target.closest('button')||event.button!==0)return;if(!pointers.size)usedMulti=false;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});try{stage.setPointerCapture(event.pointerId);}catch{}begin();});
+ stage.addEventListener('pointermove',event=>{if(!pointers.has(event.pointerId))return;event.preventDefault();pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});const a=[...pointers.values()];if(gesture?.kind==='pinch'&&a.length>=2){const p=point((a[0].x+a[1].x)/2,(a[0].y+a[1].y)/2),next=Math.max(1,Math.min(5,gesture.scale*Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y)/gesture.distance)),ratio=next/gesture.scale;scale=next;x=p.x-(gesture.anchor.x-gesture.x)*ratio;y=p.y-(gesture.anchor.y-gesture.y)*ratio;paint();}else if(gesture?.kind==='drag'&&scale>1){x=gesture.x+a[0].x-gesture.start.x;y=gesture.y+a[0].y-gesture.start.y;paint();}});
+ function end(event,cancel=false){if(!pointers.has(event.pointerId))return;const g=gesture,wasMulti=usedMulti;pointers.delete(event.pointerId);if(!cancel&&!pointers.size&&g?.kind==='drag'&&!wasMulti){const dx=event.clientX-g.start.x,dy=event.clientY-g.start.y;if(scale<=1.01&&Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){lastTap=null;onSwipe(dx<0?1:-1);}else if(Math.hypot(dx,dy)<10&&event.pointerType!=='mouse'){const now=Date.now();if(lastTap&&now-lastTap.at<320&&Math.hypot(lastTap.x-event.clientX,lastTap.y-event.clientY)<25){zoom(scale>1.01?1:2.5,point(event.clientX,event.clientY));lastTap=null;}else lastTap={at:now,x:event.clientX,y:event.clientY};}}begin();}
+ stage.addEventListener('pointerup',event=>end(event));stage.addEventListener('pointercancel',event=>{lastTap=null;end(event,true);});
+ stage.addEventListener('dblclick',event=>{if(event.target.closest('button'))return;event.preventDefault();zoom(scale>1.01?1:2.5,point(event.clientX,event.clientY));});
+ stage.addEventListener('wheel',event=>{if(event.target.closest('button'))return;event.preventDefault();zoom(scale*Math.exp(-event.deltaY*.002),point(event.clientX,event.clientY));},{passive:false});
+ img.addEventListener('dragstart',event=>event.preventDefault());img.addEventListener('load',paint);window.addEventListener('resize',paint);
+ minus.onclick=()=>zoom(scale/1.5);plus.onclick=()=>zoom(scale*1.5);resetButton.onclick=reset;paint();
+ return {reset,setKey(value){if(value!==key){key=value;reset();}},get zoomed(){return scale>1.01;}};
+}};

@@ -2,7 +2,7 @@
  await window.openGuestEmailLink?.();
  const G=GuestSupport,q=new URLSearchParams(location.search),slug=q.get('p'),isGuest=!!slug;
  let auth,roomId=q.get('room'),seq=0,busy=false,timer,failures=0,actor,room,asset=null,pending=null,lastDay='',lastRead=0,roomLoaded=false,sending=false,uploading=false,lastRetry=0;
- let chatMessages=[],photoAssets=new Map(),viewerIndex=0,touchStartX=null,refreshingPhotos=null;
+ let chatMessages=[],photoAssets=new Map(),viewerIndex=0,refreshingPhotos=null;
  const timeline=document.getElementById('timeline'),body=document.getElementById('body'),send=document.getElementById('send'),$=id=>document.getElementById(id);
  if(isGuest){document.body.classList.add('guest-facing-chat');const s=JSON.parse(localStorage.getItem('omg_guest_'+slug)||'null');if(!s){location.replace('guest.html?p='+encodeURIComponent(slug));return;}auth={guest_token:s.guest_token};roomId=s.room_id;$('back').href='guest.html?p='+encodeURIComponent(slug);$('back').textContent='‹ 숙소 안내';}
  else{const s=await omgSession.require({allowCompleted:true});if(!s)return;auth={access_token:s.accessToken};}
@@ -41,7 +41,7 @@
  }
  function renderViewer(){
   const list=photos(),item=list[viewerIndex];if(!item){closeViewer();return;}
-  $('photoViewerImage').src=item.asset.url;
+  photoZoom.setKey(String(item.message.id));$('photoViewerImage').src=item.asset.url;
   $('photoViewerName').textContent=mine(item.message)?'나':item.message.sender_name||(isGuest?'직원':room?.guest_name||'게스트');
   $('photoViewerDate').textContent=new Date(item.message.created_at).toLocaleString('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   $('photoCount').textContent=`${list.length}장 중 ${viewerIndex+1}번째`;
@@ -51,7 +51,7 @@
   $('photoThumbs').querySelector('.active')?.scrollIntoView?.({block:'nearest',inline:'center'});
  }
  function openViewerById(id){const list=photos(),index=list.findIndex(item=>String(item.message.id)===String(id));if(index<0)return;viewerIndex=index;$('photoViewer').hidden=false;document.body.classList.add('media-open');renderViewer();$('photoViewerClose').focus();refreshPhotoUrls(id).catch(error=>console.warn('Guest photo refresh',error));}
- function closeViewer(){$('photoGallery').hidden=true;$('photoViewer').hidden=true;document.body.classList.remove('media-open');$('photoViewerImage').removeAttribute('src');}
+ function closeViewer(){photoZoom.reset();$('photoGallery').hidden=true;$('photoViewer').hidden=true;document.body.classList.remove('media-open');$('photoViewerImage').removeAttribute('src');}
  function moveViewer(step){const next=viewerIndex+step;if(next<0||next>=photos().length)return;viewerIndex=next;renderViewer();}
  function renderGallery(){const list=photos();$('galleryCount').textContent=`${list.length}장`;$('galleryStatus').textContent=list.length?'':'대화에 사진이 없습니다.';$('photoGrid').innerHTML=list.map((item,index)=>`<button type="button" data-gallery-index="${index}" aria-label="${index+1}번째 사진 열기"><img src="${G.esc(item.asset.url)}" alt="대화 사진" loading="lazy"><time>${G.esc(new Date(item.message.created_at).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}))}</time></button>`).join('');$('photoGrid').querySelectorAll('[data-gallery-index]').forEach(button=>button.onclick=()=>{viewerIndex=Number(button.dataset.galleryIndex);$('photoGallery').hidden=true;renderViewer();});}
  async function refreshPhotoUrls(currentId){
@@ -80,8 +80,7 @@
   catch(err){G.message(err.message+' 전송을 다시 누르면 중복 없이 재시도합니다.',true);}finally{sending=false;body.disabled=false;send.disabled=uploading||!room?.chat_enabled;}
  };
  $('photoViewerClose').onclick=closeViewer;$('photoPrevious').onclick=()=>moveViewer(-1);$('photoNext').onclick=()=>moveViewer(1);$('photoGalleryOpen').onclick=openGallery;$('photoGalleryClose').onclick=()=>$('photoGallery').hidden=true;
- $('photoStage').addEventListener('touchstart',event=>{touchStartX=event.changedTouches[0]?.clientX??null;},{passive:true});
- $('photoStage').addEventListener('touchend',event=>{if(touchStartX===null)return;const distance=(event.changedTouches[0]?.clientX??touchStartX)-touchStartX;touchStartX=null;if(Math.abs(distance)>45)moveViewer(distance<0?1:-1);},{passive:true});
+ const photoZoom=OMSPhotoZoom.attach($('photoStage'),$('photoViewerImage'),{onSwipe:moveViewer});
  document.addEventListener('keydown',event=>{if(!$('photoGallery').hidden&&event.key==='Escape'){$('photoGallery').hidden=true;return;}if($('photoViewer').hidden)return;if(event.key==='Escape')closeViewer();else if(event.key==='ArrowLeft')moveViewer(-1);else if(event.key==='ArrowRight')moveViewer(1);});
  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)poll();});window.addEventListener('online',poll);window.addEventListener('focus',poll);await poll();
  if(!isGuest)call('retry_events').catch(()=>{});

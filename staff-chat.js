@@ -1,7 +1,7 @@
 (async()=>{
  const $=id=>document.getElementById(id),e=GuestSupport.esc,params=new URLSearchParams(location.search),peer=params.get('peer');
  let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false;
- let peerProfile=null,viewerIndex=0,touchStartX=null,galleryLoading=false,galleryComplete=false;
+ let peerProfile=null,viewerIndex=0,galleryLoading=false,galleryComplete=false;
  const line=$('timeline'),input=$('body');
  let searchVersion=0,searchIds=[],searchIndex=-1,searchQuery='',searchLoading=false;
  function paintSearch(){
@@ -70,7 +70,7 @@
  function renderPhoto(){const el=$('photoPending');el.hidden=!photo;el.innerHTML=photo?'<img alt="선택한 사진"><span>사진 첨부</span><button type="button" aria-label="첨부 취소">×</button>':'';if(photo){el.querySelector('img').src=photo;el.querySelector('button').onclick=()=>{if(sending)return;photo=null;pending=null;renderPhoto();keepDraft();};}}
  function renderViewer(){
   const list=photos(),item=list[viewerIndex];if(!item){closeViewer();return;}
-  $('photoViewerImage').src=item.photo;$('photoViewerName').textContent=item.mine?'나':peerProfile?.display_name||'대화 상대';
+  photoZoom.setKey(String(item.id));$('photoViewerImage').src=item.photo;$('photoViewerName').textContent=item.mine?'나':peerProfile?.display_name||'대화 상대';
   $('photoViewerDate').textContent=new Date(item.created_at).toLocaleString('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   $('photoCount').textContent=`${list.length}장 중 ${viewerIndex+1}번째`;
   $('photoPrevious').disabled=viewerIndex===0;$('photoNext').disabled=viewerIndex===list.length-1;
@@ -79,7 +79,7 @@
   const active=$('photoThumbs').querySelector('.active');if(active?.scrollIntoView)active.scrollIntoView({block:'nearest',inline:'center'});
  }
  function openViewerById(id){const list=photos(),index=list.findIndex(item=>String(item.id)===String(id));if(index<0)return;viewerIndex=index;$('photoViewer').hidden=false;document.body.classList.add('media-open');renderViewer();$('photoViewerClose').focus();}
- function closeViewer(){$('photoGallery').hidden=true;$('photoViewer').hidden=true;document.body.classList.remove('media-open');$('photoViewerImage').removeAttribute('src');}
+ function closeViewer(){photoZoom.reset();$('photoGallery').hidden=true;$('photoViewer').hidden=true;document.body.classList.remove('media-open');$('photoViewerImage').removeAttribute('src');}
  function moveViewer(step){const next=viewerIndex+step;if(next<0||next>=photos().length)return;viewerIndex=next;renderViewer();}
  function renderGallery(){const list=photos();$('galleryCount').textContent=`${list.length}장`;$('galleryStatus').textContent=list.length?'':'대화에 사진이 없습니다.';$('photoGrid').innerHTML=list.map((item,index)=>`<button type="button" data-gallery-index="${index}" aria-label="${index+1}번째 사진 열기"><img src="${e(item.photo)}" alt="대화 사진" loading="lazy"><time>${e(new Date(item.created_at).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}))}</time></button>`).join('');$('photoGrid').querySelectorAll('[data-gallery-index]').forEach(button=>button.onclick=()=>{viewerIndex=Number(button.dataset.galleryIndex);$('photoGallery').hidden=true;renderViewer();});}
  async function loadAllPhotos(){
@@ -101,8 +101,7 @@
  $('peerIdentity').onclick=()=>{if(!peerProfile)return;$('peerProfileDialog').showModal?.()||$('peerProfileDialog').setAttribute('open','');};
  $('peerProfileClose').onclick=()=>$('peerProfileDialog').close?.()||$('peerProfileDialog').removeAttribute('open');
  $('photoViewerClose').onclick=closeViewer;$('photoPrevious').onclick=()=>moveViewer(-1);$('photoNext').onclick=()=>moveViewer(1);$('photoGalleryOpen').onclick=openGallery;$('photoGalleryClose').onclick=()=>$('photoGallery').hidden=true;
- $('photoStage').addEventListener('touchstart',event=>{touchStartX=event.changedTouches[0]?.clientX??null;},{passive:true});
- $('photoStage').addEventListener('touchend',event=>{if(touchStartX===null)return;const distance=(event.changedTouches[0]?.clientX??touchStartX)-touchStartX;touchStartX=null;if(Math.abs(distance)>45)moveViewer(distance<0?1:-1);},{passive:true});
+ const photoZoom=OMSPhotoZoom.attach($('photoStage'),$('photoViewerImage'),{onSwipe:moveViewer});
  document.addEventListener('keydown',event=>{if(!$('photoGallery').hidden&&event.key==='Escape'){$('photoGallery').hidden=true;return;}if($('photoViewer').hidden)return;if(event.key==='Escape')closeViewer();else if(event.key==='ArrowLeft')moveViewer(-1);else if(event.key==='ArrowRight')moveViewer(1);});
  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)load();});addEventListener('online',()=>load());addEventListener('pagehide',()=>{clearTimeout(timer);keepDraft();});
  try{

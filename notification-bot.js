@@ -37,5 +37,5 @@ window.NotificationBot=(()=>{
  document.addEventListener('touchend',()=>{if(start&&distance>80)refresh();else if(!refreshing)hint.hidden=true;start=null;distance=0;},{passive:true});document.addEventListener('touchcancel',()=>{start=null;if(!refreshing)hint.hidden=true;});loadProfiles();loadAlerts();
  if(new URLSearchParams(location.search).get('tab')==='alerts')setTimeout(()=>open(session.propertyId),0);
  }
- return {init,isAlert,search(v){query=v.trim().toLowerCase();renderRooms();},update(v,ids){data=v;properties=ids;renderRooms();renderConversation();loadAlerts();},renderRooms,openAnnouncements(){open(session.propertyId,true);}};
+ return {init,isAlert,search(v){query=v.trim().toLowerCase();renderRooms();},update(v,ids){data=v;properties=ids;renderRooms();renderConversation();loadAlerts();},renderRooms,async sentNotices(older=false){await loadAlerts(older);if(!alertsLoaded)throw Error('공지를 불러오지 못했습니다.');return {items:items().filter(i=>i.message_type==='announcement'&&i.is_sender).sort((a,b)=>b.created_at.localeCompare(a.created_at)),hasOlder};}};
 })();

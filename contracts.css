@@ -30,3 +30,5 @@
 .contract-break-holiday{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
 .contract-break-holiday:has(label[hidden]){grid-template-columns:1fr}
 .contract-choice-schedule_mode .contract-segments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+
+.contract-fields label.contract-extra{font-size:11px;font-weight:500;color:var(--muted);margin:7px 0}.contract-shell .contract-extra textarea{min-height:0;height:58px;line-height:20px;padding:8px 10px;resize:vertical}

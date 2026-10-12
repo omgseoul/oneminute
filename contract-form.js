@@ -24,11 +24,11 @@ window.OMSContractForm = (() => {
    <div class="standard-time field-wide">${input('start_time','출근','time')}${input('end_time','퇴근','time')}</div>
    <div class="contract-break-holiday field-wide">${input('break_minutes','휴게시간 · 분','number')}${input('holiday','주휴일')}</div>
    <div class="field-wide contract-daily" hidden><strong>요일별 근무시간 · 휴게시간</strong><div class="contract-day-head"><span>요일</span><span>시작</span><span>종료</span><span>휴게(분)</span></div>${dayRows}</div><label class="field-wide">근무시간 보충 설명<input data-field="schedule_note" value="${esc(f.schedule_note)}" maxlength="1000" placeholder="필요한 경우만 입력"></label>
-   <h2>임금</h2>${choice('pay_type','급여 종류',[['hourly','시급'],['monthly','월급'],['annual','연봉']])}${input('amount','계약 금액 · 원','number')}${input('pay_day','매월 지급일 · 말일은 31','number')}${input('pay_period','임금 산정기간','text',true)}${input('pay_method','지급방법','text',true)}${input('bonus','상여금')}${input('allowance','기타수당 / 구성 내역')}${input('overtime','연장·야간·휴일근로 수당','text',true)}
+   <h2>임금</h2>${choice('pay_type','급여 종류',[['hourly','시급'],['monthly','월급'],['annual','연봉']])}${input('amount','계약 금액 · 원','number')}${input('pay_day','매월 지급일 · 말일은 31','number')}${input('pay_period','임금 산정기간','text',true)}${input('pay_method','지급방법','text',true)}${input('bonus','상여금')}${input('allowance','기타수당 / 구성 내역')}${input('overtime','연장·야간·휴일근로 수당','text',true)}<label class="field-wide contract-extra">기타 약정<textarea data-field="extra" rows="2" maxlength="6000">${esc(f.extra)}</textarea></label><p class="field-wide contract-other-note" hidden>기타 계약서는 별도 계약 내용을 기타 약정에 입력해주세요.</p>
    ${checks('insurance','사회보험 적용 항목',['고용보험','산재보험','국민연금','건강보험'])}<label class="field-wide">보험 적용 / 제외 사유<input data-field="insurance_note" value="${esc(f.insurance_note)}" maxlength="500" placeholder="해당 사항이 있으면 입력"></label>
    <h2>사업장 정보</h2>${input('business_name','사업장명')}${input('employer_name','사업주명')}${input('business_phone','연락처','tel',true)}${input('business_address','사업장 주소','text',true)}
    <h2>근로자 정보</h2>${input('employee_name','근로자명')}${input('employee_phone','연락처','tel')}${input('employee_address','주소','text',true)}
-   <h2>기타 약정</h2><label class="field-wide">추가 약정<textarea data-field="extra" maxlength="6000">${esc(f.extra)}</textarea></label><p class="field-wide contract-other-note" hidden>기타 계약서는 별도 계약 내용을 추가 약정에 입력해주세요.</p>${input('written_date','작성일','date')}
+   ${input('written_date','작성일','date')}
   </div><p class="contract-note">사업장 정보는 Property 설정의 기본값입니다. 이 계약서에 맞게 수정할 수 있습니다.</p><button type="button" id="useStructured">입력 항목으로 계약 내용 생성</button>`;
   const bodyLabel=body.closest('label'),ownerLabel=employer.closest('label');ownerLabel.hidden=mode==='structured';
   const details=document.createElement('details');details.className='contract-text-editor';details.innerHTML='<summary>계약서 전문 확인·직접 수정</summary>';bodyLabel.before(details);details.append(bodyLabel);details.open=mode==='manual';
@@ -62,7 +62,7 @@ ${pay}: ${Number(f.amount||0).toLocaleString('ko-KR')}원${f.pay_type==='annual'
 지급방법: ${f.pay_method}
 상여금: ${f.bonus}
 기타수당 / 임금 구성: ${f.allowance}
-연장·야간·휴일근로 수당: ${f.overtime}
+연장·야간·휴일근로 수당: ${f.overtime}${f.extra.trim()?'\n'+f.extra.trim().split(/\r?\n/).map(line=>'약정: '+line).join('\n'):''}
 
 6. 사회보험
 적용 항목: ${f.insurance.join(' · ')||'별도 기재 없음'}
@@ -77,9 +77,8 @@ ${pay}: ${Number(f.amount||0).toLocaleString('ko-KR')}원${f.pay_type==='annual'
 근로자 주소: ${f.employee_address}
 근로자 연락처: ${f.employee_phone}
 
-8. ${f.kind==='other'?'추가 계약 사항 및 계약서 교부':'계약서 교부 및 기타 약정'}
+8. 계약서 교부
 서명 완료된 계약서는 사업주와 근로자의 관련문서에 동일한 PDF로 보관하며 열람·다운로드할 수 있습니다.
-${f.extra||'추가 약정 없음'}
 본 계약에서 정하지 않은 사항은 적용 법령 및 취업규칙에 따릅니다.`;}
   function update(){host.querySelector('[data-field="end"]').disabled=f.term!=='fixed';const daily=f.schedule_mode==='daily';host.querySelector('.standard-time').hidden=daily;host.querySelector('.contract-daily').hidden=!daily;host.querySelector('.contract-break-holiday [data-field="break_minutes"]').closest('label').hidden=daily;host.querySelector('.contract-other-note').hidden=f.kind!=='other';host.querySelectorAll('[data-day-row]').forEach(row=>row.hidden=!daily||!f.days.includes(row.dataset.dayRow));if(mode==='structured'){if(['근로계약서','표준 근로계약서','단시간 근로계약서','기타 계약서'].includes(title.value))title.value={standard:'표준 근로계약서',parttime:'단시간 근로계약서',other:'기타 계약서'}[f.kind];body.value=text();employer.value=f.employer_name;}}
   function sync(){fields.forEach(root=>root.querySelectorAll('[data-field]').forEach(el=>{if(el.type==='radio')el.checked=f[el.dataset.field]===el.value;else el.value=f[el.dataset.field]??'';}));host.querySelectorAll('[data-set]').forEach(el=>el.checked=(f[el.dataset.set]||[]).includes(el.value));host.querySelectorAll('[data-day]').forEach(el=>el.value=f.daily_schedule?.[el.dataset.day]?.[el.dataset.part]??(el.dataset.part==='break'?f.break_minutes:el.dataset.part==='start'?f.start_time:f.end_time)??'');update();}

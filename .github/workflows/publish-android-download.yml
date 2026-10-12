@@ -1,0 +1,23 @@
+name: Publish verified Android download
+on:
+  workflow_run:
+    workflows: ['Build and verify OMS Android update']
+    types: [completed]
+permissions:
+  contents: read
+  pages: write
+jobs:
+  refresh-download:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh public site after verified APK commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          curl --fail-with-body --silent --show-error --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GH_REPOSITORY/pages/builds"

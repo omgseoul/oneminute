@@ -54,7 +54,7 @@
       label: String(field?.label || "").trim().slice(0, 40),
       help: "",
       kind: ["text", "numeric", "counter", "rooms", "photo"].includes(field?.kind) ? field.kind : "text",
-      size: field?.size === "half" ? "half" : "full",
+      size: ["third", "half", "full"].includes(field?.size) ? field.size : "full",
       required: field?.required === true,
       custom: true
     })).filter(field => /^custom_[a-z0-9_-]{1,50}$/.test(field.key) && field.label && !seen.has(field.key) && seen.add(field.key));

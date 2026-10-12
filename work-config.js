@@ -99,11 +99,11 @@
   function normalizeRoomTypes(roomTypes, rooms) {
     const source = Array.isArray(roomTypes) && roomTypes.length
       ? roomTypes
-      : [{ name: "객실", rooms: Array.isArray(rooms) ? rooms : [] }];
+      : (Array.isArray(rooms) && rooms.length ? [{ name: "객실", rooms }] : []);
     return source.slice(0, 30).map((group, index) => ({
-      name: String(group?.name || `객실타입${index + 1}`).trim().slice(0, 40),
+      name: String(group?.name || (Array.isArray(group?.rooms) && group.rooms.length ? `객실타입${index + 1}` : "")).trim().slice(0, 40),
       rooms: [...new Set((Array.isArray(group?.rooms) ? group.rooms : []).map(room => String(room).trim()).filter(Boolean))].slice(0, 100)
-    })).filter(group => group.name && group.rooms.length);
+    })).filter(group => group.name);
   }
 
   async function rpc(name, args) {

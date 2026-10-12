@@ -6,5 +6,5 @@
   url.searchParams.set('v',info.version_code);
   document.querySelectorAll('a[data-apk-download]').forEach(a=>{a.href=url.href;a.dataset.version=info.version_name;});
  }).catch(()=>{});
- const button=document.querySelector('[data-check-app-update]');if(button){button.hidden=typeof window.OMGNative?.checkForUpdate!=='function';button.onclick=()=>window.OMGNative.checkForUpdate();}
+ const button=document.querySelector('[data-check-app-update]');if(button){button.hidden=typeof window.OMGNative?.checkForUpdate!=='function';button.style.display=button.hidden?'none':'block';button.onclick=()=>window.OMGNative.checkForUpdate();}
 })();

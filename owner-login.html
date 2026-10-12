@@ -19,7 +19,7 @@
   </form>
   <div class="links"><a href="login.html">직원 로그인으로</a></div>
 </section></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="work-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="work-config.js?v=20261012-room-types"></script>
 <script>
 const form=document.getElementById("ownerLoginForm");const button=document.getElementById("loginButton");const message=document.getElementById("message");
 window.omgWorkConfig.loadLoginProperty().then(property=>{document.getElementById("propertyTitle").textContent=property.property_name;document.title=`${property.property_name} 사장 로그인`;}).catch(error=>{message.textContent=error.message;});

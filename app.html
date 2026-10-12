@@ -124,4 +124,4 @@ async function loadTodayOverview(session){
 })().catch(error => { console.error("Home initialization failed",error);document.getElementById("mainMenu").inert=false;document.getElementById("mainMenu").removeAttribute("inert");document.getElementById("workerStatus").textContent = "데이터를 불러오는 중입니다.";document.getElementById("workerStatus").style.color="#7d8998";document.getElementById("appShell").classList.add("ready");window.omgTransition.ready(); });
 async function logoutWorkApp(){window.OMGNative?.clearPushSession?.();await window.omgSession.logout();location.replace("login.html");}
 addEventListener("pagehide",()=>{clearInterval(homeMessageTimer);clearTimeout(messagePopupTimer);});
-</script></body></html>
+</script><button data-check-app-update hidden style="display:block;margin:8px auto;font-size:11px;padding:6px 9px">앱 업데이트 확인</button><script src="apk-download.js?v=20261012"></script></body></html>

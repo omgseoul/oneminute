@@ -1,0 +1,8 @@
+*.jks
+*.keystore
+*.p12
+**/google-services.json
+**/build/
+**/.gradle/
+
+__pycache__/

@@ -1,57 +1,93 @@
-name: Build Guesthouse Manager APK
-
+name: Build and verify OMS Android update
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - 'guesthouse-manager-app/**'
-      - '.github/workflows/build-android-apk.yml'
+    paths: ['guesthouse-manager-app/**', '.github/workflows/build-android-apk.yml']
   push:
-    paths:
-      - 'guesthouse-manager-app/**'
-      - '.github/workflows/build-android-apk.yml'
-
+    branches: [main]
+    paths: ['guesthouse-manager-app/**', '.github/workflows/build-android-apk.yml']
 permissions:
-  contents: write
-
+  contents: read
+concurrency:
+  group: oms-android-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  build:
+  compile:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+        with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-      - name: Restore Firebase Android configuration
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        with: {gradle-version: '8.9'}
+      - name: Firebase configuration
+        env: {GOOGLE_SERVICES_JSON: '${{ secrets.GOOGLE_SERVICES_JSON }}'}
         run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "::error::Repository secret GOOGLE_SERVICES_JSON is required to build the APK."
-            exit 1
-          fi
-          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          test -n "$GOOGLE_SERVICES_JSON"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > guesthouse-manager-app/app/google-services.json
+      - name: Compile Android changes
+        run: gradle assembleDebug --stacktrace
         working-directory: guesthouse-manager-app
-      - name: Build debug APK
-        run: gradle clean assembleDebug --no-build-cache --stacktrace
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions: {contents: write, id-token: write}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.9'}
+      - name: Firebase configuration
+        env: {GOOGLE_SERVICES_JSON: '${{ secrets.GOOGLE_SERVICES_JSON }}'}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > guesthouse-manager-app/app/google-services.json
+      - name: Restore encrypted persistent signing key
+        run: python3 guesthouse-manager-app/scripts/restore-signing.py
+      - name: Build update predecessor and continuity probe
         working-directory: guesthouse-manager-app
+        run: |
+          OMS_VERSION_CODE=$((OMS_VERSION_CODE - 1)) gradle assembleRelease assembleReleaseAndroidTest --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/oms-predecessor.apk"
+          cp app/build/outputs/apk/androidTest/release/app-release-androidTest.apk "$RUNNER_TEMP/oms-probe.apk"
+      - name: Build signed production update
+        working-directory: guesthouse-manager-app
+        run: gradle assembleRelease --no-build-cache --stacktrace
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify replacement install preserves private app data
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install "$RUNNER_TEMP/oms-predecessor.apk"
+            adb install -t "$RUNNER_TEMP/oms-probe.apk"
+            adb shell am instrument -w -e phase seed com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-seed.txt"
+            grep -q 'oms_update=ok' "$RUNNER_TEMP/oms-seed.txt"
+            adb install -r guesthouse-manager-app/app/build/outputs/apk/release/app-release.apk
+            adb shell am instrument -w -e phase verify com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-verify.txt"
+            grep -q 'oms_update=ok' "$RUNNER_TEMP/oms-verify.txt"
+      - name: Verify release identity and prepare download
+        run: python3 guesthouse-manager-app/scripts/publish-apk.py guesthouse-manager-app/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
-        with:
-          name: Guesthouse-Manager-debug
-          path: guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
-      - name: Publish installable APK
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with: {name: OMS-release, path: guesthouse-manager-app/app/build/outputs/apk/release/app-release.apk}
+      - name: Publish verified APK and update manifest
         run: |
-          install -D guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk downloads/OMS-0.14.6.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add downloads/OMS-0.14.6.apk
-          if ! git diff --cached --quiet; then
-            git commit -m "Publish OMS 0.14.6 APK [skip ci]"
-            git pull --rebase origin main
-            git push
-          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/OMS-latest.apk downloads/oms-update.json
+          git commit -m 'Publish verified OMS release APK [skip ci]'
+          git pull --rebase origin main
+          git push
+      - name: Remove runner signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/oms-release.p12" guesthouse-manager-app/app/google-services.json

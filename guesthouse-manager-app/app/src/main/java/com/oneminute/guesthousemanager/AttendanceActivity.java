@@ -173,6 +173,7 @@ public class AttendanceActivity extends AppCompatActivity {
         // Always request the current page. Restoring WebView state can revive an old
         // document whose click handlers no longer match the deployed site.
         webView.loadUrl(appUrlFromIntent(getIntent()));
+        AppUpdateChecker.check(this, false);
     }
 
     private String appUrlFromIntent(Intent intent) {
@@ -192,6 +193,9 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private final class PushBridge {
+        @JavascriptInterface
+        public void checkForUpdate() { runOnUiThread(() -> AppUpdateChecker.check(AttendanceActivity.this, true)); }
+
         @JavascriptInterface
         public void saveAttendanceExcel(String filename, String content) {
             runOnUiThread(() -> {

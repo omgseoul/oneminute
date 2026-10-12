@@ -1,0 +1,9 @@
+{
+  "version_code": 1116,
+  "version_name": "0.15.0",
+  "apk_url": "https://omgworks24.com/downloads/OMS-latest.apk",
+  "certificate_sha256": "178af6048f210dda0fad77fcbca7aabe99af797f43657104aa7d377b798104eb",
+  "sha256": "4e30757d62da62d8d63b990bee706f273bdc9c2c18eb7ee56820670402279abf",
+  "published_at": "2026-10-12T13:23:14.434243+00:00",
+  "bootstrap_required": true
+}

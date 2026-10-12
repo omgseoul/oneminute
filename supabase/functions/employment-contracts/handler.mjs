@@ -9,7 +9,7 @@ export function createContractHandler({db,pdf}){
  // Bound request bodies before JSON parsing, including chunked uploads.
  const reader=req.body?.getReader();let size=0,chunks=[];if(!reader)throw Error('요청 내용이 없습니다.');while(true){const{done,value}=await reader.read();if(done)break;size+=value.length;if(size>500000){await reader.cancel();return respond({ok:false,message:'계약서 또는 서명 크기가 너무 큽니다.'},413);}chunks.push(value);}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const body=JSON.parse(new TextDecoder().decode(bytes)),token=body.access_token,action=body.action,data=body.data||{};
  if(!uuid(token))return respond({ok:false,message:'관리자 또는 근무자 로그인이 필요합니다.'},401);
- if(!['list','get','draft','template_save','send','cancel','request_change','sign','pdf'].includes(action))throw Error('지원하지 않는 요청입니다.');
+ if(!['list','get','draft','template_save','template_delete','send','cancel','request_change','sign','pdf'].includes(action))throw Error('지원하지 않는 요청입니다.');
  if(action==='send'||action==='sign'){const current=await rpc(token,'get',{id:data.id});await pdf.validate(current.contract,data.signature);}
  if(action==='pdf'){const current=await rpc(token,'get',{id:data.id});const path=await ensurePdf(current.contract);const link=await db.storage.from('employee-documents').createSignedUrl(path,120,{download:'근로계약서.pdf'});if(link.error)throw link.error;return respond({ok:true,url:link.data.signedUrl});}
  const result=await rpc(token,action,data);

@@ -27,5 +27,5 @@
   load();return {load};
  }
  window.PropertyDataManagement={mount({host,accessToken}){return createManager({host,ownerToken:accessToken});}};
- const shell=document.querySelector('#operatorShell .summary');if(shell){const root=document.createElement('section');root.className='panel storage-panel';root.innerHTML='<div class="panel-head"><h2>지점별 저장 사용량</h2><button class="refresh storage-refresh" type="button">새로고침</button></div><div class="storage-host"></div>';shell.after(root);const manager=createManager({host:root.querySelector('.storage-host')});root.querySelector('.storage-refresh').onclick=manager.load;}
+ const retentionHost=document.getElementById('retentionHost');if(retentionHost){const detail=retentionHost.closest('details');let manager;detail.addEventListener('toggle',()=>{if(detail.open&&!manager)manager=createManager({host:retentionHost});});return;}const shell=document.querySelector('#operatorShell .summary');if(shell){const root=document.createElement('section');root.className='panel storage-panel';root.innerHTML='<div class="panel-head"><h2>지점별 저장 사용량</h2><button class="refresh storage-refresh" type="button">새로고침</button></div><div class="storage-host"></div>';shell.after(root);const manager=createManager({host:root.querySelector('.storage-host')});root.querySelector('.storage-refresh').onclick=manager.load;}
 })();

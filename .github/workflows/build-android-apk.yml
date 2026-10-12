@@ -21,6 +21,8 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.9'}
+      - name: Validate APK publication certificate parsing
+        run: python3 guesthouse-manager-app/scripts/test-publish-apk.py
       - name: Firebase configuration
         env: {GOOGLE_SERVICES_JSON: '${{ secrets.GOOGLE_SERVICES_JSON }}'}
         run: |

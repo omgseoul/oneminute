@@ -18,8 +18,9 @@
   const email=$('email').value.trim(),password=$('password').value;
   try{
    if(mode==='signup'){
-    const name=$('name').value.trim(),propertyName=$('propertyName').value.trim(),code=$('trialCode').value.trim();
+    const name=$('name').value.trim(),propertyName=$('propertyName').value.trim(),code=$('trialCode').value.trim().toUpperCase();
     if(!name||!propertyName||!code)throw Error('이름·사업장명·체험코드를 입력해주세요.');
+    if(!/^[A-Z0-9]{8}$/.test(code))throw Error('체험코드는 영문 또는 숫자 8자리로 입력해주세요.');
     if(password!==$('confirmPassword').value)throw Error('비밀번호가 서로 다릅니다.');
     submit.textContent='체험코드 확인 중…';
     const checked=await omgSupabase.rpc('check_trial_code',{p_code:code});

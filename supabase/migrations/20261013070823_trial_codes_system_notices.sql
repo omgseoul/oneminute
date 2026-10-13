@@ -6,7 +6,7 @@ alter table omg_private.service_plans add constraint service_plans_code_check ch
 alter table public.account_properties add column first_admin_login_at timestamptz;
 
 create table omg_private.trial_codes(
- id uuid primary key default gen_random_uuid(),code text not null unique check(code ~ '^[A-Z0-9]{8}$'),
+ id uuid primary key default gen_random_uuid(),code text not null unique check(code ~ '^[A-Z0-9]{8,64}$'),
  trial_days int not null check(trial_days between 1 and 365),storage_limit_bytes bigint not null check(storage_limit_bytes between 1048576 and 1099511627776),
  expires_at timestamptz,note text not null default '' check(char_length(note)<=300),
  created_by uuid references auth.users(id) on delete set null,created_at timestamptz not null default now(),
@@ -40,7 +40,7 @@ revoke all on function omg_private.normalize_trial_code(text) from public,anon,a
 create function public.check_trial_code(p_code text) returns jsonb language plpgsql security definer set search_path='' as $$
 declare c omg_private.trial_codes%rowtype;
 begin
- if omg_private.normalize_trial_code(p_code) !~ '^[A-Z0-9]{8}$' then return jsonb_build_object('ok',false,'message','체험코드를 확인해주세요.');end if;
+ if char_length(coalesce(p_code,''))>100 then return jsonb_build_object('ok',false,'message','체험코드를 확인해주세요.');end if;
  select * into c from omg_private.trial_codes where code=omg_private.normalize_trial_code(p_code) and used_at is null and revoked_at is null and (expires_at is null or expires_at>now());
  if not found then return jsonb_build_object('ok',false,'message','사용 가능한 체험코드가 아닙니다. 코드를 확인하거나 운영자에게 문의해주세요.');end if;
  return jsonb_build_object('ok',true,'trial_days',c.trial_days,'storage_limit_bytes',c.storage_limit_bytes);
@@ -169,7 +169,7 @@ begin
   if btrim(coalesce(p_data->>'code',''))<>'' and n<>1 then raise exception '직접 지정한 코드는 한 개씩 생성해주세요.';end if;
   for i in 1..n loop
    value:=omg_private.normalize_trial_code(nullif(btrim(p_data->>'code'),''));
-   if value='' then loop value:=upper(substr(replace(gen_random_uuid()::text,'-',''),1,8));exit when not exists(select 1 from omg_private.trial_codes as existing_code where existing_code.code=value);end loop;elsif value !~ '^[A-Z0-9]{8}$' then raise exception '체험코드는 영문 또는 숫자 8자리로 입력해주세요.';end if;
+   if value='' then value:='OMS'||upper(replace(gen_random_uuid()::text,'-',''));end if;
    insert into omg_private.trial_codes(code,trial_days,storage_limit_bytes,expires_at,note,created_by) values(value,days,lim,expiry,btrim(coalesce(p_data->>'note','')),auth.uid());
   end loop;
   insert into public.platform_audit_logs(operator_user_id,action,detail) values(auth.uid(),'trial_codes_created',jsonb_build_object('count',n,'trial_days',days,'storage_limit_bytes',lim));
@@ -249,8 +249,7 @@ begin
  perform 1 from public.properties where id=prop for update;
  s:=omg_private.property_service_state(prop);
  if coalesce((s->>'restricted')::boolean,false) then raise exception '이용 기간이 종료되었습니다. 관리자에게 구독 연장을 요청해주세요.';end if;
- if tg_table_name='missions' then has_photo:=coalesce(new.description_photo,'')<>'';delta:=octet_length(coalesce(new.description_photo,''));if tg_op='UPDATE' then delta:=delta-octet_length(coalesce(old.description_photo,''));end if;
- elsif tg_table_name='mission_completions' then has_photo:=coalesce(new.photo_data_url,'')<>'';delta:=octet_length(coalesce(new.photo_data_url,''));if tg_op='UPDATE' then delta:=delta-octet_length(coalesce(old.photo_data_url,''));end if;
+ if tg_table_name='mission_completions' then has_photo:=coalesce(new.photo_data_url,'')<>'';delta:=octet_length(coalesce(new.photo_data_url,''));if tg_op='UPDATE' then delta:=delta-octet_length(coalesce(old.photo_data_url,''));end if;
  elsif tg_table_name='work_reports' then has_photo:=new.payload::text like '%data:image/%';delta:=octet_length(new.payload::text);if tg_op='UPDATE' then delta:=delta-octet_length(old.payload::text);end if;
  elsif tg_table_name='property_messages' then has_photo:=new.message like '%data:image/%';delta:=octet_length(new.message);if tg_op='UPDATE' then delta:=delta-octet_length(old.message);end if;end if;
  if has_photo and delta>0 and not(s->>'exempt')::boolean and s->>'storage_action'='block_photos' and (s->>'used_bytes')::bigint+delta>(s->>'limit_bytes')::bigint then raise exception '저장 용량을 초과했습니다. 관리자에게 용량 추가를 요청해주세요.';end if;

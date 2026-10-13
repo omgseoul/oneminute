@@ -44,3 +44,22 @@ test('default order follows home branch and branch numbers, while name headers t
  const work=host.querySelector('.payroll-columns [data-sort=work]');work.click();assert.equal(work.getAttribute('aria-pressed'),'true');assert.deepEqual(names(),['다솜','가람','나무']);
  host.querySelector('.payroll-columns [data-sort=pay]').click();assert.deepEqual(names(),['다솜','가람','나무']);w.close();
 });
+
+test('payroll employee picker lists all properties, per-property select-all, then staff grouped by branch number',async()=>{
+ const dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/attendance.html',runScripts:'outside-only'}),w=dom.window;
+ const rows=[
+  {employee_id:'third',property_id:'p3',property_name:'세번째',display_name:'나무',work_minutes:30,work_days:1,pay_type:'hourly',hourly_rate:2000},
+  {employee_id:'second',property_id:'p2',property_name:'두번째',display_name:'가람',work_minutes:60,work_days:1,pay_type:'hourly',hourly_rate:2000},
+  {employee_id:'home',property_id:'home',property_name:'본점',display_name:'다솜',work_minutes:90,work_days:1,pay_type:'hourly',hourly_rate:2000}
+ ];
+ w.omgSupabase={rpc:async()=>({data:{ok:true,employees:rows}})};w.eval(fs.readFileSync('property-selector.js','utf8'));w.eval(fs.readFileSync('payroll.js','utf8'));
+ w.OMSPayroll.init({accessToken:'token',getPropertyIds:()=>['p2','p3','home'],getPropertyNumber:id=>({p2:2,p3:3,home:10})[id],ownPropertyId:'home'});w.document.getElementById('openPayroll').click();await tick();
+ const host=w.document.querySelector('.payroll-employee-host'),panel=host.querySelector('.property-picker-panel');
+ assert.match(panel.querySelector('[data-all]').parentElement.textContent,/전 지점 대상/);
+ assert.deepEqual([...panel.querySelectorAll('[data-group]')].map(x=>x.dataset.group),['home','p2','p3']);
+ assert.deepEqual([...panel.querySelectorAll('[data-value]')].map(x=>x.dataset.value),['home','second','third']);
+ assert.deepEqual([...panel.querySelectorAll('.property-picker-section')].map(x=>x.textContent),['근무자 명단','본점 근무자','2번 지점 근무자','3번 지점 근무자']);
+ panel.querySelector('[data-all]').click();panel.querySelector('[data-group="p2"]').click();assert.deepEqual([...w.document.querySelectorAll('.payroll-row .payroll-person-name strong')].map(x=>x.textContent),['가람']);
+ assert.equal(host.querySelector('[data-group="p2"]').checked,true);
+ host.querySelector('[data-all]').click();assert.equal(w.document.querySelectorAll('.payroll-row').length,3);w.close();
+});

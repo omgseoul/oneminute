@@ -1,25 +1,5 @@
 (() => {
   'use strict';
-  document.querySelectorAll('[role="tablist"]').forEach(group => {
-    const tabs = [...group.querySelectorAll('[role="tab"][data-panel]')];
-    function activate(tab) {
-      tabs.forEach(item => {
-        const selected = item === tab;
-        item.setAttribute('aria-selected', String(selected));
-        item.tabIndex = selected ? 0 : -1;
-        document.getElementById(item.getAttribute('aria-controls')).hidden = !selected;
-      });
-    }
-    tabs.forEach((tab,index) => {
-      tab.addEventListener('click',()=>activate(tab));
-      tab.addEventListener('keydown',event=>{
-        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-        event.preventDefault();
-        const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
-        activate(tabs[next]);tabs[next].focus();
-      });
-    });
-  });
   const complete=document.querySelector('.demo-complete');
   complete?.addEventListener('click',()=>{complete.hidden=true;document.querySelector('.completion-result').hidden=false;});
   const photo=document.getElementById('photo-demo');
@@ -46,8 +26,8 @@
   if(canvas){
     const ctx=canvas.getContext('2d'),clear=document.querySelector('[data-sign-clear]'),button=document.querySelector('[data-sign-complete]'),agree=document.querySelector('[data-sign-agree]'),result=document.querySelector('.signature-result');
     let drawing=false,points=1;
-    ctx.strokeStyle='#183153';ctx.lineWidth=3.2;ctx.lineCap='round';ctx.lineJoin='round';
-    ctx.beginPath();ctx.moveTo(135,118);ctx.bezierCurveTo(171,76,162,40,146,111);ctx.bezierCurveTo(131,164,231,63,217,96);ctx.bezierCurveTo(195,133,244,96,247,105);ctx.bezierCurveTo(249,144,282,78,288,96);ctx.bezierCurveTo(271,134,318,97,332,109);ctx.bezierCurveTo(350,139,384,67,395,96);ctx.bezierCurveTo(382,128,408,134,441,99);ctx.stroke();
+    ctx.strokeStyle='#183153';ctx.lineWidth=3.2;ctx.save();ctx.scale(canvas.width/660,canvas.height/180);ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(135,118);ctx.bezierCurveTo(171,76,162,40,146,111);ctx.bezierCurveTo(131,164,231,63,217,96);ctx.bezierCurveTo(195,133,244,96,247,105);ctx.bezierCurveTo(249,144,282,78,288,96);ctx.bezierCurveTo(271,134,318,97,332,109);ctx.bezierCurveTo(350,139,384,67,395,96);ctx.bezierCurveTo(382,128,408,134,441,99);ctx.stroke();ctx.restore();ctx.lineWidth=4.5;
     const position=event=>{const box=canvas.getBoundingClientRect();return[(event.clientX-box.left)*canvas.width/box.width,(event.clientY-box.top)*canvas.height/box.height];};
     canvas.addEventListener('pointerdown',event=>{event.preventDefault();drawing=true;canvas.setPointerCapture(event.pointerId);ctx.beginPath();ctx.moveTo(...position(event));});
     canvas.addEventListener('pointermove',event=>{if(!drawing)return;ctx.lineTo(...position(event));ctx.stroke();points++;});

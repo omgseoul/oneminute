@@ -36,6 +36,7 @@ create or replace function omg_private.property_usage_bytes(prop uuid) returns b
  +(select coalesce(sum(omg_private.guest_asset_bytes(a.object_path)),0) from public.guest_support_assets a where a.property_id=prop)
  +(select coalesce(sum(coalesce((o.metadata->>'size')::bigint,0)),0) from storage.objects o join public.employees e on e.id=omg_private.document_employee(o.name) where o.bucket_id='employee-documents' and e.property_id=prop)
  +(select coalesce(sum(octet_length(coalesce(c.photo_data_url,''))+octet_length(coalesce(c.note,''))),0) from public.mission_completions c join public.missions m on m.id=c.mission_id where m.property_id=prop)
+ +(select coalesce(sum(octet_length(coalesce(m.description_photo,''))),0) from public.missions m where m.property_id=prop)
  +(select coalesce(sum(octet_length(e.report_config::text)),0) from public.employees e where e.property_id=prop);
 $$;
 revoke all on function omg_private.property_usage_bytes(uuid) from public,anon,authenticated;

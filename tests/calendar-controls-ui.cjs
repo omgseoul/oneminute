@@ -3,13 +3,13 @@ const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
 test('calendar opens in weekly view and bottom icons switch month, week, day',async()=>{
  const html=fs.readFileSync('calendar.html','utf8');
  const dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/calendar.html',runScripts:'outside-only'}),w=dom.window;
- const calls=[];w.omgSession={require:async()=>({sessionKind:'staff',accessToken:'token',timezone:'Asia/Seoul'})};
- w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:true,events:[],tasks:[],employees:[]}};}};
+ const calls=[],pastDue=new Date(Date.now()-60*60*1000).toISOString(),dueToday=new Date(Date.now()+60*60*1000).toISOString();w.omgSession={require:async()=>({sessionKind:'staff',accessToken:'token',timezone:'Asia/Seoul'})};
+ w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='list_overdue_calendar_tasks'?{ok:true,tasks:[{id:'late',title:'놓친 할 일',due_at:pastDue}]}:{ok:true,events:[],tasks:[{id:'today-task',title:'오늘 할 일',due_at:dueToday}],employees:[]}};}};
  w.omgTransition={ready(){}};w.eval(fs.readFileSync('calendar.js','utf8'));await tick();
  const d=w.document,actions=d.querySelector('.calendar-floating-actions');
  assert.deepEqual([...actions.querySelectorAll('button')].map(button=>button.dataset.view||button.id),['month','week','day','addEvent']);
  assert.equal(d.querySelector('.calendar-toolbar #viewButtons'),null);
- assert.equal(d.querySelector('.calendar-week-grid').children.length,7);
+ assert.equal(d.querySelector('.calendar-week-grid').children.length,7);const todayKey=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date()),todayCard=d.querySelector('.calendar-week-card[data-date="'+todayKey+'"]'),todayEntries=[...todayCard.querySelectorAll('.calendar-week-entry')];assert.deepEqual(todayEntries.map(entry=>entry.dataset.id),['late','today-task']);assert.equal(todayEntries[0].querySelector('.calendar-week-type').textContent,'To do');assert.equal(todayEntries[0].querySelector('.calendar-late-badge').textContent,'지연');
  assert.equal(actions.querySelector('[data-view=week]').getAttribute('aria-pressed'),'true');
  assert.equal(actions.querySelector('[data-view=day] svg path'),null);
  const monthPath=actions.querySelector('[data-view=month] svg path').getAttribute('d');
@@ -27,3 +27,4 @@ test('calendar opens in weekly view and bottom icons switch month, week, day',as
  d.getElementById('nextButton').click();await tick();assert.ok(calls.length>=5);
  w.close();
 });
+

@@ -11,7 +11,7 @@ begin
   if btrim(coalesce(p_data->>'code',''))<>'' and n<>1 then raise exception '직접 지정한 코드는 한 개씩 생성해주세요.';end if;
   for i in 1..n loop
    value:=omg_private.normalize_trial_code(nullif(btrim(p_data->>'code'),''));
-   if value='' then value:='OMS'||upper(replace(gen_random_uuid()::text,'-',''));end if;
+   if value='' then loop value:=upper(substr(replace(gen_random_uuid()::text,'-',''),1,8));exit when not exists(select 1 from omg_private.trial_codes as existing_code where existing_code.code=value);end loop;elsif value !~ '^[A-Z0-9]{8}$' then raise exception '체험코드는 영문 또는 숫자 8자리로 입력해주세요.';end if;
    insert into omg_private.trial_codes(code,trial_days,storage_limit_bytes,expires_at,note,created_by) values(value,days,lim,expiry,btrim(coalesce(p_data->>'note','')),auth.uid());
   end loop;
   insert into public.platform_audit_logs(operator_user_id,action,detail) values(auth.uid(),'trial_codes_created',jsonb_build_object('count',n,'trial_days',days,'storage_limit_bytes',lim));

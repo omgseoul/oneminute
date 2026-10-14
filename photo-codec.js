@@ -28,9 +28,9 @@
   }finally{image.close?.();}
  }
  async function video(file){
-  const maxSource=200*1024*1024,maxOutput=20*1024*1024,maxDuration=180;
+  const maxSource=100*1024*1024,maxOutput=20*1024*1024,maxDuration=180;
   if(!file||(!file.type.startsWith('video/')&&!/\.(mp4|mov|m4v|webm|3gp|mkv)$/i.test(file.name||'')))throw new Error('사진이나 동영상 파일을 선택해주세요.');
-  if(file.size>maxSource)throw new Error('원본 동영상은 200MB 이하로 선택해주세요.');
+  if(file.size>maxSource)throw new Error('원본 동영상은 100MB 이하로 선택해주세요.');
   if(typeof MediaRecorder==='undefined'||typeof HTMLCanvasElement.prototype.captureStream!=='function')throw new Error('이 기기에서는 동영상 압축을 지원하지 않습니다. 최신 Chrome에서 다시 시도해주세요.');
   const url=URL.createObjectURL(file),source=document.createElement('video');source.muted=true;source.playsInline=true;source.preload='metadata';source.src=url;
   try{

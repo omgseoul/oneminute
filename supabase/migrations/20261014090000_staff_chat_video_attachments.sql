@@ -123,7 +123,7 @@ begin
   if position(old_part in src)=0 then raise exception 'Unexpected service storage guard';end if;
   src:=replace(src,old_part,new_part);
   old_part:=$find$new.message like '%data:image/%';$find$;
-  new_part:=$put$(new.message like '%data:image/%' or new.message like '%data:video/webm;base64,%')$put$;
+  new_part:=$put$(new.message like '%data:image/%' or new.message like '%data:video/webm;base64,%');$put$;
   if position(old_part in src)=0 then raise exception 'Unexpected property message storage guard';end if;
   src:=replace(src,old_part,new_part);
   if position('staff_chat_photos' in src)=0 or position('data:video/webm' in src)=0 then

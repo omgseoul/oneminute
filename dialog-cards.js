@@ -23,12 +23,12 @@ window.OMSDialogs=(()=>{
   host.hidden=false;body.hidden=true;
  }
  function present(item){
-  const attendance=item.message_type==='attendance_approval',notice=['announcement','attendance_warning'].includes(item.message_type),contract=!!window.StaffChat?.contractId(item.message),overlay=$('detail');
-  overlay.classList.toggle('dc-dialog',!contract);overlay.classList.toggle('dc-attendance',attendance);overlay.classList.toggle('dc-notice',notice&&!contract);
+  const systemAlert=!!item.is_platform_system_notice,attendance=item.message_type==='attendance_approval',notice=['announcement','attendance_warning'].includes(item.message_type),contract=!!window.StaffChat?.contractId(item.message),overlay=$('detail');
+  overlay.classList.toggle('dc-dialog',!contract);overlay.classList.toggle('dc-attendance',attendance);overlay.classList.toggle('dc-notice',(notice||systemAlert)&&!contract);
   $('detailBody').hidden=attendance;requestCards(item);
   $('detailTitle').classList.toggle('sr-only',contract);
   if(contract){$('detailKicker').textContent='';$('detailState').hidden=true;return;}
-  $('detailKicker').textContent=attendance?'근태 수정':notice?(item.message_type==='attendance_warning'?'근태 안내':'직원 공지'):['holiday_approval','holiday_notice'].includes(item.message_type)?'휴일 신청':item.message_type==='property_share_approval'?'지점 공유':'결재 · 안내';
+  $('detailKicker').textContent=systemAlert?'* 시스템 알림 *':attendance?'근태 수정':notice?(item.message_type==='attendance_warning'?'근태 안내':'직원 공지'):['holiday_approval','holiday_notice'].includes(item.message_type)?'휴일 신청':item.message_type==='property_share_approval'?'지점 공유':'결재 · 안내';
   const status=attendance||['holiday_approval','property_share_approval'].includes(item.message_type)?({approved:'결재완료',rejected:'반려',pending:'미결재'})[item.approval_status]||'미결재':notice?(item.is_sender?'발송한 공지':item.acknowledged_at?'확인완료':'확인 필요'):'';
   $('detailState').textContent=status;$('detailState').hidden=!status;$('detailState').classList.toggle('complete',['결재완료','확인완료'].includes(status));
   if(attendance){

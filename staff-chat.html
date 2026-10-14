@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="staff-chat.css?v=20261011-search">
   <link rel="stylesheet" href="home-link.css?v=20261001">
   <link rel="stylesheet" href="top-layout.css?v=20261005b">
-<style>.staff-contract-link{display:block;margin-top:12px;padding:10px 12px;border:1px solid #c5d8f0;border-radius:10px;background:#fff;color:#2467bd;text-decoration:none;font-weight:750}</style><link rel="stylesheet" href="photo-viewer-zoom.css?v=20261012-zoom"></head>
+<style>.chat-video{display:grid;gap:7px;max-width:min(320px,75vw);margin:5px 0}.chat-video video{display:block;width:100%;max-height:55vh;border-radius:12px;background:#111}.chat-video button{min-height:40px;padding:8px 12px;border:0;border-radius:10px;background:#e9f2ff;color:#245c9e;font-weight:850}.staff-contract-link{display:block;margin-top:12px;padding:10px 12px;border:1px solid #c5d8f0;border-radius:10px;background:#fff;color:#2467bd;text-decoration:none;font-weight:750}</style><link rel="stylesheet" href="photo-viewer-zoom.css?v=20261012-zoom"></head>
 <body>
   <div class="chat-page">
     <header class="chat-head">
@@ -24,8 +24,8 @@
       <div id="photoPending" class="photo-pending" hidden></div>
       <div class="row">
         <button id="priority" type="button" aria-label="일반·긴급 선택" aria-pressed="false">일반⌄</button>
-        <label class="photo-button" for="photoInput" aria-label="사진 첨부"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg></label>
-        <input id="photoInput" type="file" accept="image/*" hidden>
+        <label class="photo-button" for="photoInput" aria-label="사진 또는 동영상 첨부"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg></label>
+        <input id="photoInput" type="file" accept="image/*,video/*" aria-label="사진 또는 동영상 첨부" hidden>
         <textarea id="body" placeholder="메세지 입력" maxlength="2000" rows="1" aria-label="메세지 내용"></textarea>
         <button class="btn primary" id="send" type="submit" aria-label="보내기">➤</button>
       </div>
@@ -67,6 +67,6 @@
   <script src="supabase-config.js"></script><script src="supabase-client.js"></script>
   <script src="notification-config.js"></script><script src="notification-client.js"></script>
   <script src="photo-codec.js?v=20261007-1920"></script><script src="guest-support-client.js?v=20261001-ui"></script>
-  <script src="staff-chat-client.js?v=20261009-contracts"></script><script src="photo-viewer-zoom.js?v=20261012-zoom"></script><script src="staff-chat.js?v=20261012-zoom"></script>
+  <script src="staff-chat-client.js?v=20261009-contracts"></script><script src="photo-viewer-zoom.js?v=20261012-zoom"></script><script src="staff-chat.js?v=20261014-video"></script>
 </body>
 </html>

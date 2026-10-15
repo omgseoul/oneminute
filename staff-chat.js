@@ -1,7 +1,7 @@
 (async()=>{
  const $=id=>document.getElementById(id),e=GuestSupport.esc,params=new URLSearchParams(location.search),peer=params.get('peer');
  let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false;
- let peerProfile=null,viewerIndex=0,galleryLoading=false,galleryComplete=false;const videoUrls=new Map();
+ let peerProfile=null,viewerIndex=0,galleryLoading=false,galleryComplete=false;const videoUrls=new Map(),videoRequests=new Map(),videoPosters=new Map(),videoPosterRequests=new Map();let videoObserver;
  const line=$('timeline'),input=$('body');
  let searchVersion=0,searchIds=[],searchIndex=-1,searchQuery='',searchLoading=false;
  function paintSearch(){
@@ -45,13 +45,72 @@
   $('peerProfilePhone').textContent=peerProfile.contact_phone||'-';
  }
  async function loadPeerProfile(){try{applyProfile(await StaffChat.profile(session,peer));}catch(error){console.warn('Staff profile load',error);}}
+ async function videoUrl(id){
+  if(videoUrls.has(id))return videoUrls.get(id);
+  if(videoRequests.has(id))return videoRequests.get(id);
+  const request=(async()=>{
+   const result=await call('attachment',{message_id:id});
+   if(!result?.attachment)throw new Error('동영상을 불러오지 못했습니다.');
+   const encoded=result.attachment.split(',')[1]||'',binary=atob(encoded),bytes=new Uint8Array(binary.length);
+   for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+   const url=URL.createObjectURL(new Blob([bytes],{type:result.mime_type||'video/webm'}));
+   videoUrls.set(id,url);return url;
+  })().finally(()=>videoRequests.delete(id));
+  videoRequests.set(id,request);return request;
+ }
+ function videoPoster(url){
+  return new Promise(resolve=>{
+   const media=document.createElement('video');media.muted=true;media.playsInline=true;media.preload='auto';
+   let settled=false;
+   const finish=image=>{if(settled)return;settled=true;clearTimeout(timer);media.removeAttribute('src');media.load();resolve(image||'');};
+   const capture=()=>{try{
+    if(!media.videoWidth||!media.videoHeight){finish('');return;}
+    const canvas=document.createElement('canvas');canvas.width=Math.min(320,media.videoWidth);canvas.height=Math.max(1,Math.round(canvas.width*media.videoHeight/media.videoWidth));
+    canvas.getContext('2d').drawImage(media,0,0,canvas.width,canvas.height);
+    finish(canvas.toDataURL('image/jpeg',.72));
+   }catch{finish('');}};
+   const timer=setTimeout(capture,6000);
+   media.onerror=()=>finish('');
+   media.onseeked=capture;
+   media.onloadeddata=()=>{const target=Math.min(.25,Number.isFinite(media.duration)?media.duration/3:0);if(target>.03){try{media.currentTime=target;}catch{capture();}}else capture();};
+   media.src=url;media.load();
+  });
+ }
+ async function showVideoPoster(id,button){
+  try{
+   let poster=videoPosters.get(id);
+   if(!poster){
+    let request=videoPosterRequests.get(id);
+    if(!request){request=(async()=>{const image=await videoPoster(await videoUrl(id));if(image)videoPosters.set(id,image);return image;})().finally(()=>videoPosterRequests.delete(id));videoPosterRequests.set(id,request);}
+    poster=await request;
+   }
+   if(!button.isConnected)return;
+   const image=button.closest('.chat-video')?.querySelector('.video-poster');
+   if(image&&poster){image.src=poster;image.hidden=false;}
+  }catch(error){console.warn('Video preview',error);}
+ }
  function render(older=false){
   const near=line.scrollHeight-line.scrollTop-line.clientHeight<110,prev=line.scrollHeight;let day='';
-  $('bubbles').innerHTML=messages.map(m=>{const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="bubble">${m.attachment_type==='video/webm'?'<div class="chat-video"><video controls playsinline preload="none" hidden></video><button type="button" data-video-load="'+e(m.id)+'">▶ 동영상 재생</button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</div></div>`;}).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
+  $('bubbles').innerHTML=messages.map(m=>{const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="bubble">${m.attachment_type==='video/webm'?'<div class="chat-video"><img class="video-poster" alt="" hidden><video controls playsinline preload="metadata" hidden></video><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</div></div>`;}).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
   if(older)line.scrollTop+=line.scrollHeight-prev;else if(near||!started)line.scrollTop=line.scrollHeight;
   started=true;line.classList.remove('chat-loading');
   $('bubbles').querySelectorAll('[data-photo]').forEach(img=>img.onclick=()=>openViewerById(img.dataset.photo));
-  $('bubbles').querySelectorAll('[data-video-load]').forEach(button=>{const id=button.dataset.videoLoad,video=button.closest('.chat-video').querySelector('video'),cached=videoUrls.get(id);if(cached){video.src=cached;video.hidden=false;button.hidden=true;}button.onclick=async()=>{button.disabled=true;button.textContent='동영상 불러오는 중…';try{let url=videoUrls.get(id);if(!url){const result=await call('attachment',{message_id:id});if(!result?.attachment)throw new Error('동영상을 불러오지 못했습니다.');const encoded=result.attachment.split(',')[1]||'',binary=atob(encoded),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);url=URL.createObjectURL(new Blob([bytes],{type:result.mime_type||'video/webm'}));videoUrls.set(id,url);}video.src=url;video.hidden=false;button.hidden=true;video.load();await video.play();}catch(error){button.disabled=false;button.textContent='▶ 다시 불러오기';status(error.message||'동영상을 불러오지 못했습니다.',true);}};});paintSearch();
+  videoObserver?.disconnect();
+  if('IntersectionObserver' in window)videoObserver=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(!entry.isIntersecting)return;videoObserver.unobserve(entry.target);showVideoPoster(entry.target.dataset.videoLoad,entry.target);});},{root:line,rootMargin:'160px'});
+  $('bubbles').querySelectorAll('[data-video-load]').forEach(button=>{
+   const id=button.dataset.videoLoad,holder=button.closest('.chat-video'),video=holder.querySelector('video'),image=holder.querySelector('.video-poster'),poster=videoPosters.get(id);
+   if(poster){image.src=poster;image.hidden=false;}
+   else if(videoObserver)videoObserver.observe(button);
+   else showVideoPoster(id,button);
+   button.onclick=async()=>{
+    button.disabled=true;button.querySelector('.video-label').textContent='불러오는 중…';
+    try{
+     const url=await videoUrl(id);
+     video.src=url;video.hidden=false;video.muted=false;image.hidden=true;button.hidden=true;video.load();
+     try{await video.play();}catch{video.controls=true;}
+    }catch(error){button.disabled=false;button.querySelector('.video-label').textContent='다시 시도';status(error.message||'동영상을 불러오지 못했습니다.',true);}
+   };
+  });paintSearch();
  }
  async function markRead(){const ids=messages.filter(m=>!m.mine&&!m.read_at).map(m=>m.id);if(ids.length&&!document.hidden){await call('read',{ids});messages.forEach(m=>{if(ids.includes(m.id))m.read_at=new Date().toISOString();});}}
  async function load(older=false){
@@ -104,7 +163,7 @@
  $('photoViewerClose').onclick=closeViewer;$('photoPrevious').onclick=()=>moveViewer(-1);$('photoNext').onclick=()=>moveViewer(1);$('photoGalleryOpen').onclick=openGallery;$('photoGalleryClose').onclick=()=>$('photoGallery').hidden=true;
  const photoZoom=OMSPhotoZoom.attach($('photoStage'),$('photoViewerImage'),{onSwipe:moveViewer});
  document.addEventListener('keydown',event=>{if(!$('photoGallery').hidden&&event.key==='Escape'){$('photoGallery').hidden=true;return;}if($('photoViewer').hidden)return;if(event.key==='Escape')closeViewer();else if(event.key==='ArrowLeft')moveViewer(-1);else if(event.key==='ArrowRight')moveViewer(1);});
- addEventListener('pagehide',()=>{for(const url of videoUrls.values())URL.revokeObjectURL(url);videoUrls.clear();});
+ addEventListener('pagehide',()=>{videoObserver?.disconnect();for(const url of videoUrls.values())URL.revokeObjectURL(url);videoUrls.clear();});
  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)load();});addEventListener('online',()=>load());addEventListener('pagehide',()=>{clearTimeout(timer);keepDraft();});
  try{
   session=await omgSession.require({allowCompleted:true});if(!session)return;if(!/^(owner|employee):[0-9a-f-]{36}$/i.test(peer||''))throw new Error('대화 상대를 선택해주세요.');

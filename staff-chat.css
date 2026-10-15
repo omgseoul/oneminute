@@ -13,3 +13,7 @@ body.media-open{overflow:hidden}.peer-profile-dialog{padding:22px 20px max(24px,
 @media(max-width:560px){.photo-arrow{display:none}.photo-viewer-foot{min-height:116px}.photo-thumbs button{flex-basis:52px;width:52px;height:58px}}
 
 .chat-search-toggle{display:grid;place-items:center;width:40px;height:40px;padding:8px;border:0;border-radius:12px;background:transparent;color:#527d98}.chat-search-toggle svg{width:23px;height:23px}.chat-search-panel{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:9px 0}.chat-search-panel[hidden]{display:none!important}.chat-search-panel input{flex:1;min-width:0;width:50%;height:39px;border:1px solid #dbe5f0;border-radius:11px;background:white;padding:8px 11px;font:inherit;font-size:14px}.chat-search-panel button{height:39px;min-width:36px;border:0;border-radius:10px;background:#e8f1ff;color:#2867ad;padding:7px 10px;font:inherit;font-size:13px}.chat-search-navigation{display:flex;align-items:center;gap:6px;width:100%}.chat-search-navigation span{flex:1;color:#7b899b;font-size:11px}.chat-search-navigation button{height:30px}.chat-search-navigation button:disabled{opacity:.35}.bubble-row.search-match .bubble{outline:2px solid #bbd6fc;outline-offset:2px}.bubble-row.search-current .bubble{outline:3px solid #2a71c7;outline-offset:3px}
+
+
+/* The selected video is shown before sending; keep it within the composer. */
+.photo-pending video{display:block;flex:0 0 auto;width:min(220px,48vw);height:132px;max-width:100%;max-height:24dvh;object-fit:contain;border-radius:10px;background:#111}

@@ -11,6 +11,8 @@
   let screen = "input";
   let weekday = new Date().getDay();
   const typeLabel = state.reportType === "clock_out" ? "퇴근보고" : "출근보고";
+  document.querySelector('[data-screen="input"]').textContent = typeLabel + " 입력 예시";
+  document.querySelector('[data-screen="result"]').textContent = typeLabel + " 결과 예시";
   const reportConfig = state.reportConfig;
   const fields = (state.property.custom_report_fields || []).filter(field => (reportConfig[state.reportType] || []).includes(field.key));
   const allCards = (reportConfig.reminder_cards || []).filter(card => (card.report_types || []).includes(state.reportType));
@@ -111,7 +113,7 @@
     const memo = document.createElement("section"); memo.className = "memo-card"; memo.innerHTML = '<label>특이사항</label><textarea placeholder="추가로 보고할 내용이 있으면 입력해주세요."></textarea>'; host.append(memo);
     const cards = allCards.filter(card => (card.report_weekdays?.[state.reportType] || card.weekdays || [0,1,2,3,4,5,6]).includes(weekday));
     if ((reportConfig[state.reportType] || []).includes("reminder_cards") && cards.length) host.append(createReminders(cards));
-    const submit = document.createElement("button"); submit.className = "submit"; submit.type = "button"; submit.textContent = "보고 제출"; submit.disabled = true; host.append(submit);
+    const submit = document.createElement("button"); submit.className = "submit"; submit.type = "button"; submit.textContent = "보고 제출";  host.append(submit);
   }
   function renderResult(host) {
     const top = document.createElement("div"); top.className = "top"; top.innerHTML = '<span class="back">미리보기 화면</span><span class="property"></span>'; top.querySelector(".property").textContent = state.property.name || ""; host.append(top);

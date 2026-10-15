@@ -9,6 +9,8 @@
     return;
   }
   let screen = "input";
+  let submittedValues = null;
+  let submittedMemo = null;
   let weekday = new Date().getDay();
   const typeLabel = state.reportType === "clock_out" ? "퇴근보고" : "출근보고";
   document.querySelector('[data-screen="input"]').textContent = typeLabel + " 입력 예시";
@@ -57,6 +59,7 @@
   function createInputField(field) {
     const section = document.createElement("section");
     section.className = "field-card custom-result " + (["third", "half"].includes(field.size) ? field.size : "full");
+    section.dataset.field = field.key;
     const head = document.createElement("div"); head.className = "field-head";
     const heading = document.createElement("h2"); heading.textContent = field.label;
     if (field.required) { const mark = document.createElement("span"); mark.className = "required-mark"; mark.textContent = " *"; heading.append(mark); }
@@ -71,11 +74,14 @@
       const button = document.createElement("button"); button.type = "button"; button.className = "custom-value custom-choice"; button.textContent = "객실선택"; head.append(button);
       const dialog = document.createElement("dialog"); dialog.className = "room-dialog";
       const title = document.createElement("h2"); title.textContent = field.label; dialog.append(title); appendRooms(dialog, field);
-      const done = document.createElement("button"); done.type = "button"; done.className = "room-done"; done.textContent = "확인"; done.onclick = () => dialog.close(); dialog.append(done); section.append(dialog);
+      const done = document.createElement("button"); done.type = "button"; done.className = "room-done"; done.textContent = "확인"; done.onclick = () => { const chosen = [...dialog.querySelectorAll("input:checked")].map(input => input.value); section.dataset.previewValue = chosen.join(", "); button.textContent = chosen.length ? chosen.length + "건 " + chosen.join(", ") : "객실선택"; dialog.close(); }; dialog.append(done); section.append(dialog);
       button.onclick = () => dialog.showModal();
     } else if (field.kind === "photo") {
       const photo = document.createElement("div"); photo.className = "custom-photo";
-      const button = document.createElement("button"); button.type = "button"; button.className = "custom-value custom-choice"; button.textContent = "사진첨부"; button.title = "미리보기에서는 사진을 첨부하지 않습니다."; photo.append(button); head.append(photo);
+      const button = document.createElement("button"); button.type = "button"; button.className = "custom-value custom-choice"; button.textContent = "사진첨부";
+      const picker = document.createElement("input"); picker.type = "file"; picker.accept = "image/*"; picker.multiple = true; picker.hidden = true;
+      button.onclick = () => picker.click(); picker.onchange = () => { const count = picker.files.length; section.dataset.previewValue = count ? count + "장 첨부" : ""; button.textContent = count ? count + "장 선택" : "사진첨부"; };
+      photo.append(button, picker); head.append(photo);
     }
     return section;
   }
@@ -95,6 +101,7 @@
     return section;
   }
   function sampleValue(field) {
+    if (submittedValues) return submittedValues[field.key] || "미입력";
     if (field.kind === "numeric" || field.kind === "counter") return "3";
     if (field.kind === "rooms") return roomTypes.flatMap(group => group.rooms || [])[0] || "없음";
     if (field.kind === "photo") return "사진 첨부";
@@ -113,7 +120,18 @@
     const memo = document.createElement("section"); memo.className = "memo-card"; memo.innerHTML = '<label>특이사항</label><textarea placeholder="추가로 보고할 내용이 있으면 입력해주세요."></textarea>'; host.append(memo);
     const cards = allCards.filter(card => (card.report_weekdays?.[state.reportType] || card.weekdays || [0,1,2,3,4,5,6]).includes(weekday));
     if ((reportConfig[state.reportType] || []).includes("reminder_cards") && cards.length) host.append(createReminders(cards));
-    const submit = document.createElement("button"); submit.className = "submit"; submit.type = "button"; submit.textContent = "보고 제출";  host.append(submit);
+    const submit = document.createElement("button"); submit.className = "submit"; submit.type = "button"; submit.textContent = "보고 제출";
+    submit.onclick = () => {
+      submittedValues = {};
+      fields.forEach(field => {
+        const section = [...form.querySelectorAll(".field-card")].find(card => card.dataset.field === field.key);
+        const input = section?.querySelector(field.kind === "counter" ? ".stepper input" : ".custom-value:not(button)");
+        submittedValues[field.key] = (section?.dataset.previewValue || input?.value || "").trim();
+      });
+      submittedMemo = host.querySelector(".memo-card textarea")?.value.trim() || "";
+      screen = "result"; render(); document.querySelector(".preview-stage").scrollTop = 0;
+    };
+    host.append(submit);
   }
   function renderResult(host) {
     const top = document.createElement("div"); top.className = "top"; top.innerHTML = '<span class="back">미리보기 화면</span><span class="property"></span>'; top.querySelector(".property").textContent = state.property.name || ""; host.append(top);
@@ -123,7 +141,7 @@
     const rows = fields.map(field => '<div class="report-value-row"><strong>' + esc(field.label) + '</strong><div>' + esc(sampleValue(field)) + '</div></div>').join("");
     result.innerHTML = '<div class="preview-result-head"><b>' + esc(typeLabel) + '</b><span>예시 결과</span></div>' + (rows || '<p class="empty">표시할 보고 항목이 없습니다.</p>');
     if ((reportConfig[state.reportType] || []).includes("reminder_cards")) result.innerHTML += '<div class="report-value-row"><strong>리마인더 확인</strong><div>' + allCards.filter(card => (card.report_weekdays?.[state.reportType] || card.weekdays || [0,1,2,3,4,5,6]).includes(weekday)).length + '개</div></div>';
-    result.innerHTML += '<div class="report-value-row"><strong>특이사항</strong><div>예시 메모</div></div>'; host.append(result);
+    result.innerHTML += '<div class="report-value-row"><strong>특이사항</strong><div>' + esc(submittedMemo === null ? "예시 메모" : submittedMemo || "없음") + '</div></div>'; host.append(result);
   }
   function render() {
     $("previewTitle").textContent = typeLabel + (screen === "input" ? " 입력 예시" : " 결과 예시");

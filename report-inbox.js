@@ -37,7 +37,7 @@ window.ReportInbox=(()=>{
       continue;
     }
     flushPhotos();
-    const result=field.kind==='rooms'&&Array.isArray(value)?e(value.length?`${value.length}건 ${value.join(', ')}`:'없음'):typeof value==='object'&&value&&!Array.isArray(value)?e(`${value.count||0}개 · ${(value.rooms||[]).join(', ')||'객실 미선택'}`):e(Array.isArray(value)?value.join(', ')||'없음':value??'없음');
+    const result=field.kind==='rooms'&&Array.isArray(value)?window.OMSHousingRooms.result(value,payload.entire_houses):typeof value==='object'&&value&&!Array.isArray(value)?e(`${value.count||0}개 · `)+window.OMSHousingRooms.result(value.rooms||[],payload.entire_houses):e(Array.isArray(value)?value.join(', ')||'없음':value??'없음');
     html+=`<div class="report-value-row"><strong>${e(field.label)}</strong><div>${result}</div></div>`;
   }
   flushPhotos();

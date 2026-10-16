@@ -1,0 +1,7 @@
+.room-group.entire-house-group .entire-house-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.entire-house-choice label{display:flex;align-items:center;justify-content:center;min-height:36px;padding:8px 6px;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+.room input:focus-visible+label{outline:2px solid #2467bd;outline-offset:2px}
+.housing-result{min-width:0;text-align:left;display:grid;gap:8px}
+.entire-house-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}
+.entire-house-result{display:flex;align-items:center;justify-content:center;min-width:0;min-height:36px;padding:8px 6px;border:1px solid #cbd8e8;border-radius:10px;background:#edf5ff;color:#183153;font-size:12px;font-weight:800;line-height:1.4;white-space:normal;overflow-wrap:anywhere;text-align:center}
+.housing-unit-result{white-space:pre-wrap}

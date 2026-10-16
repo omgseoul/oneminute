@@ -43,19 +43,9 @@
   }
   function appendRooms(parent, field) {
     if (!roomTypes.length) { const empty = document.createElement("div"); empty.className = "empty"; empty.textContent = "Property 설정에서 객실을 먼저 등록해주세요."; parent.append(empty); return; }
-    roomTypes.forEach((group, gi) => {
-      const block = document.createElement("div"); block.className = "room-group";
-      const type = document.createElement("p"); type.className = "room-type"; type.textContent = group.name; block.append(type);
-      const list = document.createElement("div"); list.className = "rooms";
-      (group.rooms || []).forEach((room, ri) => {
-        const wrap = document.createElement("span"); wrap.className = "room";
-        const input = document.createElement("input"); input.type = "checkbox"; input.name = field.key; input.id = field.key + "-" + gi + "-" + ri; input.value = room;
-        const label = document.createElement("label"); label.htmlFor = input.id; label.textContent = room;
-        wrap.append(input, label); list.append(wrap);
-      });
-      block.append(list); parent.append(block);
-    });
+    window.OMSHousingRooms.append(parent, field, roomTypes);
   }
+
   function createInputField(field) {
     const section = document.createElement("section");
     section.className = "field-card custom-result " + (["third", "half"].includes(field.size) ? field.size : "full");
@@ -74,7 +64,7 @@
       const button = document.createElement("button"); button.type = "button"; button.className = "custom-value custom-choice"; button.textContent = "객실선택"; head.append(button);
       const dialog = document.createElement("dialog"); dialog.className = "room-dialog";
       const title = document.createElement("h2"); title.textContent = field.label; dialog.append(title); appendRooms(dialog, field);
-      const done = document.createElement("button"); done.type = "button"; done.className = "room-done"; done.textContent = "확인"; done.onclick = () => { const chosen = [...dialog.querySelectorAll("input:checked")].map(input => input.value); section.dataset.previewValue = chosen.join(", "); button.textContent = chosen.length ? chosen.length + "건 " + chosen.join(", ") : "객실선택"; dialog.close(); }; dialog.append(done); section.append(dialog);
+      const done = document.createElement("button"); done.type = "button"; done.className = "room-done"; done.textContent = "확인"; done.onclick = () => { const chosen = [...dialog.querySelectorAll("input:checked")].map(input => input.value); section.dataset.previewRooms = JSON.stringify(chosen); section.dataset.previewValue = chosen.join(", "); button.textContent = chosen.length ? chosen.length + "건 " + chosen.join(", ") : "객실선택"; dialog.close(); }; dialog.append(done); section.append(dialog);
       button.onclick = () => dialog.showModal();
     } else if (field.kind === "photo") {
       const photo = document.createElement("div"); photo.className = "custom-photo";
@@ -103,7 +93,7 @@
   function sampleValue(field) {
     if (submittedValues) return submittedValues[field.key] || "미입력";
     if (field.kind === "numeric" || field.kind === "counter") return "3";
-    if (field.kind === "rooms") return roomTypes.flatMap(group => group.rooms || [])[0] || "없음";
+    if (field.kind === "rooms") return roomTypes.flatMap(group => (group.rooms || []).length ? group.rooms : [group.name]).slice(0, 3);
     if (field.kind === "photo") return "사진 첨부";
     return "예시 입력값";
   }
@@ -126,7 +116,7 @@
       fields.forEach(field => {
         const section = [...form.querySelectorAll(".field-card")].find(card => card.dataset.field === field.key);
         const input = section?.querySelector(field.kind === "counter" ? ".stepper input" : ".custom-value:not(button)");
-        submittedValues[field.key] = (section?.dataset.previewValue || input?.value || "").trim();
+        submittedValues[field.key] = field.kind === "rooms" ? JSON.parse(section?.dataset.previewRooms || "[]") : (section?.dataset.previewValue || input?.value || "").trim();
       });
       submittedMemo = host.querySelector(".memo-card textarea")?.value.trim() || "";
       screen = "result"; render(); document.querySelector(".preview-stage").scrollTop = 0;
@@ -138,7 +128,7 @@
     const hero = document.createElement("section"); hero.className = "hero"; hero.innerHTML = '<h1></h1><p>보고 결과 화면 예시</p><div class="clock"></div>';
     hero.querySelector("h1").textContent = typeLabel + " 결과"; hero.querySelector(".clock").textContent = (state.employeeName || "근무자") + " · 예시 제출 08:58"; host.append(hero);
     const result = document.createElement("section"); result.className = "preview-result-card";
-    const rows = fields.map(field => '<div class="report-value-row"><strong>' + esc(field.label) + '</strong><div>' + esc(sampleValue(field)) + '</div></div>').join("");
+    const rows = fields.map(field => '<div class="report-value-row"><strong>' + esc(field.label) + '</strong><div>' + (field.kind === 'rooms' ? window.OMSHousingRooms.result(sampleValue(field), window.OMSHousingRooms.housesFor(roomTypes)) : esc(sampleValue(field))) + '</div></div>').join("");
     result.innerHTML = '<div class="preview-result-head"><b>' + esc(typeLabel) + '</b><span>예시 결과</span></div>' + (rows || '<p class="empty">표시할 보고 항목이 없습니다.</p>');
     if ((reportConfig[state.reportType] || []).includes("reminder_cards")) result.innerHTML += '<div class="report-value-row"><strong>리마인더 확인</strong><div>' + allCards.filter(card => (card.report_weekdays?.[state.reportType] || card.weekdays || [0,1,2,3,4,5,6]).includes(weekday)).length + '개</div></div>';
     result.innerHTML += '<div class="report-value-row"><strong>특이사항</strong><div>' + esc(submittedMemo === null ? "예시 메모" : submittedMemo || "없음") + '</div></div>'; host.append(result);

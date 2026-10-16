@@ -3,7 +3,7 @@ window.NotificationBot=(()=>{
  const $=id=>document.getElementById(id),e=v=>GuestSupport.esc(String(v??''));
  let session,callbacks,data={messages:[]},properties=null,profiles=[],query='',roomProperty=null,announcementMode=false,profileLoaded=false,refreshing=false,alertBusy=false,alertsLoaded=false,alertMessages=[],unreadByProperty={},cursor=null,hasOlder=false;
  const isAlert=i=>!!StaffChat.contractId(i.message)||['announcement','attendance_warning','attendance_approval','property_share_approval','holiday_approval','holiday_notice'].includes(i.message_type)||i.sender_type==='system';
- const needsAck=i=>['announcement','attendance_warning'].includes(i.message_type);
+ const needsAck=i=>['announcement','attendance_warning'].includes(i.message_type)&&(i.require_signature!==false||i.require_understanding!==false);
  const icon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="5"/><path d="M12 3v4M8 12v2m8-2v2m-7 3h6M2 12v4m20-4v4"/><circle cx="12" cy="2.5" r="1"/></svg>';
  function avatar(p){return `<span class="staff-avatar bot-avatar">${p?.profile_image?`<img src="${e(p.profile_image)}" alt="">`:icon}</span>`;}
  function items(){return(alertsLoaded?alertMessages:data.messages||[]).filter(i=>isAlert(i)&&(!properties||properties.includes(String(i.property_id||session.propertyId))));}

@@ -12,7 +12,7 @@
   function collectSchedules(node){return[...node.querySelectorAll('.reminder-condition')].map(card=>({offset_days:Number(card.querySelector('[data-field=offset]').value),send_time:card.querySelector('[data-field=time]').value}));}
   function renderSchedules(node,schedules,expandedIndex=0){const list=node.querySelector('.reminder-schedules');list.innerHTML=schedules.length?schedules.map((schedule,index)=>conditionCard(schedule,index,index===expandedIndex)).join(''):'<button class="reminder-empty-add" type="button">＋ 알림 조건 추가</button>';bindConditions(node);}
   function validate(host){return kinds.map(([kind])=>{const node=host.querySelector(`[data-kind="${kind}"]`),schedules=collectSchedules(node);if(schedules.some(item=>!Number.isInteger(item.offset_days)||item.offset_days<0||item.offset_days>365||!item.send_time))throw new Error('발송 날짜와 시각을 확인해주세요.');return{kind,schedules,notify_staff:node.querySelector('[data-field=staff]').checked,notify_owner:node.querySelector('[data-field=owner]').checked};});}
-  let saveCurrent=async()=>{};
+  let saveCurrent=async()=>{throw new Error('알림 설정을 먼저 불러와주세요.');},mountVersion=0,settingsReady=false;
   function bindConditions(node){
     node.querySelectorAll('.reminder-condition-toggle').forEach(button=>button.onclick=()=>{const card=button.closest('.reminder-condition'),open=card.classList.toggle('open');button.setAttribute('aria-expanded',String(open));});
     node.querySelector('.reminder-add, .reminder-empty-add')?.addEventListener('click',()=>{const schedules=collectSchedules(node);if(schedules.length>=10){alert('알림 조건은 최대 10개까지 추가할 수 있습니다.');return;}schedules.push({offset_days:1,send_time:'09:00'});renderSchedules(node,schedules,schedules.length-1);});
@@ -20,13 +20,15 @@
     node.querySelectorAll('.reminder-delete').forEach(button=>button.onclick=async()=>{const card=button.closest('.reminder-condition'),schedules=collectSchedules(node),index=[...node.querySelectorAll('.reminder-condition')].indexOf(card);schedules.splice(index,1);renderSchedules(node,schedules,Math.min(index,schedules.length-1));try{await saveCurrent();}catch(error){node.closest('#propertyReminderSettings').querySelector('#reminderSettingsMessage').textContent=error.message||'삭제하지 못했습니다.';}});
   }
   function mount({host,token,propertyId}){
+    const version=++mountVersion;settingsReady=false;host.inert=true;
     host.innerHTML=kinds.map(([kind,label])=>`<section class="reminder-setting" data-kind="${kind}">${help(label,kind)}<div class="reminder-recipients"><span>알림 대상</span><label><input data-field="staff" type="checkbox" checked>대상근로자</label><label><input data-field="owner" type="checkbox" checked>관리자</label></div><div class="reminder-schedules"></div></section>`).join('')+'<p id="reminderSettingsMessage" role="status"></p>';
     const message=host.querySelector('#reminderSettingsMessage');
-    saveCurrent=async()=>{message.textContent='';await rpc('save_property_reminder_settings',{p_access_token:token,p_property_id:propertyId,p_settings:validate(host)});};
+    saveCurrent=async()=>{if(!settingsReady)throw new Error('알림 설정을 불러온 뒤 저장해주세요.');message.textContent='';await rpc('save_property_reminder_settings',{p_access_token:token,p_property_id:propertyId,p_settings:validate(host)});};
     host.querySelectorAll('.reminder-setting').forEach(node=>renderSchedules(node,[{offset_days:1,send_time:'09:00'}],0));
     host.onclick=event=>{const helpButton=event.target.closest('.reminder-help-button');host.querySelectorAll('.reminder-help').forEach(wrap=>{const button=wrap.querySelector('button'),content=wrap.querySelector('.reminder-help-content');if(button===helpButton){const open=content.hidden;content.hidden=!open;button.setAttribute('aria-expanded',String(open));}else{content.hidden=true;button.setAttribute('aria-expanded','false');}});};
     host.onkeydown=event=>{if(event.key==='Escape')host.querySelectorAll('.reminder-help-content').forEach(content=>content.hidden=true);};
-    rpc('get_property_reminder_settings',{p_access_token:token,p_property_id:propertyId}).then(data=>{for(const row of data.settings||[]){const node=host.querySelector(`[data-kind="${row.kind}"]`);if(!node)continue;const schedules=Array.isArray(row.schedules)?row.schedules:legacySchedules(row);node.querySelector('[data-field=staff]').checked=row.notify_staff;node.querySelector('[data-field=owner]').checked=row.notify_owner;renderSchedules(node,schedules,schedules.length?0:-1);}}).catch(error=>message.textContent=error.message);
+    rpc('get_property_reminder_settings',{p_access_token:token,p_property_id:propertyId}).then(data=>{if(version!==mountVersion)return;for(const row of data.settings||[]){const node=host.querySelector(`[data-kind="${row.kind}"]`);if(!node)continue;const schedules=Array.isArray(row.schedules)?row.schedules:legacySchedules(row);node.querySelector('[data-field=staff]').checked=row.notify_staff;node.querySelector('[data-field=owner]').checked=row.notify_owner;renderSchedules(node,schedules,schedules.length?0:-1);}settingsReady=true;}).catch(error=>{if(version===mountVersion)message.textContent=error.message;}).finally(()=>{if(version===mountVersion)host.inert=false;});
   }
-  window.omgReminderSettings={mount};
+  window.omgReminderSettings={mount,save:()=>saveCurrent()};
 })();
+

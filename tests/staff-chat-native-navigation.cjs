@@ -20,6 +20,7 @@ async function checkHub(native){
  click('staff');await flush();
  assert.equal(launches.length,0,'staff tab must stay inside the shared hub even in the app');
  assert.equal(d.getElementById('staffPane').hidden,false);assert.equal(tabs,d.querySelector('.hub-tabs'));assert.equal(property,d.getElementById('hubProperty'));
+ if(native){const event=new w.MouseEvent('click',{bubbles:true,cancelable:true,button:0});d.querySelector('.staff-room:not(.bot-room)').dispatchEvent(event);assert(event.defaultPrevented,'room link hands off without loading a web chat page');assert.equal(launches.length,1);launches=[];}
  assert(d.querySelector('.bot-room'),'the real notification bot must remain in the staff list');assert.match(d.querySelector('.staff-room-property').textContent,/타지점/);
  d.querySelector('.bot-room').click();assert.equal(d.getElementById('botConversation').hidden,false);assert.match(d.getElementById('botTimeline').textContent,/공지 내용/);
  d.querySelector('[data-bot-message]').click();assert.equal(details[0].message_id,'notice','bot actions retain the existing detail/acknowledgement flow');

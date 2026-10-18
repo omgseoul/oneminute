@@ -8,6 +8,7 @@ import android.os.SystemClock;
 import android.util.Base64;
 import android.view.*;
 import android.widget.*;
+import android.webkit.WebView;
 import android.view.inputmethod.InputMethodManager;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -28,6 +29,7 @@ public final class NativeStaffChatProbe {
     private final Instrumentation instrumentation;
     private NativeStaffChatActivity activity;
     private FakeApi fake;
+    static void runHandoff(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verifyHandoff();result.putString("oms_handoff","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_handoff","failed: "+error);i.finish(0,result);}}
     private String stage="start",layout="";
     NativeStaffChatProbe(Instrumentation i){instrumentation=i;}
     static void run(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verify();result.putString("oms_chat","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_chat","failed: "+error);i.finish(0,result);}}
@@ -42,8 +44,8 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
-            waitFor(()->((TextView)field(activity,"send")).isEnabled());
-            verifySafeLayout();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());
+            verifySendStates();verifySafeLayout();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 😀"),"emoji cursor insertion");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
             ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
@@ -65,7 +67,7 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            waitFor(()->((TextView)field(activity,"send")).isEnabled());verifySafeLayout();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
@@ -85,16 +87,50 @@ public final class NativeStaffChatProbe {
         // Rebuild after the first window dispatch: this reproduced the room opened
         // from the old native list, where all system-bar padding was lost.
         ui(()->{Method open=activity.getClass().getDeclaredMethod("openRoom",String.class);open.setAccessible(true);open.invoke(activity,PEER);return null;});
-        stage="reopened room and rows";waitFor(()->safeLayout(false)&&((TextView)field(activity,"send")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1);
+        stage="reopened room and rows";waitFor(()->safeLayout(false)&&((EditText)field(activity,"input")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1);
         int[] center=ui(()->{View input=(View)field(activity,"input");int[] p=new int[2];input.getLocationOnScreen(p);return new int[]{p[0]+input.getWidth()/3,p[1]+input.getHeight()/2};});
         long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,center[0],center[1],0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,center[0],center[1],0);instrumentation.sendPointerSync(down);instrumentation.sendPointerSync(up);down.recycle();up.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);return null;});
+        View sameInput=(View)field(activity,"input");
         stage="keyboard shown";waitFor(()->safeLayout(true));instrumentation.sendStringSync("visible input");
+        check(ui(()->field(activity,"input")==sameInput&&!activity.isDestroyed()),"keyboard opening preserves the input view and activity");
         Bitmap keyboard=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),"native-chat-keyboard.png"))){keyboard.compress(Bitmap.CompressFormat.PNG,100,out);}keyboard.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");check(input.getText().toString().contains("visible input"),"visible composer accepts actual keyboard input");input.setText("");((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);input.clearFocus();return null;});
         stage="keyboard hidden";waitFor(()->safeLayout(false));
     }
     private void capture(String name){try{Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();}catch(Exception ignored){}}
+    private void verifySendStates()throws Exception{
+        File file=new File(instrumentation.getTargetContext().getCacheDir(),"composer-state.jpg");try(FileOutputStream out=new FileOutputStream(file)){out.write(1);}
+        ui(()->{EditText input=(EditText)field(activity,"input");TextView send=(TextView)field(activity,"send");input.setText("");check(!send.isEnabled()&&send.getAlpha()<.5f,"empty send is dimmed and disabled");input.setText(" \n ");check(!send.isEnabled(),"whitespace is not sendable");input.setText("확인");check(send.isEnabled()&&send.getAlpha()==1f,"typing enables and brightens send immediately");input.setText("");Field pending=activity.getClass().getDeclaredField("pendingFile");pending.setAccessible(true);pending.set(activity,file);Method show=activity.getClass().getDeclaredMethod("showAttachment");show.setAccessible(true);show.invoke(activity);check(send.isEnabled(),"attachment-only message is sendable");pending.set(activity,null);show.invoke(activity);check(!send.isEnabled(),"removing the last attachment dims send");return null;});file.delete();
+    }
+    private String js(WebView view,String code)throws Exception{
+        java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
+        instrumentation.runOnMainSync(()->view.evaluateJavascript(code,value->{result.set(value);done.countDown();}));
+        if(!done.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("WebView script timed out");return result.get();
+    }
+    private void awaitJs(WebView view,String code)throws Exception{long until=SystemClock.uptimeMillis()+20000;while(SystemClock.uptimeMillis()<until){if("true".equals(js(view,code)))return;Thread.sleep(100);}throw new AssertionError("WebView condition timed out: "+code);}
+    private void verifyHandoff()throws Exception{
+        Context c=instrumentation.getTargetContext();c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
+        NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
+        Instrumentation.ActivityMonitor monitor=new Instrumentation.ActivityMonitor(NativeStaffChatActivity.class.getName(),null,false);instrumentation.addMonitor(monitor);
+        AttendanceActivity host=null;
+        try{
+            host=(AttendanceActivity)instrumentation.startActivitySync(new Intent().setClassName(c,"com.oneminute.guesthousemanager.ChatHandoffProbeActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            Field webField=AttendanceActivity.class.getDeclaredField("webView");webField.setAccessible(true);WebView web=(WebView)webField.get(host);
+            awaitJs(web,"window.fixtureReady===true && !!document.querySelector('.staff-room')");String nonce=js(web,"window.fixtureNonce");
+            String before=ui(()->web.getUrl())+" "+js(web,"JSON.stringify({href:location.href,origin:location.origin,bridge:typeof window.OMGNative?.openStaffChat})");
+            js(web,"window.fixtureLinkCancelled=null;document.querySelector('.staff-room').addEventListener('click',event=>setTimeout(()=>window.fixtureLinkCancelled=event.defaultPrevented,0),{once:true});document.querySelector('.staff-room').click();true");activity=(NativeStaffChatActivity)monitor.waitForActivityWithTimeout(10000);check(activity!=null,"real WebView link opens one native conversation: "+before+" after="+ui(()->web.getUrl())+" cancelled="+js(web,"window.fixtureLinkCancelled"));
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();
+            final AttendanceActivity parent=host;
+            ui(()->{Method open=AttendanceActivity.class.getDeclaredMethod("openNativeStaffChat",String.class,String.class);open.setAccessible(true);check((Boolean)open.invoke(parent,PEER,"[]"),"repeated host callback is consumed");return null;});
+            View sameInput=(View)field(activity,"input");ui(()->{EditText input=(EditText)field(activity,"input");input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);input.setText("입력 중 유지");return null;});
+            stage="handoff keyboard";waitFor(()->safeLayout(true));Thread.sleep(7200);
+            check(monitor.getHits()==1,"watchdog must not relaunch the native room after 1.5/6.5 seconds");
+            ui(()->{check(!activity.isDestroyed()&&field(activity,"input")==sameInput,"typing must not recreate the activity or composer");EditText input=(EditText)field(activity,"input");check(input.getText().toString().equals("입력 중 유지"),"typing draft stays intact");((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);input.clearFocus();return null;});
+            stage="handoff keyboard hidden";waitFor(()->safeLayout(false));Thread.sleep(400);ui(()->{activity.getOnBackPressedDispatcher().onBackPressed();return null;});waitFor(()->activity.isFinishing());
+            awaitJs(web,"!document.hidden");check(nonce.equals(js(web,"window.fixtureNonce")),"return preserves the original hub document");check("true".equals(js(web,"!document.getElementById('navigationFailure')")),"no false N5 dialog after returning to hub");
+        }finally{if(host!=null){final AttendanceActivity parent=host;ui(()->{parent.finish();return null;});}instrumentation.removeMonitor(monitor);NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
+    }
     private void verifyUploads(Context c)throws Exception{
         File dir=new File(c.getFilesDir(),"native-chat-upload-probe");dir.mkdirs();
         File image=new File(dir,"source.png");Bitmap png=Bitmap.createBitmap(48,32,Bitmap.Config.ARGB_8888);try(FileOutputStream out=new FileOutputStream(image)){png.compress(Bitmap.CompressFormat.PNG,100,out);}png.recycle();

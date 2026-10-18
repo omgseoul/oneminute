@@ -7,6 +7,7 @@ public class UpdateProbe extends Instrumentation {
  @Override public void onStart() {
   if("chat".equals(phase)){NativeStaffChatProbe.run(this);return;}
   if("chat-layout".equals(phase)){NativeStaffChatProbe.runLayout(this);return;}
+  if("chat-handoff".equals(phase)){NativeStaffChatProbe.runHandoff(this);return;}
   Bundle result=new Bundle();
   android.content.SharedPreferences prefs=getTargetContext().getSharedPreferences("oms_update_probe",0);
   if("seed".equals(phase))prefs.edit().putString("marker","continuity-ok").commit();

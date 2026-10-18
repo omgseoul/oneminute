@@ -49,7 +49,8 @@
   if (!window.OMGNative || window.omgTapRecoveryInstalled) return;
   window.omgTapRecoveryInstalled = true;
   var pending = null, timer = 0, attempt = 0, down = null;
-  function cancel() { clearTimeout(timer); pending = null; }
+  function cancel() { clearTimeout(timer); pending = null; down = null; attempt++; }
+  function nativeNavigation() { cancel(); document.getElementById('navigationFailure')?.remove(); }
   function menuLink(target) {
     var link = target && target.closest ? target.closest('a[href]') : null;
     if (!link || link.target || link.hasAttribute('download') || link.getAttribute('href').charAt(0) === '#') return null;
@@ -57,7 +58,7 @@
     return /^https?:$/.test(url.protocol) && url.origin === location.origin ? link : null;
   }
   function showFailure(link, code) {
-    if (document.getElementById('navigationFailure')) return;
+    if (document.hidden || document.getElementById('navigationFailure')) return;
     var layer = document.createElement('div');
     layer.id = 'navigationFailure';
     layer.setAttribute('role', 'dialog');
@@ -89,9 +90,9 @@
     cancel(); pending = start.link;
     // Let a normal click win first; recover a completed tap if WebView drops it.
     timer = setTimeout(function () {
-      if (pending !== start.link) return;
+      if (document.hidden || pending !== start.link) return;
       location.assign(start.link.href);
-      timer = setTimeout(function () { if (pending === start.link) showFailure(start.link, '터치 직접 이동 미완료'); }, 5000);
+      if (pending === start.link) timer = setTimeout(function () { if (pending === start.link) showFailure(start.link, '터치 직접 이동 미완료'); }, 5000);
     }, 400);
   }, true);
   document.addEventListener('click', function (event) {
@@ -101,11 +102,14 @@
     var id = ++attempt;
     // Do not cancel the real click. Retry only if this document never leaves.
     timer = setTimeout(function () {
-      if (pending !== link || id !== attempt) return;
+      if (document.hidden || pending !== link || id !== attempt) return;
       location.assign(link.href);
-      timer = setTimeout(function () { if (pending === link && id === attempt) showFailure(link, '클릭 후 이동 미완료'); }, 5000);
+      if (pending === link && id === attempt) timer = setTimeout(function () { if (pending === link && id === attempt) showFailure(link, '클릭 후 이동 미완료'); }, 5000);
     }, 1500);
   }, true);
   addEventListener('pagehide', cancel);
   addEventListener('pageshow', cancel);
+  addEventListener('omg:native-navigation', nativeNavigation);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) cancel(); });
 })();
+

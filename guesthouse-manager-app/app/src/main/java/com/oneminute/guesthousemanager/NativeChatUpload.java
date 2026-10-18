@@ -34,15 +34,16 @@ final class NativeChatUpload {
                     while((n=in.read(buffer))!=-1){total+=n;if(closed)throw new IOException("취소되었습니다.");if(total>100L*1024*1024)throw new IOException("원본 파일은 100MB 이하로 선택해주세요.");out.write(buffer,0,n);}
                 }
                 String mime=context.getContentResolver().getType(uri);
+                if(mime==null||"application/octet-stream".equals(mime)){BitmapFactory.Options probe=new BitmapFactory.Options();probe.inJustDecodeBounds=true;BitmapFactory.decodeFile(source.getPath(),probe);mime=probe.outWidth>0?"image/unknown":"video/unknown";}
                 if(mime!=null&&mime.startsWith("image/")){
                     File image=compressImage(directory);source.delete();source=null;main.post(()->{if(!closed)cb.done(image,"image/jpeg");else image.delete();});
                 }else if(mime!=null&&mime.startsWith("video/")){
                     long duration;int width,height;
-                    try(MediaMetadataRetriever info=new MediaMetadataRetriever()){
+                    MediaMetadataRetriever info=new MediaMetadataRetriever();try{
                         info.setDataSource(source.getPath());duration=Long.parseLong(info.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
                         width=Integer.parseInt(info.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));height=Integer.parseInt(info.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
                         String rotation=info.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);if("90".equals(rotation)||"270".equals(rotation)){int t=width;width=height;height=t;}
-                    }
+                    }finally{info.release();}
                     if(duration<=0||duration>180000)throw new IOException("동영상은 3분 이하로 선택해주세요.");
                     float scale=Math.min(1f,1280f/Math.max(width,height));int targetHeight=Math.max(2,((int)(height*scale)/2)*2);
                     int bitrate=(int)Math.max(150000,Math.min(2500000,(20L*1024*1024*8*.84)/(duration/1000d)-64000));
@@ -57,13 +58,14 @@ final class NativeChatUpload {
         BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/1920);Bitmap bitmap=BitmapFactory.decodeFile(source.getPath(),options);
         if(bitmap==null)throw new IOException("사진을 읽지 못했습니다.");
         try{
-            ExifInterface exif=new ExifInterface(source.getPath());Matrix matrix=new Matrix();int orientation=exif.getAttributeInt(ExifInterface.TAG_ORIENTATION,1);
+            int orientation=1;try{ExifInterface exif=new ExifInterface(source.getPath());orientation=exif.getAttributeInt(ExifInterface.TAG_ORIENTATION,1);}catch(IOException ignored){}Matrix matrix=new Matrix();
             switch(orientation){case 2:matrix.setScale(-1,1);break;case 3:matrix.setRotate(180);break;case 4:matrix.setScale(1,-1);break;case 5:matrix.setRotate(90);matrix.postScale(-1,1);break;case 6:matrix.setRotate(90);break;case 7:matrix.setRotate(-90);matrix.postScale(-1,1);break;case 8:matrix.setRotate(-90);break;}
             Bitmap oriented=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),matrix,true);if(oriented!=bitmap){bitmap.recycle();bitmap=oriented;}
             float scale=Math.min(1,1920f/Math.max(bitmap.getWidth(),bitmap.getHeight()));if(scale<1){Bitmap resized=Bitmap.createScaledBitmap(bitmap,Math.max(1,Math.round(bitmap.getWidth()*scale)),Math.max(1,Math.round(bitmap.getHeight()*scale)),true);if(resized!=bitmap)bitmap.recycle();bitmap=resized;}
+            if(bitmap.hasAlpha()){Bitmap opaque=Bitmap.createBitmap(bitmap.getWidth(),bitmap.getHeight(),Bitmap.Config.RGB_565);Canvas canvas=new Canvas(opaque);canvas.drawColor(Color.WHITE);canvas.drawBitmap(bitmap,0,0,null);bitmap.recycle();bitmap=opaque;}
             File file=File.createTempFile("photo-",".jpg",dir);
             for(int quality:new int[]{86,76,66,56,46}){try(FileOutputStream out=new FileOutputStream(file)){bitmap.compress(Bitmap.CompressFormat.JPEG,quality,out);}if(file.length()<=700*1024)break;}
-            if(file.length()>1572864){file.delete();throw new IOException("사진을 1.5MB 이하로 압축하지 못했습니다.");}return file;
+            if(file.length()<3||file.length()>1572864){file.delete();throw new IOException("사진을 1.5MB 이하로 압축하지 못했습니다.");}return file;
         }finally{bitmap.recycle();}
     }
     private void export(File directory,int height,int bitrate,int attempt,Callback cb){

@@ -44,14 +44,14 @@ final class NativeStaffChatMedia {
     void bind(ImageView image,String peer,String id,boolean video){
         String key=id+(video?":video":":image");image.setTag(key);image.setImageDrawable(null);image.setBackgroundColor(0xffdce8f7);
         Bitmap hit=thumbs.get(key);if(hit!=null){image.setImageBitmap(hit);return;}
-        image.post(()->worker.execute(()->{
+        image.post(()->{if(closed)return;worker.execute(()->{
             if(closed||!image.isAttachedToWindow()||!key.equals(image.getTag()))return;
             try{Bitmap bitmap=thumbnail(file(peer,id),video);if(bitmap==null)return;thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}catch(Exception ignored){/* The row remains a tappable retry placeholder. */}
-        }));
+        });});
     }
     static Bitmap thumbnail(File file,boolean video)throws Exception {
         if(!video){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/480);return BitmapFactory.decodeFile(file.getPath(),options);}
-        try(MediaMetadataRetriever reader=new MediaMetadataRetriever()){
+        MediaMetadataRetriever reader=new MediaMetadataRetriever();try{
             reader.setDataSource(file.getPath());Bitmap frame=null;
             for(long time:new long[]{500000,1500000,0}){
                 frame=Build.VERSION.SDK_INT>=27?reader.getScaledFrameAtTime(time,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,480,480):reader.getFrameAtTime(time,MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
@@ -59,7 +59,7 @@ final class NativeStaffChatMedia {
             }
             if(frame!=null&&Math.max(frame.getWidth(),frame.getHeight())>480){float scale=480f/Math.max(frame.getWidth(),frame.getHeight());Bitmap resized=Bitmap.createScaledBitmap(frame,Math.max(1,Math.round(frame.getWidth()*scale)),Math.max(1,Math.round(frame.getHeight()*scale)),true);if(resized!=frame)frame.recycle();return resized;}
             return frame;
-        }
+        }finally{reader.release();}
     }
     static Bitmap fullImage(File file){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/2048);return BitmapFactory.decodeFile(file.getPath(),o);}
     private void prune(){File[] list=api.cacheDirectory().listFiles();if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}

@@ -1,0 +1,11 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+const dom=new JSDOM('<nav id="nav"><button data-hub="guest">게스트</button><button data-hub="staff">직원 <span id="staffCount"></span></button></nav>',{runScripts:'outside-only',url:'https://omgworks24.com/messages.html'}),w=dom.window,d=w.document;
+w.GuestSupport={esc:s=>s};w.omgSupabase={rpc:async()=>({data:{ok:true,rooms:[]}})};w.setTimeout=()=>0;w.clearTimeout=()=>{};
+w.eval(fs.readFileSync('staff-chat-client.js','utf8'));
+let launches=[],webClicks=0;w.OMGNative={openStaffChat:(peer,properties)=>{launches.push({peer,properties:JSON.parse(properties)});return true;}};
+const nav=d.getElementById('nav');w.StaffConversations.init({propertyId:'home'},nav);w.StaffConversations.setProperties(['home','remote']);nav.querySelector('[data-hub=staff]').onclick=()=>webClicks++;
+nav.querySelector('[data-hub=staff] span').click();assert.equal(launches.length,1);assert.deepEqual(launches[0],{peer:'',properties:['home','remote']});assert.equal(webClicks,0);
+w.StaffConversations.show(true);assert.equal(launches.length,1,'programmatic staff selection for notices must not launch another native activity');
+delete w.OMGNative;nav.querySelector('[data-hub=staff]').click();assert.equal(webClicks,1,'web and older Android apps retain the web tab');
+w.OMGNative={openStaffChat:()=>false};nav.querySelector('[data-hub=staff]').click();assert.equal(webClicks,2,'failed handoff must fall back to the existing web tab');
+dom.window.close();console.log('PASS: native handoff preserves property filters, does not intercept notices, opens once and retains browser/old-app fallback');

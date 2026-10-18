@@ -25,8 +25,8 @@ android {
         applicationId 'com.oneminute.guesthousemanager'
         minSdk 26
         targetSdk 35
-        versionCode Integer.parseInt(System.getenv('OMS_VERSION_CODE') ?: '32')
-        versionName '0.16.3'
+        versionCode Integer.parseInt(System.getenv('OMS_VERSION_CODE') ?: '33')
+        versionName '0.16.4'
         testInstrumentationRunner 'com.oneminute.guesthousemanager.UpdateProbe'
     }
 }

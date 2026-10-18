@@ -45,7 +45,7 @@ public final class NativeStaffChatProbe {
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((EditText)field(activity,"input")).isEnabled());
-            verifySendStates();verifySafeLayout();
+            verifySendStates();verifySafeLayout();verifyProfile();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 😀"),"emoji cursor insertion");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
             ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
@@ -67,7 +67,7 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
@@ -122,6 +122,44 @@ public final class NativeStaffChatProbe {
         stage="keyboard hidden keeps latest message visible";waitFor(()->safeLayout(false)&&latestMessageVisible());
     }
     private void capture(String name){try{Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();}catch(Exception ignored){}}
+    private void verifyProfile()throws Exception{
+        stage="worker profile loaded";waitFor(()->field(activity,"profile")!=null);
+        View sameInput=(View)field(activity,"input");
+        ui(()->{((EditText)sameInput).setText("프로필을 닫아도 유지할 초안");((TextView)field(activity,"title")).performClick();return null;});
+        stage="shared worker profile card";waitFor(()->{
+            Dialog dialog=(Dialog)field(activity,"peerProfileDialog");if(dialog==null||!dialog.isShowing())return false;
+            View decor=dialog.getWindow().getDecorView();FrameLayout avatar=decor.findViewWithTag("staff-profile-avatar");
+            return avatar!=null&&((ImageView)avatar.getChildAt(1)).getDrawable()!=null;
+        });
+        ui(()->{
+            Dialog dialog=(Dialog)field(activity,"peerProfileDialog");View decor=dialog.getWindow().getDecorView();
+            check(((TextView)decor.findViewWithTag("staff-profile-name")).getText().toString().equals("김한울"),"profile hero displays worker name");
+            for(String[] expected:new String[][]{{"display_name","김한울"},{"job_title","평일 오전"},{"property_name","One Minute"},{"contact_phone","-"}})check(((TextView)decor.findViewWithTag("staff-profile-"+expected[0])).getText().toString().equals(expected[1]),"profile field "+expected[0]);
+            View close=decor.findViewWithTag("staff-profile-close");Rect visible=new Rect();check(close.getGlobalVisibleRect(visible)&&visible.height()==close.getHeight(),"top-right close is fully visible");
+            return null;
+        });
+        instrumentation.waitForIdleSync();Thread.sleep(350);capture("native-chat-profile.png");
+        ui(()->{Dialog dialog=(Dialog)field(activity,"peerProfileDialog");dialog.getWindow().getDecorView().findViewWithTag("staff-profile-close").performClick();return null;});
+        stage="profile close returns to room";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
+        ui(()->{
+            JSONObject profile=(JSONObject)field(activity,"profile");profile.put("job_title",JSONObject.NULL).put("contact_phone","  ").put("property_name","One Minute 서울역점 긴 지점 이름도 줄바꿈하여 전체 내용이 보여야 합니다");
+            ((View)((ImageView)field(activity,"headerAvatar")).getParent()).performClick();return null;
+        });
+        stage="avatar opens same profile with long and empty fields";waitFor(()->{
+            Dialog dialog=(Dialog)field(activity,"peerProfileDialog");if(!dialog.isShowing())return false;
+            TextView property=dialog.getWindow().getDecorView().findViewWithTag("staff-profile-property_name");
+            return property.getLayout()!=null&&property.getLineCount()>1;
+        });
+        ui(()->{
+            Dialog dialog=(Dialog)field(activity,"peerProfileDialog");View decor=dialog.getWindow().getDecorView();
+            check(((TextView)decor.findViewWithTag("staff-profile-job_title")).getText().toString().equals("-"),"missing job uses shared placeholder");
+            check(((TextView)decor.findViewWithTag("staff-profile-contact_phone")).getText().toString().equals("-"),"blank contact uses shared placeholder");
+            ((ScrollView)decor.findViewWithTag("staff-profile-scroll")).fullScroll(View.FOCUS_DOWN);return null;
+        });
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+        stage="profile back preserves room and draft";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
+        ui(()->{check(field(activity,"input")==sameInput&&((EditText)sameInput).getText().toString().equals("프로필을 닫아도 유지할 초안"),"profile close/back preserve input and unsent draft");((EditText)sameInput).setText("");return null;});
+    }
     private void verifySendStates()throws Exception{
         File file=new File(instrumentation.getTargetContext().getCacheDir(),"composer-state.jpg");try(FileOutputStream out=new FileOutputStream(file)){out.write(1);}
         ui(()->{EditText input=(EditText)field(activity,"input");TextView send=(TextView)field(activity,"send");input.setText("");check(!send.isEnabled()&&send.getAlpha()<.5f,"empty send is dimmed and disabled");input.setText(" \n ");check(!send.isEnabled(),"whitespace is not sendable");input.setText("확인");check(send.isEnabled()&&send.getAlpha()==1f,"typing enables and brightens send immediately");input.setText("");Field pending=activity.getClass().getDeclaredField("pendingFile");pending.setAccessible(true);pending.set(activity,file);Method show=activity.getClass().getDeclaredMethod("showAttachment");show.setAccessible(true);show.invoke(activity);check(send.isEnabled(),"attachment-only message is sendable");pending.set(activity,null);show.invoke(activity);check(!send.isEnabled(),"removing the last attachment dims send");return null;});file.delete();
@@ -184,7 +222,7 @@ public final class NativeStaffChatProbe {
             }
             return new JSONObject().put("ok",true).put("can_send",true).put("peer",new JSONObject().put("display_name","근무자 채팅")).put("messages",messages);
         }
-        @Override JSONObject rpc(String name,JSONObject args)throws Exception{return new JSONObject().put("ok",true).put("recipients",new JSONArray()).put("profile",new JSONObject().put("display_name","근무자"));}
+        @Override JSONObject rpc(String name,JSONObject args)throws Exception{return new JSONObject().put("ok",true).put("recipients",new JSONArray()).put("profile",new JSONObject().put("display_name","김한울").put("profile_image","data:image/jpeg;base64,"+jpeg).put("job_title","평일 오전").put("property_name","One Minute").put("contact_phone",""));}
         @Override void notifyMessage(String id){}
     }
 }

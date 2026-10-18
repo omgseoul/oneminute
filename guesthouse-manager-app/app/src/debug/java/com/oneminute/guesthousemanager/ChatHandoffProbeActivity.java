@@ -11,7 +11,8 @@ public final class ChatHandoffProbeActivity extends AttendanceActivity {
         try(InputStream in=getAssets().open("chat-handoff.html")) {
             ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] bytes=new byte[4096];int n;
             while((n=in.read(bytes))!=-1)out.write(bytes,0,n);
-            view.loadDataWithBaseURL("https://omgworks24.com/messages.html?tab=staff",new String(out.toByteArray(),StandardCharsets.UTF_8),"text/html","UTF-8",null);
+            String url="https://omgworks24.com/messages.html?tab=staff";
+            view.loadDataWithBaseURL(url,new String(out.toByteArray(),StandardCharsets.UTF_8),"text/html","UTF-8",url);
         }catch(IOException e){throw new IllegalStateException(e);}
     }
 }

@@ -118,7 +118,8 @@ public final class NativeStaffChatProbe {
             host=(AttendanceActivity)instrumentation.startActivitySync(new Intent().setClassName(c,"com.oneminute.guesthousemanager.ChatHandoffProbeActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             Field webField=AttendanceActivity.class.getDeclaredField("webView");webField.setAccessible(true);WebView web=(WebView)webField.get(host);
             awaitJs(web,"window.fixtureReady===true && !!document.querySelector('.staff-room')");String nonce=js(web,"window.fixtureNonce");
-            js(web,"document.querySelector('.staff-room').click();true");activity=(NativeStaffChatActivity)monitor.waitForActivityWithTimeout(10000);check(activity!=null,"real WebView link opens one native conversation");
+            String before=ui(()->web.getUrl())+" "+js(web,"JSON.stringify({href:location.href,origin:location.origin,bridge:typeof window.OMGNative?.openStaffChat})");
+            js(web,"window.fixtureLinkCancelled=null;document.querySelector('.staff-room').addEventListener('click',event=>setTimeout(()=>window.fixtureLinkCancelled=event.defaultPrevented,0),{once:true});document.querySelector('.staff-room').click();true");activity=(NativeStaffChatActivity)monitor.waitForActivityWithTimeout(10000);check(activity!=null,"real WebView link opens one native conversation: "+before+" after="+ui(()->web.getUrl())+" cancelled="+js(web,"window.fixtureLinkCancelled"));
             waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();
             final AttendanceActivity parent=host;
             ui(()->{Method open=AttendanceActivity.class.getDeclaredMethod("openNativeStaffChat",String.class,String.class);open.setAccessible(true);check((Boolean)open.invoke(parent,PEER,"[]"),"repeated host callback is consumed");return null;});

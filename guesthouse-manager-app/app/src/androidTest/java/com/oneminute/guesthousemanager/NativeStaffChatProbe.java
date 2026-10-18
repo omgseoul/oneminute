@@ -81,8 +81,8 @@ public final class NativeStaffChatProbe {
         waitFor(()->safeLayout(false));
         // Rebuild after the first window dispatch: this reproduced the room opened
         // from the old native list, where all system-bar padding was lost.
-        ui(()->{Method build=activity.getClass().getDeclaredMethod("build");build.setAccessible(true);build.invoke(activity);return null;});
-        waitFor(()->safeLayout(false)&&((TextView)field(activity,"send")).isEnabled());
+        ui(()->{Method open=activity.getClass().getDeclaredMethod("openRoom",String.class);open.setAccessible(true);open.invoke(activity,PEER);return null;});
+        waitFor(()->safeLayout(false)&&((TextView)field(activity,"send")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1);
         int[] center=ui(()->{View input=(View)field(activity,"input");int[] p=new int[2];input.getLocationOnScreen(p);return new int[]{p[0]+input.getWidth()/3,p[1]+input.getHeight()/2};});
         long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,center[0],center[1],0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,center[0],center[1],0);instrumentation.sendPointerSync(down);instrumentation.sendPointerSync(up);down.recycle();up.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);return null;});

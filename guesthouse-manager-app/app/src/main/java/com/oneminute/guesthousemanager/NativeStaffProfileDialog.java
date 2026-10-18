@@ -68,6 +68,9 @@ final class NativeStaffProfileDialog extends Dialog {
         personName.setText(name);personInitial.setText(name.substring(0,name.offsetByCodePoints(0,1)));personPhoto.setContentDescription(name+" 프로필 사진");media.avatar(personPhoto,profile.optString("profile_image"));
         for(java.util.Map.Entry<String,TextView> entry:details.entrySet())entry.getValue().setText(value(profile,entry.getKey()));
         status.setVisibility(View.GONE);retry.setVisibility(View.GONE);
+        // Binding can resize the floating window above a hardware-backed WebView.
+        // Schedule a full decor redraw after the new content has been laid out.
+        View decor=getWindow().getDecorView();decor.post(()->{decor.requestLayout();decor.postInvalidateOnAnimation();});
     }
     void loading(){status.setText("정보를 불러오는 중입니다.");status.setVisibility(View.VISIBLE);retry.setVisibility(View.GONE);}
     void failed(String message,Runnable reload){status.setText(message);status.setVisibility(View.VISIBLE);retry.setVisibility(View.VISIBLE);retry.setOnClickListener(v->reload.run());}

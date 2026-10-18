@@ -54,11 +54,11 @@ jobs:
             adb logcat -d -b crash
             grep -q 'oms_handoff=ok' "$RUNNER_TEMP/oms-handoff.txt"
             adb shell am instrument -w -e phase chat com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-chat.txt"
-            grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-probe.png > "$RUNNER_TEMP/oms-native-chat.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-keyboard.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-profile.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-worker-profile-host.png > "$RUNNER_TEMP/oms-native-approval-profile.png"
+            grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
             adb shell wm size 720x1280
             adb shell wm density 360
             adb shell settings put system font_scale 1.3

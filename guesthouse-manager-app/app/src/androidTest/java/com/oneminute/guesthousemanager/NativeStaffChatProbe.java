@@ -174,6 +174,16 @@ public final class NativeStaffChatProbe {
     private Dialog approvalProfile(AttendanceActivity host)throws Exception{
         Field owner=AttendanceActivity.class.getDeclaredField("workerProfiles");owner.setAccessible(true);Object controller=owner.get(host);return controller==null?null:(Dialog)field(controller,"dialog");
     }
+    private void awaitProfileDrawn(Dialog dialog)throws Exception{
+        long until=SystemClock.uptimeMillis()+6000;
+        while(SystemClock.uptimeMillis()<until){
+            Rect heading=ui(()->{Rect bounds=new Rect();dialog.getWindow().getDecorView().findViewWithTag("staff-profile-title").getGlobalVisibleRect(bounds);return bounds;});
+            Bitmap frame=instrumentation.getUiAutomation().takeScreenshot();int ink=0;
+            if(frame!=null){for(int y=Math.max(0,heading.top);y<Math.min(frame.getHeight(),heading.bottom);y+=2)for(int x=Math.max(0,heading.left);x<Math.min(frame.getWidth(),heading.right);x+=2){int c=frame.getPixel(x,y);if(Color.red(c)<100&&Color.green(c)<130&&Color.blue(c)>Color.green(c)+10)ink++;}frame.recycle();}
+            if(ink>12)return;Thread.sleep(100);
+        }
+        throw new AssertionError("Native worker profile title was measured but not drawn on screen");
+    }
     private void verifyApprovalProfile()throws Exception{
         Context context=instrumentation.getTargetContext();AttendanceActivity host=null;
         NativeWorkerProfileController.apiFactory=FakeApi::new;
@@ -192,7 +202,7 @@ public final class NativeStaffChatProbe {
             });
             check("true".equals(js(web,"!document.getElementById('messageProfile')?.open")),"native profile does not create a second web modal");
             check(before.equals(js(web,"JSON.stringify({nonce:fixtureNonce,href:location.href,state:history.state,length:history.length})")),"opening native profile preserves approval document and history");
-            instrumentation.waitForIdleSync();Thread.sleep(350);capture("native-worker-profile-host.png");
+            instrumentation.waitForIdleSync();awaitProfileDrawn(ui(()->approvalProfile(parent)));capture("native-worker-profile-host.png");
             ui(()->{approvalProfile(parent).getWindow().getDecorView().findViewWithTag("staff-profile-close").performClick();return null;});
             stage="approval profile closes without dismissing approval";waitFor(()->!approvalProfile(parent).isShowing());
             check(before.equals(js(web,"JSON.stringify({nonce:fixtureNonce,href:location.href,state:history.state,length:history.length})")),"closing profile keeps approval layer and scroll document");
@@ -208,7 +218,7 @@ public final class NativeStaffChatProbe {
             ui(()->{String url="https://example.invalid/messages.html";web.loadDataWithBaseURL(url,"<html><body>untrusted fixture</body></html>","text/html","UTF-8",url);return null;});
             awaitJs(web,"location.host==='example.invalid'");
             check("false".equals(js(web,"OMGNative.openWorkerProfile('"+PEER+"')")),"native worker profile rejects an untrusted page");
-        }finally{NativeWorkerProfileController.apiFactory=NativeStaffChatApi::new;if(host!=null){final AttendanceActivity parent=host;ui(()->{parent.finish();return null;});}}
+        }finally{NativeWorkerProfileController.apiFactory=NativeStaffChatApi::new;if(host!=null){final AttendanceActivity parent=host;if(ui(()->approvalProfile(parent)!=null&&approvalProfile(parent).isShowing()))capture("native-worker-profile-host.png");ui(()->{parent.finish();return null;});}}
         stage="return from approval fixture";waitFor(()->activity.hasWindowFocus());
     }
     private void verifySendStates()throws Exception{

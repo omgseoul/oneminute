@@ -82,21 +82,43 @@ public final class NativeStaffChatProbe {
         layout+=" safe="+safe+" titleY="+t[1]+" sendBottom="+(s[1]+send.getHeight())+" windowBottom="+(d[1]+decor.getHeight());
         return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect());
     }
+    private boolean latestMessageVisible()throws Exception{
+        ListView list=(ListView)field(activity,"list");View composer=(View)field(activity,"composer");
+        View last=list.getChildCount()>0?list.getChildAt(list.getChildCount()-1):null;
+        if(last==null)return false;
+        int[] row=new int[2],bar=new int[2];last.getLocationOnScreen(row);composer.getLocationOnScreen(bar);
+        layout+=" last="+list.getLastVisiblePosition()+"/"+(list.getCount()-1)+" rowBottom="+(row[1]+last.getHeight())+" composerTop="+bar[1];
+        return list.getLastVisiblePosition()==list.getCount()-1&&last.getBottom()<=list.getHeight()-list.getPaddingBottom()+1&&row[1]+last.getHeight()<=bar[1];
+    }
     private void verifySafeLayout()throws Exception{
         stage="initial system bars";waitFor(()->safeLayout(false));
         // Rebuild after the first window dispatch: this reproduced the room opened
         // from the old native list, where all system-bar padding was lost.
         ui(()->{Method open=activity.getClass().getDeclaredMethod("openRoom",String.class);open.setAccessible(true);open.invoke(activity,PEER);return null;});
-        stage="reopened room and rows";waitFor(()->safeLayout(false)&&((EditText)field(activity,"input")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1);
+        stage="reopened room and rows";waitFor(()->safeLayout(false)&&((EditText)field(activity,"input")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1&&latestMessageVisible());
+        // Begin in older history, so a composer focus must deliberately reveal the
+        // newest message instead of merely preserving the pre-keyboard offset.
+        ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});
+        stage="older history before typing";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
         int[] center=ui(()->{View input=(View)field(activity,"input");int[] p=new int[2];input.getLocationOnScreen(p);return new int[]{p[0]+input.getWidth()/3,p[1]+input.getHeight()/2};});
         long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,center[0],center[1],0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,center[0],center[1],0);instrumentation.sendPointerSync(down);instrumentation.sendPointerSync(up);down.recycle();up.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);return null;});
         View sameInput=(View)field(activity,"input");
-        stage="keyboard shown";waitFor(()->safeLayout(true));instrumentation.sendStringSync("visible input");
+        stage="keyboard and latest message shown";waitFor(()->safeLayout(true)&&latestMessageVisible());instrumentation.sendStringSync("visible input");
         check(ui(()->field(activity,"input")==sameInput&&!activity.isDestroyed()),"keyboard opening preserves the input view and activity");
+        ui(()->{((EditText)field(activity,"input")).setText("one\ntwo\nthree\nfour");return null;});
+        stage="multiline composer keeps latest message visible";waitFor(()->safeLayout(true)&&latestMessageVisible());
+        // Once typing has started, scrolling back through history must still work.
+        ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});
+        stage="history while keyboard open";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
+        ui(()->{((EditText)field(activity,"input")).setText("visible input");return null;});
+        instrumentation.waitForIdleSync();
+        check(ui(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1),"composer resize preserves intentional history scrolling");
+        ui(()->{ListView list=(ListView)field(activity,"list");list.setSelection(list.getCount()-1);return null;});
+        stage="latest message before capture";waitFor(()->safeLayout(true)&&latestMessageVisible());
         Bitmap keyboard=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),"native-chat-keyboard.png"))){keyboard.compress(Bitmap.CompressFormat.PNG,100,out);}keyboard.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");check(input.getText().toString().contains("visible input"),"visible composer accepts actual keyboard input");input.setText("");((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);input.clearFocus();return null;});
-        stage="keyboard hidden";waitFor(()->safeLayout(false));
+        stage="keyboard hidden keeps latest message visible";waitFor(()->safeLayout(false)&&latestMessageVisible());
     }
     private void capture(String name){try{Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();}catch(Exception ignored){}}
     private void verifySendStates()throws Exception{

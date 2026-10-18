@@ -44,6 +44,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private File pendingFile;
     private boolean urgent,canSend=true,sending,preparing,busy,active,destroyed,complete,searching,profileLoading;
     private int generation;
+    private boolean keyboardVisible;
     private JSONArray rooms=new JSONArray(),recipients=new JSONArray();
     private final Set<String> properties=new HashSet<>(),reading=new HashSet<>();
     private final Runnable poll=()->load(false,null);
@@ -63,7 +64,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         build();
     }
     private void build(){
-        generation++;busy=false;searching=false;reading.clear();state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;
+        generation++;busy=false;searching=false;reading.clear();state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         root=column(this);root.setBackgroundColor(BG);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
@@ -77,15 +78,37 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         search=new EditText(this);search.setSingleLine(true);search.setTextSize(14);search.setTextColor(INK);search.setHint(peer.isEmpty()?"이름 또는 대화 내용 검색":"내용 검색 · 입력 후 검색을 누르면 이전 대화도 검색");search.setVisibility(View.GONE);search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);root.addView(search);
         search.addTextChangedListener(new SimpleWatcher(){@Override public void afterTextChanged(Editable e){query=e.toString().trim().toLowerCase(Locale.ROOT);refreshList(false);}});search.setOnEditorActionListener((v,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH&&!peer.isEmpty()){searchHistory(0);return true;}return false;});
         status=text(this,"불러오는 중…",12,MUTED);status.setPadding(dp(this,16),dp(this,3),dp(this,16),dp(this,3));status.setMinHeight(dp(this,22));status.setOnClickListener(v->load(false,null));root.addView(status);
-        list=new ListView(this);list.setDivider(null);list.setClipToPadding(false);list.setPadding(dp(this,12),0,dp(this,12),dp(this,8));
+        list=new MessageList();list.setDivider(null);list.setClipToPadding(false);list.setPadding(dp(this,12),0,dp(this,12),dp(this,8));
         older=button(this,"이전 대화 더 보기","이전 대화 더 보기");older.setVisibility(View.GONE);older.setOnClickListener(v->load(true,null));list.addHeaderView(older,null,false);if(peer.isEmpty()){TextView notices=button(this,"공지 · 시스템 알림 ›","공지 및 시스템 알림 보기");notices.setGravity(Gravity.CENTER_VERTICAL);notices.setPadding(dp(this,14),0,dp(this,14),0);notices.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/messages.html?tab=staff")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP)));list.addHeaderView(notices,null,false);}list.setStackFromBottom(!peer.isEmpty());root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
         if(!peer.isEmpty())buildComposer();else composer=null;
         refreshList(true);if(active)load(false,null);
     }
     private void applySafeArea(View view,WindowInsetsCompat insets){
+        boolean visible=insets.isVisible(WindowInsetsCompat.Type.ime());
+        boolean composing=visible&&!keyboardVisible&&input!=null&&input.hasFocus()&&list!=null&&list.getParent()==view;
+        keyboardVisible=visible;
+        if(composing)((MessageList)list).followNextResize=true;
         androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout()|WindowInsetsCompat.Type.ime());
         view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
+        if(composing)scrollToLatest(list);
+    }
+    private void scrollToLatest(ListView target){
+        final int request=generation;
+        target.post(()->{if(!destroyed&&request==generation&&target==list&&target.getCount()>0)target.setSelection(target.getCount()-1);});
+    }
+    /** Keep the last message above the composer as IME/emoji/input height changes.
+     * History stays in place when the reader has deliberately scrolled upward. */
+    private final class MessageList extends ListView{
+        boolean followNextResize;
+        MessageList(){super(NativeStaffChatActivity.this);}
+        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){
+            View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
+            boolean atLatest=oldh>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=oldh-getPaddingBottom()+1;
+            boolean follow=followNextResize||atLatest;followNextResize=false;
+            super.onSizeChanged(w,h,oldw,oldh);
+            if(h!=oldh&&follow)scrollToLatest(this);
+        }
     }
     private void buildComposer(){
         composer=column(this);composer.setPadding(dp(this,10),dp(this,6),dp(this,10),dp(this,8));composer.setBackgroundColor(Color.WHITE);root.addView(composer);
@@ -96,7 +119,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         FrameLayout wrap=new FrameLayout(this);wrap.setBackground(background(0xfff2f7fd,16,this));row.addView(wrap,new LinearLayout.LayoutParams(0,-2,1));
         input=new EditText(this);input.setTextSize(15);input.setTextColor(INK);input.setHintTextColor(0xff91a1b5);input.setHint("메세지 입력");input.setBackgroundColor(Color.TRANSPARENT);input.setMinLines(1);input.setMaxLines(4);input.setMinHeight(dp(this,44));input.setPadding(dp(this,12),dp(this,10),dp(this,38),dp(this,10));input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(2000)});input.setContentDescription("메세지 내용");wrap.addView(input,new FrameLayout.LayoutParams(-1,-2));
         emoji=new ImageButton(this);emoji.setImageDrawable(new Smile());emoji.setBackgroundColor(Color.TRANSPARENT);emoji.setPadding(dp(this,6),dp(this,6),dp(this,6),dp(this,6));emoji.setContentDescription("이모지 선택");FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(dp(this,36),dp(this,44),Gravity.RIGHT|Gravity.BOTTOM);wrap.addView(emoji,ep);
-        send=button(this,"➤","메세지 보내기");send.setTextColor(Color.WHITE);send.setBackground(background(0xff82ace1,14,this));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(this,42),dp(this,44));sp.setMargins(dp(this,5),0,0,0);row.addView(send,sp);send.setOnClickListener(v->send());
+        send=button(this,"➤","메세지 보내기");send.setTextColor(Color.WHITE);send.setBackground(background(BLUE,14,this));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(this,42),dp(this,44));sp.setMargins(dp(this,5),0,0,0);row.addView(send,sp);send.setOnClickListener(v->send());
         emojis=new GridView(this);emojis.setNumColumns(7);emojis.setHorizontalSpacing(dp(this,2));emojis.setVerticalSpacing(dp(this,2));emojis.setBackground(background(0xfff8fbff,16,this));emojis.setVisibility(View.GONE);emojis.setAdapter(new BaseAdapter(){public int getCount(){return EMOJIS.length;}public Object getItem(int p){return EMOJIS[p];}public long getItemId(int p){return p;}public View getView(int p,View recycled,ViewGroup parent){TextView cell=text(NativeStaffChatActivity.this,EMOJIS[p],26,INK);cell.setGravity(Gravity.CENTER);cell.setLayoutParams(new AbsListView.LayoutParams(-1,dp(NativeStaffChatActivity.this,42)));cell.setContentDescription(EMOJIS[p]+" 삽입");return cell;}});composer.addView(emojis,new LinearLayout.LayoutParams(-1,Math.min(dp(this,220),getResources().getDisplayMetrics().heightPixels/3)));
         emojis.setOnItemClickListener((parent,view,position,id)->{int a=Math.max(0,input.getSelectionStart()),b=Math.max(a,input.getSelectionEnd());String value=EMOJIS[position];if(input.length()-(b-a)+value.length()<=2000)input.getText().replace(a,b,value);});
         emoji.setOnClickListener(v->{if(!canSend)return;boolean show=emojis.getVisibility()!=View.VISIBLE;if(show)((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);emojis.setVisibility(show?View.VISIBLE:View.GONE);emoji.setContentDescription(show?"이모지 선택 닫기":"이모지 선택");});input.setOnClickListener(v->emojis.setVisibility(View.GONE));
@@ -137,7 +160,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private void refreshList(boolean bottom){
         if(list==null)return;final boolean conversations=peer.isEmpty();final List<JSONObject> shown=conversations?shownRooms():shownMessages();
         if(adapter instanceof RowsAdapter){((RowsAdapter)adapter).items=shown;adapter.notifyDataSetChanged();}else{adapter=new RowsAdapter(shown,conversations);list.setAdapter(adapter);}
-        if(bottom&&!shown.isEmpty())list.post(()->list.setSelection(list.getCount()-1));
+        if(bottom&&!shown.isEmpty())scrollToLatest(list);
         if(shown.isEmpty()&&status!=null)notice(query.isEmpty()?(conversations?"아직 대화가 없습니다. +를 눌러 대화를 시작하세요.":"첫 메세지를 보내 대화를 시작하세요."):"검색 결과가 없습니다.",false);
     }
     private final class RowsAdapter extends BaseAdapter{

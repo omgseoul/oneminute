@@ -144,7 +144,10 @@
  $('priority').onclick=()=>{if(sending)return;priority=priority==='urgent'?'normal':'urgent';$('priority').textContent=priority==='urgent'?'긴급⌄':'일반⌄';$('priority').setAttribute('aria-pressed',String(priority==='urgent'));keepDraft();};
  input.oninput=()=>{syncComposer();input.style.height='auto';input.style.height=Math.min(110,input.scrollHeight)+'px';keepDraft();};
  $('composer').onsubmit=async event=>{event.preventDefault();const originalText=input.value;const body=input.value.trim()||(photo?(String(photo).startsWith('data:video/')?'동영상':'사진'):'');if(!canSend||input.disabled||(!body&&!photo)||sending||preparing)return;sending=true;$('send').disabled=true;status('보내는 중…');if(!pending||pending.body!==body||pending.priority!==priority||pending.photo!==photo)pending={body,priority,photo,client_id:crypto.randomUUID()};keepDraft();try{const result=await call('send',pending);if(input.value===originalText)input.value='';photo=null;renderPhoto();pending=null;keepDraft();status('');try{if(!result.duplicate)await window.omgNotifications.send(session.accessToken,result.message_id);}catch{status('메세지는 저장됐지만 알림 전달을 확인하지 못했습니다.',true);}await load();}catch(err){status(err.message,true);}finally{sending=false;syncComposer();input.style.height='auto';}};
- $('peerIdentity').onclick=()=>{if(!peerProfile)return;$('peerProfileDialog').showModal?.()||$('peerProfileDialog').setAttribute('open','');};
+ $('peerIdentity').onclick=()=>{
+  try{if(typeof window.OMGNative?.openWorkerProfile==='function'&&window.OMGNative.openWorkerProfile(peer)===true)return;}catch{}
+  if(!peerProfile)return;$('peerProfileDialog').showModal?.()||$('peerProfileDialog').setAttribute('open','');
+ };
  $('peerProfileClose').onclick=()=>$('peerProfileDialog').close?.()||$('peerProfileDialog').removeAttribute('open');
  $('photoViewerClose').onclick=()=>closeViewer();$('photoPrevious').onclick=()=>moveViewer(-1);$('photoNext').onclick=()=>moveViewer(1);$('photoGalleryOpen').onclick=openGallery;$('photoGalleryClose').onclick=()=>closeGallery();
  const photoZoom=OMSPhotoZoom.attach($('photoStage'),$('photoViewerImage'),{onSwipe:moveViewer});

@@ -32,6 +32,7 @@ public class AttendanceActivity extends AppCompatActivity {
     private byte[] pendingExcel;
     private static final int STAFF_CHAT_REQUEST = 7302;
     private boolean staffChatOpen;
+    private NativeWorkerProfileController workerProfiles;
 
     private String safeTopicPart(String value) {
         return value == null ? "" : value.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
@@ -96,6 +97,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private void clearPushSession() {
+        runOnUiThread(()->{if(workerProfiles!=null)workerProfiles.clear();});
         NativePushRegistration.clear(this);
         NativeStaffChatApi.clearLocal(this);
         SupabaseMessageReceipt.clear(this);
@@ -139,7 +141,7 @@ public class AttendanceActivity extends AppCompatActivity {
         webView.addJavascriptInterface(new PushBridge(), "OMGNative");
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { recovery.started(url); }
+            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { if(workerProfiles!=null)workerProfiles.clear();recovery.started(url); }
             @Override public void onPageFinished(WebView view, String url) { recovery.finished(url); }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) recovery.fail(request.getUrl().toString());
@@ -216,7 +218,25 @@ public class AttendanceActivity extends AppCompatActivity {
         return true;
     }
 
+    private boolean openNativeWorkerProfile(String peer) {
+        Uri current=Uri.parse(webView==null||webView.getUrl()==null?"":webView.getUrl());
+        boolean trusted="https".equals(current.getScheme())&&
+                ("omgworks24.com".equals(current.getHost())||"www.omgworks24.com".equals(current.getHost()))&&
+                ("/messages.html".equals(current.getPath())||"/staff-chat.html".equals(current.getPath()));
+        if(!trusted||peer==null||!NativeStaffChatApi.validPeer(peer))return false;
+        if(workerProfiles==null)workerProfiles=new NativeWorkerProfileController(this);
+        return workerProfiles.open(peer);
+    }
+
     private final class PushBridge {
+        @JavascriptInterface
+        public boolean openWorkerProfile(String peer) {
+            java.util.concurrent.atomic.AtomicBoolean opened=new java.util.concurrent.atomic.AtomicBoolean(false);
+            java.util.concurrent.CountDownLatch latch=new java.util.concurrent.CountDownLatch(1);
+            runOnUiThread(()->{try {opened.set(openNativeWorkerProfile(peer));} finally {latch.countDown();}});
+            try {latch.await(2,java.util.concurrent.TimeUnit.SECONDS);}catch(InterruptedException error){Thread.currentThread().interrupt();}
+            return opened.get();
+        }
         @JavascriptInterface
         public boolean openStaffChat(String peer, String propertyIds) {
             java.util.concurrent.atomic.AtomicBoolean opened=new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -259,7 +279,9 @@ public class AttendanceActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void bindAppSession(String accessToken, String expiresAt) {
+            String previous=NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","");
             SupabaseMessageReceipt.bind(AttendanceActivity.this, accessToken, expiresAt);
+            if(!previous.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))runOnUiThread(()->{if(workerProfiles!=null)workerProfiles.clear();});
             NativePushRegistration.refresh(AttendanceActivity.this);
         }
 
@@ -388,13 +410,14 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume(); if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume(); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
     protected void onPause() { if (recovery != null) recovery.pause(); super.onPause(); }
 
     @Override
     protected void onDestroy() {
+        if(workerProfiles!=null)workerProfiles.close();
         if (recovery != null) recovery.destroy();
         if (webView != null) {
             webView.stopLoading();

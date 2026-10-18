@@ -19,7 +19,10 @@ window.MessageProfiles=(()=>{
   try{const profile=await StaffChat.profile(entry.session,entry.peer);if(active!==entry||version!==request)return;entry.profile=profile;paint(profile);$('messageProfileStatus').textContent='';}
   catch(error){if(active!==entry||version!==request)return;$('messageProfileStatus').textContent=error.message||'근무자 정보를 불러오지 못했습니다.';$('messageProfileRetry').hidden=false;}
  }
- function open(entry,button){ensure();active=entry;returnFocus=button;paint(entry.profile||{display_name:entry.name,profile_image:entry.image});history.pushState({...history.state,omgWorkerProfile:true},'',location.href);dialog.showModal();load(entry);}
+ function open(entry,button){
+  try{if(typeof window.OMGNative?.openWorkerProfile==='function'&&window.OMGNative.openWorkerProfile(entry.peer)===true)return;}catch{}
+  ensure();active=entry;returnFocus=button;paint(entry.profile||{display_name:entry.name,profile_image:entry.image});history.pushState({...history.state,omgWorkerProfile:true},'',location.href);dialog.showModal();load(entry);
+ }
  function close(){if(dialog?.open)history.back();}
  function restore(){if(!dialog?.open)return false;request++;active=null;dialog.close();returnFocus?.focus();return true;}
  function bind(item,session,recipients=[]){

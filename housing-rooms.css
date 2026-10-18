@@ -1,7 +1,7 @@
-.room-group.entire-house-group .entire-house-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.entire-house-choice label{display:flex;align-items:center;justify-content:center;min-height:36px;padding:8px 6px;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+.room-group.entire-house-group{display:block;margin-top:8px}.room-group.entire-house-group>.room-type{display:none}
+.room-group.entire-house-group .entire-house-options,.entire-house-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}
+.entire-house-choice label,.entire-house-result{box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-width:0;min-height:34px;height:40px;padding:4px 5px;border:1px solid #cbd8e8;border-radius:9px;background:#edf5ff;color:#183153;font-weight:800;line-height:1.2;white-space:normal;overflow:hidden;text-align:center}
+.entire-house-choice label{background:#fff}.entire-house-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;width:100%;max-height:2.4em;overflow:hidden;overflow-wrap:anywhere;white-space:normal;line-height:1.2;text-align:center}
 .room input:focus-visible+label{outline:2px solid #2467bd;outline-offset:2px}
-.housing-result{min-width:0;text-align:left;display:grid;gap:8px}
-.entire-house-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}
-.entire-house-result{display:flex;align-items:center;justify-content:center;min-width:0;min-height:36px;padding:8px 6px;border:1px solid #cbd8e8;border-radius:10px;background:#edf5ff;color:#183153;font-size:12px;font-weight:800;line-height:1.4;white-space:normal;overflow-wrap:anywhere;text-align:center}
-.housing-unit-result{white-space:pre-wrap}
+.housing-result{min-width:0;text-align:left;display:grid;gap:6px}.housing-unit-result{white-space:normal}
+.report-value-row:has(.housing-result){grid-template-columns:minmax(68px,max-content) minmax(0,1fr);column-gap:8px;align-items:start}.report-value-row:has(.housing-result)>strong{padding-top:8px;font-size:12px}.report-value-row .housing-result{white-space:normal;text-align:left}

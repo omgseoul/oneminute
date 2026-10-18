@@ -1,4 +1,6 @@
 window.OMSHousingRooms = (() => {
+  const houseLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
+  function houseName(value) { const text=houseLabel(value),label=document.createElement('span');label.className='entire-house-name';label.textContent=text;label.title=text;label.style.fontSize=(Array.from(text).length>10?'10':Array.from(text).length>6?'11':'12')+'px';return label; }
   const housesFor = groups => (groups || []).filter(group => !(group.rooms || []).length).map(group => group.name).filter(Boolean);
   function append(parent, field, groups, onChange) {
     let houseList = null;
@@ -20,7 +22,7 @@ window.OMSHousingRooms = (() => {
         const input = document.createElement('input'); input.type = 'checkbox'; input.name = field.key;
         input.value = room; input.id = `${field.key}-${groupIndex}-${index}`;
         if (onChange) input.addEventListener('change', onChange);
-        const label = document.createElement('label'); label.htmlFor = input.id; label.textContent = room;
+        const label = document.createElement('label'); label.htmlFor = input.id; if(isHouse){label.title=houseLabel(room);label.append(houseName(room));}else label.textContent = room;
         wrap.append(input, label); list.append(wrap);
       });
     });
@@ -31,7 +33,7 @@ window.OMSHousingRooms = (() => {
     const units = [];
     (values || []).forEach(value => {
       if (!houseNames.has(value)) { units.push(value); return; }
-      const chip = document.createElement('span'); chip.className = 'entire-house-result'; chip.textContent = value; grid.append(chip);
+      const chip = document.createElement('span'); chip.className = 'entire-house-result'; chip.title=houseLabel(value);chip.append(houseName(value));grid.append(chip);
     });
     if (grid.childElementCount) host.append(grid);
     if (units.length || !grid.childElementCount) {

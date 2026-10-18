@@ -57,6 +57,7 @@ jobs:
             grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-probe.png > "$RUNNER_TEMP/oms-native-chat.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-keyboard.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-profile.png"
             adb shell wm size 720x1280
             adb shell wm density 360
             adb shell settings put system font_scale 1.3
@@ -64,6 +65,7 @@ jobs:
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-small.png"
             grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-small.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-small-keyboard.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-small-profile.png"
             adb shell wm size 1080x2400
             adb shell wm density 480
             adb shell settings put system font_scale 1.0
@@ -72,6 +74,7 @@ jobs:
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-gesture.png"
             grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-gesture.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-gesture-keyboard.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-gesture-profile.png"
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: OMS-native-chat-preview, path: '${{ runner.temp }}/oms-native-*.png'}

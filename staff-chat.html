@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>메세지</title>
   <link rel="stylesheet" href="guest-support.css?v=20261001-compact">
-  <link rel="stylesheet" href="staff-chat.css?v=20261018-dark-send">
+  <link rel="stylesheet" href="staff-chat.css?v=20261018-shared-profile">
   <link rel="stylesheet" href="home-link.css?v=20261001">
   <link rel="stylesheet" href="top-layout.css?v=20261005b">
 <style>.chat-video{position:relative;width:min(220px,62vw);height:132px;margin:3px 0 6px;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#243d5c,#7793b1)}.chat-video .video-poster,.chat-video video{position:absolute;inset:0;display:block;width:100%;height:100%;border-radius:0;background:#111}.chat-video .video-poster{object-fit:cover}.chat-video video{object-fit:contain}.chat-video img[hidden],.chat-video video[hidden],.chat-video button[hidden]{display:none!important}.chat-video button{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;padding:0;border:0;border-radius:0;background:linear-gradient(180deg,#0001,#0005);color:#fff;cursor:pointer}.chat-video .video-play{display:grid;place-items:center;width:46px;height:46px;padding-left:3px;border-radius:50%;background:#f4f9ff;color:#2467bd;font-size:22px;box-shadow:0 2px 12px #0003}.chat-video .video-label{font-size:12px;font-weight:850;text-shadow:0 1px 4px #0008}.staff-contract-link{display:block;margin-top:12px;padding:10px 12px;border:1px solid #c5d8f0;border-radius:10px;background:#fff;color:#2467bd;text-decoration:none;font-weight:750}</style><link rel="stylesheet" href="photo-viewer-zoom.css?v=20261018-media"></head>
@@ -34,13 +34,13 @@
     </form>
   </div>
 
-  <dialog id="peerProfileDialog" class="peer-profile-dialog" aria-labelledby="peerProfileName">
-    <div class="profile-sheet-head"><h2>근무자 정보</h2><button id="peerProfileClose" type="button" aria-label="닫기">×</button></div>
+  <dialog id="peerProfileDialog" class="peer-profile-dialog" aria-labelledby="peerProfileTitle">
+    <div class="profile-sheet-head"><h2 id="peerProfileTitle">근무자 정보</h2><button id="peerProfileClose" type="button" aria-label="근무자 정보 닫기">×</button></div>
     <div class="profile-hero"><span id="peerProfileAvatar"></span><strong id="peerProfileName"></strong></div>
     <dl class="profile-fields">
       <div><dt>이름</dt><dd id="peerProfileDisplayName">-</dd></div>
       <div><dt>직무</dt><dd id="peerProfileJobTitle">-</dd></div>
-      <div><dt>지점 (소속)</dt><dd id="peerProfileProperty">-</dd></div>
+      <div><dt>지점</dt><dd id="peerProfileProperty">-</dd></div>
       <div><dt>연락처</dt><dd id="peerProfilePhone">-</dd></div>
     </dl>
   </dialog>

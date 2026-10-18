@@ -50,6 +50,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private final Runnable poll=()->load(false,null);
     private final Runnable readVisible=this::readVisible;
     private JSONObject profile;
+    private NativeStaffProfileDialog peerProfileDialog;
 
     @Override protected void onCreate(Bundle saved){
         super.onCreate(saved);
@@ -239,7 +240,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private void loadProfile(boolean show){
         if(profileLoading)return;profileLoading=true;final String room=peer;final int request=generation;worker.execute(()->{try{JSONObject p=api.rpc("staff_chat_peer_profile",new JSONObject().put("p_peer",room)).getJSONObject("profile");main.post(()->{if(!destroyed&&request==generation){profileLoading=false;profile=p;title.setText(p.optString("display_name","근무자"));if(headerAvatar!=null){media.avatar(headerAvatar,p.optString("profile_image"));((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(p.optString("display_name","?")));}if(show)profileDialog();}});}catch(Exception e){main.post(()->{if(request!=generation)return;profileLoading=false;if(show)notice("근무자 정보를 불러오지 못했습니다.",true);});}});
     }
-    private void profileDialog(){if(profile==null)return;StringBuilder text=new StringBuilder();for(String[] field:new String[][]{{"이름","display_name"},{"직무","job_title"},{"지점 (소속)","property_name"},{"연락처","contact_phone"}})text.append(field[0]).append("  ").append(profile.optString(field[1],"-")).append("\n\n");new AlertDialog.Builder(this).setTitle("근무자 정보").setMessage(text.toString().trim()).setPositiveButton("닫기",null).show();}
+    private void profileDialog(){if(profile==null||peerProfileDialog!=null&&peerProfileDialog.isShowing())return;peerProfileDialog=new NativeStaffProfileDialog(this,profile,media);peerProfileDialog.show();}
     private void searchHistory(int pages){if(pages==0&&searching||complete||peer.isEmpty())return;if(pages==0)searching=true;notice("이전 대화에서 검색 중…",false);int request=generation;load(true,()->{if(request!=generation)return;if(!complete&&pages<19)searchHistory(pages+1);else{searching=false;refreshList(false);notice(complete?"검색을 완료했습니다.":"검색을 다시 누르면 더 이전 대화도 검색합니다.",false);}});}
     private void openMedia(String id){List<JSONObject> items=state.media();if(items.isEmpty())return;if(viewer!=null)viewer.dismiss();viewer=new NativeStaffMediaViewer(this,media,peer,items,id,new NativeStaffMediaViewer.History(){public void older(Runnable ready){load(true,ready);}public List<JSONObject> items(){return state.media();}public boolean complete(){return complete;}});}
     private void openGallery(){collectMedia(0,generation);}
@@ -273,6 +274,6 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     @Override protected void onResume(){super.onResume();active=true;if(api!=null){if(!api.valid()){finish();return;}load(false,null);}}
     @Override protected void onPause(){active=false;main.removeCallbacks(poll);main.removeCallbacks(readVisible);if(viewer!=null)viewer.pause();saveDraft();super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state){state.putString("peer",peer);saveDraft();super.onSaveInstanceState(state);}
-    @Override protected void onDestroy(){destroyed=true;active=false;generation++;main.removeCallbacksAndMessages(null);if(viewer!=null)viewer.dismiss();if(upload!=null)upload.close();if(media!=null)media.close();worker.shutdown();super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;active=false;generation++;main.removeCallbacksAndMessages(null);if(peerProfileDialog!=null)peerProfileDialog.dismiss();if(viewer!=null)viewer.dismiss();if(upload!=null)upload.close();if(media!=null)media.close();worker.shutdown();super.onDestroy();}
     private abstract static class SimpleWatcher implements TextWatcher{public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){}}
 }

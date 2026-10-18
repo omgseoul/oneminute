@@ -95,14 +95,23 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void scrollToLatest(ListView target){
         final int request=generation;
-        target.post(()->{if(!destroyed&&request==generation&&target==list&&target.getCount()>0)target.setSelection(target.getCount()-1);});
+        target.post(()->{if(!destroyed&&request==generation&&target==list&&target.getCount()>0)((MessageList)target).showLatest();});
     }
     /** Keep the last message above the composer as IME/emoji/input height changes.
      * History stays in place when the reader has deliberately scrolled upward. */
     private final class MessageList extends ListView{
-        boolean followNextResize;
+        boolean followNextResize,alignAfterLayout;
         int laidOutHeight;
         MessageList(){super(NativeStaffChatActivity.this);}
+        void showLatest(){
+            int position=getCount()-1;
+            View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
+            if(last!=null&&getLastVisiblePosition()==position){
+                // setSelection alone aligns the TOP of an oversized photo/video
+                // row. A negative offset keeps its bottom and timestamp visible.
+                setSelectionFromTop(position,getHeight()-getPaddingBottom()-getPaddingTop()-last.getHeight());
+            }else{alignAfterLayout=true;setSelection(position);}
+        }
         @Override protected void onMeasure(int widthSpec,int heightSpec){
             // ListView measurement can reposition/re-measure its existing rows.
             // Capture the old bottom before that happens, not in onSizeChanged.
@@ -114,7 +123,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             boolean follow=followNextResize&&laidOutHeight!=bottom-top;
             super.onLayout(changed,left,top,right,bottom);
             laidOutHeight=bottom-top;followNextResize=false;
-            if(follow)scrollToLatest(this);
+            if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
         }
     }
     private void buildComposer(){

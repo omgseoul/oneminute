@@ -29,6 +29,7 @@ public final class NativeStaffChatProbe {
     private final Instrumentation instrumentation;
     private NativeStaffChatActivity activity;
     private FakeApi fake;
+    private String roomProfileMetrics;
     static void runHandoff(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verifyHandoff();result.putString("oms_handoff","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_handoff","failed: "+error);i.finish(0,result);}}
     private String stage="start",layout="";
     NativeStaffChatProbe(Instrumentation i){instrumentation=i;}
@@ -45,7 +46,7 @@ public final class NativeStaffChatProbe {
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((EditText)field(activity,"input")).isEnabled());
-            verifySendStates();verifySafeLayout();verifyProfile();
+            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 😀"),"emoji cursor insertion");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
             ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
@@ -67,7 +68,7 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
@@ -138,7 +139,7 @@ public final class NativeStaffChatProbe {
             View close=decor.findViewWithTag("staff-profile-close");Rect visible=new Rect();check(close.getGlobalVisibleRect(visible)&&visible.height()==close.getHeight(),"top-right close is fully visible");
             return null;
         });
-        instrumentation.waitForIdleSync();Thread.sleep(350);capture("native-chat-profile.png");
+        instrumentation.waitForIdleSync();Thread.sleep(350);roomProfileMetrics=ui(()->profileMetrics((Dialog)field(activity,"peerProfileDialog")));capture("native-chat-profile.png");
         ui(()->{Dialog dialog=(Dialog)field(activity,"peerProfileDialog");dialog.getWindow().getDecorView().findViewWithTag("staff-profile-close").performClick();return null;});
         stage="profile close returns to room";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
         ui(()->{
@@ -159,6 +160,56 @@ public final class NativeStaffChatProbe {
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
         stage="profile back preserves room and draft";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
         ui(()->{check(field(activity,"input")==sameInput&&((EditText)sameInput).getText().toString().equals("프로필을 닫아도 유지할 초안"),"profile close/back preserve input and unsent draft");((EditText)sameInput).setText("");return null;});
+    }
+    private String profileMetrics(Dialog dialog){
+        View decor=dialog.getWindow().getDecorView();StringBuilder result=new StringBuilder();
+        for(String tag:new String[]{"card","title","avatar","name","fields","close","display_name","job_title","property_name","contact_phone"}){
+            View view=decor.findViewWithTag("staff-profile-"+tag);int[] point=new int[2];view.getLocationOnScreen(point);
+            result.append(tag).append(':').append(point[0]).append(',').append(point[1]).append(',').append(view.getWidth()).append(',').append(view.getHeight());
+            if(view instanceof TextView){TextView text=(TextView)view;result.append(',').append(text.getTextSize()).append(',').append(text.getLineHeight());}
+            result.append(';');
+        }
+        return result.toString();
+    }
+    private Dialog approvalProfile(AttendanceActivity host)throws Exception{
+        Field owner=AttendanceActivity.class.getDeclaredField("workerProfiles");owner.setAccessible(true);Object controller=owner.get(host);return controller==null?null:(Dialog)field(controller,"dialog");
+    }
+    private void verifyApprovalProfile()throws Exception{
+        Context context=instrumentation.getTargetContext();AttendanceActivity host=null;
+        NativeWorkerProfileController.apiFactory=FakeApi::new;
+        try{
+            host=(AttendanceActivity)instrumentation.startActivitySync(new Intent().setClassName(context,"com.oneminute.guesthousemanager.ChatHandoffProbeActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            final AttendanceActivity parent=host;Field webField=AttendanceActivity.class.getDeclaredField("webView");webField.setAccessible(true);WebView web=(WebView)webField.get(host);
+            awaitJs(web,"window.fixtureReady===true && !!document.querySelector('.mp-identity')");
+            String before=js(web,"JSON.stringify({nonce:fixtureNonce,href:location.href,state:history.state,length:history.length})");
+            check("false".equals(js(web,"OMGNative.openWorkerProfile('employee:invalid')")),"malformed worker ID is rejected by native host");
+            js(web,"document.querySelector('.mp-identity').click();true");
+            stage="approval opens identical native profile";waitFor(()->{
+                Dialog dialog=approvalProfile(parent);if(dialog==null||!dialog.isShowing())return false;
+                View status=dialog.getWindow().getDecorView().findViewWithTag("staff-profile-status");
+                layout="expected="+roomProfileMetrics+" actual="+profileMetrics(dialog);
+                return status.getVisibility()==View.GONE&&roomProfileMetrics.equals(profileMetrics(dialog));
+            });
+            check("true".equals(js(web,"!document.getElementById('messageProfile')?.open")),"native profile does not create a second web modal");
+            check(before.equals(js(web,"JSON.stringify({nonce:fixtureNonce,href:location.href,state:history.state,length:history.length})")),"opening native profile preserves approval document and history");
+            instrumentation.waitForIdleSync();Thread.sleep(350);capture("native-worker-profile-host.png");
+            ui(()->{approvalProfile(parent).getWindow().getDecorView().findViewWithTag("staff-profile-close").performClick();return null;});
+            stage="approval profile closes without dismissing approval";waitFor(()->!approvalProfile(parent).isShowing());
+            check(before.equals(js(web,"JSON.stringify({nonce:fixtureNonce,href:location.href,state:history.state,length:history.length})")),"closing profile keeps approval layer and scroll document");
+            NativeWorkerProfileController.apiFactory=a->{FakeApi api=new FakeApi(a);api.profileFailures=1;return api;};
+            js(web,"document.querySelector('.mp-identity').click();true");
+            stage="native profile error stays in shared card";waitFor(()->{
+                Dialog dialog=approvalProfile(parent);return dialog!=null&&dialog.isShowing()&&dialog.getWindow().getDecorView().findViewWithTag("staff-profile-retry").getVisibility()==View.VISIBLE;
+            });
+            ui(()->{Dialog dialog=approvalProfile(parent);View decor=dialog.getWindow().getDecorView();check(((TextView)decor.findViewWithTag("staff-profile-display_name")).getText().toString().equals("-"),"failed lookup cannot show previous person's data");decor.findViewWithTag("staff-profile-retry").performClick();return null;});
+            stage="native profile retry reuses card";waitFor(()->approvalProfile(parent).getWindow().getDecorView().findViewWithTag("staff-profile-status").getVisibility()==View.GONE);
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="native profile back preserves approval";waitFor(()->!approvalProfile(parent).isShowing());
+            check(before.equals(js(web,"JSON.stringify({nonce:fixtureNonce,href:location.href,state:history.state,length:history.length})")),"native profile back does not pop approval history");
+            ui(()->{String url="https://example.invalid/messages.html";web.loadDataWithBaseURL(url,"<html><body>untrusted fixture</body></html>","text/html","UTF-8",url);return null;});
+            awaitJs(web,"location.host==='example.invalid'");
+            check("false".equals(js(web,"OMGNative.openWorkerProfile('"+PEER+"')")),"native worker profile rejects an untrusted page");
+        }finally{NativeWorkerProfileController.apiFactory=NativeStaffChatApi::new;if(host!=null){final AttendanceActivity parent=host;ui(()->{parent.finish();return null;});}}
+        stage="return from approval fixture";waitFor(()->activity.hasWindowFocus());
     }
     private void verifySendStates()throws Exception{
         File file=new File(instrumentation.getTargetContext().getCacheDir(),"composer-state.jpg");try(FileOutputStream out=new FileOutputStream(file)){out.write(1);}
@@ -208,6 +259,7 @@ public final class NativeStaffChatProbe {
     }
     private static final class FakeApi extends NativeStaffChatApi {
         int sendCalls;
+        int profileFailures;
         final Set<String> saved=new HashSet<>(),readIds=new HashSet<>();
         final String jpeg;
         FakeApi(Context c)throws Exception{super(c);Bitmap b=Bitmap.createBitmap(32,32,Bitmap.Config.RGB_565);b.eraseColor(0xff95c6ff);ByteArrayOutputStream out=new ByteArrayOutputStream();b.compress(Bitmap.CompressFormat.JPEG,90,out);b.recycle();jpeg=Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}
@@ -222,7 +274,7 @@ public final class NativeStaffChatProbe {
             }
             return new JSONObject().put("ok",true).put("can_send",true).put("peer",new JSONObject().put("display_name","근무자 채팅")).put("messages",messages);
         }
-        @Override JSONObject rpc(String name,JSONObject args)throws Exception{return new JSONObject().put("ok",true).put("recipients",new JSONArray()).put("profile",new JSONObject().put("display_name","김한울").put("profile_image","data:image/jpeg;base64,"+jpeg).put("job_title","평일 오전").put("property_name","One Minute").put("contact_phone",""));}
+        @Override JSONObject rpc(String name,JSONObject args)throws Exception{if("staff_chat_peer_profile".equals(name)&&profileFailures-->0)throw new IOException("연결을 확인하고 다시 시도해주세요.");return new JSONObject().put("ok",true).put("recipients",new JSONArray()).put("profile",new JSONObject().put("display_name","김한울").put("profile_image","data:image/jpeg;base64,"+jpeg).put("job_title","평일 오전").put("property_name","One Minute").put("contact_phone",""));}
         @Override void notifyMessage(String id){}
     }
 }

@@ -59,6 +59,9 @@ class NativeStaffChatApi {
             JSONObject result=new JSONObject(text.toString());
             if(code<200||code>=300||!result.optBoolean("ok"))throw new IOException(result.optString("message","연결을 확인하고 다시 시도해주세요."));
             return result;
+        }catch(Exception error){
+            String message=error.getMessage();if(message!=null&&message.matches("(?s).*[가-힣].*"))throw error;
+            throw new IOException("연결을 확인하고 다시 시도해주세요.");
         }finally{connection.disconnect();}
     }
     File cacheDirectory(){File dir=new File(context.getCacheDir(),"staff-chat/"+scope);dir.mkdirs();return dir;}

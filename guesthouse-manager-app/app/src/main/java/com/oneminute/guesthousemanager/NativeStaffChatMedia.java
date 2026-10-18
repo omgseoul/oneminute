@@ -49,18 +49,24 @@ final class NativeStaffChatMedia {
             try{Bitmap bitmap=thumbnail(file(peer,id),video);if(bitmap==null)return;thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}catch(Exception ignored){/* The row remains a tappable retry placeholder. */}
         });});
     }
+    void avatar(ImageView image,String data){
+        image.setImageDrawable(null);if(data==null||!data.startsWith("data:image/")||data.length()>2200000)return;
+        final String key="avatar:"+NativeStaffChatApi.hash(data);image.setTag(key);Bitmap hit=thumbs.get(key);if(hit!=null){image.setImageBitmap(hit);return;}
+        image.post(()->{if(closed)return;worker.execute(()->{if(closed||!key.equals(image.getTag()))return;try{int comma=data.indexOf(',');if(comma<0)return;byte[] bytes=Base64.decode(data.substring(comma+1),Base64.DEFAULT);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/128);Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);if(bitmap!=null){thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}}catch(Exception ignored){}});});
+    }
     static Bitmap thumbnail(File file,boolean video)throws Exception {
         if(!video){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/480);return BitmapFactory.decodeFile(file.getPath(),options);}
         MediaMetadataRetriever reader=new MediaMetadataRetriever();try{
             reader.setDataSource(file.getPath());Bitmap frame=null;
-            for(long time:new long[]{500000,1500000,0}){
-                frame=Build.VERSION.SDK_INT>=27?reader.getScaledFrameAtTime(time,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,480,480):reader.getFrameAtTime(time,MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-                if(frame!=null)break;
+            for(long time:new long[]{500000,1500000,3000000,0}){
+                Bitmap candidate=Build.VERSION.SDK_INT>=27?reader.getScaledFrameAtTime(time,MediaMetadataRetriever.OPTION_CLOSEST,480,480):reader.getFrameAtTime(time,MediaMetadataRetriever.OPTION_CLOSEST);
+                if(candidate!=null){if(frame!=null&&frame!=candidate)frame.recycle();frame=candidate;if(!black(frame))break;}
             }
             if(frame!=null&&Math.max(frame.getWidth(),frame.getHeight())>480){float scale=480f/Math.max(frame.getWidth(),frame.getHeight());Bitmap resized=Bitmap.createScaledBitmap(frame,Math.max(1,Math.round(frame.getWidth()*scale)),Math.max(1,Math.round(frame.getHeight()*scale)),true);if(resized!=frame)frame.recycle();return resized;}
             return frame;
         }finally{reader.release();}
     }
+    private static boolean black(Bitmap bitmap){for(int y=1;y<=4;y++)for(int x=1;x<=4;x++){int pixel=bitmap.getPixel(Math.min(bitmap.getWidth()-1,bitmap.getWidth()*x/5),Math.min(bitmap.getHeight()-1,bitmap.getHeight()*y/5));if(Math.max(Color.red(pixel),Math.max(Color.green(pixel),Color.blue(pixel)))>20)return false;}return true;}
     static Bitmap fullImage(File file){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/2048);return BitmapFactory.decodeFile(file.getPath(),o);}
     private void prune(){File[] list=api.cacheDirectory().listFiles();if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
     void close(){closed=true;worker.shutdownNow();thumbs.evictAll();}

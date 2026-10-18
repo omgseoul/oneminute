@@ -101,13 +101,20 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
      * History stays in place when the reader has deliberately scrolled upward. */
     private final class MessageList extends ListView{
         boolean followNextResize;
+        int laidOutHeight;
         MessageList(){super(NativeStaffChatActivity.this);}
-        @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){
+        @Override protected void onMeasure(int widthSpec,int heightSpec){
+            // ListView measurement can reposition/re-measure its existing rows.
+            // Capture the old bottom before that happens, not in onSizeChanged.
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
-            boolean atLatest=oldh>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=oldh-getPaddingBottom()+1;
-            boolean follow=followNextResize||atLatest;followNextResize=false;
-            super.onSizeChanged(w,h,oldw,oldh);
-            if(h!=oldh&&follow)scrollToLatest(this);
+            if(getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
+            super.onMeasure(widthSpec,heightSpec);
+        }
+        @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
+            boolean follow=followNextResize&&laidOutHeight!=bottom-top;
+            super.onLayout(changed,left,top,right,bottom);
+            laidOutHeight=bottom-top;followNextResize=false;
+            if(follow)scrollToLatest(this);
         }
     }
     private void buildComposer(){

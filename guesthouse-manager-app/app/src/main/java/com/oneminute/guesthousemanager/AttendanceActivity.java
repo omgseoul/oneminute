@@ -95,6 +95,7 @@ public class AttendanceActivity extends AppCompatActivity {
 
     private void clearPushSession() {
         NativePushRegistration.clear(this);
+        NativeStaffChatApi.clearLocal(this);
         SupabaseMessageReceipt.clear(this);
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
@@ -192,7 +193,27 @@ public class AttendanceActivity extends AppCompatActivity {
         if (webView != null) webView.loadUrl(appUrlFromIntent(intent));
     }
 
+    private boolean openNativeStaffChat(String peer, String propertyIds) {
+        Uri current=Uri.parse(webView==null||webView.getUrl()==null?"":webView.getUrl());
+        boolean trusted="https".equals(current.getScheme()) &&
+                ("omgworks24.com".equals(current.getHost())||"www.omgworks24.com".equals(current.getHost())) &&
+                ("/messages.html".equals(current.getPath())||"/staff-chat.html".equals(current.getPath())||"/app.html".equals(current.getPath()));
+        if(!trusted||peer==null||(!peer.isEmpty()&&!NativeStaffChatApi.validPeer(peer))||propertyIds==null||propertyIds.length()>4096)return false;
+        try { new NativeStaffChatApi(this); } catch(Exception error) { return false; }
+        startActivity(new Intent(this,NativeStaffChatActivity.class).putExtra("peer",peer).putExtra("property_ids",propertyIds));
+        return true;
+    }
+
     private final class PushBridge {
+        @JavascriptInterface
+        public boolean openStaffChat(String peer, String propertyIds) {
+            java.util.concurrent.atomic.AtomicBoolean opened=new java.util.concurrent.atomic.AtomicBoolean(false);
+            java.util.concurrent.CountDownLatch latch=new java.util.concurrent.CountDownLatch(1);
+            runOnUiThread(()->{try { opened.set(openNativeStaffChat(peer,propertyIds)); } finally { latch.countDown(); }});
+            try { latch.await(2,java.util.concurrent.TimeUnit.SECONDS); } catch(InterruptedException error) { Thread.currentThread().interrupt(); }
+            return opened.get();
+        }
+
         @JavascriptInterface
         public void checkForUpdate() { runOnUiThread(() -> AppUpdateChecker.check(AttendanceActivity.this, true)); }
 
@@ -318,6 +339,10 @@ public class AttendanceActivity extends AppCompatActivity {
                 && path != null && path.startsWith("/oneminute/");
         boolean isAppPage = "https".equals(uri.getScheme()) && (isCustomDomain || isLegacyDomain);
         if (isAppPage) {
+            if (isCustomDomain && "/staff-chat.html".equals(path)) {
+                String peer=uri.getQueryParameter("peer");
+                if (peer!=null && openNativeStaffChat(peer,"[]")) return true;
+            }
             // Explicit loading is more reliable than returning false on Samsung
             // Android WebView, where a consumed DOM click can otherwise stop here.
             view.loadUrl(uri.toString());

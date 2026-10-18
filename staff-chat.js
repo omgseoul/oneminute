@@ -157,6 +157,7 @@
  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)load();});addEventListener('online',()=>load());addEventListener('pagehide',()=>{clearTimeout(timer);keepDraft();});
  try{
   session=await omgSession.require({allowCompleted:true});if(!session)return;if(!/^(owner|employee):[0-9a-f-]{36}$/i.test(peer||''))throw new Error('대화 상대를 선택해주세요.');
+  if(StaffChat.nativeOpen?.(peer)){location.replace('messages.html?tab=staff');return;}
   draftKey='staff-chat:'+session.accessToken+':'+peer;try{const draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(draft){input.value=draft.body||'';pending=draft.pending;photo=draft.photo||null;renderPhoto();if(draft.priority==='urgent')$('priority').click();}}catch{}
   await Promise.all([loadPeerProfile(),load()]);
  }catch(err){line.classList.remove('chat-loading');status(err.message,true);$('send').disabled=true;}

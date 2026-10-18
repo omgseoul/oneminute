@@ -29,8 +29,28 @@ jobs:
           test -n "$GOOGLE_SERVICES_JSON"
           printf '%s' "$GOOGLE_SERVICES_JSON" > guesthouse-manager-app/app/google-services.json
       - name: Compile Android changes
-        run: gradle assembleDebug --stacktrace
+        run: OMS_CHAT_TEST_BUILD=debug gradle testDebugUnitTest assembleDebug assembleDebugAndroidTest --stacktrace
         working-directory: guesthouse-manager-app
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify native staff chat with synthetic local data
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
+            adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e phase chat com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-chat.txt"
+            grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-probe.png > "$RUNNER_TEMP/oms-native-chat.png"
+      - uses: actions/upload-artifact@v4
+        with: {name: OMS-native-chat-preview, path: '${{ runner.temp }}/oms-native-chat.png'}
   release:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest

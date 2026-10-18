@@ -1,0 +1,11 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+const html=fs.readFileSync('staff-chat.html','utf8'),script=fs.readFileSync('staff-chat-emoji.js','utf8');
+const dom=new JSDOM(html,{runScripts:'outside-only'}),w=dom.window,d=w.document,input=d.getElementById('body'),toggle=d.getElementById('emojiToggle'),panel=d.getElementById('emojiPanel');
+w.eval(script);let edits=0,submits=0;input.addEventListener('input',()=>edits++);d.getElementById('composer').addEventListener('submit',e=>{e.preventDefault();submits++;});
+input.value='앞뒤';input.focus();input.setSelectionRange(1,1);input.dispatchEvent(new w.Event('select'));toggle.click();assert(!panel.hidden);assert.equal(toggle.getAttribute('aria-expanded'),'true');panel.firstChild.click();assert.equal(input.value,'앞😀뒤');assert.equal(input.selectionStart,3);assert.equal(edits,1);assert.equal(submits,0);
+input.setSelectionRange(1,3);input.dispatchEvent(new w.Event('select'));panel.children[2].click();assert.equal(input.value,'앞😊뒤');
+input.value='가'.repeat(1999);input.setSelectionRange(1999,1999);input.dispatchEvent(new w.Event('select'));panel.firstChild.click();assert.equal(input.value.length,1999);
+input.disabled=true;panel.children[1].click();assert.equal(input.value.length,1999);input.disabled=false;
+d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert(panel.hidden);toggle.click();d.body.click();assert(panel.hidden);
+assert(toggle.closest('.staff-input-wrap'));assert.equal(toggle.type,'button');assert(!d.querySelector('.staff-input-wrap textarea').nextElementSibling.hidden);dom.window.close();
+console.log('PASS: emoji toggle, cursor insertion, selection replacement, 2000-character limit, disabled input, escape/outside close and no accidental submit');

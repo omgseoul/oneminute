@@ -54,7 +54,9 @@ public final class NativeStaffChatProbe {
             waitFor(()->{FrameLayout stage=(FrameLayout)field(field(activity,"viewer"),"stage");return stage.getChildAt(0) instanceof StaffChatZoomImage&&((ImageView)stage.getChildAt(0)).getDrawable()!=null;});
             ui(()->{((NativeStaffMediaViewer)field(activity,"viewer")).dismiss();((EditText)field(activity,"input")).setText("이모지를 선택해보세요");if(((GridView)field(activity,"emojis")).getVisibility()!=View.VISIBLE)((ImageButton)field(activity,"emoji")).performClick();return null;});
             Thread.sleep(400);Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-probe.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
-            ui(()->{activity.onBackPressed();check(activity.isFinishing(),"back returns to the existing message hub, not a separate native list");return null;});
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->((GridView)field(activity,"emojis")).getVisibility()==View.GONE);
+            check(!activity.isFinishing(),"first back closes the emoji picker");
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
     }
     private void verifyLayoutOnly()throws Exception{
@@ -64,7 +66,7 @@ public final class NativeStaffChatProbe {
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             waitFor(()->((TextView)field(activity,"send")).isEnabled());verifySafeLayout();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
-            ui(()->{activity.onBackPressed();check(activity.isFinishing(),"room closes back to shared hub");return null;});
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
     }
     private boolean safeLayout(boolean keyboard)throws Exception{

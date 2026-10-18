@@ -52,6 +52,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle saved){
         super.onCreate(saved);
+        getOnBackPressedDispatcher().addCallback(this,new androidx.activity.OnBackPressedCallback(true){@Override public void handleOnBackPressed(){back();}});
         try{api=apiFactory.create(this);}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();finish();return;}
         media=new NativeStaffChatMedia(api);upload=new NativeChatUpload(this);
         try{JSONArray selected=new JSONArray(getIntent().getStringExtra("property_ids")==null?"[]":getIntent().getStringExtra("property_ids"));for(int i=0;i<selected.length();i++)if(selected.optString(i).matches("[0-9a-fA-F-]{36}"))properties.add(selected.optString(i));}catch(Exception ignored){}

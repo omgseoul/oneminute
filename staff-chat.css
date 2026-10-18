@@ -30,3 +30,5 @@ body.media-open{overflow:hidden}.peer-profile-dialog{padding:22px 20px max(24px,
 .staff-emoji-panel button{min-width:0;min-height:36px;padding:3px;border:0;border-radius:8px;background:transparent;font-size:24px;line-height:1.2}.staff-emoji-panel button:hover{background:#e6effb}
 .composer #send{background:#82ace1;color:#fff}.mine .bubble{background:#dfecfc;border-color:#d4e4f8;color:#19334f}
 @media(max-width:360px){.staff-emoji-panel{grid-template-columns:repeat(7,minmax(0,1fr))}.composer .row{gap:5px}.composer #priority{padding:0 6px}.composer .staff-input-wrap textarea{padding-left:9px}}
+
+.composer #send{opacity:1;transition:opacity .15s ease}.composer #send:disabled{opacity:.35;cursor:default}

@@ -30,6 +30,8 @@ public class AttendanceActivity extends AppCompatActivity {
     private WebViewRecovery recovery;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExcel;
+    private static final int STAFF_CHAT_REQUEST = 7302;
+    private boolean staffChatOpen;
 
     private String safeTopicPart(String value) {
         return value == null ? "" : value.trim().replaceAll("[^A-Za-z0-9_.~-]", "_");
@@ -173,9 +175,12 @@ public class AttendanceActivity extends AppCompatActivity {
         });
         // Always request the current page. Restoring WebView state can revive an old
         // document whose click handlers no longer match the deployed site.
-        webView.loadUrl(appUrlFromIntent(getIntent()));
-        AppUpdateChecker.check(this, false);
+        loadInitialAppPage(webView, appUrlFromIntent(getIntent()));
+        checkAppUpdate();
     }
+
+    protected void loadInitialAppPage(WebView view, String url) { view.loadUrl(url); }
+    protected void checkAppUpdate() { AppUpdateChecker.check(this, false); }
 
     private String appUrlFromIntent(Intent intent) {
         Uri data = intent == null ? null : intent.getData();
@@ -202,8 +207,12 @@ public class AttendanceActivity extends AppCompatActivity {
         // Only a selected person's conversation gets a native screen, including with
         // older cached web code that still asks to open an empty native list.
         if(!trusted||peer==null||!NativeStaffChatApi.validPeer(peer)||propertyIds==null||propertyIds.length()>4096)return false;
+        if(staffChatOpen)return true;
         try { new NativeStaffChatApi(this); } catch(Exception error) { return false; }
-        startActivity(new Intent(this,NativeStaffChatActivity.class).putExtra("peer",peer).putExtra("property_ids",propertyIds));
+        staffChatOpen=true;
+        webView.evaluateJavascript("window.dispatchEvent(new Event('omg:native-navigation'))",null);
+        try { startActivityForResult(new Intent(this,NativeStaffChatActivity.class).putExtra("peer",peer).putExtra("property_ids",propertyIds),STAFF_CHAT_REQUEST); }
+        catch(Exception error){staffChatOpen=false;return false;}
         return true;
     }
 
@@ -287,6 +296,7 @@ public class AttendanceActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == STAFF_CHAT_REQUEST) { staffChatOpen=false; super.onActivityResult(requestCode,resultCode,data); return; }
         if (requestCode == EXCEL_SAVE_REQUEST) {
             final byte[] bytes = pendingExcel;
             pendingExcel = null;

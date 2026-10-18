@@ -5,7 +5,7 @@ const {JSDOM,VirtualConsole}=require('jsdom');
 const source=fs.readFileSync('home-navigation.js','utf8');
 function setup(native=true){
  const navigation=[];const console=new VirtualConsole();console.on('jsdomError',error=>{if(/navigation/.test(error.message))navigation.push(error.message);});
- const dom=new JSDOM('<nav id="mainMenu"><a href="messages.html"><span>메세지</span></a></nav>',{url:'https://omgworks24.com/app.html',runScripts:'outside-only',virtualConsole:console});
+ const dom=new JSDOM('<nav id="mainMenu"><a href="messages.html"><span>메세지</span></a></nav>',{url:'https://omgworks24.com/app.html',runScripts:'outside-only',virtualConsole:console,pretendToBeVisual:true});
  const w=dom.window,jobs=new Map();let id=0;
  w.setTimeout=fn=>{jobs.set(++id,fn);return id;};w.clearTimeout=id=>jobs.delete(id);
  if(native)w.OMGNative={};w.eval(source);
@@ -36,4 +36,13 @@ test('dynamic chat room and online employee links recover outside main menu',()=
  const c=setup();c.w.document.querySelector('nav').removeAttribute('id');c.w.document.querySelector('a').href=href;
  c.fire('pointerdown');c.fire('pointerup');c.tick();assert.equal(c.navigation.length,1);c.dom.window.close();
  }
+});
+
+
+test('successful native handoff cancels retries and removes stale N5 without leaving the document',()=>{
+ const c=setup();c.fire('click');c.w.dispatchEvent(new c.w.Event('omg:native-navigation'));c.tick();c.tick();assert.equal(c.navigation.length,0);assert.equal(c.w.document.getElementById('navigationFailure'),null);
+ c.fire('click');c.tick();c.tick();assert(c.w.document.getElementById('navigationFailure'));c.w.dispatchEvent(new c.w.Event('omg:native-navigation'));assert.equal(c.w.document.getElementById('navigationFailure'),null);c.dom.window.close();
+});
+test('native activity visibility cancels the watcher without a pagehide event',()=>{
+ const c=setup();c.fire('click');Object.defineProperty(c.w.document,'hidden',{configurable:true,value:true});c.w.document.dispatchEvent(new c.w.Event('visibilitychange'));c.tick();c.tick();assert.equal(c.navigation.length,0);assert.equal(c.w.document.querySelector('[role=dialog]'),null);c.dom.window.close();
 });

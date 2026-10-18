@@ -29,7 +29,9 @@ jobs:
           test -n "$GOOGLE_SERVICES_JSON"
           printf '%s' "$GOOGLE_SERVICES_JSON" > guesthouse-manager-app/app/google-services.json
       - name: Compile Android changes
-        run: OMS_CHAT_TEST_BUILD=debug gradle testDebugUnitTest assembleDebug assembleDebugAndroidTest --stacktrace
+        run: |
+          python3 scripts/prepare-chat-handoff-fixture.py
+          OMS_CHAT_TEST_BUILD=debug gradle testDebugUnitTest assembleDebug assembleDebugAndroidTest --stacktrace
         working-directory: guesthouse-manager-app
       - name: Enable emulator acceleration
         run: |
@@ -48,6 +50,9 @@ jobs:
             adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
+            adb shell am instrument -w -e phase chat-handoff com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-handoff.txt"
+            adb logcat -d -b crash
+            grep -q 'oms_handoff=ok' "$RUNNER_TEMP/oms-handoff.txt"
             adb shell am instrument -w -e phase chat com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-chat.txt"
             grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-probe.png > "$RUNNER_TEMP/oms-native-chat.png"

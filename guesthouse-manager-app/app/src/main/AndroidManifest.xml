@@ -17,8 +17,8 @@
     <application android:allowBackup="false" android:theme="@style/AppTheme" android:label="OMS" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:usesCleartextTraffic="false">
         <activity android:name=".EmergencyReportActivity" />
         <activity android:name=".OwnerInboxActivity" />
-        <activity android:name=".NativeStaffChatActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".AttendanceActivity" android:launchMode="singleTop" />
+        <activity android:name=".NativeStaffChatActivity" android:exported="false" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".AttendanceActivity" android:launchMode="singleTop" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard" />
         <activity
             android:name=".MessageAlertActivity"
             android:excludeFromRecents="true"

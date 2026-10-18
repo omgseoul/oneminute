@@ -96,6 +96,7 @@ public final class NativeStaffChatProbe {
         // from the old native list, where all system-bar padding was lost.
         ui(()->{Method open=activity.getClass().getDeclaredMethod("openRoom",String.class);open.setAccessible(true);open.invoke(activity,PEER);return null;});
         stage="reopened room and rows";waitFor(()->safeLayout(false)&&((EditText)field(activity,"input")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1&&latestMessageVisible());
+        instrumentation.waitForIdleSync();Thread.sleep(150);instrumentation.waitForIdleSync();
         // Begin in older history, so a composer focus must deliberately reveal the
         // newest message instead of merely preserving the pre-keyboard offset.
         ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});

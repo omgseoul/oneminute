@@ -94,15 +94,28 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         if(composing)scrollToLatest(list);
     }
     private void scrollToLatest(ListView target){
-        final int request=generation;
-        target.post(()->{if(!destroyed&&request==generation&&target==list&&target.getCount()>0)((MessageList)target).showLatest();});
+        ((MessageList)target).queueLatest();
     }
     /** Keep the last message above the composer as IME/emoji/input height changes.
      * History stays in place when the reader has deliberately scrolled upward. */
     private final class MessageList extends ListView{
         boolean followNextResize,alignAfterLayout;
         int laidOutHeight;
+        Runnable latestScroll;
         MessageList(){super(NativeStaffChatActivity.this);}
+        void queueLatest(){
+            if(latestScroll!=null)removeCallbacks(latestScroll);
+            final int request=generation;
+            latestScroll=()->{latestScroll=null;if(!destroyed&&request==generation&&this==list&&getCount()>0)showLatest();};
+            post(latestScroll);
+        }
+        @Override public boolean onTouchEvent(MotionEvent event){
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
+                if(latestScroll!=null)removeCallbacks(latestScroll);
+                latestScroll=null;followNextResize=false;alignAfterLayout=false;
+            }
+            return super.onTouchEvent(event);
+        }
         void showLatest(){
             int position=getCount()-1;
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;

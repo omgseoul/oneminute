@@ -1,6 +1,6 @@
 window.OMSHousingRooms = (() => {
   const houseLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
-  function houseName(value) { const text=houseLabel(value),label=document.createElement('span');label.className='entire-house-name';label.textContent=text;label.title=text;label.style.fontSize=(Array.from(text).length>10?'10':Array.from(text).length>6?'11':'12')+'px';return label; }
+  function houseName(value) { const text=houseLabel(value),label=document.createElement('span');label.className='entire-house-name';label.textContent=text;label.title=text;return label; }
   const housesFor = groups => (groups || []).filter(group => !(group.rooms || []).length).map(group => group.name).filter(Boolean);
   function append(parent, field, groups, onChange) {
     let houseList = null;

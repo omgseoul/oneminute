@@ -4,9 +4,13 @@ import android.app.*;
 import android.content.*;
 import android.graphics.*;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Base64;
 import android.view.*;
 import android.widget.*;
+import android.view.inputmethod.InputMethodManager;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import org.json.*;
@@ -24,11 +28,13 @@ public final class NativeStaffChatProbe {
     private final Instrumentation instrumentation;
     private NativeStaffChatActivity activity;
     private FakeApi fake;
+    private String stage="start",layout="";
     NativeStaffChatProbe(Instrumentation i){instrumentation=i;}
     static void run(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verify();result.putString("oms_chat","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_chat","failed: "+error);i.finish(0,result);}}
-    private <T>T ui(Callable<T> action)throws Exception{AtomicReference<T> value=new AtomicReference<>();AtomicReference<Exception> error=new AtomicReference<>();instrumentation.runOnMainSync(()->{try{value.set(action.call());}catch(Exception e){error.set(e);}});if(error.get()!=null)throw error.get();return value.get();}
+    static void runLayout(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verifyLayoutOnly();result.putString("oms_layout","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-layout.png");error.printStackTrace();result.putString("oms_layout","failed: "+error);i.finish(0,result);}}
+    private <T>T ui(Callable<T> action)throws Exception{AtomicReference<T> value=new AtomicReference<>();AtomicReference<Throwable> error=new AtomicReference<>();instrumentation.runOnMainSync(()->{try{value.set(action.call());}catch(Throwable e){error.set(e);}});if(error.get() instanceof Error)throw (Error)error.get();if(error.get()!=null)throw (Exception)error.get();return value.get();}
     private static Object field(Object object,String name)throws Exception{Field field=object.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(object);}
-    private void waitFor(Callable<Boolean> condition)throws Exception{long until=System.currentTimeMillis()+25000;while(System.currentTimeMillis()<until){if(ui(condition))return;Thread.sleep(100);}throw new AssertionError("Native UI condition timed out");}
+    private void waitFor(Callable<Boolean> condition)throws Exception{long until=System.currentTimeMillis()+25000;while(System.currentTimeMillis()<until){if(ui(condition))return;Thread.sleep(100);}throw new AssertionError("Native UI condition timed out: "+stage+" "+layout);}
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     private void verify()throws Exception{
         Context c=instrumentation.getTargetContext();c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
@@ -37,6 +43,7 @@ public final class NativeStaffChatProbe {
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((TextView)field(activity,"send")).isEnabled());
+            verifySafeLayout();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 😀"),"emoji cursor insertion");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
             ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
@@ -48,9 +55,46 @@ public final class NativeStaffChatProbe {
             waitFor(()->{FrameLayout stage=(FrameLayout)field(field(activity,"viewer"),"stage");return stage.getChildAt(0) instanceof StaffChatZoomImage&&((ImageView)stage.getChildAt(0)).getDrawable()!=null;});
             ui(()->{((NativeStaffMediaViewer)field(activity,"viewer")).dismiss();((EditText)field(activity,"input")).setText("이모지를 선택해보세요");if(((GridView)field(activity,"emojis")).getVisibility()!=View.VISIBLE)((ImageButton)field(activity,"emoji")).performClick();return null;});
             Thread.sleep(400);Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-probe.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
-            ui(()->{activity.finish();return null;});
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->((GridView)field(activity,"emojis")).getVisibility()==View.GONE);
+            check(!activity.isFinishing(),"first back closes the emoji picker");
+            stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
     }
+    private void verifyLayoutOnly()throws Exception{
+        Context c=instrumentation.getTargetContext();c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
+        NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
+        try{
+            activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            waitFor(()->((TextView)field(activity,"send")).isEnabled());verifySafeLayout();
+            Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
+            stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
+        }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
+    }
+    private boolean safeLayout(boolean keyboard)throws Exception{
+        View root=(View)field(activity,"root"),input=(View)field(activity,"input"),send=(View)field(activity,"send"),title=(View)field(activity,"title");
+        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(root);if(insets==null||root.getHeight()==0)return false;
+        layout="ime="+insets.isVisible(WindowInsetsCompat.Type.ime())+" destroyed="+activity.isDestroyed()+" rows="+((ListView)field(activity,"list")).getCount()+" padding="+root.getPaddingTop()+","+root.getPaddingBottom();
+        if(keyboard!=insets.isVisible(WindowInsetsCompat.Type.ime()))return false;
+        androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout()|WindowInsetsCompat.Type.ime());
+        View decor=activity.getWindow().getDecorView();int[] d=new int[2],t=new int[2],s=new int[2];decor.getLocationOnScreen(d);title.getLocationOnScreen(t);send.getLocationOnScreen(s);
+        layout+=" safe="+safe+" titleY="+t[1]+" sendBottom="+(s[1]+send.getHeight())+" windowBottom="+(d[1]+decor.getHeight());
+        return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect());
+    }
+    private void verifySafeLayout()throws Exception{
+        stage="initial system bars";waitFor(()->safeLayout(false));
+        // Rebuild after the first window dispatch: this reproduced the room opened
+        // from the old native list, where all system-bar padding was lost.
+        ui(()->{Method open=activity.getClass().getDeclaredMethod("openRoom",String.class);open.setAccessible(true);open.invoke(activity,PEER);return null;});
+        stage="reopened room and rows";waitFor(()->safeLayout(false)&&((TextView)field(activity,"send")).isEnabled()&&((ListView)field(activity,"list")).getCount()>1);
+        int[] center=ui(()->{View input=(View)field(activity,"input");int[] p=new int[2];input.getLocationOnScreen(p);return new int[]{p[0]+input.getWidth()/3,p[1]+input.getHeight()/2};});
+        long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,center[0],center[1],0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,center[0],center[1],0);instrumentation.sendPointerSync(down);instrumentation.sendPointerSync(up);down.recycle();up.recycle();
+        ui(()->{EditText input=(EditText)field(activity,"input");input.requestFocus();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);return null;});
+        stage="keyboard shown";waitFor(()->safeLayout(true));instrumentation.sendStringSync("visible input");
+        Bitmap keyboard=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),"native-chat-keyboard.png"))){keyboard.compress(Bitmap.CompressFormat.PNG,100,out);}keyboard.recycle();
+        ui(()->{EditText input=(EditText)field(activity,"input");check(input.getText().toString().contains("visible input"),"visible composer accepts actual keyboard input");input.setText("");((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);input.clearFocus();return null;});
+        stage="keyboard hidden";waitFor(()->safeLayout(false));
+    }
+    private void capture(String name){try{Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();}catch(Exception ignored){}}
     private void verifyUploads(Context c)throws Exception{
         File dir=new File(c.getFilesDir(),"native-chat-upload-probe");dir.mkdirs();
         File image=new File(dir,"source.png");Bitmap png=Bitmap.createBitmap(48,32,Bitmap.Config.ARGB_8888);try(FileOutputStream out=new FileOutputStream(image)){png.compress(Bitmap.CompressFormat.PNG,100,out);}png.recycle();

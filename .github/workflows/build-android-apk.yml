@@ -46,11 +46,30 @@ jobs:
           script: |
             adb install guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
             adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell settings put secure show_ime_with_hard_keyboard 1
+            adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb shell am instrument -w -e phase chat com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-chat.txt"
             grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-probe.png > "$RUNNER_TEMP/oms-native-chat.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-keyboard.png"
+            adb shell wm size 720x1280
+            adb shell wm density 360
+            adb shell settings put system font_scale 1.3
+            adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-small.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-small.png"
+            grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-small.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-small-keyboard.png"
+            adb shell wm size 1080x2400
+            adb shell wm density 480
+            adb shell settings put system font_scale 1.0
+            adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
+            adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-gesture.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-gesture.png"
+            grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-gesture.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-gesture-keyboard.png"
       - uses: actions/upload-artifact@v4
-        with: {name: OMS-native-chat-preview, path: '${{ runner.temp }}/oms-native-chat.png'}
+        if: always()
+        with: {name: OMS-native-chat-preview, path: '${{ runner.temp }}/oms-native-*.png'}
   release:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest

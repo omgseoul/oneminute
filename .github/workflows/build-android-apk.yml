@@ -56,16 +56,16 @@ jobs:
             adb shell wm density 360
             adb shell settings put system font_scale 1.3
             adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-small.txt"
-            grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-small.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-small.png"
+            grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-small.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-small-keyboard.png"
             adb shell wm size 1080x2400
             adb shell wm density 480
             adb shell settings put system font_scale 1.0
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
             adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-gesture.txt"
-            grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-gesture.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-gesture.png"
+            grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-gesture.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-gesture-keyboard.png"
       - uses: actions/upload-artifact@v4
         if: always()

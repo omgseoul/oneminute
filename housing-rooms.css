@@ -1,9 +1,11 @@
 .room-group.entire-house-group{display:block;margin-top:8px}.room-group.entire-house-group>.room-type{display:none}
 .room-group.entire-house-group .entire-house-options,.entire-house-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}
 .entire-house-choice label,.entire-house-result{box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-width:0;min-height:44px;height:auto;padding:6px 4px;border:1px solid #cbd8e8;border-radius:9px;background:#edf5ff;color:#183153;font-size:.75rem;font-weight:800;line-height:1.4;white-space:normal;text-align:center;container-type:inline-size;-webkit-text-size-adjust:100%;text-size-adjust:100%}
-.entire-house-choice{display:flex;min-width:0}.entire-house-choice label{flex:1;background:#fff}.entire-house-name{display:block;min-width:0;width:100%;font-size:inherit;line-height:1.4;overflow-wrap:anywhere;word-break:normal;white-space:normal;text-wrap:balance;text-align:center}
-/* Fit the actual tile width. Natural height also respects Android text scaling; never clip a line. */
-@supports(font-size:1cqi){.entire-house-name{font-size:clamp(.6875rem,16cqi,.75rem)}}
+.entire-house-choice{display:flex;min-width:0}.entire-house-choice label{flex:1;background:#fff}.entire-house-name{display:block;min-width:0;width:100%;font-size:min(.75rem,2.8vw);line-height:1.4;white-space:normal;text-align:center}
+.entire-house-name>.entire-house-line{display:block;white-space:nowrap;line-height:1.4;word-break:normal;overflow-wrap:normal;letter-spacing:0}
+.entire-house-more{font-size:.8em}
+/* Each explicit line holds four graphemes. Reserve horizontal space for both trailing dots. */
+@supports(font-size:1cqi){.entire-house-name{font-size:min(.75rem,18cqi)}}
 .room input:focus-visible+label{outline:2px solid #2467bd;outline-offset:2px}
 .housing-result{min-width:0;text-align:left;display:grid;gap:6px}.housing-unit-result{white-space:normal}
 .report-value-row:has(.housing-result){grid-template-columns:minmax(68px,max-content) minmax(0,1fr);column-gap:8px;align-items:start}.report-value-row:has(.housing-result)>strong{padding-top:8px;font-size:12px}.report-value-row .housing-result{white-space:normal;text-align:left}

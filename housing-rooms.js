@@ -1,6 +1,16 @@
 window.OMSHousingRooms = (() => {
   const houseLabel = value => String(value || '').replace(/\s+/g, ' ').trim();
-  function houseName(value) { const text=houseLabel(value),label=document.createElement('span');label.className='entire-house-name';label.textContent=text;label.title=text;return label; }
+  const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('ko', {granularity:'grapheme'}) : null;
+  function houseName(value) {
+    const text=houseLabel(value), chars=segmenter ? Array.from(segmenter.segment(text),part=>part.segment) : Array.from(text);
+    const label=document.createElement('span');label.className='entire-house-name';label.title=text;
+    for(let offset=0;offset<Math.min(chars.length,8);offset+=4){
+      const line=document.createElement('span');line.className='entire-house-line';line.textContent=chars.slice(offset,offset+4).join('');
+      if(offset===4&&chars.length>8){const dots=document.createElement('span');dots.className='entire-house-more';dots.textContent='..';line.append(dots);}
+      label.append(line);
+    }
+    return label;
+  }
   const housesFor = groups => (groups || []).filter(group => !(group.rooms || []).length).map(group => group.name).filter(Boolean);
   function append(parent, field, groups, onChange) {
     let houseList = null;
@@ -22,7 +32,7 @@ window.OMSHousingRooms = (() => {
         const input = document.createElement('input'); input.type = 'checkbox'; input.name = field.key;
         input.value = room; input.id = `${field.key}-${groupIndex}-${index}`;
         if (onChange) input.addEventListener('change', onChange);
-        const label = document.createElement('label'); label.htmlFor = input.id; if(isHouse){label.title=houseLabel(room);label.append(houseName(room));}else label.textContent = room;
+        const label = document.createElement('label'); label.htmlFor = input.id; if(isHouse){input.setAttribute('aria-label',houseLabel(room));label.title=houseLabel(room);label.append(houseName(room));}else label.textContent = room;
         wrap.append(input, label); list.append(wrap);
       });
     });

@@ -198,7 +198,10 @@ public class AttendanceActivity extends AppCompatActivity {
         boolean trusted="https".equals(current.getScheme()) &&
                 ("omgworks24.com".equals(current.getHost())||"www.omgworks24.com".equals(current.getHost())) &&
                 ("/messages.html".equals(current.getPath())||"/staff-chat.html".equals(current.getPath())||"/app.html".equals(current.getPath()));
-        if(!trusted||peer==null||(!peer.isEmpty()&&!NativeStaffChatApi.validPeer(peer))||propertyIds==null||propertyIds.length()>4096)return false;
+        // The message hub owns the staff list, tabs, branch filter and notification bot.
+        // Only a selected person's conversation gets a native screen, including with
+        // older cached web code that still asks to open an empty native list.
+        if(!trusted||peer==null||!NativeStaffChatApi.validPeer(peer)||propertyIds==null||propertyIds.length()>4096)return false;
         try { new NativeStaffChatApi(this); } catch(Exception error) { return false; }
         startActivity(new Intent(this,NativeStaffChatActivity.class).putExtra("peer",peer).putExtra("property_ids",propertyIds));
         return true;

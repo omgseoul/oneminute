@@ -57,13 +57,20 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         try{JSONArray selected=new JSONArray(getIntent().getStringExtra("property_ids")==null?"[]":getIntent().getStringExtra("property_ids"));for(int i=0;i<selected.length();i++)if(selected.optString(i).matches("[0-9a-fA-F-]{36}"))properties.add(selected.optString(i));}catch(Exception ignored){}
         String initial=saved!=null?saved.getString("peer",""):getIntent().getStringExtra("peer");
         if(initial!=null&&!initial.isEmpty()&&!NativeStaffChatApi.validPeer(initial)){finish();return;}
-        peer=initial==null?"":initial;build();
+        peer=initial==null?"":initial;
+        if(peer.isEmpty()){startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/messages.html?tab=staff")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));finish();return;}
+        build();
     }
     private void build(){
         generation++;busy=false;searching=false;reading.clear();state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
-        root=column(this);root.setBackgroundColor(BG);setContentView(root);
-        ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{androidx.core.graphics.Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.ime());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});
+        root=column(this);root.setBackgroundColor(BG);
+        ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
+        setContentView(root);
+        WindowInsetsControllerCompat controls=WindowCompat.getInsetsController(getWindow(),root);controls.setAppearanceLightStatusBars(true);controls.setAppearanceLightNavigationBars(true);
+        // Replacing the content view does not guarantee a new inset dispatch. Apply
+        // the window's current values after attachment as well as future IME/bar changes.
+        final View content=root;content.post(()->{WindowInsetsCompat current=ViewCompat.getRootWindowInsets(content);if(current!=null)applySafeArea(content,current);ViewCompat.requestApplyInsets(content);});
         LinearLayout header=row(this);header.setPadding(dp(this,12),dp(this,8),dp(this,12),dp(this,8));ImageButton back=icon(this,"back",peer.isEmpty()?"OMS로 돌아가기":"채팅 목록으로 돌아가기");title=text(this,peer.isEmpty()?"직원 채팅":"대화 불러오는 중…",20,INK);title.setTypeface(null,Typeface.BOLD);title.setPadding(dp(this,12),0,dp(this,8),0);ImageButton searchButton=icon(this,"search","대화 검색");ImageButton extra=icon(this,peer.isEmpty()?"plus":"grid",peer.isEmpty()?"새 대화":"사진·동영상 모아보기");header.addView(back,new LinearLayout.LayoutParams(dp(this,44),dp(this,44)));if(!peer.isEmpty()){FrameLayout avatar=avatar("?",null,32);headerAvatar=(ImageView)avatar.getChildAt(1);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(dp(this,32),dp(this,32));ap.leftMargin=dp(this,10);header.addView(avatar,ap);avatar.setOnClickListener(v->showProfile());}else headerAvatar=null;header.addView(title,weighted());header.addView(searchButton,new LinearLayout.LayoutParams(dp(this,44),dp(this,44)));LinearLayout.LayoutParams iconGap=new LinearLayout.LayoutParams(dp(this,44),dp(this,44));iconGap.leftMargin=dp(this,6);header.addView(extra,iconGap);root.addView(header);
         back.setOnClickListener(v->back());searchButton.setOnClickListener(v->{search.setVisibility(search.getVisibility()==View.GONE?View.VISIBLE:View.GONE);if(search.getVisibility()==View.VISIBLE)search.requestFocus();else{query="";search.setText("");refreshList(false);}});extra.setOnClickListener(v->{if(peer.isEmpty())showPeople();else openGallery();});title.setOnClickListener(v->{if(!peer.isEmpty())showProfile();});
         search=new EditText(this);search.setSingleLine(true);search.setTextSize(14);search.setTextColor(INK);search.setHint(peer.isEmpty()?"이름 또는 대화 내용 검색":"내용 검색 · 입력 후 검색을 누르면 이전 대화도 검색");search.setVisibility(View.GONE);search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);root.addView(search);
@@ -74,6 +81,10 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
         if(!peer.isEmpty())buildComposer();else composer=null;
         refreshList(true);if(active)load(false,null);
+    }
+    private void applySafeArea(View view,WindowInsetsCompat insets){
+        androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout()|WindowInsetsCompat.Type.ime());
+        view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
     }
     private void buildComposer(){
         composer=column(this);composer.setPadding(dp(this,10),dp(this,6),dp(this,10),dp(this,8));composer.setBackgroundColor(Color.WHITE);root.addView(composer);
@@ -204,7 +215,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         super.onActivityResult(request,result,data);if(request!=PICK_MEDIA||result!=Activity.RESULT_OK||data==null||data.getData()==null||peer.isEmpty())return;
         preparing=true;enableComposer();notice("첨부 파일을 준비하는 중…",false);final int version=generation;upload.prepare(data.getData(),draftDirectory(),new NativeChatUpload.Callback(){public void status(String text){if(!destroyed&&version==generation)notice(text,false);}public void done(File file,String type){if(destroyed||version!=generation){file.delete();return;}if(pendingFile!=null)pendingFile.delete();pendingFile=file;mime=type;pendingId="";preparing=false;showAttachment();saveDraft();enableComposer();notice("",false);}public void failed(String message){if(destroyed||version!=generation)return;preparing=false;enableComposer();notice(message,true);}});
     }
-    private void back(){if(viewer!=null&&viewer.showing()){viewer.dismiss();return;}if(emojis!=null&&emojis.getVisibility()==View.VISIBLE){emojis.setVisibility(View.GONE);return;}if(preparing){Toast.makeText(this,"첨부 파일 준비가 끝난 후 이동해주세요.",Toast.LENGTH_SHORT).show();return;}if(!peer.isEmpty()){saveDraft();peer="";adapter=null;input=null;sending=false;build();}else finish();}
+    private void back(){if(viewer!=null&&viewer.showing()){viewer.dismiss();return;}if(emojis!=null&&emojis.getVisibility()==View.VISIBLE){emojis.setVisibility(View.GONE);return;}if(preparing){Toast.makeText(this,"첨부 파일 준비가 끝난 후 이동해주세요.",Toast.LENGTH_SHORT).show();return;}saveDraft();finish();}
     @Override public void onBackPressed(){back();}
     @Override protected void onResume(){super.onResume();active=true;if(api!=null){if(!api.valid()){finish();return;}load(false,null);}}
     @Override protected void onPause(){active=false;main.removeCallbacks(poll);main.removeCallbacks(readVisible);if(viewer!=null)viewer.pause();saveDraft();super.onPause();}

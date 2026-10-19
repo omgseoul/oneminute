@@ -49,6 +49,11 @@ final class NativeMessageBadgeProbe {
             check((n.flags&Notification.FLAG_GROUP_SUMMARY)==0,"Badge must not be a launcher-filtered group header");
             check(n.getGroup()==null,"Badge remains independent of alert groups");
             check(c.getSystemService(NotificationManager.class).getNotificationChannel(NativeMessageBadge.CHANNEL).canShowBadge(),"Badge channel enabled");
+            Notification actual=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("보낸 사람 · 안녕하세요").build();
+            NativeMessageBadge.postAlert(c,actual);NativeMessageBadge.postAlert(c,actual);
+            check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==1,"One real message notification, no extra unread bulletin");
+            NativeMessageBadge.fromWeb(c,TOKEN,2);expect(c,2);
+            check("보낸 사람 · 안녕하세요".contentEquals(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT)),"Count updates preserve actual message content");
             NativeLauncherBadgeProbe.verify(instrumentation,c,TOKEN);
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
             NativeMessageBadge.fromWeb(c,"wrong-session",99);expect(c,7);
@@ -61,6 +66,11 @@ final class NativeMessageBadgeProbe {
             NativeMessageBadge.loader=ctx->{entered.countDown();release.await(5,TimeUnit.SECONDS);return 99;};
             NativeMessageBadge.refresh(c);check(entered.await(4,TimeUnit.SECONDS),"Snapshot started");
             NativeMessageBadge.fromWeb(c,TOKEN,2);release.countDown();Thread.sleep(300);expect(c,2);
+            Thread.sleep(200);CountDownLatch staleEntered=new CountDownLatch(1),staleRelease=new CountDownLatch(1);java.util.concurrent.atomic.AtomicInteger loads=new java.util.concurrent.atomic.AtomicInteger();
+            NativeMessageBadge.loader=ctx->{if(loads.incrementAndGet()==1){staleEntered.countDown();staleRelease.await(5,TimeUnit.SECONDS);return 99;}return 0;};
+            NativeMessageBadge.refresh(c);check(staleEntered.await(4,TimeUnit.SECONDS),"Pre-read snapshot started");
+            NativeMessageBadge.changed(c);staleRelease.countDown();expect(c,0);
+            check(loads.get()>=2,"Reading invalidates stale snapshot and reloads count");
             c.getSharedPreferences("omg_receipts",0).edit().putString("expires","2000-01-01T00:00:00Z").commit();
             NativeMessageBadge.refresh(c);expect(c,0);
             result.putString("oms_badge","ok");instrumentation.finish(-1,result);

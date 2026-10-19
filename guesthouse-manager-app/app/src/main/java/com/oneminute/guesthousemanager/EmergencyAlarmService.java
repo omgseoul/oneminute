@@ -31,8 +31,8 @@ public class EmergencyAlarmService extends Service {
     public static final String ACTION_STOP = "com.oneminute.guesthousemanager.STOP_URGENT_ALERT";
     public static final String ACTION_SCREEN_CLOSE = "com.oneminute.guesthousemanager.URGENT_SCREEN_CLOSE";
 
-    private static final String CHANNEL_ID = "urgent_alerts_countdown_v6_vibration";
-    private static final int NOTIFICATION_ID = 9001;
+    private static final String CHANNEL_ID = "urgent_alerts_countdown_v7_badge";
+    private static final int NOTIFICATION_ID = NativeMessageBadge.ID;
     private static final long COUNTDOWN_MS = 60_000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -67,7 +67,7 @@ public class EmergencyAlarmService extends Service {
         channel.enableVibration(true);
         channel.setVibrationPattern(new long[]{0, 650, 180, 650});
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-        channel.setShowBadge(false);
+        channel.setShowBadge(true);
         channel.setBypassDnd(true);
         channel.setSound(null, null);
         NotificationManager manager = getSystemService(NotificationManager.class);
@@ -179,7 +179,7 @@ public class EmergencyAlarmService extends Service {
                 (ringing ? "미확인 긴급 메세지" : senderIntro());
         String content = ringing ? "확인할 때까지 긴급 알람이 계속 울립니다." : message;
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_oms_notification)
+                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
                 .setColor(Color.rgb(217, 54, 62))
                 .setContentTitle(title)
                 .setContentText(content)
@@ -400,6 +400,7 @@ public class EmergencyAlarmService extends Service {
         restoreAlarmVolume();
         releaseWakeLock();
         if (overlayController != null) overlayController.dismiss();
+        NativeMessageBadge.changed(this);
         super.onDestroy();
     }
 

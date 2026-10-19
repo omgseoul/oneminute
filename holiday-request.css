@@ -43,3 +43,5 @@
 .holiday-switch[aria-checked=false]{background:#dfe6ee;color:#617187}
 
 .holiday-toggle{display:inline-flex;flex-shrink:0;padding:3px;border-radius:11px;background:#edf3fa}.holiday-toggle button{min-width:42px;min-height:29px;border:0;border-radius:8px;background:transparent;color:#728198;font-size:12px;font-weight:800}.holiday-toggle button[aria-pressed=true]{background:#fff;color:#2467bd;box-shadow:0 2px 7px #1734521c}
+
+.holiday-success{text-align:center}.holiday-success-icon{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 16px;border-radius:50%;background:#edf5ff;color:#2467bd;font-size:34px;font-weight:800}.holiday-success h2{font-size:22px;color:#183153}.holiday-success dl{display:grid;grid-template-columns:65px minmax(0,1fr);gap:12px;text-align:left;padding:18px;border-radius:16px;background:#f4f7fc;font-size:14px}.holiday-success dt{color:#708095}.holiday-success dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#183153}.holiday-success p{font-size:12px;color:#708095;line-height:1.6}

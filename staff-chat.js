@@ -90,6 +90,7 @@
   const near=line.scrollHeight-line.scrollTop-line.clientHeight<110,prev=line.scrollHeight;let day='';
   $('bubbles').innerHTML=messages.map(m=>{
    const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;
+   if(m.system)return label+`<div class="chat-system-event" data-id="${e(m.id)}">${e(m.body)}</div>`;
    const name=peerProfile?.display_name||'근무자',face=m.mine?'':`<button type="button" class="message-avatar" data-peer-profile aria-label="${e(name)} 근무자 정보 보기">${StaffChat.avatar(name,peerProfile?.profile_image)}</button>`;
    return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<div class="bubble-name">${e(name)}</div>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-meta">${!m.read_at?'<span class="message-unread" aria-label="안 읽은 사람 1명">1</span>':''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
   }).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
@@ -106,7 +107,7 @@
   if(readBusy||document.hidden||!document.hasFocus()||!$('photoViewer').hidden||$('peerProfileDialog').open)return;
   const viewport=line.getBoundingClientRect(),visible=new Set([...$('bubbles').querySelectorAll('[data-id]')].filter(row=>{const rect=row.getBoundingClientRect();return rect.bottom>viewport.top&&rect.top<viewport.bottom&&rect.height>0;}).map(row=>row.dataset.id));
   const ids=messages.filter(m=>!m.mine&&!m.read_at&&visible.has(m.id)).map(m=>m.id);if(!ids.length)return;readBusy=true;
-  try{await call('read',{ids});try{window.OMGNative?.refreshMessageBadge?.();}catch(_){}for(const m of messages)if(ids.includes(m.id))m.read_at=new Date().toISOString();for(const row of $('bubbles').querySelectorAll('[data-id]'))if(ids.includes(row.dataset.id))row.querySelector('.message-unread')?.remove();}finally{readBusy=false;}
+  try{const result=await call('read',{ids}),confirmed=result.read_ids||ids;try{window.OMGNative?.refreshMessageBadge?.();}catch(_){}window.dispatchEvent(new Event('omg:messages-changed'));for(const m of messages)if(confirmed.includes(m.id))m.read_at=new Date().toISOString();for(const row of $('bubbles').querySelectorAll('[data-id]'))if(confirmed.includes(row.dataset.id))row.querySelector('.message-unread')?.remove();}finally{readBusy=false;}
  }
  line.addEventListener('scroll',scheduleRead,{passive:true});addEventListener('focus',scheduleRead);
  async function load(older=false){

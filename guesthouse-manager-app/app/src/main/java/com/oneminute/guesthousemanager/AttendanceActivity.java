@@ -295,11 +295,11 @@ public class AttendanceActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void setMessageBadge(String token,int count) {
-            runOnUiThread(()->{if(trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,count);});
+            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,count);});
         }
         @JavascriptInterface
         public void refreshMessageBadge() {
-            runOnUiThread(()->{if(trustedBadgePage())NativeMessageBadge.refresh(AttendanceActivity.this);});
+            runOnUiThread(()->{if(trustedBadgePage())NativeMessageBadge.changed(AttendanceActivity.this);});
         }
 
         @JavascriptInterface
@@ -427,7 +427,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume();NativeMessageBadge.refresh(this); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume();NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
     protected void onPause() { if (recovery != null) recovery.pause(); super.onPause(); }

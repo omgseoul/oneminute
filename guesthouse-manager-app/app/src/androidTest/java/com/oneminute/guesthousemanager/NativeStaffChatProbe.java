@@ -46,6 +46,7 @@ public final class NativeStaffChatProbe {
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((EditText)field(activity,"input")).isEnabled());
+            stage="visible incoming receipt reaches server";waitFor(()->fake.readIds.contains(VIDEO));
             verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
@@ -68,7 +69,8 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());stage="visible incoming receipt reaches server";waitFor(()->fake.readIds.contains(VIDEO));
+            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}

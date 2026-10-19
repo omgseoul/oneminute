@@ -59,3 +59,5 @@ body.media-open{overflow:hidden}
 .bubble-meta .bubble-time{margin:0}
 .message-unread{font-size:11px;line-height:1.3;font-weight:750;color:#2467bd}
 @media(max-width:360px){.timeline{padding-left:12px;padding-right:12px}.oms-sticker{width:108px;height:108px}}
+
+.chat-system-event{text-align:center;color:#708095;font-size:12px;line-height:1.6;padding:14px 12px}

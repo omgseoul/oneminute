@@ -101,6 +101,7 @@ public class AttendanceActivity extends AppCompatActivity {
         NativePushRegistration.clear(this);
         NativeStaffChatApi.clearLocal(this);
         SupabaseMessageReceipt.clear(this);
+        NativeMessageBadge.clear(this);
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
         String memberTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
@@ -228,6 +229,11 @@ public class AttendanceActivity extends AppCompatActivity {
         return workerProfiles.open(peer);
     }
 
+    private boolean trustedBadgePage() {
+        Uri uri=Uri.parse(webView==null||webView.getUrl()==null?"":webView.getUrl());
+        return "https".equals(uri.getScheme())&&("omgworks24.com".equals(uri.getHost())||"www.omgworks24.com".equals(uri.getHost()));
+    }
+
     private final class PushBridge {
         @JavascriptInterface
         public boolean openWorkerProfile(String peer) {
@@ -282,7 +288,18 @@ public class AttendanceActivity extends AppCompatActivity {
             String previous=NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","");
             SupabaseMessageReceipt.bind(AttendanceActivity.this, accessToken, expiresAt);
             if(!previous.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))runOnUiThread(()->{if(workerProfiles!=null)workerProfiles.clear();});
+            if(!previous.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))NativeMessageBadge.clear(AttendanceActivity.this);
             NativePushRegistration.refresh(AttendanceActivity.this);
+            NativeMessageBadge.refresh(AttendanceActivity.this);
+        }
+
+        @JavascriptInterface
+        public void setMessageBadge(String token,int count) {
+            runOnUiThread(()->{if(trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,count);});
+        }
+        @JavascriptInterface
+        public void refreshMessageBadge() {
+            runOnUiThread(()->{if(trustedBadgePage())NativeMessageBadge.refresh(AttendanceActivity.this);});
         }
 
         @JavascriptInterface
@@ -410,7 +427,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume(); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume();NativeMessageBadge.refresh(this); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
     protected void onPause() { if (recovery != null) recovery.pause(); super.onPause(); }

@@ -37,7 +37,7 @@
   const name=document.createElement('div');name.className='bubble-name';name.textContent=mine(m)?'나':m.sender_name;el.append(name);
   const bubble=document.createElement('div');bubble.className='bubble';
   if(m.asset_id){const item=photoAssets.get(String(m.asset_id));if(item){const img=new Image();img.src=item.url;img.alt='첨부 사진';img.loading='lazy';img.width=320;img.style.aspectRatio='4/3';img.style.objectFit='contain';img.dataset.photoMessage=String(m.id);img.onclick=()=>openViewerById(m.id);bubble.append(img);}}
-  if(m.body)bubble.append(document.createTextNode(m.body));el.append(bubble);const time=document.createElement('time');time.className='bubble-time';time.textContent=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});el.append(time);timeline.append(el);
+  if(m.body)bubble.append(document.createTextNode(m.body));const line=document.createElement('div');line.className='guest-message-line';line.append(bubble);el.append(line);const time=document.createElement('time');time.className='bubble-time';time.textContent=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});line.append(time);timeline.append(el);
  }
  function renderViewer(){
   const list=photos(),item=list[viewerIndex];if(!item){closeViewer();return;}
@@ -67,7 +67,7 @@
   try{const firstLoad=timeline.classList.contains('chat-loading');const nearBottom=timeline.scrollHeight-timeline.scrollTop-timeline.clientHeight<100;const v=await call('messages',{after_seq:seq});room=v.room;actor=v.actor_key;remember(v.messages,v.assets||[]);
    if(!roomLoaded){timeline.replaceChildren();roomLoaded=true;}for(const m of v.messages){append(m);seq=Math.max(seq,Number(m.seq));}
    failures=0;if(room.chat_enabled)G.message(navigator.onLine?'':'인터넷 연결을 기다리는 중입니다.');renderMeta();if(nearBottom||firstLoad)timeline.scrollTop=timeline.scrollHeight;if(v.messages.length<100)timeline.classList.remove('chat-loading');
-   if(!isGuest&&seq>lastRead&&document.hasFocus()){await call('read',{last_seq:seq});lastRead=seq;}
+   if(!isGuest&&seq>lastRead&&document.hasFocus()){await call('read',{last_seq:seq});lastRead=seq;try{window.OMGNative?.refreshMessageBadge?.();}catch(_){}}
    if(!$('photoGallery').hidden)renderGallery();
    timer=setTimeout(poll,v.messages.length===100?50:2000);
    if(Date.now()-lastRetry>95000){lastRetry=Date.now();call('retry_events').catch(()=>{});}

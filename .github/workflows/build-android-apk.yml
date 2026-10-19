@@ -48,6 +48,9 @@ jobs:
           script: |
             adb install guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
             adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell pm grant com.oneminute.guesthousemanager android.permission.POST_NOTIFICATIONS
+            adb shell am instrument -w -e phase badge com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-badge.txt"
+            grep -q 'oms_badge=ok' "$RUNNER_TEMP/oms-badge.txt"
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb shell am instrument -w -e phase chat-handoff com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-handoff.txt"

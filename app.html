@@ -55,6 +55,7 @@ async function loadMessageSummary(accessToken,announce=false){
  const reportResult=data.can_manage?await window.omgSupabase.rpc("work_report_inbox",{p_access_token:accessToken}):null;
  const reportData=reportResult?.data?.ok?reportResult.data:null,reportCount=Number(reportData?.unread_count)||0;
  const unread=Number(data.unread_count)||0,count=unread+guestCount+reportCount,counter=document.getElementById("messageCounter");
+ try{window.OMGNative?.setMessageBadge?.(accessToken,count);}catch(_){}
  counter.textContent=count>99?"99+":String(count);counter.style.display=count?"grid":"none";
  if(announce&&lastUnreadCount!=null&&unread>lastUnreadCount){
   document.querySelector("#messageArrival strong").textContent="새 메세지 도착";

@@ -34,9 +34,12 @@ class NativeStaffChatApi {
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));
     }
     JSONObject rpc(String name,JSONObject args)throws Exception {
-        if(!name.matches("staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages"))throw new IOException("잘못된 요청입니다.");
+        if(!name.matches("staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox"))throw new IOException("잘못된 요청입니다.");
         args.put("p_access_token",token);
         return request(BASE+"rest/v1/rpc/"+name,args,true);
+    }
+    JSONObject guestRooms(JSONObject cursor)throws Exception {
+        return request(BASE+"functions/v1/guest-support",new JSONObject().put("action","rooms").put("data",cursor).put("access_token",token),true);
     }
     void notifyMessage(String id)throws Exception {
         request(BASE+"functions/v1/dispatch-notification",new JSONObject().put("access_token",token).put("message_id",id),false);

@@ -58,6 +58,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             for (String key : receipts.getAll().keySet()) if (System.currentTimeMillis() - receipts.getLong(key, 0) > 86400000L) edit.remove(key);
             edit.putLong(dedupeId, System.currentTimeMillis()).commit();
         }
+        if (!"stop".equals(mode)) NativeMessageBadge.received(this, message.getData().get("alertId"));
         String body = message.getData().get("message");
         String priority = message.getData().get("priority");
         boolean urgent = "urgent".equals(mode) || "urgent".equals(priority);
@@ -128,13 +129,14 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, WEAK_MESSAGE_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setSmallIcon(R.drawable.ic_oms_notification)
                 .setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
                 .setContentText(sender + " · " + body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setGroup(NativeMessageBadge.GROUP)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true)
                 .setContentIntent(content)
@@ -180,11 +182,12 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, NORMAL_MESSAGE_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_email).setColor(Color.rgb(36, 103, 189))
+                .setSmallIcon(R.drawable.ic_oms_notification).setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
                 .setContentText(sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority(NotificationCompat.PRIORITY_HIGH).setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setPriority(NotificationCompat.PRIORITY_HIGH).setGroup(NativeMessageBadge.GROUP)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(content).build();
         manager.notify(notificationId, notification);
         Handler handler = new Handler(Looper.getMainLooper());
@@ -241,7 +244,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         PendingIntent content = PendingIntent.getActivity(this, requestCode, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setSmallIcon(R.drawable.ic_oms_notification)
                 .setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(isApproval(messageType) ? "결재 요청" : "새 메세지 도착")
                 .setContentText(sender + " · " + body)

@@ -20,7 +20,7 @@
 .preview-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .preview-days button{min-width:0;height:31px;padding:0;border:1px solid #d5e0ed;border-radius:9px;background:#f7f9fc;color:#6d7b90;font-size:11px;font-weight:850}
 .preview-days button[aria-pressed=true]{border-color:#2467bd;background:#edf5ff;color:#2467bd}
-.preview-stage{flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain}
+.preview-stage{flex:1;min-width:0;min-height:0;margin:12px 4px;border:3px solid #111;border-radius:14px;overflow:auto;overscroll-behavior:contain}
 .preview-stage>.container{margin:0 auto}
 .preview-result-card{margin-top:16px;padding:18px;border:1px solid #dfe8f4;border-radius:19px;background:#fff}
 .preview-result-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:13px;border-bottom:1px solid #e8eef6;color:#183153}

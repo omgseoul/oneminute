@@ -8,9 +8,9 @@ import androidx.core.app.NotificationCompat;
 import org.json.*;
 import java.util.concurrent.*;
 
-/** One badge-bearing notification represents the same total as the home menu.
+/** One standalone badge-bearing notification represents the same total as the home menu.
  * Alert channels remain separate so their sounds and user settings are preserved.
- * Only the summary contributes a count; three alert modes cannot count one item three times.
+ * Only the standalone notification contributes a count; three alert modes cannot count one item three times.
  */
 final class NativeMessageBadge {
     static final String GROUP="oms_unread_messages";
@@ -86,9 +86,19 @@ final class NativeMessageBadge {
                 .setSmallIcon(R.drawable.ic_oms_notification).setColor(0xff2467bd)
                 .setContentTitle("OMS · 미확인 소식 "+count+"개").setContentText("메세지 메뉴에서 확인해주세요.")
                 .setNumber(count).setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE).setGroup(GROUP).setGroupSummary(true)
-                .setOnlyAlertOnce(true).setSilent(true).setAutoCancel(false).setContentIntent(content).build();
-        try{manager.notify(ID,notification);}catch(SecurityException ignored){/* Respect notification permission. */}
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                // Launchers filter group headers; the count must be a standalone notification.
+                .setOnlyAlertOnce(true).setAutoCancel(false).setContentIntent(content).build();
+        try{
+            // Some launchers keep the old count on an in-place notification update.
+            // Remove that key first when the count changes, or when migrating 0.16.7's
+            // group header, so their notification model receives a remove/add pair.
+            for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()==ID){
+                Notification previous=item.getNotification();
+                if(previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0)manager.cancel(ID);
+            }
+            manager.notify(ID,notification);
+        }catch(SecurityException ignored){/* Respect notification permission. */}
     }
 
     private static int loadCount(Context c)throws Exception{

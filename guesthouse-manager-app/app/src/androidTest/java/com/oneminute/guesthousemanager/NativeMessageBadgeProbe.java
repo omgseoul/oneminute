@@ -46,8 +46,11 @@ final class NativeMessageBadgeProbe {
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
             Notification n=summary(c);
             check(n.getSmallIcon().getResId()==R.drawable.ic_oms_notification,"OMS status icon");
-            check((n.flags&Notification.FLAG_GROUP_SUMMARY)!=0,"One badge-bearing summary");
+            check((n.flags&Notification.FLAG_GROUP_SUMMARY)==0,"Badge must not be a launcher-filtered group header");
+            check(n.getGroup()==null,"Badge remains independent of alert groups");
             check(c.getSystemService(NotificationManager.class).getNotificationChannel(NativeMessageBadge.CHANNEL).canShowBadge(),"Badge channel enabled");
+            NativeLauncherBadgeProbe.verify(instrumentation,c,TOKEN);
+            NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
             NativeMessageBadge.fromWeb(c,"wrong-session",99);expect(c,7);
             NativeMessageBadge.received(c,"same-alert");expect(c,8);
             NativeMessageBadge.received(c,"same-alert");Thread.sleep(150);expect(c,8);

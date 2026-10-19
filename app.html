@@ -87,7 +87,7 @@ async function loadTodayOverview(session){
   if(missionResult.error||!missionResult.data?.ok)throw new Error("할 일을 불러오지 못했습니다.");
   const mine=(missionResult.data.missions||[]).filter(item=>(!item.target_employee_ids?.length||item.target_employee_ids.includes(session.employeeId))&&!item.owner_completed_at&&!item.completed_at&&!(item.completion_mode==="any"&&Number(item.completed_count)>0)&&!(item.completion_employee_ids||[]).includes(session.employeeId));
   const dateOf=value=>{const p=zonedParts(value);return `${p.year}-${pad(p.month)}-${pad(p.day)}`;};
-  overdueResult.data.tasks=mine.filter(item=>item.due_at&&dateOf(item.due_at)<dateKey);
+  overdueResult.data.tasks=mine.filter(item=>item.due_at&&new Date(item.due_at).getTime()<Date.now());
   data.tasks=mine.filter(item=>item.due_at?dateOf(item.due_at)===dateKey:item.timing==="today");
  }
  const overdueIds=new Set((overdueResult.data.tasks||[]).map(item=>String(item.id)));

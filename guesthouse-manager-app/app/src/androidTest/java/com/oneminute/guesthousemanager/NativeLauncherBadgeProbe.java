@@ -23,6 +23,7 @@ final class NativeLauncherBadgeProbe {
             if(item.getId()==NativeMessageBadge.ID)current=item.getNotification();
         if(current==null)throw new AssertionError("Missing badge fixture");
         // Reproduce 0.16.7: group headers store a number but Launcher3 filters them out.
+        manager.cancel(NativeMessageBadge.ID);
         manager.notify(NativeMessageBadge.ID,Notification.Builder.recoverBuilder(c,current)
                 .setGroup(NativeMessageBadge.GROUP).setGroupSummary(true).build());
         shell("input keyevent KEYCODE_HOME");Thread.sleep(800);
@@ -56,7 +57,7 @@ final class NativeLauncherBadgeProbe {
             last=labels();boolean matches=!last.isEmpty()&&(count==0
                     ?last.stream().noneMatch(s->s.matches(".*\\b[1-9][0-9]*\\b.*"))
                     :last.stream().anyMatch(s->s.matches(".*\\b"+count+"\\b.*")));
-            if(matches){System.out.println("LAUNCHER_BADGE count="+count+" labels="+last);return;}
+            if(matches){android.os.Bundle result=new android.os.Bundle();result.putString("oms_launcher","count="+count+" labels="+last);instrumentation.sendStatus(0,result);return;}
             Thread.sleep(200);
         }
         capture("launcher-badge-failed.png");throw new AssertionError("Launcher count "+count+" not visible; labels="+last+", launcher="+launcher);

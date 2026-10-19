@@ -123,7 +123,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             if(last!=null&&getLastVisiblePosition()==position){
                 // setSelection alone aligns the TOP of an oversized photo/video
                 // row. A negative offset keeps its bottom and timestamp visible.
-                setSelectionFromTop(position,getHeight()-getPaddingBottom()-getPaddingTop()-last.getHeight());
+                if(Math.abs(last.getBottom()-(getHeight()-getPaddingBottom()))>1)setSelectionFromTop(position,getHeight()-getPaddingBottom()-getPaddingTop()-last.getHeight());
             }else{alignAfterLayout=true;setSelection(position);}
         }
         @Override protected void onMeasure(int widthSpec,int heightSpec){
@@ -134,7 +134,9 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             super.onMeasure(widthSpec,heightSpec);
         }
         @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
-            boolean follow=followNextResize&&laidOutHeight!=bottom-top;
+            // Sender names, sticker spans and asynchronous profile images can
+            // change row heights while the viewport height itself stays fixed.
+            boolean follow=followNextResize;
             super.onLayout(changed,left,top,right,bottom);
             laidOutHeight=bottom-top;followNextResize=false;
             if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}

@@ -119,7 +119,7 @@ public final class NativeStaffChatProbe {
         instrumentation.waitForIdleSync();Thread.sleep(150);instrumentation.waitForIdleSync();
         // Begin in older history, so a composer focus must deliberately reveal the
         // newest message instead of merely preserving the pre-keyboard offset.
-        ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});
+        scrollOlderHistory();
         stage="older history before typing";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
         int[] center=ui(()->{View input=(View)field(activity,"input");int[] p=new int[2];input.getLocationOnScreen(p);return new int[]{p[0]+input.getWidth()/3,p[1]+input.getHeight()/2};});
         long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,center[0],center[1],0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,center[0],center[1],0);instrumentation.sendPointerSync(down);instrumentation.sendPointerSync(up);down.recycle();up.recycle();
@@ -130,16 +130,26 @@ public final class NativeStaffChatProbe {
         ui(()->{((EditText)field(activity,"input")).setText("one\ntwo\nthree\nfour");return null;});
         stage="multiline composer keeps latest message visible";waitFor(()->safeLayout(true)&&latestMessageVisible());
         // Once typing has started, scrolling back through history must still work.
-        ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});
+        scrollOlderHistory();
         stage="history while keyboard open";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
         ui(()->{((EditText)field(activity,"input")).setText("visible input");return null;});
         instrumentation.waitForIdleSync();
         check(ui(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1),"composer resize preserves intentional history scrolling");
-        ui(()->{ListView list=(ListView)field(activity,"list");list.setSelection(list.getCount()-1);return null;});
+        ui(()->{Method latest=activity.getClass().getDeclaredMethod("scrollToLatest",ListView.class);latest.setAccessible(true);latest.invoke(activity,(ListView)field(activity,"list"));return null;});
         stage="latest message before capture";waitFor(()->safeLayout(true)&&latestMessageVisible());
         Bitmap keyboard=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),"native-chat-keyboard.png"))){keyboard.compress(Bitmap.CompressFormat.PNG,100,out);}keyboard.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");check(input.getText().toString().contains("visible input"),"visible composer accepts actual keyboard input");input.setText("");((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);input.clearFocus();return null;});
         stage="keyboard hidden keeps latest message visible";waitFor(()->safeLayout(false)&&latestMessageVisible());
+    }
+    private void scrollOlderHistory()throws Exception{
+        for(int attempt=0;attempt<10;attempt++){
+            if(ui(()->{ListView list=(ListView)field(activity,"list");return list.getLastVisiblePosition()<list.getCount()-1;}))return;
+            int[] gesture=ui(()->{View list=(View)field(activity,"list");int[] point=new int[2];list.getLocationOnScreen(point);return new int[]{point[0]+list.getWidth()/2,point[1]+list.getHeight()/5,point[1]+list.getHeight()*4/5};});
+            long start=SystemClock.uptimeMillis();
+            for(int step=0;step<=8;step++){int action=step==0?MotionEvent.ACTION_DOWN:step==8?MotionEvent.ACTION_UP:MotionEvent.ACTION_MOVE;MotionEvent event=MotionEvent.obtain(start,start+step*35,action,gesture[0],gesture[1]+(gesture[2]-gesture[1])*step/8f,0);instrumentation.sendPointerSync(event);event.recycle();Thread.sleep(35);}
+            instrumentation.waitForIdleSync();Thread.sleep(150);
+        }
+        throw new AssertionError("An actual downward history swipe did not reveal older messages: "+stage);
     }
     private void capture(String name){try{Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();}catch(Exception ignored){}}
     private void verifyProfile()throws Exception{

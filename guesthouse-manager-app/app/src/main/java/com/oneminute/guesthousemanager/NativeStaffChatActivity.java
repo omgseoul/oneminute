@@ -81,7 +81,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         status=text(this,"불러오는 중…",12,MUTED);status.setPadding(dp(this,16),dp(this,3),dp(this,16),dp(this,3));status.setMinHeight(dp(this,22));status.setOnClickListener(v->load(false,null));root.addView(status);
         list=new MessageList();list.setDivider(null);list.setClipToPadding(false);list.setPadding(dp(this,12),0,dp(this,12),dp(this,8));
         older=button(this,"이전 대화 더 보기","이전 대화 더 보기");older.setVisibility(View.GONE);older.setOnClickListener(v->load(true,null));list.addHeaderView(older,null,false);if(peer.isEmpty()){TextView notices=button(this,"공지 · 시스템 알림 ›","공지 및 시스템 알림 보기");notices.setGravity(Gravity.CENTER_VERTICAL);notices.setPadding(dp(this,14),0,dp(this,14),0);notices.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/messages.html?tab=staff")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP)));list.addHeaderView(notices,null,false);}list.setStackFromBottom(!peer.isEmpty());root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
+        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){if(s==SCROLL_STATE_IDLE)((MessageList)list).settledScroll();scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
         if(!peer.isEmpty())buildComposer();else composer=null;
         refreshList(true);if(active)load(false,null);
     }
@@ -100,12 +100,12 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     /** Keep the last message above the composer as IME/emoji/input height changes.
      * History stays in place when the reader has deliberately scrolled upward. */
     private final class MessageList extends ListView{
-        boolean followNextResize,alignAfterLayout,historySelectionPending;
+        boolean followNextResize,alignAfterLayout,readerBrowsing;
         int laidOutHeight;
         Runnable latestScroll;
         MessageList(){super(NativeStaffChatActivity.this);}
         void queueLatest(){
-            historySelectionPending=false;
+            readerBrowsing=false;
             if(latestScroll!=null)removeCallbacks(latestScroll);
             final int request=generation;
             latestScroll=()->{latestScroll=null;if(!destroyed&&request==generation&&this==list&&getCount()>0)showLatest();};
@@ -113,22 +113,18 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         }
         @Override public boolean onTouchEvent(MotionEvent event){
             if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
-                if(latestScroll!=null)removeCallbacks(latestScroll);
-                latestScroll=null;followNextResize=false;alignAfterLayout=false;historySelectionPending=true;
+                browseHistory();
             }
             return super.onTouchEvent(event);
         }
-        private void selectHistory(int position){
-            if(position>=getCount()-1)return;
+        void browseHistory(){
             if(latestScroll!=null)removeCallbacks(latestScroll);
-            latestScroll=null;followNextResize=false;alignAfterLayout=false;historySelectionPending=true;
+            latestScroll=null;followNextResize=false;alignAfterLayout=false;readerBrowsing=true;
         }
-        @Override public void setSelection(int position){
-            selectHistory(position);
-            if(position>=getCount()-1){historySelectionPending=false;followNextResize=true;alignAfterLayout=true;}
-            super.setSelection(position);
+        void settledScroll(){
+            View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
+            if(last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)readerBrowsing=false;
         }
-        @Override public void setSelectionFromTop(int position,int y){selectHistory(position);super.setSelectionFromTop(position,y);}
         void showLatest(){
             int position=getCount()-1;
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
@@ -142,16 +138,15 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             // ListView measurement can reposition/re-measure its existing rows.
             // Capture the old bottom before that happens, not in onSizeChanged.
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
-            if(!historySelectionPending&&getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
+            if(!readerBrowsing&&getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
             super.onMeasure(widthSpec,heightSpec);
         }
         @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
             // Sender names, sticker spans and asynchronous profile images can
             // change row heights while the viewport height itself stays fixed.
-            boolean follow=followNextResize&&!historySelectionPending;
+            boolean follow=followNextResize&&!readerBrowsing;
             super.onLayout(changed,left,top,right,bottom);
             laidOutHeight=bottom-top;followNextResize=false;
-            if(getLastVisiblePosition()<getCount()-1)historySelectionPending=false;
             if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
         }
     }
@@ -191,7 +186,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
                 main.post(()->{
                     if(destroyed||request!=generation)return;
                     if(room.isEmpty()){rooms=result.optJSONArray("rooms");if(rooms==null)rooms=new JSONArray();refreshList(false);}
-                    else{JSONArray incoming=result.optJSONArray("messages");if(incoming==null)incoming=new JSONArray();boolean initial=state.messages.isEmpty();boolean changed=state.merge(incoming)|state.mergeReceipts(result.optJSONArray("receipts"));if(previous||initial)complete=incoming.length()<50;canSend=result.optBoolean("can_send",false);JSONObject person=result.optJSONObject("peer");if(person!=null&&profile==null)title.setText(person.optString("display_name","근무자"));older.setVisibility(complete?View.GONE:View.VISIBLE);enableComposer();if(changed){refreshList(initial||atBottom&&!previous);if(previous&&!anchor.isEmpty())restoreAnchor(anchor,anchorTop);}if(!canSend)notice("현재 이 계정에 메세지를 보낼 수 없습니다.",true);if(profile==null&&!profileLoading)loadProfile(false);scheduleRead();}
+                    else{JSONArray incoming=result.optJSONArray("messages");if(incoming==null)incoming=new JSONArray();boolean initial=state.messages.isEmpty();boolean changed=state.merge(incoming)|state.mergeReceipts(result.optJSONArray("receipts"));if(previous||initial)complete=incoming.length()<50;canSend=result.optBoolean("can_send",false);JSONObject person=result.optJSONObject("peer");if(person!=null&&profile==null)title.setText(person.optString("display_name","근무자"));older.setVisibility(complete?View.GONE:View.VISIBLE);enableComposer();if(changed){if(previous)((MessageList)list).browseHistory();refreshList(initial||atBottom&&!previous);if(previous&&!anchor.isEmpty())restoreAnchor(anchor,anchorTop);}if(!canSend)notice("현재 이 계정에 메세지를 보낼 수 없습니다.",true);if(profile==null&&!profileLoading)loadProfile(false);scheduleRead();}
                     if(canSend||room.isEmpty())notice("",false);finishLoad(request,ready);
                 });
             }catch(Exception e){main.post(()->{if(!destroyed&&request==generation){notice(e.getMessage()==null?"연결을 확인하고 여기를 눌러 다시 시도해주세요.":e.getMessage(),true);finishLoad(request,ready);}});}

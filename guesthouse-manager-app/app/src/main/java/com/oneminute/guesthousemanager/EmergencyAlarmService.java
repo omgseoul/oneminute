@@ -400,6 +400,7 @@ public class EmergencyAlarmService extends Service {
         restoreAlarmVolume();
         releaseWakeLock();
         if (overlayController != null) overlayController.dismiss();
+        NativeMessageBadge.changed(this);
         super.onDestroy();
     }
 

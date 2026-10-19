@@ -132,7 +132,10 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         }
         @Override public boolean onTouchEvent(MotionEvent event){
             if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
+                // A reader gesture takes precedence over any pending composer or IME
+                // alignment, including layout passes before SCROLL_STATE_TOUCH_SCROLL.
                 cancelAlignment();
+                readerBrowsing=true;
             }
             return super.onTouchEvent(event);
         }

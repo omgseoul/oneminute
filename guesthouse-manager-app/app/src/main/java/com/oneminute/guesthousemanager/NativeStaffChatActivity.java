@@ -100,11 +100,12 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     /** Keep the last message above the composer as IME/emoji/input height changes.
      * History stays in place when the reader has deliberately scrolled upward. */
     private final class MessageList extends ListView{
-        boolean followNextResize,alignAfterLayout;
+        boolean followNextResize,alignAfterLayout,historySelectionPending;
         int laidOutHeight;
         Runnable latestScroll;
         MessageList(){super(NativeStaffChatActivity.this);}
         void queueLatest(){
+            historySelectionPending=false;
             if(latestScroll!=null)removeCallbacks(latestScroll);
             final int request=generation;
             latestScroll=()->{latestScroll=null;if(!destroyed&&request==generation&&this==list&&getCount()>0)showLatest();};
@@ -113,10 +114,21 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         @Override public boolean onTouchEvent(MotionEvent event){
             if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
                 if(latestScroll!=null)removeCallbacks(latestScroll);
-                latestScroll=null;followNextResize=false;alignAfterLayout=false;
+                latestScroll=null;followNextResize=false;alignAfterLayout=false;historySelectionPending=true;
             }
             return super.onTouchEvent(event);
         }
+        private void selectHistory(int position){
+            if(position>=getCount()-1)return;
+            if(latestScroll!=null)removeCallbacks(latestScroll);
+            latestScroll=null;followNextResize=false;alignAfterLayout=false;historySelectionPending=true;
+        }
+        @Override public void setSelection(int position){
+            selectHistory(position);
+            if(position>=getCount()-1){historySelectionPending=false;followNextResize=true;alignAfterLayout=true;}
+            super.setSelection(position);
+        }
+        @Override public void setSelectionFromTop(int position,int y){selectHistory(position);super.setSelectionFromTop(position,y);}
         void showLatest(){
             int position=getCount()-1;
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
@@ -130,15 +142,16 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             // ListView measurement can reposition/re-measure its existing rows.
             // Capture the old bottom before that happens, not in onSizeChanged.
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
-            if(getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
+            if(!historySelectionPending&&getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
             super.onMeasure(widthSpec,heightSpec);
         }
         @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
             // Sender names, sticker spans and asynchronous profile images can
             // change row heights while the viewport height itself stays fixed.
-            boolean follow=followNextResize;
+            boolean follow=followNextResize&&!historySelectionPending;
             super.onLayout(changed,left,top,right,bottom);
             laidOutHeight=bottom-top;followNextResize=false;
+            if(getLastVisiblePosition()<getCount()-1)historySelectionPending=false;
             if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
         }
     }

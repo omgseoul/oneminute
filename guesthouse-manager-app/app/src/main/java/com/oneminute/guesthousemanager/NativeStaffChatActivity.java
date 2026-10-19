@@ -81,7 +81,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         status=text(this,"불러오는 중…",12,MUTED);status.setPadding(dp(this,16),dp(this,3),dp(this,16),dp(this,3));status.setMinHeight(dp(this,22));status.setOnClickListener(v->load(false,null));root.addView(status);
         list=new MessageList();list.setDivider(null);list.setClipToPadding(false);list.setPadding(dp(this,12),0,dp(this,12),dp(this,8));
         older=button(this,"이전 대화 더 보기","이전 대화 더 보기");older.setVisibility(View.GONE);older.setOnClickListener(v->load(true,null));list.addHeaderView(older,null,false);if(peer.isEmpty()){TextView notices=button(this,"공지 · 시스템 알림 ›","공지 및 시스템 알림 보기");notices.setGravity(Gravity.CENTER_VERTICAL);notices.setPadding(dp(this,14),0,dp(this,14),0);notices.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/messages.html?tab=staff")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP)));list.addHeaderView(notices,null,false);}list.setStackFromBottom(!peer.isEmpty());root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){if(s==SCROLL_STATE_IDLE)((MessageList)list).settledScroll();scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
+        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){if(s==SCROLL_STATE_IDLE)((MessageList)list).settledScroll();else ((MessageList)list).browseHistory();scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
         if(!peer.isEmpty())buildComposer();else composer=null;
         refreshList(true);if(active)load(false,null);
     }
@@ -116,16 +116,17 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         }
         @Override public boolean onTouchEvent(MotionEvent event){
             if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
-                browseHistory();
+                cancelAlignment();
             }
             return super.onTouchEvent(event);
         }
-        void browseHistory(){
+        private void cancelAlignment(){
             if(latestScroll!=null)removeCallbacks(latestScroll);
-            latestScroll=null;followNextResize=false;alignAfterLayout=false;readerBrowsing=true;
+            latestScroll=null;followNextResize=false;alignAfterLayout=false;
             if(historyRestore!=null)removeCallbacks(historyRestore);
             historyRestore=null;historyFirst=-1;
         }
+        void browseHistory(){cancelAlignment();readerBrowsing=true;}
         void settledScroll(){
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
             if(last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)readerBrowsing=false;

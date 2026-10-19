@@ -179,7 +179,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private void load(boolean previous,Runnable ready){
         if(!active||destroyed)return;if(busy){if(ready!=null)main.postDelayed(()->load(previous,ready),200);return;}if(!api.valid()){finish();return;}busy=true;main.removeCallbacks(poll);final int request=generation;final String room=peer;
         JSONObject args;try{args=data();JSONArray receiptIds=state.receiptIds(receiptCursor,200);receiptCursor+=receiptIds.length();args.put("receipt_ids",receiptIds);if(previous&&!state.messages.isEmpty()){JSONObject first=state.messages.get(0);args.put("before_time",first.getString("created_at")).put("before_id",first.getString("id"));}}catch(Exception e){busy=false;return;}
-        final String anchor=firstVisibleId();final int anchorTop=list.getChildCount()>0?list.getChildAt(0).getTop():0;final boolean atBottom=list.getLastVisiblePosition()>=list.getCount()-2;
+        final String anchor=firstVisibleId();final int anchorTop=list.getChildCount()>0?list.getChildAt(0).getTop():0;final boolean atBottom=!((MessageList)list).readerBrowsing&&list.getLastVisiblePosition()>=list.getCount()-2;
         worker.execute(()->{
             try{
                 JSONObject result=api.chat(room.isEmpty()?"rooms":"messages",args);

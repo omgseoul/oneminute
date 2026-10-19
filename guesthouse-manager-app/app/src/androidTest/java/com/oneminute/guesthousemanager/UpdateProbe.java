@@ -5,6 +5,7 @@ public class UpdateProbe extends Instrumentation {
  private String phase;
  @Override public void onCreate(Bundle args) { super.onCreate(args); phase=args.getString("phase", "verify"); start(); }
  @Override public void onStart() {
+  if("badge".equals(phase)){NativeMessageBadgeProbe.run(this);return;}
   if("chat".equals(phase)){NativeStaffChatProbe.run(this);return;}
   if("chat-layout".equals(phase)){NativeStaffChatProbe.runLayout(this);return;}
   if("chat-handoff".equals(phase)){NativeStaffChatProbe.runHandoff(this);return;}

@@ -47,7 +47,7 @@ final class SupabaseMessageReceipt {
     StringBuilder response=new StringBuilder();
     try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream(),StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null)response.append(line);}
     if(new JSONObject(response.toString()).optBoolean("ok")) synchronized(SupabaseMessageReceipt.class){
-     if(token.equals(p.getString("token",""))){Set<String> pending=new HashSet<>(p.getStringSet("pending",new HashSet<>()));pending.remove(id);p.edit().putStringSet("pending",pending).apply();}
+     if(token.equals(p.getString("token",""))){Set<String> pending=new HashSet<>(p.getStringSet("pending",new HashSet<>()));pending.remove(id);p.edit().putStringSet("pending",pending).apply();NativeMessageBadge.refresh(c);}
     }
    }catch(Exception ignored){/* Retry after the next validated WebView session; keep unread on failure. */}
    finally{if(connection!=null)connection.disconnect();}

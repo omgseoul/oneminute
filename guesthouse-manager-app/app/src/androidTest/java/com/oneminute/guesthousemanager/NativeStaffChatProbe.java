@@ -32,7 +32,7 @@ public final class NativeStaffChatProbe {
     private String roomProfileMetrics;
     static void runHandoff(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verifyHandoff();result.putString("oms_handoff","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_handoff","failed: "+error);i.finish(0,result);}}
     private String stage="start",layout="";
-    NativeStaffChatProbe(Instrumentation i){instrumentation=i;}
+    NativeStaffChatProbe(Instrumentation i){instrumentation=i;NativeMessageBadge.loader=context->0;}
     static void run(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verify();result.putString("oms_chat","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-probe.png");error.printStackTrace();result.putString("oms_chat","failed: "+error);i.finish(0,result);}}
     static void runLayout(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verifyLayoutOnly();result.putString("oms_layout","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-layout.png");error.printStackTrace();result.putString("oms_layout","failed: "+error);i.finish(0,result);}}
     private <T>T ui(Callable<T> action)throws Exception{AtomicReference<T> value=new AtomicReference<>();AtomicReference<Throwable> error=new AtomicReference<>();instrumentation.runOnMainSync(()->{try{value.set(action.call());}catch(Throwable e){error.set(e);}});if(error.get() instanceof Error)throw (Error)error.get();if(error.get()!=null)throw (Exception)error.get();return value.get();}
@@ -88,6 +88,7 @@ public final class NativeStaffChatProbe {
         stage="incoming identity and unread outgoing";waitFor(()->{
             View root=(View)field(activity,"root");View avatar=root.findViewWithTag("message-avatar-"+VIDEO);return avatar!=null&&root.findViewWithTag("message-name-"+VIDEO)!=null&&root.findViewWithTag("message-unread-"+outgoing)!=null;
         });
+        ui(()->{View root=(View)field(activity,"root");verifySideMeta(root,outgoing,true);verifySideMeta(root,VIDEO,false);return null;});
         ui(()->{View root=(View)field(activity,"root");check(root.findViewWithTag("message-avatar-"+outgoing)==null&&root.findViewWithTag("message-name-"+outgoing)==null,"own messages omit identity");root.findViewWithTag("message-avatar-"+VIDEO).performClick();return null;});
         stage="message avatar opens shared profile";waitFor(()->{Dialog dialog=(Dialog)field(activity,"peerProfileDialog");return dialog!=null&&dialog.isShowing()&&dialog.getWindow().getDecorView().hasWindowFocus();});instrumentation.waitForIdleSync();
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="message profile closes";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
@@ -95,6 +96,14 @@ public final class NativeStaffChatProbe {
         ui(()->{fake.sentRead=true;Method load=activity.getClass().getDeclaredMethod("load",boolean.class,Runnable.class);load.setAccessible(true);load.invoke(activity,false,null);return null;});
         stage="real receipt removes outgoing 1";waitFor(()->((View)field(activity,"root")).findViewWithTag("message-unread-"+outgoing)==null);
         ui(()->{NativeStaffChatState state=(NativeStaffChatState)field(activity,"state");check(!state.messages.get(46).isNull("read_at"),"receipt-only projection updates earlier sticker");return null;});
+    }
+    private void verifySideMeta(View root,String id,boolean mine){
+        View bubble=root.findViewWithTag("message-bubble-"+id),meta=root.findViewWithTag("message-meta-"+id),time=root.findViewWithTag("message-time-"+id);
+        check(bubble!=null&&meta!=null&&time!=null,"Bubble and side metadata exist");
+        int[] b=new int[2],m=new int[2],t=new int[2];bubble.getLocationOnScreen(b);meta.getLocationOnScreen(m);time.getLocationOnScreen(t);
+        check(mine?m[0]+meta.getWidth()<=b[0]:m[0]>=b[0]+bubble.getWidth(),"Metadata stays beside the bubble");
+        check(Math.abs(m[1]+meta.getHeight()-b[1]-bubble.getHeight())<=2,"Metadata aligns to bubble bottom");
+        check(t[1]+time.getHeight()<=b[1]+bubble.getHeight()+2,"Time does not add a row below the bubble");
     }
     private void verifyStickerPicker()throws Exception{
         ui(()->{((ImageButton)field(activity,"emoji")).performClick();return null;});

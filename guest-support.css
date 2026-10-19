@@ -12,3 +12,6 @@ body{overflow-x:hidden}main,section,.card,.row>*,.grid2>*{min-width:0}.btn{white
 /* Keep chat identity visible while the conversation scrolls. */
 .chat-page{overflow:hidden;min-height:0}
 .chat-head{position:sticky;top:0;z-index:20}
+
+/* Keep message times beside their bubbles, including guest conversations. */
+.guest-message-line{display:flex;align-items:flex-end;max-width:100%;min-width:0}.mine .guest-message-line{flex-direction:row-reverse}.guest-message-line .bubble{max-width:100%;min-width:0;flex:0 1 auto}.guest-message-line .bubble-time{flex:0 0 auto;white-space:nowrap;margin:0 0 1px 6px}.mine .guest-message-line .bubble-time{margin:0 6px 1px 0}

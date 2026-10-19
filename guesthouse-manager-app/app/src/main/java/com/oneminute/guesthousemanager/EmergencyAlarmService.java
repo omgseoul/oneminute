@@ -67,7 +67,7 @@ public class EmergencyAlarmService extends Service {
         channel.enableVibration(true);
         channel.setVibrationPattern(new long[]{0, 650, 180, 650});
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-        channel.setShowBadge(true);
+        channel.setShowBadge(false);
         channel.setBypassDnd(true);
         channel.setSound(null, null);
         NotificationManager manager = getSystemService(NotificationManager.class);
@@ -179,7 +179,7 @@ public class EmergencyAlarmService extends Service {
                 (ringing ? "미확인 긴급 메세지" : senderIntro());
         String content = ringing ? "확인할 때까지 긴급 알람이 계속 울립니다." : message;
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setSmallIcon(R.drawable.ic_oms_notification)
                 .setColor(Color.rgb(217, 54, 62))
                 .setContentTitle(title)
                 .setContentText(content)

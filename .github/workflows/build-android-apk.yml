@@ -48,15 +48,7 @@ jobs:
           script: |
             adb install guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
             adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell pm grant com.oneminute.guesthousemanager android.permission.POST_NOTIFICATIONS
-            adb shell settings put secure notification_badging 1
-            launcher_package=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME | tail -1 | tr -d '\r' | cut -d/ -f1)
-            adb shell cmd notification allow_listener "$launcher_package/com.android.launcher3.notification.NotificationListener"
-            adb shell am instrument -w -e phase badge com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-badge.txt"
-            grep -q 'oms_badge=ok' "$RUNNER_TEMP/oms-badge.txt"
-            adb exec-out run-as com.oneminute.guesthousemanager cat files/launcher-badge-before.png > "$RUNNER_TEMP/oms-native-launcher-before.png"
-            adb exec-out run-as com.oneminute.guesthousemanager cat files/launcher-badge-after.png > "$RUNNER_TEMP/oms-native-launcher-after.png"
-            adb exec-out run-as com.oneminute.guesthousemanager cat files/launcher-badge-cleared.png > "$RUNNER_TEMP/oms-native-launcher-cleared.png"
+            bash guesthouse-manager-app/scripts/run-launcher-badge-probe.sh
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb shell am instrument -w -e phase chat-handoff com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-handoff.txt"

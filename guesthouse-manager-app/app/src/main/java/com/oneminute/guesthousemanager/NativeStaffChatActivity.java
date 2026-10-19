@@ -253,7 +253,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         if(!mine){TextView name=text(this,profile==null?title.getText().toString():profile.optString("display_name","근무자"),12,INK);name.setTypeface(null,Typeface.BOLD);name.setPadding(dp(this,2),0,0,dp(this,4));name.setTag("message-name-"+id);copy.addView(name);}
         LinearLayout messageLine=row(this);messageLine.setGravity(Gravity.BOTTOM|(mine?Gravity.RIGHT:Gravity.LEFT));copy.addView(messageLine,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout meta=column(this);meta.setTag("message-meta-"+id);meta.setGravity(mine?Gravity.RIGHT:Gravity.LEFT);
-        if(mine&&message.isNull("read_at")){TextView unread=text(this,"1",11,BLUE);unread.setTypeface(null,Typeface.BOLD);unread.setTag("message-unread-"+id);unread.setContentDescription("안 읽은 사람 1명");meta.addView(unread);}
+        if(message.isNull("read_at")){TextView unread=text(this,"1",11,BLUE);unread.setTypeface(null,Typeface.BOLD);unread.setTag("message-unread-"+id);unread.setContentDescription("안 읽은 사람 1명");meta.addView(unread);}
         TextView time=text(this,date(message.optString("created_at"),true),10,MUTED);time.setSingleLine(true);time.setTag("message-time-"+id);meta.addView(time);
         meta.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
         LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-2,-2);mp.gravity=Gravity.BOTTOM;if(mine)mp.rightMargin=dp(this,6);else mp.leftMargin=dp(this,6);
@@ -278,7 +278,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         List<JSONObject> shown=shownMessages();int first=Math.max(0,list.getFirstVisiblePosition()-list.getHeaderViewsCount()),last=Math.min(shown.size()-1,list.getLastVisiblePosition()-list.getHeaderViewsCount());JSONArray ids=new JSONArray();List<JSONObject> acknowledged=new ArrayList<>();
         for(int i=first;i<=last;i++){JSONObject m=shown.get(i);String id=m.optString("id");if(!m.optBoolean("mine")&&m.isNull("read_at")&&reading.add(id)){ids.put(id);acknowledged.add(m);}}
         if(ids.length()==0)return;final int request=generation;final String room=peer;
-        worker.execute(()->{boolean ok=false;try{api.chat("read",new JSONObject().put("peer",room).put("ids",ids));ok=true;}catch(Exception ignored){}final boolean succeeded=ok;if(succeeded)NativeMessageBadge.refresh(this);main.post(()->{if(request!=generation||destroyed)return;for(JSONObject m:acknowledged){reading.remove(m.optString("id"));if(succeeded)try{m.put("read_at",Instant.now().toString());}catch(Exception ignored){}}});});
+        worker.execute(()->{boolean ok=false;try{api.chat("read",new JSONObject().put("peer",room).put("ids",ids));ok=true;}catch(Exception ignored){}final boolean succeeded=ok;if(succeeded)NativeMessageBadge.refresh(this);main.post(()->{if(request!=generation||destroyed)return;for(JSONObject m:acknowledged){reading.remove(m.optString("id"));if(succeeded)try{m.put("read_at",Instant.now().toString());View unread=root.findViewWithTag("message-unread-"+m.optString("id"));if(unread!=null)((ViewGroup)unread.getParent()).removeView(unread);}catch(Exception ignored){}}});});
     }
     private void openRoom(String value){if(!NativeStaffChatApi.validPeer(value))return;saveDraft();main.removeCallbacks(poll);if(viewer!=null)viewer.dismiss();peer=value;adapter=null;input=null;canSend=true;sending=false;preparing=false;build();}
     private void showPeople(){

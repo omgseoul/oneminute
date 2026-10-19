@@ -33,6 +33,7 @@
     const start=new Date(dayStart(date)).getTime(),end=new Date(dayStart(addDays(date,1))).getTime();
     const now=Date.now(),isToday=sameDay(date,today());
     const dueTasks=tasks.flatMap(item=>{
+      if(!item.due_at)return item.timing==='today'&&isToday?[{...item,kind:'task',sort:now,late:false}]:[];
       const due=new Date(item.due_at).getTime();
       if(due<now)return isToday?[{...item,kind:'task',sort:due,late:true}]:[];
       return due>=start&&due<end?[{...item,kind:'task',sort:due,late:false}]:[];
@@ -106,6 +107,12 @@
       if(overdue.error||!overdue.data?.ok)throw new Error(overdue.data?.message||overdue.error?.message||'지연 To do를 불러오지 못했습니다.');
       const known=new Set((result.tasks||[]).map(item=>String(item.id)));
       result.tasks=[...(result.tasks||[]),...(overdue.data.tasks||[]).filter(item=>!known.has(String(item.id)))];
+      if(!isOwner){
+        const {data,error}=await window.omgSupabase.rpc('list_missions',{p_access_token:session.accessToken});
+        if(error||!data?.ok)throw new Error(data?.message||error?.message||'내 To do를 불러오지 못했습니다.');
+        result.tasks=OMSWorkerTasks.pending(data.missions||[],session.employeeId);
+        result.events=OMSWorkerTasks.events(result.events||[],session.employeeId);
+      }
       events=result.events||[];tasks=result.tasks||[];employees=result.employees||[];renderTargets();render();
     }catch(error){$('calendarMessage').textContent=error.message;render();}
   }

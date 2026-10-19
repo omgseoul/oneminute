@@ -89,7 +89,16 @@ final class NativeMessageBadge {
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 // Launchers filter group headers; the count must be a standalone notification.
                 .setOnlyAlertOnce(true).setAutoCancel(false).setContentIntent(content).build();
-        try{manager.notify(ID,notification);}catch(SecurityException ignored){/* Respect notification permission. */}
+        try{
+            // Some launchers keep the old count on an in-place notification update.
+            // Remove that key first when the count changes, or when migrating 0.16.7's
+            // group header, so their notification model receives a remove/add pair.
+            for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()==ID){
+                Notification previous=item.getNotification();
+                if(previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0)manager.cancel(ID);
+            }
+            manager.notify(ID,notification);
+        }catch(SecurityException ignored){/* Respect notification permission. */}
     }
 
     private static int loadCount(Context c)throws Exception{

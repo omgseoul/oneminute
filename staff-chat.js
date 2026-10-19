@@ -103,11 +103,16 @@
   $('bubbles').querySelectorAll('[data-video-load]').forEach(button=>{const id=button.dataset.videoLoad,holder=button.closest('.chat-video');holder.dataset.messageId=id;const poster=videoPosters.get(id);if(poster){const image=holder.querySelector('.video-poster');image.src=poster;image.hidden=false;holder.classList.add('has-poster');}else if(videoObserver)videoObserver.observe(holder);else showVideoPoster(id,holder);button.onclick=()=>openViewerById(id);});paintSearch();
  }
  function scheduleRead(){clearTimeout(readTimer);readTimer=setTimeout(()=>markRead().catch(error=>console.warn('Read receipt',error)),300);}
+ let readThroughId='';
  async function markRead(){
   if(readBusy||document.hidden||!document.hasFocus()||!$('photoViewer').hidden||$('peerProfileDialog').open)return;
-  const viewport=line.getBoundingClientRect(),visible=new Set([...$('bubbles').querySelectorAll('[data-id]')].filter(row=>{const rect=row.getBoundingClientRect();return rect.bottom>viewport.top&&rect.top<viewport.bottom&&rect.height>0;}).map(row=>row.dataset.id));
-  const ids=messages.filter(m=>!m.mine&&!m.read_at&&visible.has(m.id)).map(m=>m.id);if(!ids.length)return;readBusy=true;
-  try{const result=await call('read',{ids}),confirmed=result.read_ids||ids;try{window.OMGNative?.refreshMessageBadge?.();}catch(_){}window.dispatchEvent(new Event('omg:messages-changed'));for(const m of messages)if(confirmed.includes(m.id))m.read_at=new Date().toISOString();for(const row of $('bubbles').querySelectorAll('[data-id]'))if(confirmed.includes(row.dataset.id))row.querySelector('.message-unread')?.remove();}finally{readBusy=false;}
+  const anchor=messages.at(-1);if(!anchor||anchor.id===readThroughId)return;readBusy=true;
+  try{await call('read_room',{through_id:anchor.id});readThroughId=anchor.id;
+   const seen=messages.filter(m=>!m.mine&&(m.created_at<anchor.created_at||m.created_at===anchor.created_at&&m.id<=anchor.id));
+   const confirmed=new Set(seen.map(m=>m.id));for(const m of seen)m.read_at=new Date().toISOString();
+   for(const row of $('bubbles').querySelectorAll('[data-id]'))if(confirmed.has(row.dataset.id))row.querySelector('.message-unread')?.remove();
+   try{window.OMGNative?.refreshMessageBadge?.();}catch(_){}window.dispatchEvent(new Event('omg:messages-changed'));
+  }finally{readBusy=false;}
  }
  line.addEventListener('scroll',scheduleRead,{passive:true});addEventListener('focus',scheduleRead);
  async function load(older=false){

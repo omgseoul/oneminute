@@ -1,7 +1,7 @@
 /* Alert delivery uses the original recipient records; reading a card never acknowledges it. */
 window.NotificationBot=(()=>{
  const $=id=>document.getElementById(id),e=v=>GuestSupport.esc(String(v??''));
- let readTimer,readBusy=false;const reading=new Set();
+ let readTimer,readBusy=false,readThroughKey='';
  let session,callbacks,data={messages:[]},properties=null,profiles=[],query='',roomProperty=null,announcementMode=false,profileLoaded=false,refreshing=false,alertBusy=false,alertsLoaded=false,alertMessages=[],unreadByProperty={},cursor=null,hasOlder=false;
  const isAlert=i=>!!StaffChat.contractId(i.message)||['announcement','attendance_warning','attendance_approval','property_share_approval','holiday_approval','holiday_notice'].includes(i.message_type)||i.sender_type==='system';
  const needsAck=i=>['announcement','attendance_warning'].includes(i.message_type)&&(i.require_signature!==false||i.require_understanding!==false);
@@ -28,14 +28,17 @@ window.NotificationBot=(()=>{
  }
  function scheduleRead(){clearTimeout(readTimer);readTimer=setTimeout(markVisibleRead,300);}
  async function markVisibleRead(){
-  if(readBusy||document.hidden||!document.hasFocus()||$('botConversation')?.hidden||!$('detail').hidden)return;
-  const scroller=$('botTimeline'),viewport=scroller.getBoundingClientRect(),visible=new Set([...scroller.querySelectorAll('[data-bot-row]')].filter(row=>{const r=row.getBoundingClientRect();return r.height>0&&r.bottom>viewport.top&&r.top<viewport.bottom;}).map(row=>row.dataset.botRow));
-  const unread=items().filter(i=>visible.has(i.message_id)&&!i.is_sender&&!i.read_at&&!needsAck(i)&&!reading.has(i.message_id));if(!unread.length)return;
-  readBusy=true;let changed=false;
-  try{for(const i of unread){reading.add(i.message_id);try{const {data:v,error}=await omgSupabase.rpc('mark_property_message_read',{p_access_token:session.accessToken,p_message_id:i.message_id});if(error||!v?.ok)throw Error('읽음 처리 실패');i.read_at=new Date().toISOString();changed=true;}catch(error){console.warn(error);}finally{reading.delete(i.message_id);}}}
-  finally{readBusy=false;if(changed){try{window.OMGNative?.refreshMessageBadge?.();}catch{}await callbacks.refresh();}}
+  if(readBusy||document.hidden||!document.hasFocus()||$('botConversation')?.hidden||!$('detail').hidden||announcementMode)return;
+  const anchor=items().slice().sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.message_id.localeCompare(a.message_id))[0];
+  if(!anchor)return;const key=anchor.message_id+':'+JSON.stringify(properties);if(key===readThroughKey)return;
+  const selected=properties?.slice()||null;readBusy=true;
+  try{const {data:v,error}=await omgSupabase.rpc('mark_notification_bot_seen',{p_access_token:session.accessToken,p_through_message_id:anchor.message_id,p_property_ids:selected});
+   if(error||!v?.ok)throw Error('읽음 처리 실패');readThroughKey=key;
+   for(const i of items())if(!i.is_sender&&(i.created_at<anchor.created_at||i.created_at===anchor.created_at&&i.message_id<=anchor.message_id))i.read_at=new Date().toISOString();
+   try{window.OMGNative?.refreshMessageBadge?.();}catch{}await callbacks.refresh();
+  }catch(error){console.warn(error);readTimer=setTimeout(markVisibleRead,2000);}finally{readBusy=false;}
  }
- function open(id,announcements=false){roomProperty=String(id||session.propertyId);announcementMode=announcements;$('botSearch').value='';$('botSearchPanel').hidden=true;$('botSearchToggle').setAttribute('aria-expanded','false');$('botConversation').hidden=false;document.body.classList.add('bot-open');history.pushState({...history.state,omgBot:true},'',location.href);renderConversation();$('botTimeline').scrollTop=$('botTimeline').scrollHeight;scheduleRead();}
+ function open(id,announcements=false){readThroughKey='';roomProperty=String(id||session.propertyId);announcementMode=announcements;$('botSearch').value='';$('botSearchPanel').hidden=true;$('botSearchToggle').setAttribute('aria-expanded','false');$('botConversation').hidden=false;document.body.classList.add('bot-open');history.pushState({...history.state,omgBot:true},'',location.href);renderConversation();$('botTimeline').scrollTop=$('botTimeline').scrollHeight;scheduleRead();}
  function close(){if(history.state?.omgBot)history.back();else hide();}
  function hide(){$('botConversation').hidden=true;document.body.classList.remove('bot-open');}
  async function refresh(){if(refreshing)return;refreshing=true;const hint=$('pullRefresh');hint.hidden=false;hint.textContent='새로고침 중…';try{await callbacks.refresh();await loadProfiles();hint.textContent='업데이트했습니다.';}catch{hint.textContent='연결을 확인하고 다시 내려주세요.';}finally{refreshing=false;setTimeout(()=>hint.hidden=true,1200);}}

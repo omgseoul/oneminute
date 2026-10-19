@@ -1,0 +1,2 @@
+/* Personal pending work is shared by the home overview and every calendar view. */
+window.OMSWorkerTasks={events(items,employeeId){return items.filter(item=>(item.target_employee_ids||[]).includes(employeeId)||item.can_edit&&!item.holiday_request_id);},pending(items,employeeId){return items.filter(item=>(!item.target_employee_ids?.length||item.target_employee_ids.includes(employeeId))&&!item.owner_completed_at&&!item.completed_at&&!(item.completion_mode==='any'&&Number(item.completed_count)>0)&&!(item.completion_employee_ids||[]).includes(employeeId));}};

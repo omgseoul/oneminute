@@ -4,8 +4,8 @@ test('calendar opens in weekly view and bottom icons switch month, week, day',as
  const html=fs.readFileSync('calendar.html','utf8');
  const dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/calendar.html',runScripts:'outside-only'}),w=dom.window;
  const calls=[],pastDue=new Date(Date.now()-60*60*1000).toISOString(),dueToday=new Date(Date.now()+60*60*1000).toISOString();w.omgSession={require:async()=>({sessionKind:'staff',accessToken:'token',timezone:'Asia/Seoul'})};
- w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='list_overdue_calendar_tasks'?{ok:true,tasks:[{id:'late',title:'놓친 할 일',due_at:pastDue}]}:{ok:true,events:[],tasks:[{id:'today-task',title:'오늘 할 일',due_at:dueToday}],employees:[]}};}};
- w.omgTransition={ready(){}};w.eval(fs.readFileSync('calendar.js','utf8'));await tick();
+ w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='list_missions'?{ok:true,missions:[{id:'late',title:'놓친 할 일',due_at:pastDue},{id:'today-task',title:'오늘 할 일',due_at:dueToday}]}:name==='list_overdue_calendar_tasks'?{ok:true,tasks:[{id:'late',title:'놓친 할 일',due_at:pastDue}]}:{ok:true,events:[],tasks:[{id:'today-task',title:'오늘 할 일',due_at:dueToday}],employees:[]}};}};
+ w.omgTransition={ready(){}};w.eval(fs.readFileSync('worker-tasks.js','utf8'));w.eval(fs.readFileSync('calendar.js','utf8'));await tick();
  const d=w.document,actions=d.querySelector('.calendar-floating-actions');
  assert.deepEqual([...actions.querySelectorAll('button')].map(button=>button.dataset.view||button.id),['month','week','day','addEvent']);
  assert.equal(d.querySelector('.calendar-toolbar #viewButtons'),null);

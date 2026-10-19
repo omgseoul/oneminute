@@ -46,7 +46,9 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private int generation,receiptCursor;
     private boolean keyboardVisible;
     private JSONArray rooms=new JSONArray(),recipients=new JSONArray();
-    private final Set<String> properties=new HashSet<>(),reading=new HashSet<>();
+    private final Set<String> properties=new HashSet<>();
+    private String readThroughId="";
+    private boolean readingRoom;
     private final Runnable poll=()->load(false,null);
     private final Runnable readVisible=this::readVisible;
     private JSONObject profile;
@@ -65,7 +67,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         build();
     }
     private void build(){
-        generation++;receiptCursor=0;busy=false;searching=false;reading.clear();state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
+        generation++;receiptCursor=0;busy=false;searching=false;readThroughId="";readingRoom=false;state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         root=column(this);root.setBackgroundColor(BG);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
@@ -281,11 +283,20 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void scheduleRead(){main.removeCallbacks(readVisible);if(active&&!peer.isEmpty())main.postDelayed(readVisible,300);}
     private void readVisible(){
-        if(!active||destroyed||peer.isEmpty()||!hasWindowFocus()||viewer!=null&&viewer.showing())return;
-        List<JSONObject> shown=shownMessages();int first=Math.max(0,list.getFirstVisiblePosition()-list.getHeaderViewsCount()),last=Math.min(shown.size()-1,list.getLastVisiblePosition()-list.getHeaderViewsCount());JSONArray ids=new JSONArray();List<JSONObject> acknowledged=new ArrayList<>();
-        for(int i=first;i<=last;i++){JSONObject m=shown.get(i);String id=m.optString("id");if(!m.optBoolean("mine")&&m.isNull("read_at")&&reading.add(id)){ids.put(id);acknowledged.add(m);}}
-        if(ids.length()==0)return;final int request=generation;final String room=peer;
-        worker.execute(()->{boolean ok=false;try{JSONObject result=api.chat("read",new JSONObject().put("peer",room).put("ids",ids));JSONArray confirmed=result.optJSONArray("read_ids");if(confirmed!=null){Set<String> accepted=new HashSet<>();for(int i=0;i<confirmed.length();i++)accepted.add(confirmed.optString(i));acknowledged.removeIf(m->!accepted.contains(m.optString("id")));}ok=true;}catch(Exception ignored){}final boolean succeeded=ok;if(succeeded)NativeMessageBadge.changed(this);main.post(()->{if(request!=generation||destroyed)return;for(int i=0;i<ids.length();i++)reading.remove(ids.optString(i));for(JSONObject m:acknowledged){reading.remove(m.optString("id"));if(succeeded)try{m.put("read_at",Instant.now().toString());View unread=root.findViewWithTag("message-unread-"+m.optString("id"));if(unread!=null)((ViewGroup)unread.getParent()).removeView(unread);}catch(Exception ignored){}}});});
+        if(readingRoom||!active||destroyed||peer.isEmpty()||!hasWindowFocus()||viewer!=null&&viewer.showing()||peerProfileDialog!=null&&peerProfileDialog.isShowing()||state.messages.isEmpty())return;
+        // Opening the conversation reads through its snapshot, including history
+        // above our own replies or stickers and outside the loaded page.
+        final String through=state.messages.get(state.messages.size()-1).optString("id");
+        if(through.isEmpty()||through.equals(readThroughId))return;
+        final List<JSONObject> snapshot=new ArrayList<>(state.messages);
+        final int request=generation;final String room=peer;readingRoom=true;
+        worker.execute(()->{boolean ok=false;try{JSONObject result=api.chat("read_room",new JSONObject().put("peer",room).put("through_id",through));ok=result.optBoolean("ok");}catch(Exception ignored){}final boolean succeeded=ok;
+            if(succeeded)NativeMessageBadge.changed(this);
+            main.post(()->{if(request!=generation||destroyed)return;readingRoom=false;if(!succeeded)return;readThroughId=through;
+                for(JSONObject m:snapshot)if(!m.optBoolean("mine"))try{m.put("read_at",Instant.now().toString());View unread=root.findViewWithTag("message-unread-"+m.optString("id"));if(unread!=null)((ViewGroup)unread.getParent()).removeView(unread);}catch(Exception ignored){}
+                scheduleRead();
+            });
+        });
     }
     private void openRoom(String value){if(!NativeStaffChatApi.validPeer(value))return;saveDraft();main.removeCallbacks(poll);if(viewer!=null)viewer.dismiss();peer=value;adapter=null;input=null;canSend=true;sending=false;preparing=false;build();}
     private void showPeople(){

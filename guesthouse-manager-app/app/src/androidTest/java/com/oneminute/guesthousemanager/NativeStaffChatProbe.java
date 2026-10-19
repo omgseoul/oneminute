@@ -89,7 +89,7 @@ public final class NativeStaffChatProbe {
             View root=(View)field(activity,"root");View avatar=root.findViewWithTag("message-avatar-"+VIDEO);return avatar!=null&&root.findViewWithTag("message-name-"+VIDEO)!=null&&root.findViewWithTag("message-unread-"+outgoing)!=null;
         });
         ui(()->{View root=(View)field(activity,"root");check(root.findViewWithTag("message-avatar-"+outgoing)==null&&root.findViewWithTag("message-name-"+outgoing)==null,"own messages omit identity");root.findViewWithTag("message-avatar-"+VIDEO).performClick();return null;});
-        stage="message avatar opens shared profile";waitFor(()->field(activity,"peerProfileDialog")!=null&&((Dialog)field(activity,"peerProfileDialog")).isShowing());
+        stage="message avatar opens shared profile";waitFor(()->{Dialog dialog=(Dialog)field(activity,"peerProfileDialog");return dialog!=null&&dialog.isShowing()&&dialog.getWindow().getDecorView().hasWindowFocus();});instrumentation.waitForIdleSync();
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="message profile closes";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
         capture("native-chat-messages.png");
         ui(()->{fake.sentRead=true;Method load=activity.getClass().getDeclaredMethod("load",boolean.class,Runnable.class);load.setAccessible(true);load.invoke(activity,false,null);return null;});

@@ -1,9 +1,9 @@
 {
-  "version_code": 1141,
-  "version_name": "0.16.5",
-  "apk_url": "https://omgworks24.com/downloads/OMS-latest.apk",
+  "version_code": 1153,
+  "version_name": "0.16.6",
+  "apk_url": "https://omgworks24.com/downloads/OMS-0.16.6.apk",
   "certificate_sha256": "178af6048f210dda0fad77fcbca7aabe99af797f43657104aa7d377b798104eb",
-  "sha256": "c0e462102458230943cc69f9cf2985eb3a15428120f334bca46ddc2ebc5fe717",
-  "published_at": "2026-10-18T14:23:35.513277+00:00",
+  "sha256": "23ef8a9542cffc631da02e53cb57f6a3809d45208919ef60874228d9154b4fbc",
+  "published_at": "2026-10-19T02:16:52.347914+00:00",
   "bootstrap_required": false
 }

@@ -6,7 +6,8 @@
   const remember=()=>{start=input.selectionStart??input.value.length;end=input.selectionEnd??start;};
   ['select','keyup','click','input','blur'].forEach(event=>input.addEventListener(event,remember));
   const close=()=>{panel.hidden=true;toggle.setAttribute('aria-expanded','false');};
-  emojis.forEach(emoji=>{const button=document.createElement('button');button.type='button';button.textContent=emoji;button.setAttribute('aria-label',emoji+' 삽입');button.onclick=()=>{
+  const entries=[...(window.OMSStickers?.entries||[]).map(sticker=>({value:sticker.token,label:sticker.label,art:OMSStickers.art(sticker,'oms-sticker-picker')})),...emojis.map(value=>({value,label:value}))];
+  entries.forEach(entry=>{const emoji=entry.value,button=document.createElement('button');button.type='button';if(entry.art){button.innerHTML=entry.art;button.className='shiba-choice';}else button.textContent=emoji;button.setAttribute('aria-label',entry.label+' 삽입');button.title=entry.label;button.onclick=()=>{
     if(input.disabled)return;
     const limit=input.maxLength>0?input.maxLength:2000;
     if(input.value.length-(end-start)+emoji.length>limit)return;

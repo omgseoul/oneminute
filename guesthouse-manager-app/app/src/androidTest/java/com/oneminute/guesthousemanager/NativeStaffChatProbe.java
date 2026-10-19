@@ -46,8 +46,8 @@ public final class NativeStaffChatProbe {
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((EditText)field(activity,"input")).isEnabled());
-            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();
-            ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 😀"),"emoji cursor insertion");((TextView)field(activity,"send")).performClick();return null;});
+            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
+            ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
             ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
             check(fake.sendCalls==2&&fake.saved.size()==1,"ambiguous send retry must use one client id");
@@ -68,7 +68,7 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
@@ -82,6 +82,25 @@ public final class NativeStaffChatProbe {
         View decor=activity.getWindow().getDecorView();int[] d=new int[2],t=new int[2],s=new int[2];decor.getLocationOnScreen(d);title.getLocationOnScreen(t);send.getLocationOnScreen(s);
         layout+=" safe="+safe+" titleY="+t[1]+" sendBottom="+(s[1]+send.getHeight())+" windowBottom="+(d[1]+decor.getHeight());
         return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect());
+    }
+    private void verifyConversationRows()throws Exception{
+        String outgoing="12345678-1234-4234-8234-000000000048";
+        stage="incoming identity and unread outgoing";waitFor(()->{
+            View root=(View)field(activity,"root");View avatar=root.findViewWithTag("message-avatar-"+VIDEO);return avatar!=null&&root.findViewWithTag("message-name-"+VIDEO)!=null&&root.findViewWithTag("message-unread-"+outgoing)!=null;
+        });
+        ui(()->{View root=(View)field(activity,"root");check(root.findViewWithTag("message-avatar-"+outgoing)==null&&root.findViewWithTag("message-name-"+outgoing)==null,"own messages omit identity");root.findViewWithTag("message-avatar-"+VIDEO).performClick();return null;});
+        stage="message avatar opens shared profile";waitFor(()->field(activity,"peerProfileDialog")!=null&&((Dialog)field(activity,"peerProfileDialog")).isShowing());
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="message profile closes";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
+        capture("native-chat-messages.png");
+        ui(()->{fake.sentRead=true;Method load=activity.getClass().getDeclaredMethod("load",boolean.class,Runnable.class);load.setAccessible(true);load.invoke(activity,false,null);return null;});
+        stage="real receipt removes outgoing 1";waitFor(()->((View)field(activity,"root")).findViewWithTag("message-unread-"+outgoing)==null);
+        ui(()->{NativeStaffChatState state=(NativeStaffChatState)field(activity,"state");check(!state.messages.get(46).isNull("read_at"),"receipt-only projection updates earlier sticker");return null;});
+    }
+    private void verifyStickerPicker()throws Exception{
+        ui(()->{((ImageButton)field(activity,"emoji")).performClick();return null;});
+        stage="four Shiba rows at picker top";waitFor(()->{GridView grid=(GridView)field(activity,"emojis");return grid.getVisibility()==View.VISIBLE&&grid.getNumColumns()==7&&grid.getLastVisiblePosition()>=27;});
+        ui(()->{GridView grid=(GridView)field(activity,"emojis");check(grid.getAdapter().getCount()==28+54,"28 Shiba stickers plus unchanged original emojis");for(int i=0;i<28;i++){View cell=grid.getAdapter().getView(i,null,grid);check(cell instanceof ImageView&&((ImageView)cell).getDrawable()!=null,"bundled transparent Shiba atlas "+i);}return null;});
+        capture("native-chat-stickers.png");instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="picker closes without leaving room";waitFor(()->((GridView)field(activity,"emojis")).getVisibility()==View.GONE);check(!activity.isFinishing(),"picker back keeps room");
     }
     private boolean latestMessageVisible()throws Exception{
         ListView list=(ListView)field(activity,"list");View composer=(View)field(activity,"composer");
@@ -270,6 +289,7 @@ public final class NativeStaffChatProbe {
     private static final class FakeApi extends NativeStaffChatApi {
         int sendCalls;
         int profileFailures;
+        boolean sentRead;
         final Set<String> saved=new HashSet<>(),readIds=new HashSet<>();
         final String jpeg;
         FakeApi(Context c)throws Exception{super(c);Bitmap b=Bitmap.createBitmap(32,32,Bitmap.Config.RGB_565);b.eraseColor(0xff95c6ff);ByteArrayOutputStream out=new ByteArrayOutputStream();b.compress(Bitmap.CompressFormat.JPEG,90,out);b.recycle();jpeg=Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}
@@ -279,10 +299,11 @@ public final class NativeStaffChatProbe {
             if("attachment".equals(action)){boolean video=VIDEO.equals(data.optString("message_id"));return new JSONObject().put("ok",true).put("attachment",video?"data:video/mp4;base64,"+CLIP:"data:image/jpeg;base64,"+jpeg);}
             if("rooms".equals(action))return new JSONObject().put("ok",true).put("rooms",new JSONArray());
             JSONArray messages=new JSONArray();if(!data.has("before_time"))for(int i=0;i<50;i++){
-                JSONObject m=new JSONObject().put("id",String.format(Locale.ROOT,"12345678-1234-4234-8234-%012d",i)).put("created_at",String.format(Locale.ROOT,"2026-10-18T01:%02d:00Z",i)).put("body",i==49?"동영상":i==48?"객실 사진":"확인했습니다 "+i).put("mine",i%2==0).put("read_at",JSONObject.NULL);
+                JSONObject m=new JSONObject().put("id",String.format(Locale.ROOT,"12345678-1234-4234-8234-%012d",i)).put("created_at",String.format(Locale.ROOT,"2026-10-18T01:%02d:00Z",i)).put("body",i==49?"동영상":i==48?"객실 사진":i==47?"[시바:ㅋㅋㅋ]":i==46?"[시바:청소 완료]":"확인했습니다 "+i).put("mine",i%2==0).put("read_at",sentRead&&i==48?"2026-10-19T00:00:00Z":JSONObject.NULL);
                 if(i>=48)m.put("attachment_type",i==49?"video/mp4":"image/jpeg");messages.put(m);
             }
-            return new JSONObject().put("ok",true).put("can_send",true).put("peer",new JSONObject().put("display_name","근무자 채팅")).put("messages",messages);
+            JSONArray receipts=new JSONArray();if(sentRead)receipts.put(new JSONObject().put("id","12345678-1234-4234-8234-000000000046").put("read_at","2026-10-19T00:00:00Z"));
+            return new JSONObject().put("ok",true).put("can_send",true).put("peer",new JSONObject().put("display_name","근무자 채팅")).put("messages",messages).put("receipts",receipts);
         }
         @Override JSONObject rpc(String name,JSONObject args)throws Exception{if("staff_chat_peer_profile".equals(name)&&profileFailures-->0)throw new IOException("연결을 확인하고 다시 시도해주세요.");return new JSONObject().put("ok",true).put("recipients",new JSONArray()).put("profile",new JSONObject().put("display_name","김한울").put("profile_image","data:image/jpeg;base64,"+jpeg).put("job_title","평일 오전").put("property_name","One Minute").put("contact_phone",""));}
         @Override void notifyMessage(String id){}

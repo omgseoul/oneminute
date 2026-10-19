@@ -13,5 +13,12 @@ public class NativeStaffChatStateTest {
  @Test public void retryReusesIdUntilTheUserChangesTheMessage(){
   String id=NativeStaffChatState.pendingId("old","new","");assertEquals(id,NativeStaffChatState.pendingId("new","new",id));assertNotEquals(id,NativeStaffChatState.pendingId("new","edited",id));
  }
+ @Test public void receiptsRefreshOlderOutgoingMessagesWithoutLosingBody()throws Exception{
+  NativeStaffChatState state=new NativeStaffChatState();state.merge(new JSONArray("[{id:'old',mine:true,body:'[시바:청소 완료]',created_at:'2026-10-18T00:00:00Z',read_at:null},{id:'incoming',mine:false,created_at:'2026-10-18T00:01:00Z',read_at:null}]"));
+  assertEquals("old",state.receiptIds(0,200).getString(0));assertEquals(1,state.receiptIds(0,200).length());
+  assertTrue(state.mergeReceipts(new JSONArray("[{id:'old',read_at:'2026-10-19T00:00:00Z'},{id:'incoming',read_at:'2026-10-19T00:00:00Z'}]")));assertEquals("[시바:청소 완료]",state.messages.get(0).getString("body"));assertTrue(state.messages.get(1).isNull("read_at"));assertEquals(0,state.receiptIds(0,200).length());
+  state.merge(new JSONArray("[{id:'old',mine:true,body:'[시바:청소 완료]',created_at:'2026-10-18T00:00:00Z',read_at:null}]"));assertFalse(state.messages.get(0).isNull("read_at"));
+ }
+ @Test public void stickerPreviewUsesOnlyKnownLabels(){assertEquals("🐕 청소 완료",NativeStaffChatState.clean("[시바:청소 완료]"));assertEquals("[시바:없는 그림]",NativeStaffChatState.clean("[시바:없는 그림]"));assertEquals(28,NativeShibaStickers.LABELS.length);}
  @Test public void contractLinkIsPreservedSeparatelyFromVisibleText(){String body="계약 확인\n[OMS-CONTRACT:12345678-1234-1234-1234-123456789012]";assertEquals("계약 확인",NativeStaffChatState.clean(body));assertEquals("12345678-1234-1234-1234-123456789012",NativeStaffChatState.contract(body));assertNull(NativeStaffChatState.contract("일반 대화"));}
 }

@@ -132,9 +132,11 @@ public final class NativeStaffChatProbe {
         // Once typing has started, scrolling back through history must still work.
         scrollOlderHistory();
         stage="history while keyboard open";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
+        int[] historyAnchor=ui(()->{ListView list=(ListView)field(activity,"list");return new int[]{list.getFirstVisiblePosition(),list.getChildAt(0).getTop()};});
         ui(()->{((EditText)field(activity,"input")).setText("visible input");return null;});
         instrumentation.waitForIdleSync();
         check(ui(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1),"composer resize preserves intentional history scrolling");
+        stage="history anchor preserved after composer resize";waitFor(()->{ListView list=(ListView)field(activity,"list");return list.getFirstVisiblePosition()==historyAnchor[0]&&Math.abs(list.getChildAt(0).getTop()-historyAnchor[1])<=1;});
         ui(()->{Method latest=activity.getClass().getDeclaredMethod("scrollToLatest",ListView.class);latest.setAccessible(true);latest.invoke(activity,(ListView)field(activity,"list"));return null;});
         stage="latest message before capture";waitFor(()->safeLayout(true)&&latestMessageVisible());
         Bitmap keyboard=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),"native-chat-keyboard.png"))){keyboard.compress(Bitmap.CompressFormat.PNG,100,out);}keyboard.recycle();
@@ -143,7 +145,12 @@ public final class NativeStaffChatProbe {
     }
     private void scrollOlderHistory()throws Exception{
         for(int attempt=0;attempt<10;attempt++){
-            if(ui(()->{ListView list=(ListView)field(activity,"list");return list.getLastVisiblePosition()<list.getCount()-1;}))return;
+            if(ui(()->{ListView list=(ListView)field(activity,"list");return list.getLastVisiblePosition()<list.getCount()-1;})){
+                // Frame well before the last rows: a taller viewport can naturally
+                // expose the end without scrolling if the fixture is too close to it.
+                ui(()->{ListView list=(ListView)field(activity,"list");list.smoothScrollBy(0,0);list.setSelection(5);return null;});
+                waitFor(()->{ListView list=(ListView)field(activity,"list");return list.getLastVisiblePosition()<list.getCount()-8;});return;
+            }
             int[] gesture=ui(()->{View list=(View)field(activity,"list");int[] point=new int[2];list.getLocationOnScreen(point);return new int[]{point[0]+list.getWidth()/2,point[1]+list.getHeight()/5,point[1]+list.getHeight()*4/5};});
             long start=SystemClock.uptimeMillis();
             for(int step=0;step<=8;step++){int action=step==0?MotionEvent.ACTION_DOWN:step==8?MotionEvent.ACTION_UP:MotionEvent.ACTION_MOVE;MotionEvent event=MotionEvent.obtain(start,start+step*35,action,gesture[0],gesture[1]+(gesture[2]-gesture[1])*step/8f,0);instrumentation.sendPointerSync(event);event.recycle();Thread.sleep(35);}

@@ -102,10 +102,13 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private final class MessageList extends ListView{
         boolean followNextResize,alignAfterLayout,readerBrowsing;
         int laidOutHeight;
-        Runnable latestScroll;
+        int historyFirst=-1,historyTop,historyCount;
+        Runnable latestScroll,historyRestore;
         MessageList(){super(NativeStaffChatActivity.this);}
         void queueLatest(){
             readerBrowsing=false;
+            if(historyRestore!=null)removeCallbacks(historyRestore);
+            historyRestore=null;historyFirst=-1;
             if(latestScroll!=null)removeCallbacks(latestScroll);
             final int request=generation;
             latestScroll=()->{latestScroll=null;if(!destroyed&&request==generation&&this==list&&getCount()>0)showLatest();};
@@ -120,6 +123,8 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         void browseHistory(){
             if(latestScroll!=null)removeCallbacks(latestScroll);
             latestScroll=null;followNextResize=false;alignAfterLayout=false;readerBrowsing=true;
+            if(historyRestore!=null)removeCallbacks(historyRestore);
+            historyRestore=null;historyFirst=-1;
         }
         void settledScroll(){
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
@@ -138,6 +143,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             // ListView measurement can reposition/re-measure its existing rows.
             // Capture the old bottom before that happens, not in onSizeChanged.
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
+            if(readerBrowsing&&historyFirst<0&&getChildCount()>0){historyFirst=getFirstVisiblePosition();historyTop=getChildAt(0).getTop();historyCount=getCount();}
             if(!readerBrowsing&&getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
             super.onMeasure(widthSpec,heightSpec);
         }
@@ -145,9 +151,14 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             // Sender names, sticker spans and asynchronous profile images can
             // change row heights while the viewport height itself stays fixed.
             boolean follow=followNextResize&&!readerBrowsing;
+            boolean preserve=readerBrowsing&&laidOutHeight>0&&laidOutHeight!=bottom-top&&historyFirst>=0&&historyCount==getCount();
+            final int first=historyFirst,firstTop=historyTop,request=generation;historyFirst=-1;
             super.onLayout(changed,left,top,right,bottom);
             laidOutHeight=bottom-top;followNextResize=false;
-            if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
+            if(preserve){
+                if(historyRestore!=null)removeCallbacks(historyRestore);
+                historyRestore=()->{historyRestore=null;if(!destroyed&&request==generation&&readerBrowsing&&this==list){View child=getChildAt(0);if(child==null||getFirstVisiblePosition()!=first||Math.abs(child.getTop()-firstTop)>1)setSelectionFromTop(first,firstTop-getPaddingTop());}};post(historyRestore);
+            }else if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
         }
     }
     private void buildComposer(){

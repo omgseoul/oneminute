@@ -70,6 +70,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         root=column(this);root.setBackgroundColor(BG);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
         setContentView(root);
+        root.getViewTreeObserver().addOnGlobalLayoutListener(this::fitComposer);
         WindowInsetsControllerCompat controls=WindowCompat.getInsetsController(getWindow(),root);controls.setAppearanceLightStatusBars(true);controls.setAppearanceLightNavigationBars(true);
         // Replacing the content view does not guarantee a new inset dispatch. Apply
         // the window's current values after attachment as well as future IME/bar changes.
@@ -96,6 +97,21 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void scrollToLatest(ListView target){
         ((MessageList)target).queueLatest();
+    }
+    private void fitComposer(){
+        if(input==null||composer==null||composer.getParent()!=root||root.getHeight()==0)return;
+        int lines=4;
+        if(keyboardVisible){
+            int available=root.getHeight()-root.getPaddingTop()-root.getPaddingBottom();
+            int overhead=root.getChildAt(0).getHeight()+composer.getPaddingTop()+composer.getPaddingBottom();
+            if(status!=null&&status.getVisibility()!=View.GONE)overhead+=status.getHeight();
+            if(attachment!=null&&attachment.getVisibility()!=View.GONE)overhead+=attachment.getHeight();
+            if(emojis!=null&&emojis.getVisibility()!=View.GONE)overhead+=emojis.getHeight();
+            int messageSpace=Math.max(dp(this,40),Math.min(dp(this,100),available/3));
+            int textSpace=available-overhead-messageSpace-input.getCompoundPaddingTop()-input.getCompoundPaddingBottom();
+            lines=Math.max(1,Math.min(4,textSpace/Math.max(1,input.getLineHeight())));
+        }
+        if(input.getMaxLines()!=lines)input.setMaxLines(lines);
     }
     /** Keep the last message above the composer as IME/emoji/input height changes.
      * History stays in place when the reader has deliberately scrolled upward. */

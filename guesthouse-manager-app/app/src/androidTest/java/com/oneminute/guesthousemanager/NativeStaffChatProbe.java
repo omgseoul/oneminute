@@ -81,7 +81,7 @@ public final class NativeStaffChatProbe {
         androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout()|WindowInsetsCompat.Type.ime());
         View decor=activity.getWindow().getDecorView();int[] d=new int[2],t=new int[2],s=new int[2];decor.getLocationOnScreen(d);title.getLocationOnScreen(t);send.getLocationOnScreen(s);
         layout+=" safe="+safe+" titleY="+t[1]+" sendBottom="+(s[1]+send.getHeight())+" windowBottom="+(d[1]+decor.getHeight());
-        return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect());
+        return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect())&&(!keyboard||((ListView)field(activity,"list")).getHeight()>=Math.round(40*activity.getResources().getDisplayMetrics().density));
     }
     private void verifyConversationRows()throws Exception{
         String outgoing="12345678-1234-4234-8234-000000000048";

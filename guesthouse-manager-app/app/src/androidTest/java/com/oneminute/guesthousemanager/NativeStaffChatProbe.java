@@ -33,7 +33,7 @@ public final class NativeStaffChatProbe {
     static void runHandoff(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verifyHandoff();result.putString("oms_handoff","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_handoff","failed: "+error);i.finish(0,result);}}
     private String stage="start",layout="";
     NativeStaffChatProbe(Instrumentation i){instrumentation=i;}
-    static void run(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verify();result.putString("oms_chat","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_chat","failed: "+error);i.finish(0,result);}}
+    static void run(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verify();result.putString("oms_chat","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-probe.png");error.printStackTrace();result.putString("oms_chat","failed: "+error);i.finish(0,result);}}
     static void runLayout(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verifyLayoutOnly();result.putString("oms_layout","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-layout.png");error.printStackTrace();result.putString("oms_layout","failed: "+error);i.finish(0,result);}}
     private <T>T ui(Callable<T> action)throws Exception{AtomicReference<T> value=new AtomicReference<>();AtomicReference<Throwable> error=new AtomicReference<>();instrumentation.runOnMainSync(()->{try{value.set(action.call());}catch(Throwable e){error.set(e);}});if(error.get() instanceof Error)throw (Error)error.get();if(error.get()!=null)throw (Exception)error.get();return value.get();}
     private static Object field(Object object,String name)throws Exception{Field field=object.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(object);}
@@ -46,8 +46,8 @@ public final class NativeStaffChatProbe {
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((EditText)field(activity,"input")).isEnabled());
-            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();
-            ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 😀"),"emoji cursor insertion");((TextView)field(activity,"send")).performClick();return null;});
+            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
+            ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
             waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
             ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
             check(fake.sendCalls==2&&fake.saved.size()==1,"ambiguous send retry must use one client id");
@@ -68,7 +68,7 @@ public final class NativeStaffChatProbe {
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();
+            waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
@@ -81,7 +81,26 @@ public final class NativeStaffChatProbe {
         androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout()|WindowInsetsCompat.Type.ime());
         View decor=activity.getWindow().getDecorView();int[] d=new int[2],t=new int[2],s=new int[2];decor.getLocationOnScreen(d);title.getLocationOnScreen(t);send.getLocationOnScreen(s);
         layout+=" safe="+safe+" titleY="+t[1]+" sendBottom="+(s[1]+send.getHeight())+" windowBottom="+(d[1]+decor.getHeight());
-        return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect());
+        return safe.top>0&&safe.bottom>0&&t[1]>=d[1]+safe.top&&s[1]+send.getHeight()<=d[1]+decor.getHeight()-safe.bottom+1&&input.getHeight()>0&&input.getGlobalVisibleRect(new Rect())&&(!keyboard||((ListView)field(activity,"list")).getHeight()>=Math.round(40*activity.getResources().getDisplayMetrics().density));
+    }
+    private void verifyConversationRows()throws Exception{
+        String outgoing="12345678-1234-4234-8234-000000000048";
+        stage="incoming identity and unread outgoing";waitFor(()->{
+            View root=(View)field(activity,"root");View avatar=root.findViewWithTag("message-avatar-"+VIDEO);return avatar!=null&&root.findViewWithTag("message-name-"+VIDEO)!=null&&root.findViewWithTag("message-unread-"+outgoing)!=null;
+        });
+        ui(()->{View root=(View)field(activity,"root");check(root.findViewWithTag("message-avatar-"+outgoing)==null&&root.findViewWithTag("message-name-"+outgoing)==null,"own messages omit identity");root.findViewWithTag("message-avatar-"+VIDEO).performClick();return null;});
+        stage="message avatar opens shared profile";waitFor(()->{Dialog dialog=(Dialog)field(activity,"peerProfileDialog");return dialog!=null&&dialog.isShowing()&&dialog.getWindow().getDecorView().hasWindowFocus();});instrumentation.waitForIdleSync();
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="message profile closes";waitFor(()->!((Dialog)field(activity,"peerProfileDialog")).isShowing());
+        capture("native-chat-messages.png");
+        ui(()->{fake.sentRead=true;Method load=activity.getClass().getDeclaredMethod("load",boolean.class,Runnable.class);load.setAccessible(true);load.invoke(activity,false,null);return null;});
+        stage="real receipt removes outgoing 1";waitFor(()->((View)field(activity,"root")).findViewWithTag("message-unread-"+outgoing)==null);
+        ui(()->{NativeStaffChatState state=(NativeStaffChatState)field(activity,"state");check(!state.messages.get(46).isNull("read_at"),"receipt-only projection updates earlier sticker");return null;});
+    }
+    private void verifyStickerPicker()throws Exception{
+        ui(()->{((ImageButton)field(activity,"emoji")).performClick();return null;});
+        stage="four Shiba rows at picker top";waitFor(()->{GridView grid=(GridView)field(activity,"emojis");return grid.getVisibility()==View.VISIBLE&&grid.getNumColumns()==7&&grid.getLastVisiblePosition()>=27;});
+        ui(()->{GridView grid=(GridView)field(activity,"emojis");check(grid.getAdapter().getCount()==28+54,"28 Shiba stickers plus unchanged original emojis");for(int i=0;i<28;i++){View cell=grid.getAdapter().getView(i,null,grid);check(cell instanceof ImageView&&((ImageView)cell).getDrawable()!=null,"bundled transparent Shiba atlas "+i);}return null;});
+        capture("native-chat-stickers.png");instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);stage="picker closes without leaving room";waitFor(()->((GridView)field(activity,"emojis")).getVisibility()==View.GONE);check(!activity.isFinishing(),"picker back keeps room");
     }
     private boolean latestMessageVisible()throws Exception{
         ListView list=(ListView)field(activity,"list");View composer=(View)field(activity,"composer");
@@ -100,7 +119,7 @@ public final class NativeStaffChatProbe {
         instrumentation.waitForIdleSync();Thread.sleep(150);instrumentation.waitForIdleSync();
         // Begin in older history, so a composer focus must deliberately reveal the
         // newest message instead of merely preserving the pre-keyboard offset.
-        ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});
+        scrollOlderHistory();
         stage="older history before typing";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
         int[] center=ui(()->{View input=(View)field(activity,"input");int[] p=new int[2];input.getLocationOnScreen(p);return new int[]{p[0]+input.getWidth()/3,p[1]+input.getHeight()/2};});
         long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,center[0],center[1],0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,center[0],center[1],0);instrumentation.sendPointerSync(down);instrumentation.sendPointerSync(up);down.recycle();up.recycle();
@@ -111,16 +130,33 @@ public final class NativeStaffChatProbe {
         ui(()->{((EditText)field(activity,"input")).setText("one\ntwo\nthree\nfour");return null;});
         stage="multiline composer keeps latest message visible";waitFor(()->safeLayout(true)&&latestMessageVisible());
         // Once typing has started, scrolling back through history must still work.
-        ui(()->{((ListView)field(activity,"list")).setSelection(5);return null;});
+        scrollOlderHistory();
         stage="history while keyboard open";waitFor(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1);
+        int[] historyAnchor=ui(()->{ListView list=(ListView)field(activity,"list");return new int[]{list.getFirstVisiblePosition(),list.getChildAt(0).getTop()};});
         ui(()->{((EditText)field(activity,"input")).setText("visible input");return null;});
         instrumentation.waitForIdleSync();
         check(ui(()->((ListView)field(activity,"list")).getLastVisiblePosition()<((ListView)field(activity,"list")).getCount()-1),"composer resize preserves intentional history scrolling");
-        ui(()->{ListView list=(ListView)field(activity,"list");list.setSelection(list.getCount()-1);return null;});
+        stage="history anchor preserved after composer resize";waitFor(()->{ListView list=(ListView)field(activity,"list");return list.getFirstVisiblePosition()==historyAnchor[0]&&Math.abs(list.getChildAt(0).getTop()-historyAnchor[1])<=1;});
+        ui(()->{Method latest=activity.getClass().getDeclaredMethod("scrollToLatest",ListView.class);latest.setAccessible(true);latest.invoke(activity,(ListView)field(activity,"list"));return null;});
         stage="latest message before capture";waitFor(()->safeLayout(true)&&latestMessageVisible());
         Bitmap keyboard=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),"native-chat-keyboard.png"))){keyboard.compress(Bitmap.CompressFormat.PNG,100,out);}keyboard.recycle();
         ui(()->{EditText input=(EditText)field(activity,"input");check(input.getText().toString().contains("visible input"),"visible composer accepts actual keyboard input");input.setText("");((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);input.clearFocus();return null;});
         stage="keyboard hidden keeps latest message visible";waitFor(()->safeLayout(false)&&latestMessageVisible());
+    }
+    private void scrollOlderHistory()throws Exception{
+        for(int attempt=0;attempt<10;attempt++){
+            if(ui(()->{ListView list=(ListView)field(activity,"list");return list.getLastVisiblePosition()<list.getCount()-1;})){
+                // Frame well before the last rows: a taller viewport can naturally
+                // expose the end without scrolling if the fixture is too close to it.
+                ui(()->{ListView list=(ListView)field(activity,"list");list.smoothScrollBy(0,0);list.setSelection(5);return null;});
+                waitFor(()->{ListView list=(ListView)field(activity,"list");return list.getLastVisiblePosition()<list.getCount()-8;});return;
+            }
+            int[] gesture=ui(()->{View list=(View)field(activity,"list");int[] point=new int[2];list.getLocationOnScreen(point);return new int[]{point[0]+list.getWidth()/2,point[1]+list.getHeight()/5,point[1]+list.getHeight()*4/5};});
+            long start=SystemClock.uptimeMillis();
+            for(int step=0;step<=8;step++){int action=step==0?MotionEvent.ACTION_DOWN:step==8?MotionEvent.ACTION_UP:MotionEvent.ACTION_MOVE;MotionEvent event=MotionEvent.obtain(start,start+step*35,action,gesture[0],gesture[1]+(gesture[2]-gesture[1])*step/8f,0);instrumentation.sendPointerSync(event);event.recycle();Thread.sleep(35);}
+            instrumentation.waitForIdleSync();Thread.sleep(150);
+        }
+        throw new AssertionError("An actual downward history swipe did not reveal older messages: "+stage);
     }
     private void capture(String name){try{Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(instrumentation.getTargetContext().getFilesDir(),name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();}catch(Exception ignored){}}
     private void verifyProfile()throws Exception{
@@ -270,6 +306,7 @@ public final class NativeStaffChatProbe {
     private static final class FakeApi extends NativeStaffChatApi {
         int sendCalls;
         int profileFailures;
+        boolean sentRead;
         final Set<String> saved=new HashSet<>(),readIds=new HashSet<>();
         final String jpeg;
         FakeApi(Context c)throws Exception{super(c);Bitmap b=Bitmap.createBitmap(32,32,Bitmap.Config.RGB_565);b.eraseColor(0xff95c6ff);ByteArrayOutputStream out=new ByteArrayOutputStream();b.compress(Bitmap.CompressFormat.JPEG,90,out);b.recycle();jpeg=Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}
@@ -279,10 +316,11 @@ public final class NativeStaffChatProbe {
             if("attachment".equals(action)){boolean video=VIDEO.equals(data.optString("message_id"));return new JSONObject().put("ok",true).put("attachment",video?"data:video/mp4;base64,"+CLIP:"data:image/jpeg;base64,"+jpeg);}
             if("rooms".equals(action))return new JSONObject().put("ok",true).put("rooms",new JSONArray());
             JSONArray messages=new JSONArray();if(!data.has("before_time"))for(int i=0;i<50;i++){
-                JSONObject m=new JSONObject().put("id",String.format(Locale.ROOT,"12345678-1234-4234-8234-%012d",i)).put("created_at",String.format(Locale.ROOT,"2026-10-18T01:%02d:00Z",i)).put("body",i==49?"동영상":i==48?"객실 사진":"확인했습니다 "+i).put("mine",i%2==0).put("read_at",JSONObject.NULL);
+                JSONObject m=new JSONObject().put("id",String.format(Locale.ROOT,"12345678-1234-4234-8234-%012d",i)).put("created_at",String.format(Locale.ROOT,"2026-10-18T01:%02d:00Z",i)).put("body",i==49?"동영상":i==48?"객실 사진":i==47?"[시바:ㅋㅋㅋ]":i==46?"[시바:청소 완료]":"확인했습니다 "+i).put("mine",i%2==0).put("read_at",sentRead&&i==48?"2026-10-19T00:00:00Z":JSONObject.NULL);
                 if(i>=48)m.put("attachment_type",i==49?"video/mp4":"image/jpeg");messages.put(m);
             }
-            return new JSONObject().put("ok",true).put("can_send",true).put("peer",new JSONObject().put("display_name","근무자 채팅")).put("messages",messages);
+            JSONArray receipts=new JSONArray();if(sentRead)receipts.put(new JSONObject().put("id","12345678-1234-4234-8234-000000000046").put("read_at","2026-10-19T00:00:00Z"));
+            return new JSONObject().put("ok",true).put("can_send",true).put("peer",new JSONObject().put("display_name","근무자 채팅")).put("messages",messages).put("receipts",receipts);
         }
         @Override JSONObject rpc(String name,JSONObject args)throws Exception{if("staff_chat_peer_profile".equals(name)&&profileFailures-->0)throw new IOException("연결을 확인하고 다시 시도해주세요.");return new JSONObject().put("ok",true).put("recipients",new JSONArray()).put("profile",new JSONObject().put("display_name","김한울").put("profile_image","data:image/jpeg;base64,"+jpeg).put("job_title","평일 오전").put("property_name","One Minute").put("contact_phone",""));}
         @Override void notifyMessage(String id){}

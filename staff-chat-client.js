@@ -1,7 +1,8 @@
 window.StaffChat={
  contractId(text){return /\[OMS-CONTRACT:([0-9a-f-]{36})\]/i.exec(String(text||''))?.[1]||null;},
- cleanText(text){return String(text||'').replace(/\n?\[OMS-CONTRACT:[0-9a-f-]{36}\]/gi,'');},
- contractBody(text){const id=this.contractId(text),clean=GuestSupport.esc(this.cleanText(text));return clean+(id?'<a class="staff-contract-link" href="contracts.html?id='+encodeURIComponent(id)+'&from=notification">근로계약서 확인·서명 ›</a>':'');},
+ rawText(text){return String(text||'').replace(/\n?\[OMS-CONTRACT:[0-9a-f-]{36}\]/gi,'');},
+ cleanText(text){const value=this.rawText(text);return window.OMSStickers?OMSStickers.preview(value):value;},
+ contractBody(text){const id=this.contractId(text),raw=this.rawText(text),clean=window.OMSStickers?OMSStickers.html(raw,GuestSupport.esc):GuestSupport.esc(raw);return clean+(id?'<a class="staff-contract-link" href="contracts.html?id='+encodeURIComponent(id)+'&from=notification">근로계약서 확인·서명 ›</a>':'');},
  async call(session,action,data={}){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data});if(error||!value?.ok)throw new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');return value;},
  async profile(session,peer){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_peer_profile',{p_access_token:session.accessToken,p_peer:peer});if(error||!value?.ok)throw new Error(value?.message||error?.message||'근무자 정보를 불러오지 못했습니다.');return value.profile;},
  nativeOpen(peer='',propertyIds=null){if(!peer||typeof window.OMGNative?.openStaffChat!=='function')return false;try{if(window.OMGNative.openStaffChat(peer,JSON.stringify(propertyIds||[]))!==true)return false;window.dispatchEvent(new Event('omg:native-navigation'));return true;}catch{return false;}},

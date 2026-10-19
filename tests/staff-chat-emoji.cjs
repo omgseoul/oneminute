@@ -1,9 +1,13 @@
 const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync('staff-chat.html','utf8'),script=fs.readFileSync('staff-chat-emoji.js','utf8');
 const dom=new JSDOM(html,{runScripts:'outside-only'}),w=dom.window,d=w.document,input=d.getElementById('body'),toggle=d.getElementById('emojiToggle'),panel=d.getElementById('emojiPanel');
-w.eval(script);let edits=0,submits=0;input.addEventListener('input',()=>edits++);d.getElementById('composer').addEventListener('submit',e=>{e.preventDefault();submits++;});
-input.value='앞뒤';input.focus();input.setSelectionRange(1,1);input.dispatchEvent(new w.Event('select'));toggle.click();assert(!panel.hidden);assert.equal(toggle.getAttribute('aria-expanded'),'true');panel.firstChild.click();assert.equal(input.value,'앞😀뒤');assert.equal(input.selectionStart,3);assert.equal(edits,1);assert.equal(submits,0);
-input.setSelectionRange(1,3);input.dispatchEvent(new w.Event('select'));panel.children[2].click();assert.equal(input.value,'앞😊뒤');
+w.eval(fs.readFileSync('shiba-stickers.js','utf8'));w.eval(script);let edits=0,submits=0;input.addEventListener('input',()=>edits++);d.getElementById('composer').addEventListener('submit',e=>{e.preventDefault();submits++;});
+assert.equal(panel.children.length,28+54);assert.equal(panel.children[0].title,'환영해요');assert.equal(panel.children[13].title,'감사해요');assert.equal(panel.children[14].title,'방긋');assert.equal(panel.children[27].title,'파이팅');assert.equal(panel.children[28].textContent,'😀');
+const native=fs.readFileSync('guesthouse-manager-app/app/src/main/java/com/oneminute/guesthousemanager/NativeShibaStickers.java','utf8'),frames=JSON.parse(native.match(/int\[\]\[\] FRAMES=(.*);/)[1].replaceAll('{','[').replaceAll('}',']'));
+assert.equal(frames.length,28);w.OMSStickers.entries.forEach((entry,index)=>{const [x,y,right,bottom]=frames[index],box=w.OMSStickers.art(entry).match(/viewBox="([^"]+)"/)[1].split(' ').map(Number);assert.deepEqual(box,[x,y,right-x,bottom-y]);});
+input.value='앞뒤';input.focus();input.setSelectionRange(1,1);input.dispatchEvent(new w.Event('select'));panel.firstChild.click();assert.equal(input.value,'앞[시바:환영해요]뒤');assert(panel.firstChild.querySelector('svg'));assert.equal(submits,0);edits=0;
+input.value='앞뒤';input.focus();input.setSelectionRange(1,1);input.dispatchEvent(new w.Event('select'));toggle.click();assert(!panel.hidden);assert.equal(toggle.getAttribute('aria-expanded'),'true');panel.children[28].click();assert.equal(input.value,'앞😀뒤');assert.equal(input.selectionStart,3);assert.equal(edits,1);assert.equal(submits,0);
+input.setSelectionRange(1,3);input.dispatchEvent(new w.Event('select'));panel.children[30].click();assert.equal(input.value,'앞😊뒤');
 input.value='가'.repeat(1999);input.setSelectionRange(1999,1999);input.dispatchEvent(new w.Event('select'));panel.firstChild.click();assert.equal(input.value.length,1999);
 input.disabled=true;panel.children[1].click();assert.equal(input.value.length,1999);input.disabled=false;
 d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert(panel.hidden);toggle.click();d.body.click();assert(panel.hidden);

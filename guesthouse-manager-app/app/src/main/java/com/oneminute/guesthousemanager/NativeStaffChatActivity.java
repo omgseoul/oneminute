@@ -43,7 +43,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private String peer="",draftKey="",mime="",pendingId="",pendingSignature="",query="";
     private File pendingFile;
     private boolean urgent,canSend=true,sending,preparing,busy,active,destroyed,complete,searching,profileLoading;
-    private int generation;
+    private int generation,receiptCursor;
     private boolean keyboardVisible;
     private JSONArray rooms=new JSONArray(),recipients=new JSONArray();
     private final Set<String> properties=new HashSet<>(),reading=new HashSet<>();
@@ -65,11 +65,12 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         build();
     }
     private void build(){
-        generation++;busy=false;searching=false;reading.clear();state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
+        generation++;receiptCursor=0;busy=false;searching=false;reading.clear();state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         root=column(this);root.setBackgroundColor(BG);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
         setContentView(root);
+        root.getViewTreeObserver().addOnGlobalLayoutListener(this::fitComposer);
         WindowInsetsControllerCompat controls=WindowCompat.getInsetsController(getWindow(),root);controls.setAppearanceLightStatusBars(true);controls.setAppearanceLightNavigationBars(true);
         // Replacing the content view does not guarantee a new inset dispatch. Apply
         // the window's current values after attachment as well as future IME/bar changes.
@@ -81,7 +82,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         status=text(this,"불러오는 중…",12,MUTED);status.setPadding(dp(this,16),dp(this,3),dp(this,16),dp(this,3));status.setMinHeight(dp(this,22));status.setOnClickListener(v->load(false,null));root.addView(status);
         list=new MessageList();list.setDivider(null);list.setClipToPadding(false);list.setPadding(dp(this,12),0,dp(this,12),dp(this,8));
         older=button(this,"이전 대화 더 보기","이전 대화 더 보기");older.setVisibility(View.GONE);older.setOnClickListener(v->load(true,null));list.addHeaderView(older,null,false);if(peer.isEmpty()){TextView notices=button(this,"공지 · 시스템 알림 ›","공지 및 시스템 알림 보기");notices.setGravity(Gravity.CENTER_VERTICAL);notices.setPadding(dp(this,14),0,dp(this,14),0);notices.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/messages.html?tab=staff")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP)));list.addHeaderView(notices,null,false);}list.setStackFromBottom(!peer.isEmpty());root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
+        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){if(s==SCROLL_STATE_IDLE)((MessageList)list).settledScroll();else ((MessageList)list).browseHistory();scheduleRead();}public void onScroll(AbsListView v,int first,int visible,int total){scheduleRead();}});
         if(!peer.isEmpty())buildComposer();else composer=null;
         refreshList(true);if(active)load(false,null);
     }
@@ -97,14 +98,33 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private void scrollToLatest(ListView target){
         ((MessageList)target).queueLatest();
     }
+    private void fitComposer(){
+        if(input==null||composer==null||composer.getParent()!=root||root.getHeight()==0)return;
+        int lines=4;
+        if(keyboardVisible){
+            int available=root.getHeight()-root.getPaddingTop()-root.getPaddingBottom();
+            int overhead=root.getChildAt(0).getHeight()+composer.getPaddingTop()+composer.getPaddingBottom();
+            if(status!=null&&status.getVisibility()!=View.GONE)overhead+=status.getHeight();
+            if(attachment!=null&&attachment.getVisibility()!=View.GONE)overhead+=attachment.getHeight();
+            if(emojis!=null&&emojis.getVisibility()!=View.GONE)overhead+=emojis.getHeight();
+            int messageSpace=Math.max(dp(this,40),Math.min(dp(this,100),available/3));
+            int textSpace=available-overhead-messageSpace-input.getCompoundPaddingTop()-input.getCompoundPaddingBottom();
+            lines=Math.max(1,Math.min(4,textSpace/Math.max(1,input.getLineHeight())));
+        }
+        if(input.getMaxLines()!=lines)input.setMaxLines(lines);
+    }
     /** Keep the last message above the composer as IME/emoji/input height changes.
      * History stays in place when the reader has deliberately scrolled upward. */
     private final class MessageList extends ListView{
-        boolean followNextResize,alignAfterLayout;
+        boolean followNextResize,alignAfterLayout,readerBrowsing;
         int laidOutHeight;
-        Runnable latestScroll;
+        int historyFirst=-1,historyTop,historyCount;
+        Runnable latestScroll,historyRestore;
         MessageList(){super(NativeStaffChatActivity.this);}
         void queueLatest(){
+            readerBrowsing=false;
+            if(historyRestore!=null)removeCallbacks(historyRestore);
+            historyRestore=null;historyFirst=-1;
             if(latestScroll!=null)removeCallbacks(latestScroll);
             final int request=generation;
             latestScroll=()->{latestScroll=null;if(!destroyed&&request==generation&&this==list&&getCount()>0)showLatest();};
@@ -112,10 +132,23 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         }
         @Override public boolean onTouchEvent(MotionEvent event){
             if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
-                if(latestScroll!=null)removeCallbacks(latestScroll);
-                latestScroll=null;followNextResize=false;alignAfterLayout=false;
+                // A reader gesture takes precedence over any pending composer or IME
+                // alignment, including layout passes before SCROLL_STATE_TOUCH_SCROLL.
+                cancelAlignment();
+                readerBrowsing=true;
             }
             return super.onTouchEvent(event);
+        }
+        private void cancelAlignment(){
+            if(latestScroll!=null)removeCallbacks(latestScroll);
+            latestScroll=null;followNextResize=false;alignAfterLayout=false;
+            if(historyRestore!=null)removeCallbacks(historyRestore);
+            historyRestore=null;historyFirst=-1;
+        }
+        void browseHistory(){cancelAlignment();readerBrowsing=true;}
+        void settledScroll(){
+            View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
+            if(last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)readerBrowsing=false;
         }
         void showLatest(){
             int position=getCount()-1;
@@ -123,21 +156,29 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             if(last!=null&&getLastVisiblePosition()==position){
                 // setSelection alone aligns the TOP of an oversized photo/video
                 // row. A negative offset keeps its bottom and timestamp visible.
-                setSelectionFromTop(position,getHeight()-getPaddingBottom()-getPaddingTop()-last.getHeight());
+                if(Math.abs(last.getBottom()-(getHeight()-getPaddingBottom()))>1)setSelectionFromTop(position,getHeight()-getPaddingBottom()-getPaddingTop()-last.getHeight());
             }else{alignAfterLayout=true;setSelection(position);}
         }
         @Override protected void onMeasure(int widthSpec,int heightSpec){
             // ListView measurement can reposition/re-measure its existing rows.
             // Capture the old bottom before that happens, not in onSizeChanged.
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
-            if(getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
+            if(readerBrowsing&&historyFirst<0&&getChildCount()>0){historyFirst=getFirstVisiblePosition();historyTop=getChildAt(0).getTop();historyCount=getCount();}
+            if(!readerBrowsing&&getHeight()>0&&last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)followNextResize=true;
             super.onMeasure(widthSpec,heightSpec);
         }
         @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
-            boolean follow=followNextResize&&laidOutHeight!=bottom-top;
+            // Sender names, sticker spans and asynchronous profile images can
+            // change row heights while the viewport height itself stays fixed.
+            boolean follow=followNextResize&&!readerBrowsing;
+            boolean preserve=readerBrowsing&&laidOutHeight>0&&laidOutHeight!=bottom-top&&historyFirst>=0&&historyCount==getCount();
+            final int first=historyFirst,firstTop=historyTop,request=generation;historyFirst=-1;
             super.onLayout(changed,left,top,right,bottom);
             laidOutHeight=bottom-top;followNextResize=false;
-            if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
+            if(preserve){
+                if(historyRestore!=null)removeCallbacks(historyRestore);
+                historyRestore=()->{historyRestore=null;if(!destroyed&&request==generation&&readerBrowsing&&this==list){View child=getChildAt(0);if(child==null||getFirstVisiblePosition()!=first||Math.abs(child.getTop()-firstTop)>1)setSelectionFromTop(first,firstTop-getPaddingTop());}};post(historyRestore);
+            }else if(follow||alignAfterLayout){alignAfterLayout=false;scrollToLatest(this);}
         }
     }
     private void buildComposer(){
@@ -150,10 +191,10 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         input=new EditText(this);input.setTextSize(15);input.setTextColor(INK);input.setHintTextColor(0xff91a1b5);input.setHint("메세지 입력");input.setBackgroundColor(Color.TRANSPARENT);input.setMinLines(1);input.setMaxLines(4);input.setMinHeight(dp(this,44));input.setPadding(dp(this,12),dp(this,10),dp(this,38),dp(this,10));input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(2000)});input.setContentDescription("메세지 내용");wrap.addView(input,new FrameLayout.LayoutParams(-1,-2));
         emoji=new ImageButton(this);emoji.setImageDrawable(new Smile());emoji.setBackgroundColor(Color.TRANSPARENT);emoji.setPadding(dp(this,6),dp(this,6),dp(this,6),dp(this,6));emoji.setContentDescription("이모지 선택");FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(dp(this,36),dp(this,44),Gravity.RIGHT|Gravity.BOTTOM);wrap.addView(emoji,ep);
         send=button(this,"➤","메세지 보내기");send.setTextColor(Color.WHITE);send.setBackground(background(BLUE,14,this));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(this,42),dp(this,44));sp.setMargins(dp(this,5),0,0,0);row.addView(send,sp);send.setOnClickListener(v->send());
-        emojis=new GridView(this);emojis.setNumColumns(7);emojis.setHorizontalSpacing(dp(this,2));emojis.setVerticalSpacing(dp(this,2));emojis.setBackground(background(0xfff8fbff,16,this));emojis.setVisibility(View.GONE);emojis.setAdapter(new BaseAdapter(){public int getCount(){return EMOJIS.length;}public Object getItem(int p){return EMOJIS[p];}public long getItemId(int p){return p;}public View getView(int p,View recycled,ViewGroup parent){TextView cell=text(NativeStaffChatActivity.this,EMOJIS[p],26,INK);cell.setGravity(Gravity.CENTER);cell.setLayoutParams(new AbsListView.LayoutParams(-1,dp(NativeStaffChatActivity.this,42)));cell.setContentDescription(EMOJIS[p]+" 삽입");return cell;}});composer.addView(emojis,new LinearLayout.LayoutParams(-1,Math.min(dp(this,220),getResources().getDisplayMetrics().heightPixels/3)));
-        emojis.setOnItemClickListener((parent,view,position,id)->{int a=Math.max(0,input.getSelectionStart()),b=Math.max(a,input.getSelectionEnd());String value=EMOJIS[position];if(input.length()-(b-a)+value.length()<=2000)input.getText().replace(a,b,value);});
+        emojis=new GridView(this);emojis.setNumColumns(7);emojis.setHorizontalSpacing(dp(this,2));emojis.setVerticalSpacing(dp(this,2));emojis.setBackground(background(0xfff8fbff,16,this));emojis.setVisibility(View.GONE);emojis.setAdapter(new BaseAdapter(){public int getCount(){return NativeShibaStickers.LABELS.length+EMOJIS.length;}public Object getItem(int p){return p<28?NativeShibaStickers.token(p):EMOJIS[p-28];}public long getItemId(int p){return p;}public View getView(int p,View recycled,ViewGroup parent){if(p<28){ImageView sticker=new ImageView(NativeStaffChatActivity.this);sticker.setImageDrawable(NativeShibaStickers.drawable(NativeStaffChatActivity.this,p,dp(NativeStaffChatActivity.this,40)));sticker.setPadding(2,2,2,2);sticker.setContentDescription(NativeShibaStickers.LABELS[p]+" 삽입");sticker.setLayoutParams(new AbsListView.LayoutParams(-1,dp(NativeStaffChatActivity.this,42)));return sticker;}TextView cell=text(NativeStaffChatActivity.this,EMOJIS[p-28],26,INK);cell.setGravity(Gravity.CENTER);cell.setLayoutParams(new AbsListView.LayoutParams(-1,dp(NativeStaffChatActivity.this,42)));cell.setContentDescription(EMOJIS[p-28]+" 삽입");return cell;}});composer.addView(emojis,new LinearLayout.LayoutParams(-1,Math.min(dp(this,220),getResources().getDisplayMetrics().heightPixels/3)));
+        emojis.setOnItemClickListener((parent,view,position,id)->{int a=Math.max(0,input.getSelectionStart()),b=Math.max(a,input.getSelectionEnd());String value=position<28?NativeShibaStickers.token(position):EMOJIS[position-28];if(input.length()-(b-a)+value.length()<=2000)input.getText().replace(a,b,value);});
         emoji.setOnClickListener(v->{if(!canSend)return;boolean show=emojis.getVisibility()!=View.VISIBLE;if(show)((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);emojis.setVisibility(show?View.VISIBLE:View.GONE);emoji.setContentDescription(show?"이모지 선택 닫기":"이모지 선택");});input.setOnClickListener(v->emojis.setVisibility(View.GONE));
-        restoreDraft();input.addTextChangedListener(new SimpleWatcher(){@Override public void afterTextChanged(Editable e){saveDraft();enableComposer();}});paintPriority();showAttachment();enableComposer();
+        restoreDraft();NativeShibaStickers.decorate(this,input.getText(),dp(this,26));input.addTextChangedListener(new SimpleWatcher(){@Override public void afterTextChanged(Editable e){NativeShibaStickers.decorate(NativeStaffChatActivity.this,e,dp(NativeStaffChatActivity.this,26));saveDraft();enableComposer();}});paintPriority();showAttachment();enableComposer();
     }
     private void paintPriority(){priority.setText(urgent?"긴급⌄":"일반⌄");priority.setTextColor(urgent?0xffbd354b:0xff486b91);priority.setBackground(background(urgent?0xfffff0f2:0xfff0f4f9,14,this));}
     private File draftDirectory(){File dir=new File(getFilesDir(),"staff-chat-drafts/"+api.scope);dir.mkdirs();return dir;}
@@ -168,15 +209,15 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private JSONObject data()throws JSONException{return new JSONObject().put("peer",peer);}
     private void load(boolean previous,Runnable ready){
         if(!active||destroyed)return;if(busy){if(ready!=null)main.postDelayed(()->load(previous,ready),200);return;}if(!api.valid()){finish();return;}busy=true;main.removeCallbacks(poll);final int request=generation;final String room=peer;
-        JSONObject args;try{args=data();if(previous&&!state.messages.isEmpty()){JSONObject first=state.messages.get(0);args.put("before_time",first.getString("created_at")).put("before_id",first.getString("id"));}}catch(Exception e){busy=false;return;}
-        final String anchor=firstVisibleId();final int anchorTop=list.getChildCount()>0?list.getChildAt(0).getTop():0;final boolean atBottom=list.getLastVisiblePosition()>=list.getCount()-2;
+        JSONObject args;try{args=data();JSONArray receiptIds=state.receiptIds(receiptCursor,200);receiptCursor+=receiptIds.length();args.put("receipt_ids",receiptIds);if(previous&&!state.messages.isEmpty()){JSONObject first=state.messages.get(0);args.put("before_time",first.getString("created_at")).put("before_id",first.getString("id"));}}catch(Exception e){busy=false;return;}
+        final String anchor=firstVisibleId();final int anchorTop=list.getChildCount()>0?list.getChildAt(0).getTop():0;final boolean atBottom=!((MessageList)list).readerBrowsing&&list.getLastVisiblePosition()>=list.getCount()-2;
         worker.execute(()->{
             try{
                 JSONObject result=api.chat(room.isEmpty()?"rooms":"messages",args);
                 main.post(()->{
                     if(destroyed||request!=generation)return;
                     if(room.isEmpty()){rooms=result.optJSONArray("rooms");if(rooms==null)rooms=new JSONArray();refreshList(false);}
-                    else{JSONArray incoming=result.optJSONArray("messages");if(incoming==null)incoming=new JSONArray();boolean initial=state.messages.isEmpty();boolean changed=state.merge(incoming);if(previous||initial)complete=incoming.length()<50;canSend=result.optBoolean("can_send",false);JSONObject person=result.optJSONObject("peer");if(person!=null&&profile==null)title.setText(person.optString("display_name","근무자"));older.setVisibility(complete?View.GONE:View.VISIBLE);enableComposer();if(changed){refreshList(initial||atBottom&&!previous);if(previous&&!anchor.isEmpty())restoreAnchor(anchor,anchorTop);}if(!canSend)notice("현재 이 계정에 메세지를 보낼 수 없습니다.",true);if(profile==null&&!profileLoading)loadProfile(false);scheduleRead();}
+                    else{JSONArray incoming=result.optJSONArray("messages");if(incoming==null)incoming=new JSONArray();boolean initial=state.messages.isEmpty();boolean changed=state.merge(incoming)|state.mergeReceipts(result.optJSONArray("receipts"));if(previous||initial)complete=incoming.length()<50;canSend=result.optBoolean("can_send",false);JSONObject person=result.optJSONObject("peer");if(person!=null&&profile==null)title.setText(person.optString("display_name","근무자"));older.setVisibility(complete?View.GONE:View.VISIBLE);enableComposer();if(changed){if(previous)((MessageList)list).browseHistory();refreshList(initial||atBottom&&!previous);if(previous&&!anchor.isEmpty())restoreAnchor(anchor,anchorTop);}if(!canSend)notice("현재 이 계정에 메세지를 보낼 수 없습니다.",true);if(profile==null&&!profileLoading)loadProfile(false);scheduleRead();}
                     if(canSend||room.isEmpty())notice("",false);finishLoad(request,ready);
                 });
             }catch(Exception e){main.post(()->{if(!destroyed&&request==generation){notice(e.getMessage()==null?"연결을 확인하고 여기를 눌러 다시 시도해주세요.":e.getMessage(),true);finishLoad(request,ready);}});}
@@ -204,17 +245,24 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         LinearLayout copy=column(this);copy.setPadding(dp(this,12),0,dp(this,8),0);String name=room.optString("name");String home=getSharedPreferences("omg_push",MODE_PRIVATE).getString("property_id","");if(!room.optString("property_id").equals(home)&&!room.optString("property_name").isEmpty())name+=" · "+room.optString("property_name");TextView n=text(this,name,15,INK);n.setTypeface(null,Typeface.BOLD);copy.addView(n);TextView preview=text(this,NativeStaffChatState.clean(room.optString("preview")),12,MUTED);preview.setMaxLines(1);preview.setEllipsize(TextUtils.TruncateAt.END);copy.addView(preview);row.addView(copy,weighted());TextView badge=text(this,(room.optInt("unread")>0?room.optInt("unread")+"\n":"")+date(room.optString("updated_at"),true),10,BLUE);row.addView(badge);row.setOnClickListener(v->openRoom(room.optString("peer")));return row;
     }
     private View messageRow(JSONObject message,boolean newDay){
-        boolean mine=message.optBoolean("mine");LinearLayout outer=column(this);outer.setPadding(0,dp(this,5),0,dp(this,5));
+        boolean mine=message.optBoolean("mine");String id=message.optString("id");LinearLayout outer=column(this);outer.setPadding(0,dp(this,5),0,dp(this,5));
         if(newDay){TextView day=text(this,date(message.optString("created_at"),false),11,MUTED);day.setGravity(Gravity.CENTER);day.setPadding(0,dp(this,12),0,dp(this,12));outer.addView(day);}
-        LinearLayout content=column(this);content.setPadding(dp(this,12),dp(this,9),dp(this,12),dp(this,9));content.setBackground(background(mine?SOFT:Color.WHITE,16,this));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,-2);cp.gravity=mine?Gravity.RIGHT:Gravity.LEFT;outer.addView(content,cp);
+        LinearLayout flow=row(this);flow.setGravity(Gravity.TOP);outer.addView(flow,new LinearLayout.LayoutParams(-1,-2));
+        if(!mine){String name=profile==null?title.getText().toString():profile.optString("display_name","근무자");FrameLayout face=avatar(name,profile==null?null:profile.optString("profile_image"),36);face.setTag("message-avatar-"+id);face.setContentDescription(name+" 근무자 정보 보기");face.setOnClickListener(v->showProfile());LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(dp(this,36),dp(this,36));fp.rightMargin=dp(this,8);flow.addView(face,fp);}
+        LinearLayout copy=column(this);flow.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        if(!mine){TextView name=text(this,profile==null?title.getText().toString():profile.optString("display_name","근무자"),12,INK);name.setTypeface(null,Typeface.BOLD);name.setPadding(dp(this,2),0,0,dp(this,4));name.setTag("message-name-"+id);copy.addView(name);}
+        int maxWidth=Math.max(dp(this,80),getResources().getDisplayMetrics().widthPixels-root.getPaddingLeft()-root.getPaddingRight()-dp(this,mine?68:112));
+        LinearLayout content=column(this);content.setTag("message-bubble-"+id);content.setPadding(dp(this,12),dp(this,9),dp(this,12),dp(this,9));android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(mine?SOFT:Color.WHITE);float radius=dp(this,16),tail=dp(this,4);shape.setCornerRadii(new float[]{mine?radius:tail,mine?radius:tail,mine?tail:radius,mine?tail:radius,radius,radius,radius,radius});content.setBackground(shape);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,-2);cp.gravity=mine?Gravity.RIGHT:Gravity.LEFT;copy.addView(content,cp);
         if("urgent".equals(message.optString("priority"))){TextView flag=text(this,"긴급",10,0xffbd354b);content.addView(flag);}
         if(message.optBoolean("broadcast"))content.addView(text(this,"여러 사람에게 보낸 메세지",10,MUTED));
         String type=message.optString("attachment_type");if(type.startsWith("image/")||type.startsWith("video/")){
-            FrameLayout picture=new FrameLayout(this);ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);picture.addView(image,new FrameLayout.LayoutParams(-1,-1));boolean video=type.startsWith("video/");media.bind(image,peer,message.optString("id"),video);if(video){TextView play=text(this,"▶",30,Color.WHITE);play.setShadowLayer(4,0,1,Color.BLACK);play.setGravity(Gravity.CENTER);picture.addView(play,new FrameLayout.LayoutParams(-1,-1));}content.addView(picture,new LinearLayout.LayoutParams(Math.min(dp(this,220),getResources().getDisplayMetrics().widthPixels-dp(this,100)),dp(this,140)));picture.setContentDescription(video?"동영상 전체화면 보기":"사진 전체화면 보기");picture.setOnClickListener(v->openMedia(message.optString("id")));
+            FrameLayout picture=new FrameLayout(this);ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);picture.addView(image,new FrameLayout.LayoutParams(-1,-1));boolean video=type.startsWith("video/");media.bind(image,peer,id,video);if(video){TextView play=text(this,"▶",30,Color.WHITE);play.setShadowLayer(4,0,1,Color.BLACK);play.setGravity(Gravity.CENTER);picture.addView(play,new FrameLayout.LayoutParams(-1,-1));}content.addView(picture,new LinearLayout.LayoutParams(Math.min(dp(this,220),maxWidth),dp(this,140)));picture.setContentDescription(video?"동영상 전체화면 보기":"사진 전체화면 보기");picture.setOnClickListener(v->openMedia(id));
         }
-        String clean=NativeStaffChatState.clean(message.optString("body"));if(!clean.isEmpty()){TextView body=text(this,clean,15,INK);body.setMaxWidth(Math.max(dp(this,120),getResources().getDisplayMetrics().widthPixels-dp(this,105)));body.setTextIsSelectable(true);content.addView(body);}
+        String raw=NativeStaffChatState.CONTRACT.matcher(message.optString("body")).replaceAll("").trim();if(!raw.isEmpty()){TextView body=text(this,"",15,INK);body.setText(NativeShibaStickers.render(this,raw,Math.min(dp(this,120),maxWidth)));body.setContentDescription(NativeShibaStickers.preview(raw));body.setMaxWidth(maxWidth);body.setTextIsSelectable(true);content.addView(body);}
         String contract=NativeStaffChatState.contract(message.optString("body"));if(contract!=null){TextView link=button(this,"근로계약서 확인·서명 ›","근로계약서 확인 및 서명");link.setTextSize(13);content.addView(link);link.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/contracts.html?id="+Uri.encode(contract)+"&from=notification")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP)));}
-        TextView time=text(this,date(message.optString("created_at"),true),10,MUTED);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-2,-2);tp.gravity=mine?Gravity.RIGHT:Gravity.LEFT;time.setPadding(dp(this,3),dp(this,3),dp(this,3),0);outer.addView(time,tp);return outer;
+        LinearLayout meta=row(this);meta.setGravity(Gravity.BOTTOM);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-2,-2);mp.gravity=mine?Gravity.RIGHT:Gravity.LEFT;meta.setPadding(dp(this,3),dp(this,3),dp(this,3),0);copy.addView(meta,mp);
+        if(mine&&message.isNull("read_at")){TextView unread=text(this,"1",11,BLUE);unread.setTypeface(null,Typeface.BOLD);unread.setTag("message-unread-"+id);unread.setContentDescription("안 읽은 사람 1명");unread.setPadding(0,0,dp(this,5),0);meta.addView(unread);}
+        meta.addView(text(this,date(message.optString("created_at"),true),10,MUTED));return outer;
     }
     private FrameLayout avatar(String name,String data,int size){FrameLayout frame=new FrameLayout(this);frame.setBackground(background(SOFT,size/2f,this));frame.setClipToOutline(true);TextView letter=text(this,initial(name),Math.max(15,size/2),BLUE);letter.setGravity(Gravity.CENTER);frame.addView(letter,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));media.avatar(image,data);return frame;}
     private static String initial(String value){return value.isEmpty()?"?":value.substring(0,value.offsetByCodePoints(0,1));}
@@ -238,7 +286,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void showProfile(){if(profile!=null)profileDialog();else loadProfile(true);}
     private void loadProfile(boolean show){
-        if(profileLoading)return;profileLoading=true;final String room=peer;final int request=generation;worker.execute(()->{try{JSONObject p=api.rpc("staff_chat_peer_profile",new JSONObject().put("p_peer",room)).getJSONObject("profile");main.post(()->{if(!destroyed&&request==generation){profileLoading=false;profile=p;title.setText(p.optString("display_name","근무자"));if(headerAvatar!=null){media.avatar(headerAvatar,p.optString("profile_image"));((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(p.optString("display_name","?")));}if(show)profileDialog();}});}catch(Exception e){main.post(()->{if(request!=generation)return;profileLoading=false;if(show)notice("근무자 정보를 불러오지 못했습니다.",true);});}});
+        if(profileLoading)return;profileLoading=true;final String room=peer;final int request=generation;worker.execute(()->{try{JSONObject p=api.rpc("staff_chat_peer_profile",new JSONObject().put("p_peer",room)).getJSONObject("profile");main.post(()->{if(!destroyed&&request==generation){profileLoading=false;profile=p;title.setText(p.optString("display_name","근무자"));if(headerAvatar!=null){media.avatar(headerAvatar,p.optString("profile_image"));((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(p.optString("display_name","?")));}refreshList(false);if(show)profileDialog();}});}catch(Exception e){main.post(()->{if(request!=generation)return;profileLoading=false;if(show)notice("근무자 정보를 불러오지 못했습니다.",true);});}});
     }
     private void profileDialog(){if(profile==null||peerProfileDialog!=null&&peerProfileDialog.isShowing())return;peerProfileDialog=new NativeStaffProfileDialog(this,profile,media);peerProfileDialog.show();}
     private void searchHistory(int pages){if(pages==0&&searching||complete||peer.isEmpty())return;if(pages==0)searching=true;notice("이전 대화에서 검색 중…",false);int request=generation;load(true,()->{if(request!=generation)return;if(!complete&&pages<19)searchHistory(pages+1);else{searching=false;refreshList(false);notice(complete?"검색을 완료했습니다.":"검색을 다시 누르면 더 이전 대화도 검색합니다.",false);}});}
@@ -269,7 +317,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         super.onActivityResult(request,result,data);if(request!=PICK_MEDIA||result!=Activity.RESULT_OK||data==null||data.getData()==null||peer.isEmpty())return;
         preparing=true;enableComposer();notice("첨부 파일을 준비하는 중…",false);final int version=generation;upload.prepare(data.getData(),draftDirectory(),new NativeChatUpload.Callback(){public void status(String text){if(!destroyed&&version==generation)notice(text,false);}public void done(File file,String type){if(destroyed||version!=generation){file.delete();return;}if(pendingFile!=null)pendingFile.delete();pendingFile=file;mime=type;pendingId="";preparing=false;showAttachment();saveDraft();enableComposer();notice("",false);}public void failed(String message){if(destroyed||version!=generation)return;preparing=false;enableComposer();notice(message,true);}});
     }
-    private void back(){if(viewer!=null&&viewer.showing()){viewer.dismiss();return;}if(emojis!=null&&emojis.getVisibility()==View.VISIBLE){emojis.setVisibility(View.GONE);return;}if(preparing){Toast.makeText(this,"첨부 파일 준비가 끝난 후 이동해주세요.",Toast.LENGTH_SHORT).show();return;}saveDraft();finish();}
+    private void back(){if(peerProfileDialog!=null&&peerProfileDialog.isShowing()){peerProfileDialog.dismiss();return;}if(viewer!=null&&viewer.showing()){viewer.dismiss();return;}if(emojis!=null&&emojis.getVisibility()==View.VISIBLE){emojis.setVisibility(View.GONE);return;}if(preparing){Toast.makeText(this,"첨부 파일 준비가 끝난 후 이동해주세요.",Toast.LENGTH_SHORT).show();return;}saveDraft();finish();}
     @Override public void onBackPressed(){back();}
     @Override protected void onResume(){super.onResume();active=true;if(api!=null){if(!api.valid()){finish();return;}load(false,null);}}
     @Override protected void onPause(){active=false;main.removeCallbacks(poll);main.removeCallbacks(readVisible);if(viewer!=null)viewer.pause();saveDraft();super.onPause();}

@@ -2,15 +2,15 @@ name: Build and verify OMS Android update
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['guesthouse-manager-app/**', '.github/workflows/build-android-apk.yml']
+    paths: ['guesthouse-manager-app/**', 'assets/chat-stickers/**', '.github/workflows/build-android-apk.yml']
   push:
     branches: [main]
-    paths: ['guesthouse-manager-app/**', '.github/workflows/build-android-apk.yml']
+    paths: ['guesthouse-manager-app/**', 'assets/chat-stickers/**', '.github/workflows/build-android-apk.yml']
 permissions:
   contents: read
 concurrency:
   group: oms-android-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   compile:
     if: github.event_name == 'pull_request'
@@ -58,12 +58,16 @@ jobs:
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-keyboard.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-profile.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-worker-profile-host.png > "$RUNNER_TEMP/oms-native-approval-profile.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-messages.png > "$RUNNER_TEMP/oms-native-messages.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-stickers.png > "$RUNNER_TEMP/oms-native-stickers.png"
             grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
             adb shell wm size 720x1280
             adb shell wm density 360
             adb shell settings put system font_scale 1.3
             adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-small.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-small.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-messages.png > "$RUNNER_TEMP/oms-native-small-messages.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-stickers.png > "$RUNNER_TEMP/oms-native-small-stickers.png"
             grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-small.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-small-keyboard.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-small-profile.png"
@@ -74,6 +78,8 @@ jobs:
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
             adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-gesture.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-gesture.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-messages.png > "$RUNNER_TEMP/oms-native-gesture-messages.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-stickers.png > "$RUNNER_TEMP/oms-native-gesture-stickers.png"
             grep -q 'oms_layout=ok' "$RUNNER_TEMP/oms-layout-gesture.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-keyboard.png > "$RUNNER_TEMP/oms-native-gesture-keyboard.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-profile.png > "$RUNNER_TEMP/oms-native-gesture-profile.png"
@@ -131,12 +137,12 @@ jobs:
       - name: Verify release identity and prepare download
         run: python3 guesthouse-manager-app/scripts/publish-apk.py guesthouse-manager-app/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
-        with: {name: OMS-release, path: guesthouse-manager-app/app/build/outputs/apk/release/app-release.apk}
+        with: {name: OMS-release, path: 'guesthouse-manager-app/app/build/outputs/apk/release/OMS-*.apk'}
       - name: Publish verified APK and update manifest
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads/OMS-latest.apk downloads/oms-update.json
+          git add downloads/OMS-*.apk downloads/oms-update.json index.html
           git commit -m 'Publish verified OMS release APK [skip ci]'
           git pull --rebase origin main
           git push

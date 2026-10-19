@@ -110,11 +110,13 @@ final class NativeMessageBadge {
             for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()==ID){
                 Notification previous=item.getNotification();
                 if((previous.flags&Notification.FLAG_FOREGROUND_SERVICE)!=0)return;
+                // recoverBuilder adopts and mutates this Notification: capture before rebuilding.
+                boolean repost=previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0;
                 // Keep the real sender/body and destination; count changes stay quiet.
                 if(!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))notification=Notification.Builder.recoverBuilder(c,previous).setChannelId(CHANNEL)
                     .setGroup(null).setGroupSummary(false).setNumber(count).setOnlyAlertOnce(true)
                     .setFullScreenIntent(null,false).build();
-                if(previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0)manager.cancel(ID);
+                if(repost)manager.cancel(ID);
             }
             manager.notify(ID,notification);
         }catch(SecurityException ignored){/* Respect notification permission. */}

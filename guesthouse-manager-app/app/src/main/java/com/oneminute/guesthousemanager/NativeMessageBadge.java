@@ -40,6 +40,8 @@ final class NativeMessageBadge {
         });
     }
 
+    static synchronized void changed(Context c){revision++;refresh(c);}
+
     static synchronized void fromWeb(Context c,String token,int count){
         if(token==null||!token.equals(NativeStaffChatApi.prefs(c).getString("token",""))||count<0)return;
         try{NativeStaffChatApi session=new NativeStaffChatApi(c);revision++;save(c,session.scope,count);}catch(Exception ignored){}
@@ -68,8 +70,20 @@ final class NativeMessageBadge {
         int count=Math.max(0,Math.min(1000000,total));
         prefs(c).edit().putString("scope",scope).putInt("count",count).apply();publish(c,count);
     }
+    static int currentCount(Context c){return Math.max(1,prefs(c).getInt("count",0));}
+    static synchronized void postAlert(Context c,Notification alert){
+        NotificationManager manager=c.getSystemService(NotificationManager.class);if(manager==null)return;
+        removeLegacy(manager);
+        Notification n=Notification.Builder.recoverBuilder(c,alert).setNumber(Math.max(1,prefs(c).getInt("count",0))).build();
+        manager.notify(ID,n);
+    }
+    private static void removeLegacy(NotificationManager manager){
+        for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()!=ID&&
+            (GROUP.equals(item.getNotification().getGroup())||item.getNotification().getChannelId().startsWith("property_messages_")))manager.cancel(item.getTag(),item.getId());
+    }
     static void publish(Context c,int count){
         NotificationManager manager=c.getSystemService(NotificationManager.class);if(manager==null)return;
+        removeLegacy(manager);
         if(count<=0){
             manager.cancel(ID);
             for(StatusBarNotification item:manager.getActiveNotifications())
@@ -84,7 +98,7 @@ final class NativeMessageBadge {
         PendingIntent content=PendingIntent.getActivity(c,ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification notification=new NotificationCompat.Builder(c,CHANNEL)
                 .setSmallIcon(R.drawable.ic_oms_notification).setColor(0xff2467bd)
-                .setContentTitle("OMS · 미확인 소식 "+count+"개").setContentText("메세지 메뉴에서 확인해주세요.")
+                .setContentTitle("새 메세지 도착").setContentText("미확인 메세지 "+count+"개 · 메세지 메뉴에서 확인해주세요.")
                 .setNumber(count).setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 // Launchers filter group headers; the count must be a standalone notification.
@@ -95,6 +109,11 @@ final class NativeMessageBadge {
             // group header, so their notification model receives a remove/add pair.
             for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()==ID){
                 Notification previous=item.getNotification();
+                if((previous.flags&Notification.FLAG_FOREGROUND_SERVICE)!=0)return;
+                // Keep the real sender/body and destination; count changes stay quiet.
+                if(!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))notification=Notification.Builder.recoverBuilder(c,previous).setChannelId(CHANNEL)
+                    .setGroup(null).setGroupSummary(false).setNumber(count).setOnlyAlertOnce(true)
+                    .setFullScreenIntent(null,false).build();
                 if(previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0)manager.cancel(ID);
             }
             manager.notify(ID,notification);

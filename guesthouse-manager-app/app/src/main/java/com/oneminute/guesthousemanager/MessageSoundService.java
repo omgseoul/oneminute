@@ -45,6 +45,6 @@ public class MessageSoundService extends Service {
   return START_NOT_STICKY;
  }
  private void releasePlayer(){if(player!=null){try{player.stop();}catch(Exception ignored){}player.release();player=null;}}
- @Override public void onDestroy(){handler.removeCallbacks(finish);releasePlayer();AlertAudioVolume.release(this,false);super.onDestroy();}
+ @Override public void onDestroy(){handler.removeCallbacks(finish);releasePlayer();AlertAudioVolume.release(this,false);NativeMessageBadge.changed(this);super.onDestroy();}
  @Override public IBinder onBind(Intent intent){return null;}
 }

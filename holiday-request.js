@@ -51,7 +51,8 @@
         <label class="holiday-field">휴일 신청 사유<textarea id="holidayReason" rows="3" maxlength="1500" required placeholder="휴일 신청 사유를 적어주세요"></textarea></label>
         <p id="holidayError" class="holiday-error" role="alert"></p>
         <div class="holiday-actions"><button id="holidaySubmit" class="holiday-primary" type="submit">신청</button></div>
-      </form></dialog>`);
+      </form></dialog>
+      <dialog id="holidaySuccessDialog" class="holiday-dialog holiday-success" aria-labelledby="holidaySuccessTitle"><div class="holiday-success-icon" aria-hidden="true">✓</div><h2 id="holidaySuccessTitle">휴일신청되었습니다.</h2><dl id="holidaySuccessDetails"></dl><p id="holidaySuccessHint">알림과 캘린더에서 결재 상태를 확인할 수 있습니다.</p><div class="holiday-actions"><button type="button" class="holiday-primary" data-holiday-close="holidaySuccessDialog">확인</button></div></dialog>`);
     $('requestHoliday').hidden=false;$('requestHoliday').onclick=begin;
     document.querySelectorAll('[data-holiday-close]').forEach(b=>b.onclick=()=>$(b.dataset.holidayClose).close());
     $('holidayAck').onchange=()=>{$('holidayContinue').disabled=context.settings.acknowledgement_required&&!$('holidayAck').checked;};
@@ -65,8 +66,10 @@
       const button=$('holidaySubmit');button.disabled=true;$('holidayError').textContent='';
       try{
         const result=await rpc('submit',{id:requestId,holiday_date:$('holidayDate').value,target_employee_ids:targets,reason,notice_seen:noticeSeen,acknowledged,notice_version:context.settings.updated_at});
-        $('holidayFormDialog').close();$('message').textContent='휴일 신청을 보냈습니다. 알림과 캘린더에서 결재 상태를 확인할 수 있습니다.';
-        try{if(result.message_id)await window.omgNotifications.send(session.accessToken,result.message_id);}catch(_){$('message').textContent+=' 관리자 푸시 알림 전송은 실패했지만 결재함에는 등록되었습니다.';}
+        $('holidayFormDialog').close();$('message').textContent='';
+        $('holidaySuccessDetails').innerHTML=`<dt>날짜</dt><dd>${esc($('holidayDate').value)}</dd><dt>대상</dt><dd>${esc(context.employees.filter(e=>targets.includes(e.id)).map(e=>e.name).join(', '))}</dd><dt>신청 사유</dt><dd>${esc(reason)}</dd>`;
+        $('holidaySuccessHint').textContent='알림과 캘린더에서 결재 상태를 확인할 수 있습니다.';openDialog($('holidaySuccessDialog'));
+        try{if(result.message_id)await window.omgNotifications.send(session.accessToken,result.message_id);}catch(_){$('holidaySuccessHint').textContent='결재함에 등록되었습니다. 관리자 푸시 알림 전송은 실패했습니다.';}
       }catch(error){$('holidayError').textContent=error.message;}finally{button.disabled=false;}
     };
   }};

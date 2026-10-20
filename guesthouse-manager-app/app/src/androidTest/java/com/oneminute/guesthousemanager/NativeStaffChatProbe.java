@@ -57,6 +57,7 @@ public final class NativeStaffChatProbe {
             waitFor(()->fake.sendCalls>=2);
             check(fake.sendCalls==2&&fake.saved.size()==1,"ambiguous send retry must use one client id");
             verifyDurableQueue(c);
+            NativeChatLiveProbe.run(instrumentation);
             check(fake.readThrough!=null&&fake.historyUnread==0,"room cursor reads older incoming history above our outgoing stickers");
             ui(()->{Method open=activity.getClass().getDeclaredMethod("openMedia",String.class);open.setAccessible(true);open.invoke(activity,VIDEO);return null;});
             waitFor(()->{Object viewer=field(activity,"viewer");ExoPlayer player=(ExoPlayer)field(viewer,"player");return player!=null&&player.getPlaybackState()==Player.STATE_READY&&player.getVideoSize().width>0&&player.getCurrentPosition()>100;});

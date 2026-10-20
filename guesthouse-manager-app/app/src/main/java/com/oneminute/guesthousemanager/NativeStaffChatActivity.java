@@ -33,7 +33,8 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private NativeChatOutbox outbox;
     private NativeChatLive live;
     private boolean refreshAgain;
-    private final Runnable outboxChanged=()->{if(destroyed||outbox==null)return;refreshList(true);enableComposer();if(active)refreshNow();};
+    private final Runnable outboxChanged=this::onOutboxChanged;
+    private void onOutboxChanged(){if(destroyed||outbox==null)return;refreshList(true);enableComposer();if(active)refreshNow();}
     private void refreshNow(){if(busy){refreshAgain=true;return;}load(false,null);}
     private NativeStaffMediaViewer viewer;
     private LinearLayout root,composer;

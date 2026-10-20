@@ -249,7 +249,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         List<JSONObject> items;final boolean conversations;
         RowsAdapter(List<JSONObject> items,boolean conversations){this.items=items;this.conversations=conversations;}
         public int getCount(){return items.size();}public Object getItem(int p){return items.get(p);}public long getItemId(int p){return items.get(p).optString("id",items.get(p).optString("peer")).hashCode();}
-        public View getView(int p,View recycled,ViewGroup parent){boolean day=p==0||!date(items.get(p-1).optString("created_at"),false).equals(date(items.get(p).optString("created_at"),false));String key=items.get(p).toString()+day+getResources().getDisplayMetrics().widthPixels+(profile==null?"":profile.toString());if(recycled!=null&&key.equals(recycled.getTag()))return recycled;View view=conversations?roomRow(items.get(p)):messageRow(items.get(p),day);view.setTag(key);return view;}
+        public View getView(int p,View recycled,ViewGroup parent){return conversations?roomRow(items.get(p)):messageRow(items.get(p),p==0||!date(items.get(p-1).optString("created_at"),false).equals(date(items.get(p).optString("created_at"),false)));}
     }
     private View roomRow(JSONObject room){
         LinearLayout row=row(this);row.setPadding(dp(this,5),dp(this,14),dp(this,5),dp(this,14));FrameLayout avatar=avatar(room.optString("name"),room.optString("profile_image"),48);row.addView(avatar,new LinearLayout.LayoutParams(dp(this,48),dp(this,48)));

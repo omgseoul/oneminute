@@ -169,3 +169,6 @@
 @media(max-width:560px){#reportPhotoFoot{min-height:116px}#reportPhotoThumbs button{flex-basis:52px;width:52px;height:58px}}
 
 .staff-room-menu{width:min(380px,calc(100vw - 40px));border:0;border-radius:22px;padding:20px;color:#183153;box-shadow:0 18px 50px #18315333}.staff-room-menu::backdrop{background:#0d192a70}#staffRoomLeave{display:block;width:100%;min-height:48px;border:0;border-radius:12px;background:#fff1f1;color:#cf3943;font-size:16px;font-weight:700}#staffRoomMenuError{font-size:12px;color:#b52b35}
+
+/* Bot portraits open the same profile card as staff identities. */
+.bot-conversation-head .bot-profile-trigger,.bot-profile-trigger{display:inline-flex;flex-shrink:0;align-self:flex-start;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.bot-profile-trigger:focus-visible{outline:2px solid #286bbc;outline-offset:3px}

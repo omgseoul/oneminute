@@ -21,7 +21,14 @@ window.MessageProfiles=(()=>{
  }
  function open(entry,button){
   try{if(typeof window.OMGNative?.openWorkerProfile==='function'&&window.OMGNative.openWorkerProfile(entry.peer)===true)return;}catch{}
-  ensure();active=entry;returnFocus=button;paint(entry.profile||{display_name:entry.name,profile_image:entry.image});history.pushState({...history.state,omgWorkerProfile:true},'',location.href);dialog.showModal();load(entry);
+  ensure();$('messageProfileTitle').textContent='근무자 정보';$('messageProfileClose').setAttribute('aria-label','근무자 정보 닫기');active=entry;returnFocus=button;paint(entry.profile||{display_name:entry.name,profile_image:entry.image});history.pushState({...history.state,omgWorkerProfile:true},'',location.href);dialog.showModal();load(entry);
+ }
+ function openBot(profile,button){
+  ensure();request++;active=null;returnFocus=button;
+  $('messageProfileTitle').textContent='봇 정보';$('messageProfileClose').setAttribute('aria-label','봇 정보 닫기');
+  paint({...profile,display_name:profile.display_name||'OMS 알림',profile_image:profile.profile_image||window.OMSBotAvatar?.src,job_title:'Bot',contact_phone:''});
+  $('messageProfileStatus').textContent='';$('messageProfileRetry').hidden=true;
+  history.pushState({...history.state,omgWorkerProfile:true},'',location.href);dialog.showModal();
  }
  function close(){if(dialog?.open)history.back();}
  function restore(){if(!dialog?.open)return false;request++;active=null;dialog.close();returnFocus?.focus();return true;}
@@ -40,5 +47,5 @@ window.MessageProfiles=(()=>{
    StaffChat.profile(session,person.peer).then(profile=>{if(version!==revision||!button.isConnected)return;entry.profile=profile;render(profile);}).catch(()=>{});
   });
  }
- return {bind,restore};
+ return {bind,restore,openBot};
 })();

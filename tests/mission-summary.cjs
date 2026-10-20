@@ -1,7 +1,7 @@
 const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync('app.html','utf8'),w=new JSDOM('<strong id="todayMissionCount"></strong>',{runScripts:'outside-only'}).window;
-const line=html.split('\n').find(s=>s.startsWith('async function loadMissionSummary'));w.eval(line);
+const line=html.split('\n').find(s=>s.startsWith('async function loadMissionSummary'));w.eval(fs.readFileSync('worker-tasks.js','utf8'));w.eval(line);
 const date=n=>{const d=new Date();d.setDate(d.getDate()+n);d.setHours(23,59,59);return d.toISOString();};
 const missions=[{timing:'today',target_count:6,completed_count:1,completion_employee_ids:['a']},{due_at:date(-1),target_count:2,completed_count:0},{due_at:date(1),target_count:2,completed_count:0},{timing:'today',completion_mode:'any',target_count:6,completed_count:1},{timing:'today',completion_mode:'any',target_count:6,completed_count:0},{due_at:date(-3),target_employee_ids:['z'],target_count:1,completed_count:0},{timing:'today',target_count:2,completed_count:1,completion_employee_ids:['b']},{timing:'anytime',target_count:2,completed_count:0}];
-w.omgSupabase={rpc:async name=>({data:name==='list_property_shares'?{properties:[{property_id:'p',is_own:true}]}:{ok:true,missions}})};
+w.omgSupabase={rpc:async name=>({data:name==='list_property_shares'?{ok:true,properties:[{property_id:'p',is_own:true}]}:{ok:true,missions}})};
 (async()=>{await w.loadMissionSummary({accessToken:'x'},true);assert.equal(w.document.getElementById('todayMissionCount').textContent,'5');await w.loadMissionSummary({accessToken:'x',employeeId:'b'},false);assert.equal(w.document.getElementById('todayMissionCount').textContent,'3');w.close();console.log('Home count combines today and overdue, excludes future/unscheduled/completed shared tasks, respects employee assignment and personal completion.');})().catch(e=>{console.error(e);process.exitCode=1});

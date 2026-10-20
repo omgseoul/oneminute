@@ -53,9 +53,11 @@ public final class NativeStaffChatProbe {
             waitFor(()->((EditText)field(activity,"input")).isEnabled()&&fake.readIds.contains(VIDEO));
             verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
-            waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
-            ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
+            check(ui(()->((EditText)field(activity,"input")).length()==0&&((EditText)field(activity,"input")).isEnabled()),"queued send clears input without blocking next draft");
+            waitFor(()->fake.sendCalls>=2);
             check(fake.sendCalls==2&&fake.saved.size()==1,"ambiguous send retry must use one client id");
+            verifyDurableQueue(c);
+            NativeChatLiveProbe.run(instrumentation);
             check(fake.readThrough!=null&&fake.historyUnread==0,"room cursor reads older incoming history above our outgoing stickers");
             ui(()->{Method open=activity.getClass().getDeclaredMethod("openMedia",String.class);open.setAccessible(true);open.invoke(activity,VIDEO);return null;});
             waitFor(()->{Object viewer=field(activity,"viewer");ExoPlayer player=(ExoPlayer)field(viewer,"player");return player!=null&&player.getPlaybackState()==Player.STATE_READY&&player.getVideoSize().width>0&&player.getCurrentPosition()>100;});
@@ -319,17 +321,30 @@ public final class NativeStaffChatProbe {
         }
         image.delete();video.delete();dir.delete();
     }
+    private void verifyDurableQueue(Context c)throws Exception{
+        fake.blockSend=true;
+        ui(()->{((EditText)field(activity,"input")).setText("재시작 후 복구할 메시지");((TextView)field(activity,"send")).performClick();return null;});
+        stage="durable queue failure saved";waitFor(()->{for(JSONObject m:((NativeChatOutbox)field(activity,"outbox")).rows((String)field(activity,"peer")))if("재시작 후 복구할 메시지".equals(m.optString("body")))return "failed".equals(m.optString("pending"));return false;});
+        String client=ui(()->{for(JSONObject m:((NativeChatOutbox)field(activity,"outbox")).rows((String)field(activity,"peer")))if("재시작 후 복구할 메시지".equals(m.optString("body")))return m.optString("client_id");throw new AssertionError("pending row missing");});
+        NativeChatOutbox.clearInstances();
+        NativeChatOutbox recovered=NativeChatOutbox.get(c,fake);
+        check(recovered.rows((String)field(activity,"peer")).stream().anyMatch(m->client.equals(m.optString("client_id"))),"recreated queue recovers disk entry with same ID");
+        ui(()->{Field f=activity.getClass().getDeclaredField("outbox");f.setAccessible(true);f.set(activity,recovered);recovered.observe((Runnable)field(activity,"outboxChanged"));fake.blockSend=false;recovered.retry(client);return null;});
+        stage="recovered queue delivered";waitFor(()->fake.saved.contains(client));
+        check(fake.saved.size()==2,"disk recovery delivers exactly one additional message");
+    }
     private static final class FakeApi extends NativeStaffChatApi {
         int sendCalls;
         int profileFailures;
         boolean sentRead,onlyOutgoing;
+        volatile boolean blockSend;
         volatile int historyUnread=12;
         volatile String readThrough;
         final Set<String> saved=new HashSet<>(),readIds=new HashSet<>();
         final String jpeg;
         FakeApi(Context c)throws Exception{super(c);Bitmap b=Bitmap.createBitmap(32,32,Bitmap.Config.RGB_565);b.eraseColor(0xff95c6ff);ByteArrayOutputStream out=new ByteArrayOutputStream();b.compress(Bitmap.CompressFormat.JPEG,90,out);b.recycle();jpeg=Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);}
         @Override JSONObject chat(String action,JSONObject data)throws Exception{
-            if("send".equals(action)){sendCalls++;String id=data.getString("client_id");boolean duplicate=!saved.add(id);if(sendCalls==1)throw new IOException("전송 결과를 확인하지 못했습니다.");return new JSONObject().put("ok",true).put("message_id",id).put("duplicate",duplicate);}
+            if("send".equals(action)){if(blockSend)throw new NativeStaffChatApi.ChatException("시험 오프라인",false);sendCalls++;String id=data.getString("client_id");boolean duplicate=!saved.add(id);if(sendCalls==1)throw new IOException("전송 결과를 확인하지 못했습니다.");return new JSONObject().put("ok",true).put("message_id",id).put("duplicate",duplicate).put("message",new JSONObject().put("id",id).put("client_id",id).put("mine",true).put("body",data.getString("body")).put("created_at",java.time.Instant.now().toString()));}
             if("read_room".equals(action)){readThrough=data.getString("through_id");historyUnread=0;for(int i=1;i<50;i+=2)readIds.add(String.format(Locale.ROOT,"12345678-1234-4234-8234-%012d",i));return new JSONObject().put("ok",true);}
             if("read".equals(action)){JSONArray ids=data.getJSONArray("ids");for(int i=0;i<ids.length();i++)readIds.add(ids.getString(i));return new JSONObject().put("ok",true);}
             if("attachment".equals(action)){boolean video=VIDEO.equals(data.optString("message_id"));return new JSONObject().put("ok",true).put("attachment",video?"data:video/mp4;base64,"+CLIP:"data:image/jpeg;base64,"+jpeg);}

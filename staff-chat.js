@@ -1,10 +1,14 @@
 (async()=>{
  const $=id=>document.getElementById(id),e=GuestSupport.esc,params=new URLSearchParams(location.search),peer=params.get('peer');
  let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false,canSend=false;
- let receiptCursor=0,readBusy=false,readTimer;
+ let receiptCursor=0,readBusy=false,readTimer,outbox,live,refreshAgain=false,enqueueing=false,fetched=false;
+ function outboxChanged(){if(!outbox)return;for(const item of outbox.items(peer))if(item.message)mergeMessages([{...item.message,...(item.photo?{photo:item.photo}:{})}]);render();syncComposer();}
+ function displayMessages(){const ids=new Set(messages.map(m=>m.client_id).filter(Boolean));return [...messages,...(outbox?.items(peer)||[]).filter(x=>!ids.has(x.client_id)&&!messages.some(m=>m.id===x.message_id)).map(x=>({id:'local:'+x.client_id,client_id:x.client_id,body:x.body,photo:x.photo,priority:x.priority,created_at:x.created_at,mine:true,pending:x.status,attachment_type:x.photo?.slice(5,x.photo.indexOf(';'))}))];}
+ function refreshNow(){if(busy){refreshAgain=true;return;}clearTimeout(timer);load();}
+
  let peerProfile=null,viewerIndex=0,galleryLoading=false,galleryComplete=false;const videoUrls=new Map(),videoRequests=new Map(),videoPosters=new Map(),videoPosterRequests=new Map();let videoObserver,previewObserver,viewerVersion=0,viewerMediaId=null;
  const line=$('timeline'),input=$('body');
- function syncComposer(){$('send').disabled=!canSend||input.disabled||sending||preparing||(!input.value.trim()&&!photo);}
+ function syncComposer(){$('send').disabled=!canSend||input.disabled||enqueueing||preparing||(!input.value.trim()&&!photo);}
  let searchVersion=0,searchIds=[],searchIndex=-1,searchQuery='',searchLoading=false;
  function paintSearch(){
   const q=searchQuery.trim().toLowerCase();searchIds=q?messages.filter(m=>StaffChat.cleanText(m.body).toLowerCase().includes(q)).map(m=>m.id):[];
@@ -88,12 +92,16 @@
  function mediaThumb(item){return isVideo(item)?'<img class="video-poster" alt="동영상 미리보기" hidden><span class="media-video-badge">▶</span>':'<img src="'+e(item.photo)+'" alt="사진" loading="lazy">';}
  function render(older=false){
   const near=line.scrollHeight-line.scrollTop-line.clientHeight<110,prev=line.scrollHeight;let day='';
-  $('bubbles').innerHTML=messages.map(m=>{
+  const markup=displayMessages().map(m=>{
    const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;
    if(m.system)return label+`<div class="chat-system-event" data-id="${e(m.id)}">${e(m.body)}</div>`;
    const name=peerProfile?.display_name||'근무자',face=m.mine?'':`<button type="button" class="message-avatar" data-peer-profile aria-label="${e(name)} 근무자 정보 보기">${StaffChat.avatar(name,peerProfile?.profile_image)}</button>`;
-   return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<div class="bubble-name">${e(name)}</div>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-meta">${!m.read_at?'<span class="message-unread" aria-label="안 읽은 사람 1명">1</span>':''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
+   return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<div class="bubble-name">${e(name)}</div>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-meta">${m.pending?`<button class="send-state" type="button" data-retry="${e(m.client_id)}">${m.pending==='failed'?'전송 실패 · 재시도':'전송 중…'}</button>`:!m.read_at?'<span class="message-unread" aria-label="안 읽은 사람 1명">1</span>':''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
   }).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
+  const bubbles=$('bubbles'),fragment=document.createElement('div');fragment.innerHTML=markup;
+  const old=new Map([...bubbles.children].map((node,i)=>[node.dataset.id||'day:'+node.textContent,node]));
+  let at=bubbles.firstChild;for(const fresh of [...fragment.children]){const key=fresh.dataset.id||'day:'+fresh.textContent;let node=old.get(key);old.delete(key);if(!node||node._markup!==fresh.outerHTML){node=fresh;node._markup=fresh.outerHTML;}if(node!==at)bubbles.insertBefore(node,at);at=node.nextSibling;}while(at){const next=at.nextSibling;at.remove();at=next;}for(const node of old.values())node.remove();
+  bubbles.querySelectorAll('[data-retry]').forEach(button=>button.onclick=()=>outbox?.retry(button.dataset.retry));
   $('bubbles').querySelectorAll('[data-peer-profile]').forEach(button=>button.onclick=showPeerProfile);
   if(older)line.scrollTop+=line.scrollHeight-prev;else if(near||!started)line.scrollTop=line.scrollHeight;
   started=true;line.classList.remove('chat-loading');
@@ -118,17 +126,17 @@
  async function load(older=false){
   if(busy||document.hidden||searchLoading){clearTimeout(timer);timer=setTimeout(load,2000);return;}busy=true;clearTimeout(timer);
   try{
-   const last=messages.at(-1),first=messages[0];
+   const initial=!fetched,last=fetched?messages.at(-1):null,first=messages[0];
    const cursor=older&&first?{before_time:first.created_at,before_id:first.id}:last?{after_time:last.created_at,after_id:last.id}:{};
    const v=await call('messages',{...cursor,receipt_ids:receiptIds()});
    if(loadNotice){status('');loadNotice=false;}
    if(v.peer&&!peerProfile)applyProfile(v.peer);
    canSend=v.can_send===true;input.disabled=!canSend;syncComposer();
    if(!v.can_send)status('현재 이 계정에 메세지를 보낼 수 없습니다.',true);
-   mergeMessages(v.messages);const receiptChanged=mergeReceipts(v.receipts);if(older||!started)$('older').hidden=v.messages.length<50;if(v.messages.length||!started||receiptChanged)render(older);
-   await markRead();scheduleRead();delay=!older&&v.messages.length===50?50:2000;
+   fetched=true;mergeMessages(v.messages);await outbox?.acknowledge(v.messages);const receiptChanged=mergeReceipts(v.receipts);if(older||initial)$('older').hidden=v.messages.length<50;if(v.messages.length||!started||receiptChanged)render(older);
+   await markRead();scheduleRead();delay=!older&&v.messages.length===50?50:live?.connected?30000:2500;
   }catch(err){line.classList.remove('chat-loading');console.warn('Staff chat load',err);loadNotice=true;status('데이터를 불러오는 중입니다.');delay=Math.min(delay*2,30000);}
-  finally{busy=false;timer=setTimeout(load,delay);}
+  finally{busy=false;if(refreshAgain){refreshAgain=false;timer=setTimeout(load,0);}else timer=setTimeout(load,delay);}
  }
  function renderPhoto(){syncComposer();const el=$('photoPending'),video=String(photo||'').startsWith('data:video/');el.hidden=!photo;el.innerHTML=photo?(video?'<video muted playsinline controls></video><span>동영상 첨부 (20MB 이하)</span><button type="button" aria-label="첨부 취소">×</button>':'<img alt="선택한 사진"><span>사진 첨부</span><button type="button" aria-label="첨부 취소">×</button>'):'';if(photo){el.querySelector(video?'video':'img').src=photo;el.querySelector('button').onclick=()=>{if(sending)return;photo=null;pending=null;renderPhoto();keepDraft();};}}
  function resetVideo(){const video=$('photoViewerVideo');video.onloadeddata=video.onerror=video.ontimeupdate=video.onplaying=null;video.pause();video.removeAttribute('src');video.removeAttribute('poster');video.load();video.hidden=true;$('videoFullscreen').hidden=true;$('videoViewerStatus').hidden=true;$('videoViewerRetry').hidden=true;$('photoStage').classList.remove('is-video');$('photoViewer').classList.remove('video-expanded');$('videoFullscreen').setAttribute('aria-pressed','false');$('videoFullscreen').setAttribute('aria-label','동영상 화면 확대');$('videoFullscreen').textContent='⛶';}
@@ -171,7 +179,13 @@
  $('priority').onclick=()=>{if(sending)return;priority=priority==='urgent'?'normal':'urgent';$('priority').textContent=priority==='urgent'?'긴급⌄':'일반⌄';$('priority').setAttribute('aria-pressed',String(priority==='urgent'));keepDraft();};
  function resizeComposer(){input.style.height='auto';const height=input.scrollHeight;input.style.height=Math.max(44,Math.min(110,height))+'px';input.style.overflowY=height>110?'auto':'hidden';}
  input.oninput=()=>{syncComposer();resizeComposer();keepDraft();};
- $('composer').onsubmit=async event=>{event.preventDefault();const originalText=input.value;const body=input.value.trim()||(photo?(String(photo).startsWith('data:video/')?'동영상':'사진'):'');if(!canSend||input.disabled||(!body&&!photo)||sending||preparing)return;sending=true;$('send').disabled=true;status('보내는 중…');if(!pending||pending.body!==body||pending.priority!==priority||pending.photo!==photo)pending={body,priority,photo,client_id:crypto.randomUUID()};keepDraft();try{const result=await call('send',pending);if(input.value===originalText)input.value='';photo=null;renderPhoto();pending=null;keepDraft();status('');try{if(!result.duplicate)await window.omgNotifications.send(session.accessToken,result.message_id);}catch{status('메세지는 저장됐지만 알림 전달을 확인하지 못했습니다.',true);}await load();}catch(err){status(err.message,true);}finally{sending=false;syncComposer();resizeComposer();}};
+ $('composer').onsubmit=async event=>{
+  event.preventDefault();const originalText=input.value,attachment=photo,body=originalText.trim()||(attachment?(attachment.startsWith('data:video/')?'동영상':'사진'):'');
+  if(!canSend||!body||preparing||enqueueing||!outbox)return;enqueueing=true;syncComposer();
+  try{await outbox.enqueue({peer,body,priority,photo:attachment});if(input.value===originalText)input.value='';if(photo===attachment)photo=null;pending=null;renderPhoto();keepDraft();status('');line.scrollTop=line.scrollHeight;}
+  catch(error){status('보낼 메시지를 보관하지 못했습니다. 저장 공간을 확인하고 다시 시도해주세요.',true);}
+  finally{enqueueing=false;syncComposer();resizeComposer();}
+ };
  $('peerIdentity').onclick=showPeerProfile;
  $('peerProfileClose').onclick=()=>$('peerProfileDialog').close?.()||$('peerProfileDialog').removeAttribute('open');
  $('photoViewerClose').onclick=()=>closeViewer();$('photoPrevious').onclick=()=>moveViewer(-1);$('photoNext').onclick=()=>moveViewer(1);$('photoGalleryOpen').onclick=openGallery;$('photoGalleryClose').onclick=()=>closeGallery();
@@ -188,6 +202,11 @@
   session=await omgSession.require({allowCompleted:true});if(!session)return;if(!/^(owner|employee):[0-9a-f-]{36}$/i.test(peer||''))throw new Error('대화 상대를 선택해주세요.');
   if(StaffChat.nativeOpen?.(peer)){location.replace('messages.html?tab=staff');return;}
   draftKey='staff-chat:'+session.accessToken+':'+peer;try{const draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(draft){input.value=draft.body||'';pending=draft.pending;photo=draft.photo||null;renderPhoto();if(draft.priority==='urgent')$('priority').click();}}catch{}
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(session.accessToken));
+  const scope=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  outbox=await OMSChatOutbox.open(scope,async item=>StaffChat.call(session,'send',{peer:item.peer,body:item.body,priority:item.priority,photo:item.photo,client_id:item.client_id}),outboxChanged);
+  outboxChanged();live=window.OMSChatLive?.connect(session,()=>{refreshNow();outbox.pump();try{window.OMGNative?.refreshMessageBadge?.();}catch{}});
+  addEventListener('pagehide',()=>{live?.close();outbox?.close();});
   await Promise.all([loadPeerProfile(),load()]);
  }catch(err){line.classList.remove('chat-loading');status(err.message,true);$('send').disabled=true;}
 })();

@@ -21,6 +21,10 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.9'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify live Realtime transport without creating accounts
+        run: node tests/chat-realtime/transport.cjs
       - name: Validate APK publication certificate parsing
         run: python3 guesthouse-manager-app/scripts/test-publish-apk.py
       - name: Firebase configuration

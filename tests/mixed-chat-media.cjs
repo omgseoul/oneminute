@@ -4,6 +4,7 @@ const img='data:image/jpeg;base64,AAAA';
 async function until(fn){for(let i=0;i<100;i++){if(fn())return;await tick()}throw Error('Timed out')}
 async function staffViewer(){
  const dom=new JSDOM(read('staff-chat.html').replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/staff-chat.html?peer=owner:11111111-1111-4111-8111-111111111111',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document;let calls=[],supplied=false,pendingResolve;
+ require('./chat-realtime/jsdom-env.cjs')(w);
  const initial=[{id:'p1',photo:img},{id:'v1',attachment_type:'video/webm'},{id:'p2',photo:img},{id:'v2',attachment_type:'video/webm'}].map((m,i)=>({...m,body:'첨부 '+i,created_at:'2026-10-18T00:00:0'+i+'Z',mine:true}));
  w.HTMLMediaElement.prototype.play=function(){this._playing=true;return Promise.resolve()};w.HTMLMediaElement.prototype.pause=function(){this._playing=false};w.HTMLMediaElement.prototype.load=function(){};
  w.URL.createObjectURL=()=> 'blob:test-'+calls.length;w.URL.revokeObjectURL=()=>{};

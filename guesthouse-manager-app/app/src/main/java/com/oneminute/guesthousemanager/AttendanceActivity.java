@@ -287,6 +287,7 @@ public class AttendanceActivity extends AppCompatActivity {
         public void bindAppSession(String accessToken, String expiresAt) {
             String previous=NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","");
             SupabaseMessageReceipt.bind(AttendanceActivity.this, accessToken, expiresAt);
+            NativeChatOutbox.resume(AttendanceActivity.this);
             if(!previous.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))runOnUiThread(()->{if(workerProfiles!=null)workerProfiles.clear();});
             if(!previous.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))NativeMessageBadge.clear(AttendanceActivity.this);
             NativePushRegistration.refresh(AttendanceActivity.this);
@@ -427,7 +428,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume();NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
     protected void onPause() { if (recovery != null) recovery.pause(); super.onPause(); }

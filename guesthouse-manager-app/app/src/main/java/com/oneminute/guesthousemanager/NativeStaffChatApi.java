@@ -14,6 +14,8 @@ import java.time.Instant;
 class NativeStaffChatApi {
     private static final String BASE="https://rfcozgyvupvachhhblzn.supabase.co/";
     private static final String KEY="sb_publishable_Gy0_TtIcJ6xKDEiGWEnXAg_f4_eyXPI";
+    static final String REALTIME="wss://rfcozgyvupvachhhblzn.supabase.co/realtime/v1/websocket?apikey="+KEY+"&vsn=1.0.0";
+    static class ChatException extends IOException {final boolean retryable;ChatException(String message,boolean retryable){super(message);this.retryable=retryable;}}
     private final Context context;
     private final String token;
     final String scope;
@@ -34,7 +36,7 @@ class NativeStaffChatApi {
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));
     }
     JSONObject rpc(String name,JSONObject args)throws Exception {
-        if(!name.matches("staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox"))throw new IOException("잘못된 요청입니다.");
+        if(!name.matches("chat_live_ticket|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox"))throw new IOException("잘못된 요청입니다.");
         args.put("p_access_token",token);
         return request(BASE+"rest/v1/rpc/"+name,args,true);
     }
@@ -60,10 +62,10 @@ class NativeStaffChatApi {
             }
             if(!valid())throw new IOException("로그인이 변경되었습니다. 채팅을 다시 열어주세요.");
             JSONObject result=new JSONObject(text.toString());
-            if(code<200||code>=300||!result.optBoolean("ok"))throw new IOException(result.optString("message","연결을 확인하고 다시 시도해주세요."));
+            if(code<200||code>=300||!result.optBoolean("ok"))throw new ChatException(result.optString("message","연결을 확인하고 다시 시도해주세요."),code>=500||code==429);
             return result;
         }catch(Exception error){
-            String message=error.getMessage();if(message!=null&&message.matches("(?s).*[가-힣].*"))throw error;
+            if(error instanceof ChatException)throw error;String message=error.getMessage();if(message!=null&&message.matches("(?s).*[가-힣].*"))throw error;
             throw new IOException("연결을 확인하고 다시 시도해주세요.");
         }finally{connection.disconnect();}
     }
@@ -72,6 +74,6 @@ class NativeStaffChatApi {
         try{byte[] bytes=MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:bytes)out.append(String.format("%02x",b&255));return out.toString();}
         catch(Exception e){throw new IllegalStateException(e);}
     }
-    static void clearLocal(Context c){delete(new File(c.getCacheDir(),"staff-chat"));delete(new File(c.getFilesDir(),"staff-chat-drafts"));c.getSharedPreferences("omg_chat_drafts",Context.MODE_PRIVATE).edit().clear().apply();}
+    static void clearLocal(Context c){NativeChatOutbox.clearInstances();delete(new File(c.getCacheDir(),"staff-chat"));delete(new File(c.getFilesDir(),"staff-chat-drafts"));c.getSharedPreferences("omg_chat_drafts",Context.MODE_PRIVATE).edit().clear().apply();}
     private static void delete(File f){File[] children=f.listFiles();if(children!=null)for(File child:children)delete(child);f.delete();}
 }

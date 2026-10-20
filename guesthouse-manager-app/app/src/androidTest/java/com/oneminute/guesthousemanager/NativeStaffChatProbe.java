@@ -53,8 +53,8 @@ public final class NativeStaffChatProbe {
             waitFor(()->((EditText)field(activity,"input")).isEnabled()&&fake.readIds.contains(VIDEO));
             verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
-            waitFor(()->((TextView)field(activity,"status")).getText().toString().contains("재시도"));
-            ui(()->{((TextView)field(activity,"send")).performClick();return null;});waitFor(()->((EditText)field(activity,"input")).length()==0&&!((Boolean)field(activity,"sending")));
+            check(ui(()->((EditText)field(activity,"input")).length()==0&&((EditText)field(activity,"input")).isEnabled()),"queued send clears input without blocking next draft");
+            waitFor(()->fake.sendCalls>=2);
             check(fake.sendCalls==2&&fake.saved.size()==1,"ambiguous send retry must use one client id");
             check(fake.readThrough!=null&&fake.historyUnread==0,"room cursor reads older incoming history above our outgoing stickers");
             ui(()->{Method open=activity.getClass().getDeclaredMethod("openMedia",String.class);open.setAccessible(true);open.invoke(activity,VIDEO);return null;});

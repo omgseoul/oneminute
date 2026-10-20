@@ -108,7 +108,16 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         return reply({ ok: true, validated: true });
       }
       let payload, topics, deliveryId, recipientDeadlines = {}, recipientModes = {};
-      if (path.endsWith('/reminder')) {
+      if (path.endsWith('/staff-outbox')) {
+        const secret=env('GUEST_EMAIL_WORKER_SECRET');
+        if (!secret || req.headers.get('x-webhook-secret')!==secret) return reply({ok:false,code:'unauthorized'},401);
+        if (!uuid.test(body.message_id||'')) return reply({ok:false,code:'invalid_request'},400);
+        const dispatch=await rpc('get_chat_push_dispatch',{p_message_id:body.message_id});
+        if (!dispatch.ok) return reply({ok:false,code:'not_found'},404);
+        if (env('PUSH_DELIVERY_ENABLED')!=='true') return reply({ok:false,code:'not_enabled'},503);
+        deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
+        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:dispatch.priority==='urgent'?'urgent':'message',priority:dispatch.priority||'normal',messageType:dispatch.message_type||'general',senderLabel:dispatch.sender_label||'메세지'};
+      } else if (path.endsWith('/reminder')) {
         const secret = env('GUEST_EMAIL_WORKER_SECRET');
         if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);
@@ -215,6 +224,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
           else sent++;
         }
       }
+      if (!failed && path.endsWith('/staff-outbox')) await rpc('finish_chat_push',{p_message_id:body.message_id});
       if (!failed && path.endsWith('/guest-chat')) await rpc('finish_guest_chat_dispatch',{p_event_id:body.event_id});
       return reply({ ok: failed === 0, sent, duplicates, failed, message_id: deliveryId,
         ...(failed ? { message: '메세지는 저장됐지만 일부 알림 발송을 확인하지 못했습니다.' } : {}) }, failed ? 502 : 200);

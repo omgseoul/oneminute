@@ -8,13 +8,14 @@ const pem = '-----BEGIN PRIVATE KEY-----\n' + Buffer.from(await webcrypto.subtle
 const id = '00000000-0000-4000-8000-000000000001';
 const topic = 'property_123_employee_' + id;
 function harness(options={}) {
- const config = { FCM_SERVICE_ACCOUNT:JSON.stringify({private_key:pem,client_email:'test@example.invalid',project_id:'guesthouse-manager-ajh'}),SUPABASE_URL:'https://example.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-only',PUSH_DELIVERY_ENABLED:'true',TELEGRAM_URGENT_SECRET:'test-webhook',PUSH_ADMIN_SECRET:'test-admin',...options.config };
+ const config = { FCM_SERVICE_ACCOUNT:JSON.stringify({private_key:pem,client_email:'test@example.invalid',project_id:'guesthouse-manager-ajh'}),SUPABASE_URL:'https://example.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-only',PUSH_DELIVERY_ENABLED:'true',TELEGRAM_URGENT_SECRET:'test-webhook',PUSH_ADMIN_SECRET:'test-admin',GUEST_EMAIL_WORKER_SECRET:'test-worker',...options.config };
  const calls=[],claims=new Map();let auth=true;
  const fetcher=async(url,init)=>{
   const body=url.endsWith('/token')?null:JSON.parse(init.body);calls.push({url,body});
   if(url.endsWith('/token'))return Response.json({access_token:'fake-token',expires_in:3600});
   if(url.includes('fcm.googleapis.com'))return Response.json({}, {status:options.failFcm?500:200});
-  if(url.endsWith('get_message_push_dispatch_v2'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],recipient_modes:options.recipientModes||{},message:options.message||'한'.repeat(2000),message_type:options.messageType||'attendance_warning',sender_label:'근태관리',priority:options.priority||'normal'}:{ok:false,code:'invalid_session'});
+  if(url.endsWith('finish_chat_push'))return Response.json({ok:true});
+  if(url.endsWith('get_message_push_dispatch_v2')||url.endsWith('get_chat_push_dispatch'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],recipient_modes:options.recipientModes||{},message:options.message||'한'.repeat(2000),message_type:options.messageType||'attendance_warning',sender_label:'근태관리',priority:options.priority||'normal'}:{ok:false,code:'invalid_session'});
   if(url.endsWith('resolve_native_push_targets'))return Response.json(options.devices||[]);
   if(url.endsWith('invalidate_native_push'))return Response.json(null);
   if(url.endsWith('claim_push_delivery')){if(claims.has(body.p_key))return Response.json({ok:true,claimed:false,status:claims.get(body.p_key)});claims.set(body.p_key,'sending');return Response.json({ok:true,claimed:true,lease_id:id});}
@@ -69,3 +70,5 @@ test('registered device gets direct high-priority push with recipient binding wh
 test('device resolver cannot route outside authorized recipients',async()=>{const h=harness({devices:[{topic:'property_999_employee_'+id,device_id:id,token:'x'}]});assert.equal((await h.request()).status,503);assert(!h.calls.some(c=>c.url.includes('fcm.googleapis.com')));});
 
 test('guest notification includes the guest name',async()=>{const h=harness({guestName:'나야나'});assert.equal((await h.request({event_id:id},'/guest-chat',{'x-webhook-secret':'test-admin'})).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.senderLabel,'현장게스트 나야나');});
+
+test('durable staff queue requires worker secret, completes only after push, and deduplicates legacy callers',async()=>{const h=harness();assert.equal((await h.request({message_id:id},'/staff-outbox')).status,401);assert.equal(h.calls.length,0);assert.equal((await h.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'test-worker'})).status,200);assert(h.calls.some(c=>c.url.endsWith('finish_chat_push')));await h.request();assert.equal(h.calls.filter(c=>c.url.includes('fcm.googleapis.com')).length,1);const f=harness({failFcm:true});assert.equal((await f.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'test-worker'})).status,502);assert(!f.calls.some(c=>c.url.endsWith('finish_chat_push')));});

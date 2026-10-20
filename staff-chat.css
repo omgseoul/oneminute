@@ -63,3 +63,5 @@ body.media-open{overflow:hidden}
 .chat-system-event{text-align:center;color:#708095;font-size:12px;line-height:1.6;padding:14px 12px}
 
 .composer .staff-input-wrap textarea::-webkit-scrollbar{display:none}
+
+.send-state{border:0;background:transparent;color:#7d8b9b;font-size:10px;padding:2px;white-space:nowrap;cursor:pointer}

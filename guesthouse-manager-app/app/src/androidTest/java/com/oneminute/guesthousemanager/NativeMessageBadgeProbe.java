@@ -49,6 +49,7 @@ final class NativeMessageBadgeProbe {
             check((n.flags&Notification.FLAG_GROUP_SUMMARY)==0,"Badge must not be a launcher-filtered group header");
             check(n.getGroup()==null,"Badge remains independent of alert groups");
             check(c.getSystemService(NotificationManager.class).getNotificationChannel(NativeMessageBadge.CHANNEL).canShowBadge(),"Badge channel enabled");
+            NativeNotificationModesProbe.verify(c,TOKEN);
             Notification actual=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("보낸 사람 · 안녕하세요").build();
             NativeMessageBadge.postAlert(c,actual);NativeMessageBadge.postAlert(c,actual);
             check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==1,"One real message notification, no extra unread bulletin");

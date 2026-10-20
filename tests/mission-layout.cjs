@@ -4,9 +4,9 @@ const assert=require('node:assert/strict');
 const html=fs.readFileSync('mission.html','utf8');
 const dom=new JSDOM(html,{runScripts:'outside-only'}),w=dom.window;
 const script=[...w.document.scripts].findLast(s=>!s.src).textContent.split('(async()=>{session=')[0];
-w.setInterval=()=>0;w.eval(fs.readFileSync('property-selector.js','utf8'));w.eval(fs.readFileSync('select-picker.js','utf8'));w.eval(script+"\nwindow.testEval=(code)=>eval(code);");
+w.eval(fs.readFileSync('worker-tasks.js','utf8'));w.setInterval=()=>0;w.eval(fs.readFileSync('property-selector.js','utf8'));w.eval(fs.readFileSync('select-picker.js','utf8'));w.eval(script+"\nwindow.testEval=(code)=>eval(code);");
 const run=x=>w.testEval(x);
-run('session={employeeId:"a",employeeName:"니완"};config={property:{name:"Test"}};');
+run('session={employeeId:"a",employeeName:"니완",timezone:Intl.DateTimeFormat().resolvedOptions().timeZone};config={property:{name:"Test"}};');
 assert.equal(run('sectionKey({timing:"today"})'),"today");
 for(const [days,key] of [[-1,'overdue'],[0,'today'],[1,'this_week'],[7,'this_week'],[8,'anytime'],[28,'anytime'],[35,'anytime']]){
  assert.equal(run(`sectionKey({due_at:dateAfterDays(${days})+'T23:59:59',target_count:1,completed_count:0})`),key);

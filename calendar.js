@@ -35,7 +35,7 @@
     const dueTasks=tasks.flatMap(item=>{
       if(!item.due_at)return item.timing==='today'&&isToday?[{...item,kind:'task',sort:now,late:false}]:[];
       const due=new Date(item.due_at).getTime();
-      if(due<now)return isToday?[{...item,kind:'task',sort:due,late:true}]:[];
+      if(OMSMissionTasks.section(item,{timezone})==='overdue')return isToday?[{...item,kind:'task',sort:due,late:true}]:[];
       return due>=start&&due<end?[{...item,kind:'task',sort:due,late:false}]:[];
     });
     return [
@@ -51,21 +51,21 @@
       const pending=item.title.includes("미결재");
       title=`휴일${names?` · ${names}`:""}${pending?" (미결재)":""}`;
     }
-    return selectedPropertyIds.length>1&&item.property_name?`${title} · ${item.property_name}`:title;
+    return item.kind!=='task'&&selectedPropertyIds.length>1&&item.property_name?`${title} · ${item.property_name}`:title;
   }
   function itemMarkup(item){
     const task=item.kind==='task',late=task&&item.late,title=calendarTitle(item);
-    return `<button type="button" class="calendar-item ${task?'task':''}${late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}">${task?'<span class="calendar-item-label">To do</span>':''}${late?'<span class="calendar-late-badge">지연</span>':''} ${escape(title)}</button>`;
+    return `<button type="button" class="calendar-item ${task?'task':''}${late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}">${task?'<span class="calendar-item-label">To do</span>':''}${late?'<span class="calendar-late-badge">지연</span>':''} ${task?OMSMissionTasks.propertyTag(item,ownPropertyId):''}${escape(title)}</button>`;
   }
   function dayItemMarkup(item){
     const task=item.kind==='task',late=task&&item.late,title=calendarTitle(item);
     const p=task||item.all_day?null:zonedParts(item.start_at);
     const detail=task?'To do 메뉴에서 확인':item.all_day?'종일':`${pad(p.hour)}:${pad(p.minute)}`;
-    return `<button type="button" class="calendar-item calendar-day-entry ${task?'task':''}${late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}"><span class="calendar-day-primary"><span class="calendar-day-type">${task?'To do':'일정'}</span>${late?'<span class="calendar-late-badge">지연</span>':''}<span class="calendar-day-title">${escape(title)}</span></span><small>${detail}</small></button>`;
+    return `<button type="button" class="calendar-item calendar-day-entry ${task?'task':''}${late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}"><span class="calendar-day-primary"><span class="calendar-day-type">${task?'To do':'일정'}</span>${late?'<span class="calendar-late-badge">지연</span>':''}${task?OMSMissionTasks.propertyTag(item,ownPropertyId):''}<span class="calendar-day-title">${escape(title)}</span></span><small>${detail}</small></button>`;
   }
   function weekItemMarkup(item){
     const task=item.kind==='task',late=task&&item.late,title=calendarTitle(item);
-    return `<button type="button" class="calendar-week-entry ${task?'task':''}${late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}"><span class="calendar-week-bullet" aria-hidden="true">•</span><span class="calendar-week-type">${task?'To do':'일정'}</span>${late?'<span class="calendar-late-badge">지연</span>':''}<span class="calendar-week-title">${escape(title)}</span></button>`;
+    return `<button type="button" class="calendar-week-entry ${task?'task':''}${late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}" title="${escape(title)}"><span class="calendar-week-bullet" aria-hidden="true">•</span><span class="calendar-week-type">${task?'To do':'일정'}</span>${late?'<span class="calendar-late-badge">지연</span>':''}${task?OMSMissionTasks.propertyTag(item,ownPropertyId):''}<span class="calendar-week-title">${escape(title)}</span></button>`;
   }
   function renderHeader(){
     $('rangeTitle').textContent=view==='month'?`${focusDate.getFullYear()}년 ${focusDate.getMonth()+1}월`:view==='week'?'이번 주 일정':`${focusDate.getMonth()+1}월 ${focusDate.getDate()}일 ${dayNames[focusDate.getDay()]}요일`;
@@ -103,16 +103,9 @@
     const [start,end]=range();$('calendarMessage').textContent='';
     try{let result=await rpc('list',{range_start:dayStart(start),range_end:dayStart(end)});
       if(isOwner&&selectedPropertyIds.length){const {data,error}=await window.omgSupabase.rpc('list_shared_calendar_board',{p_access_token:session.accessToken,p_property_ids:selectedPropertyIds,p_from:dayStart(start),p_to:dayStart(end)});if(error||!data?.ok)throw new Error(data?.message||error?.message||'캘린더를 불러오지 못했습니다.');result={...result,events:data.events,tasks:data.tasks};}
-      const overdue=await window.omgSupabase.rpc('list_overdue_calendar_tasks',{p_access_token:session.accessToken,p_property_ids:isOwner?selectedPropertyIds:null});
-      if(overdue.error||!overdue.data?.ok)throw new Error(overdue.data?.message||overdue.error?.message||'지연 To do를 불러오지 못했습니다.');
-      const known=new Set((result.tasks||[]).map(item=>String(item.id)));
-      result.tasks=[...(result.tasks||[]),...(overdue.data.tasks||[]).filter(item=>!known.has(String(item.id)))];
-      if(!isOwner){
-        const {data,error}=await window.omgSupabase.rpc('list_missions',{p_access_token:session.accessToken});
-        if(error||!data?.ok)throw new Error(data?.message||error?.message||'내 To do를 불러오지 못했습니다.');
-        result.tasks=OMSWorkerTasks.pending(data.missions||[],session.employeeId);
-        result.events=OMSWorkerTasks.events(result.events||[],session.employeeId);
-      }
+      const missionData=await OMSMissionTasks.load(session,{isOwner,propertyIds:isOwner?selectedPropertyIds:undefined});
+      result.tasks=OMSMissionTasks.pending(missionData.missions||[],isOwner?'':session.employeeId);
+      if(!isOwner)result.events=OMSWorkerTasks.events(result.events||[],session.employeeId);
       events=result.events||[];tasks=result.tasks||[];employees=result.employees||[];renderTargets();render();
     }catch(error){$('calendarMessage').textContent=error.message;render();}
   }

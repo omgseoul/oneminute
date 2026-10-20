@@ -23,7 +23,8 @@ import com.google.firebase.messaging.RemoteMessage;
 public class GuesthouseMessagingService extends FirebaseMessagingService {
     private static final String MESSAGE_CHANNEL_ID = "property_messages_strong_v5";
     private static final String NORMAL_MESSAGE_CHANNEL_ID = "property_messages_normal_popup_v3";
-    private static final String WEAK_MESSAGE_CHANNEL_ID = "property_messages_weak_status_v3";
+    static final String WEAK_MESSAGE_CHANNEL_ID = "property_messages_weak_status_v4";
+    static final long[] MESSAGE_VIBRATION = {0, 220, 100, 260};
     private static final String NORMAL_MESSAGE_PREFIX = "[[OMG_NORMAL_MESSAGE]]";
     @Override
     public void onNewToken(String token) {
@@ -97,21 +98,35 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         catch (RuntimeException error) { showMessageNotification(message); }
     }
 
+    // Android channel behavior is immutable: migrate the old defaults once while
+    // retaining any existing system-channel sound, vibration and importance choices.
+    static NotificationChannel ensureWeakChannel(android.content.Context context) {
+        NotificationManager manager=context.getSystemService(NotificationManager.class);
+        NotificationChannel existing=manager.getNotificationChannel(WEAK_MESSAGE_CHANNEL_ID);
+        if(existing!=null)return existing;
+        NotificationChannel old=manager.getNotificationChannel("property_messages_weak_status_v3");
+        NotificationChannel channel=weakChannelDefaults(WEAK_MESSAGE_CHANNEL_ID,old);
+        manager.createNotificationChannel(channel);
+        return manager.getNotificationChannel(WEAK_MESSAGE_CHANNEL_ID);
+    }
+
+    static NotificationChannel weakChannelDefaults(String id,NotificationChannel old) {
+        NotificationChannel channel=new NotificationChannel(id,
+                "메세지 알림 (약함)",old==null?NotificationManager.IMPORTANCE_DEFAULT:old.getImportance());
+        channel.setDescription("휴대폰 소리·진동 설정을 따르며 상단 알림줄에만 표시합니다.");
+        channel.setVibrationPattern(old!=null&&old.getVibrationPattern()!=null?old.getVibrationPattern():MESSAGE_VIBRATION);
+        channel.enableVibration(old==null||old.shouldVibrate());
+        channel.setShowBadge(old==null||old.canShowBadge());
+        channel.setSound(old==null?RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION):old.getSound(),
+                old!=null&&old.getAudioAttributes()!=null?old.getAudioAttributes():new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+        return channel;
+    }
+
     private void showWeakNotification(RemoteMessage remote) {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager == null) return;
-        Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel(WEAK_MESSAGE_CHANNEL_ID,
-                    "메세지 알림 (약함)", NotificationManager.IMPORTANCE_DEFAULT);
-            channel.setDescription("휴대폰 설정을 따르며 상단 알림줄에만 표시되는 알림");
-            channel.enableVibration(true);
-            channel.setShowBadge(true);
-            channel.setSound(sound, new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
-            manager.createNotificationChannel(channel);
-        }
+        ensureWeakChannel(this);
         String id = remote.getData().get("alertId");
         String sender = remote.getData().get("senderLabel");
         String messageType = remote.getData().get("messageType");
@@ -153,7 +168,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                     "메세지 알림 (일반)", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("휴대폰의 소리·진동 설정을 따르는 화면 팝업 알림");
             channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0, 220, 100, 260});
+            channel.setVibrationPattern(MESSAGE_VIBRATION);
             channel.setShowBadge(true);
             channel.setSound(sound, new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -204,7 +219,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                     "메세지 알림 (강함)", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("사장님과 직원이 주고받는 새 메세지 알림");
             channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0, 220, 100, 260});
+            channel.setVibrationPattern(MESSAGE_VIBRATION);
             channel.setShowBadge(true);
             channel.setSound(null, new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)

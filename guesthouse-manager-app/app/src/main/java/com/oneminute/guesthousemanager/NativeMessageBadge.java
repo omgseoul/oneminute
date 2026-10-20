@@ -112,6 +112,10 @@ final class NativeMessageBadge {
                 if((previous.flags&Notification.FLAG_FOREGROUND_SERVICE)!=0)return;
                 // recoverBuilder adopts and mutates this Notification: capture before rebuilding.
                 boolean repost=previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0;
+                // A receipt refresh often confirms the same count immediately after FCM.
+                // Reposting that alert on the silent badge channel can cancel its vibration.
+                if(!repost&&previous.getGroup()==null&&!CHANNEL.equals(previous.getChannelId())
+                        &&!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))return;
                 // Keep the real sender/body and destination; count changes stay quiet.
                 if(!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))notification=Notification.Builder.recoverBuilder(c,previous).setChannelId(CHANNEL)
                     .setGroup(null).setGroupSummary(false).setNumber(count).setOnlyAlertOnce(true)

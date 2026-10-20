@@ -27,7 +27,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode Integer.parseInt(System.getenv('OMS_VERSION_CODE') ?: '35')
-        versionName '0.17.0'
+        versionName '0.17.1'
         testInstrumentationRunner 'com.oneminute.guesthousemanager.UpdateProbe'
     }
 }

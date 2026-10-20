@@ -1,7 +1,7 @@
 (async()=>{
  const $=id=>document.getElementById(id),e=GuestSupport.esc,params=new URLSearchParams(location.search),peer=params.get('peer');
  let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false,canSend=false;
- let receiptCursor=0,readBusy=false,readTimer,outbox,live,refreshAgain=false,enqueueing=false;
+ let receiptCursor=0,readBusy=false,readTimer,outbox,live,refreshAgain=false,enqueueing=false,fetched=false;
  function outboxChanged(){if(!outbox)return;for(const item of outbox.items(peer))if(item.message)mergeMessages([{...item.message,...(item.photo?{photo:item.photo}:{})}]);render();syncComposer();}
  function displayMessages(){const ids=new Set(messages.map(m=>m.client_id).filter(Boolean));return [...messages,...(outbox?.items(peer)||[]).filter(x=>!ids.has(x.client_id)&&!messages.some(m=>m.id===x.message_id)).map(x=>({id:'local:'+x.client_id,client_id:x.client_id,body:x.body,photo:x.photo,priority:x.priority,created_at:x.created_at,mine:true,pending:x.status,attachment_type:x.photo?.slice(5,x.photo.indexOf(';'))}))];}
  function refreshNow(){if(busy){refreshAgain=true;return;}clearTimeout(timer);load();}
@@ -126,14 +126,14 @@
  async function load(older=false){
   if(busy||document.hidden||searchLoading){clearTimeout(timer);timer=setTimeout(load,2000);return;}busy=true;clearTimeout(timer);
   try{
-   const last=messages.at(-1),first=messages[0];
+   const initial=!fetched,last=fetched?messages.at(-1):null,first=messages[0];
    const cursor=older&&first?{before_time:first.created_at,before_id:first.id}:last?{after_time:last.created_at,after_id:last.id}:{};
    const v=await call('messages',{...cursor,receipt_ids:receiptIds()});
    if(loadNotice){status('');loadNotice=false;}
    if(v.peer&&!peerProfile)applyProfile(v.peer);
    canSend=v.can_send===true;input.disabled=!canSend;syncComposer();
    if(!v.can_send)status('현재 이 계정에 메세지를 보낼 수 없습니다.',true);
-   mergeMessages(v.messages);await outbox?.acknowledge(v.messages);const receiptChanged=mergeReceipts(v.receipts);if(older||!started)$('older').hidden=v.messages.length<50;if(v.messages.length||!started||receiptChanged)render(older);
+   fetched=true;mergeMessages(v.messages);await outbox?.acknowledge(v.messages);const receiptChanged=mergeReceipts(v.receipts);if(older||initial)$('older').hidden=v.messages.length<50;if(v.messages.length||!started||receiptChanged)render(older);
    await markRead();scheduleRead();delay=!older&&v.messages.length===50?50:live?.connected?30000:2500;
   }catch(err){line.classList.remove('chat-loading');console.warn('Staff chat load',err);loadNotice=true;status('데이터를 불러오는 중입니다.');delay=Math.min(delay*2,30000);}
   finally{busy=false;if(refreshAgain){refreshAgain=false;timer=setTimeout(load,0);}else timer=setTimeout(load,delay);}

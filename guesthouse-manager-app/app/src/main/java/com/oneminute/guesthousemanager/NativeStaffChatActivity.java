@@ -33,6 +33,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private NativeChatOutbox outbox;
     private NativeChatLive live;
     private boolean refreshAgain;
+    private final Runnable liveRefresh=()->{refreshNow();if(outbox!=null)outbox.pump();NativeMessageBadge.refresh(this);};
     private final Runnable outboxChanged=this::onOutboxChanged;
     private void onOutboxChanged(){if(destroyed||outbox==null)return;refreshList(true);enableComposer();if(active)refreshNow();}
     private void refreshNow(){if(busy){refreshAgain=true;return;}load(false,null);}
@@ -66,7 +67,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         try{api=apiFactory.create(this);}catch(Exception e){Toast.makeText(this,e.getMessage(),Toast.LENGTH_LONG).show();finish();return;}
         media=new NativeStaffChatMedia(api);upload=new NativeChatUpload(this);
         try{outbox=NativeChatOutbox.get(this,api);outbox.observe(outboxChanged);}catch(Exception e){Toast.makeText(this,"전송 대기열을 열지 못했습니다. 저장 공간을 확인해주세요.",Toast.LENGTH_LONG).show();finish();return;}
-        live=new NativeChatLive(api,()->{refreshNow();outbox.pump();NativeMessageBadge.refresh(this);});
+        live=new NativeChatLive(api,()->{main.removeCallbacks(liveRefresh);main.postDelayed(liveRefresh,80);});
         try{JSONArray selected=new JSONArray(getIntent().getStringExtra("property_ids")==null?"[]":getIntent().getStringExtra("property_ids"));for(int i=0;i<selected.length();i++)if(selected.optString(i).matches("[0-9a-fA-F-]{36}"))properties.add(selected.optString(i));}catch(Exception ignored){}
         String initial=saved!=null?saved.getString("peer",""):getIntent().getStringExtra("peer");
         if(initial!=null&&!initial.isEmpty()&&!NativeStaffChatApi.validPeer(initial)){finish();return;}

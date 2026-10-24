@@ -6,13 +6,18 @@ const read=file=>fs.readFileSync(file,'utf8');
   const errors=[];
   for(const width of [320,360,412,520]){
    const page=await browser.newPage({viewport:{width,height:950}});page.on('pageerror',e=>errors.push(e.message));
-   await page.route('**/*',r=>r.abort());
+   const unwantedNavigation=[];
+   await page.route('**/*',r=>{if(r.request().isNavigationRequest()&&r.request().url().includes('report.html'))unwantedNavigation.push(r.request().url());return r.abort();});
+   await page.route('https://omgworks24.com/app.html',r=>r.fulfill({contentType:'text/html',body:'<body></body>'}));
+   await page.goto('https://omgworks24.com/app.html');
    const html=read('app.html').replace(/<script[\s\S]*?<\/script>/g,'').replace(/<link[^>]*>/g,'').replace('class="omg-booting"','class=""');
-   await page.setContent(html);
+   await page.setContent('<base href="https://omgworks24.com/">'+html);
+   await page.evaluate(()=>{window.OMGNative={};});
+   await page.addScriptTag({content:read('page-transition.js')});
    await page.addStyleTag({content:read('top-layout.css')+read('action-dialog.css')+read('attendance-flow.css')});
    await page.addScriptTag({content:read('attendance-flow.js')});
    await page.evaluate(()=>{
-    document.getElementById('appShell').classList.add('ready');document.getElementById('mainMenu').inert=false;
+    document.getElementById('appShell').classList.add('ready','staff-attendance-shell');document.getElementById('mainMenu').inert=false;
     const old=document.getElementById('workerStatus'),flow=document.createElement('ol');flow.id='workerStatus';old.replaceWith(flow);flow.closest('.top').classList.add('staff-attendance-top');document.getElementById('myInfoQuick').style.display='inline-flex';
     window.session={employeeName:'변지훈',status:'working'};window.state={basis:'nfc',status:'working',entry_at:null,checkin_report_at:null};
     window.paint=()=>{OMSAttendanceFlow.renderProgress(flow,state,session);OMSAttendanceFlow.renderHeading(document.getElementById('workingHeading'),state,session);};paint();
@@ -21,7 +26,7 @@ const read=file=>fs.readFileSync(file,'utf8');
    for(const basis of ['nfc','first_login','report']){
     await page.evaluate(basis=>{state.basis=basis;paint();},basis);
     const labels=await page.locator('.attendance-progress-label').allTextContents();
-    assert.deepEqual(labels,[basis==='nfc'?'현장도착(NFC)':'로그인','출근보고','근무중','퇴근보고']);
+    assert.deepEqual(labels,[basis==='nfc'?'도착':'로그인','출근보고','근무중','퇴근보고']);
     const layout=await page.evaluate(()=>{
      const labels=[...document.querySelectorAll('.attendance-progress-label')].map(el=>{const r=document.createRange();r.selectNodeContents(el);const b=r.getBoundingClientRect();return {left:b.left,right:b.right};});
      return {labels,actions:document.querySelector('.top-actions').getBoundingClientRect().left,overflow:document.documentElement.scrollWidth>innerWidth};
@@ -31,13 +36,20 @@ const read=file=>fs.readFileSync(file,'utf8');
     assert(layout.labels[3].right<=layout.actions,`${width}/${basis} actions do not overlap`);
    }
    await page.evaluate(()=>{state.basis='nfc';paint();});
+   assert.equal(await page.locator('.attendance-progress .is-current,.attendance-progress .is-done').count(),0,'untagged NFC is entirely grey');
+   assert((await page.locator('#workingHeading').textContent()).endsWith(' 로그인'));
+   assert.equal(await page.locator('#appShell').evaluate(el=>getComputedStyle(el).paddingTop),'28px');
    const link=page.locator('#reportMenu a').first();await link.click();
    await page.getByRole('heading',{name:'NFC 태그를 해주십시오',exact:true}).waitFor();
-   await page.getByRole('button',{name:'확인',exact:true}).click();assert.equal(await page.evaluate(()=>navigation.length),0);
+   if(width===320){await page.waitForTimeout(2200);assert.deepEqual(unwantedNavigation,[]);assert.equal(await page.locator('dialog[open]').count(),1);assert.equal(await page.evaluate(()=>navigation.length),0);}
+   await page.getByRole('button',{name:'확인',exact:true}).click();if(width===320){await page.waitForTimeout(2200);assert.deepEqual(unwantedNavigation,[]);}assert.equal(await page.evaluate(()=>navigation.length),0);
    await link.click();await page.getByRole('button',{name:'무시하고 메뉴보기',exact:true}).click();await page.waitForFunction(()=>navigation.length===1);assert.equal(await page.evaluate(()=>navigation.length),1);
    await page.evaluate(()=>{state.entry_at='2026-10-24T00:00:00Z';paint();});await link.click();await page.waitForFunction(()=>navigation.length===2);assert.equal(await page.evaluate(()=>navigation.length),2);assert.equal(await page.locator('dialog[open]').count(),0);
+   assert.equal(await page.locator('.attendance-progress [aria-current=step]').textContent(),'도착');
    assert.equal(await page.locator('#workingHeading .online-dot.reported').count(),0);
    await page.evaluate(()=>{state.checkin_report_at='2026-10-24T00:01:00Z';paint();});assert.equal(await page.locator('#workingHeading .online-dot.reported').count(),1);assert.equal(await page.locator('.attendance-progress [aria-current="step"]').textContent(),'근무중');
+   assert((await page.locator('#workingHeading').textContent()).endsWith(' 근무중'));
+   const colors=await page.locator('.attendance-progress .is-done .attendance-progress-dot,.attendance-progress .is-current .attendance-progress-dot').evaluateAll(els=>els.map(el=>getComputedStyle(el).backgroundColor));assert(colors.every(color=>color==='rgb(45, 113, 189)'));
    if(width===412)await page.screenshot({path:'/workspace/scratch/399d827ad8cf/attendance-progress-home.png'});
    await page.evaluate(()=>{state.status='completed';paint();});assert.equal(await page.locator('.attendance-progress .is-done').count(),4);
    await page.close();

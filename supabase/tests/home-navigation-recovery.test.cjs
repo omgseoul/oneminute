@@ -23,6 +23,17 @@ test('tap without a click reports independently, while cancelled scroll does not
  const c=setup();c.fire('pointerdown');c.fire('pointercancel');c.fire('pointerup');c.tick();assert.equal(c.w.document.querySelector('[role=dialog]'),null);c.fire('pointerdown');c.fire('pointerup');c.tick();assert.equal(c.navigation.length,1);assert.equal(c.w.document.querySelector('[role=dialog]'),null);c.tick();assert.match(c.w.document.querySelector('[data-nav-code]').textContent,/터치 직접 이동 미완료/);c.dom.window.close();
 });
 test('ordinary browser has no recovery handlers',()=>{const c=setup(false);c.fire('click');assert.equal(c.jobs.size,0);c.dom.window.close();});
+test('application-managed links never arm pointer or click recovery',()=>{
+ const c=setup();c.w.document.querySelector('a').setAttribute('data-oms-managed-navigation','');
+ c.w.document.querySelector('a').onclick=e=>e.preventDefault();
+ c.fire('pointerdown');c.fire('pointerup');c.fire('click');c.tick();c.tick();
+ assert.equal(c.jobs.size,0);assert.equal(c.navigation.length,0);c.dom.window.close();
+});
+test('a click cancelled by an application handler is not retried later',()=>{
+ const c=setup();c.w.document.querySelector('a').onclick=e=>e.preventDefault();
+ c.fire('pointerdown');c.fire('pointerup');c.fire('click');c.tick();c.tick();
+ assert.equal(c.navigation.length,0);assert.equal(c.w.document.getElementById('navigationFailure'),null);c.dom.window.close();
+});
 test('shared transition bundle includes tested recovery and all links are covered',()=>{const bundle=fs.readFileSync('page-transition.js','utf8');assert(bundle.endsWith(source));assert(!source.includes("#mainMenu a[href]"));});
 
 test('drag out and back, scrolling, and long press never trigger tap recovery',()=>{

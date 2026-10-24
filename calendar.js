@@ -1,12 +1,15 @@
 (function(){
   const $=id=>document.getElementById(id);
   const dayNames=['일','월','화','수','목','금','토'];
-  let session,isOwner=false,timezone='Asia/Seoul',view='week',focusDate,events=[],tasks=[],employees=[],selectedPropertyIds=[],ownPropertyId=null;
+  let session,isOwner=false,timezone='Asia/Seoul',view='month',focusDate,events=[],tasks=[],employees=[],selectedPropertyIds=[],ownPropertyId=null;
+  const viewKey=()=>`oms.calendar.view.v1:${session.sessionKind||'staff'}:${session.ownerId||session.employeeId||session.propertyId||'local'}`;
+  function restoreView(){try{const saved=localStorage.getItem(viewKey());if(['month','week','day'].includes(saved))view=saved;}catch(_){/* Storage can be disabled; month remains usable. */}}
+  function saveView(){try{localStorage.setItem(viewKey(),view);}catch(_){/* A storage failure must not block switching views. */}}
   const pad=value=>String(value).padStart(2,'0');
   const key=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
   const parseKey=value=>{const [y,m,d]=value.split('-').map(Number);return new Date(y,m-1,d);};
   const addDays=(date,count)=>new Date(date.getFullYear(),date.getMonth(),date.getDate()+count);
-  const monday=date=>addDays(date,-(date.getDay()+6)%7);
+  const sunday=date=>addDays(date,-date.getDay());
   const sameDay=(a,b)=>key(a)===key(b);
   const escape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   function zonedParts(value){
@@ -25,9 +28,9 @@
   function range(){
     if(view==='day')return [focusDate,addDays(focusDate,1)];
     if(view==='week')return [focusDate,addDays(focusDate,7)];
-    const first=monday(new Date(focusDate.getFullYear(),focusDate.getMonth(),1));
+    const first=sunday(new Date(focusDate.getFullYear(),focusDate.getMonth(),1));
     const last=new Date(focusDate.getFullYear(),focusDate.getMonth()+1,0);
-    return [first,addDays(monday(last),7)];
+    return [first,addDays(sunday(last),7)];
   }
   function itemsFor(date){
     const start=new Date(dayStart(date)).getTime(),end=new Date(dayStart(addDays(date,1))).getTime();
@@ -78,7 +81,7 @@
       const items=itemsFor(date),outside=date.getMonth()!==focusDate.getMonth();
       cells.push(`<div class="calendar-day${outside?' other':''}${sameDay(date,now)?' today':''}" data-date="${key(date)}"><button class="calendar-day-number" type="button" aria-label="${key(date)} 일정 추가">${date.getDate()}</button>${items.slice(0,2).map(item=>itemMarkup(item)).join('')}${items.length>2?`<span class="calendar-more">+${items.length-2}건</span>`:''}</div>`);
     }
-    $('calendarBoard').innerHTML=`<div class="calendar-weekdays">${['월','화','수','목','금','토','일'].map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-month">${cells.join('')}</div>`;
+    $('calendarBoard').innerHTML=`<div class="calendar-weekdays">${dayNames.map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-month">${cells.join('')}</div>`;
   }
   function renderWeek(){
     const first=focusDate,now=today(),cards=[];
@@ -158,7 +161,7 @@
     dialog.scrollTop=0;
   }
   function closeEditor(){closeTargetPanel();if($('eventDialog').open)$('eventDialog').close();}
-  $('viewButtons').onclick=event=>{const button=event.target.closest('[data-view]');if(!button||button.dataset.view===view)return;view=button.dataset.view;if(view==='week')focusDate=today();refresh();};
+  $('viewButtons').onclick=event=>{const button=event.target.closest('[data-view]');if(!button||!['month','week','day'].includes(button.dataset.view)||button.dataset.view===view)return;view=button.dataset.view;saveView();if(view==='week')focusDate=today();refresh();};
   $('todayButton').onclick=()=>{focusDate=today();refresh();};
   function move(direction){if(view==='month')focusDate=new Date(focusDate.getFullYear(),focusDate.getMonth()+direction,Math.min(focusDate.getDate(),28));else focusDate=addDays(focusDate,direction*(view==='week'?7:1));refresh();}
   $('prevButton').onclick=()=>move(-1);$('nextButton').onclick=()=>move(1);
@@ -189,7 +192,7 @@
   $('deleteEvent').onclick=async()=>{if(!confirm('이 일정을 삭제할까요?'))return;const button=$('deleteEvent');button.disabled=true;try{await rpc('delete',{id:$('eventId').value});closeEditor();await refresh();}catch(error){$('eventFormMessage').textContent=error.message;}finally{button.disabled=false;}};
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)refresh();});
   (async()=>{session=await window.omgSession.require({allowCompleted:true});if(!session)return;
-    isOwner=session.sessionKind==='owner';timezone=session.timezone||'Asia/Seoul';focusDate=today();
+    isOwner=session.sessionKind==='owner';timezone=session.timezone||'Asia/Seoul';focusDate=today();restoreView();
     $('targetFieldset').hidden=!isOwner;
     if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=!ids.includes(ownPropertyId);await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=!selectedPropertyIds.includes(ownPropertyId);}
     await refresh();window.omgTransition.ready();

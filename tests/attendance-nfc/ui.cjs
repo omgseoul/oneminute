@@ -1,0 +1,24 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+(async()=>{
+ const html=fs.readFileSync('owner-settings.html','utf8').replace(/<script[\s\S]*?<\/script>/g,'');
+ const dom=new JSDOM(html,{url:'https://omgworks24.com/owner-settings.html',runScripts:'outside-only'}),w=dom.window,d=w.document;
+ let request,stopped=[];w.OMGNative={startAttendanceNfc(id){request=id;},stopAttendanceNfc(id){stopped.push(id);}};
+ for(const file of ['attendance-nfc.js','attendance-settings.js'])w.eval(fs.readFileSync(file,'utf8'));
+ const api=w.OMSAttendanceSettings;api.set({basis:'first_login',report_offset_minutes:0,nfc_tags:[]});
+ const choose=value=>{const box=d.querySelector(`input[value="${value}"][name="clockInBasis"]`);box.checked=true;box.dispatchEvent(new w.Event('change'));};
+ choose('report');assert.equal(d.querySelectorAll('[name=clockInBasis]:checked').length,1);assert(!d.getElementById('attendanceReportOptions').hidden);assert(d.getElementById('attendanceNfcOptions').hidden);
+ for(let i=0;i<10;i++)d.querySelector('[data-attendance-step="-1"]').click();assert.equal(api.value().report_offset_minutes,-10);assert(d.getElementById('attendanceOffsetHint').textContent.includes('10분 전'));
+ const offset=d.getElementById('attendanceOffset');offset.value='5';offset.dispatchEvent(new w.Event('input'));assert.equal(api.value().report_offset_minutes,5);
+ offset.value='1.5';assert.throws(()=>api.value());offset.value='0';
+ choose('nfc');assert(!d.getElementById('attendanceNfcOptions').hidden);assert.throws(()=>api.value());
+ d.getElementById('attendanceNfcManualToggle').click();d.getElementById('attendanceNfcUid').value='04:11:22:33:44:55:66';d.getElementById('attendanceNfcAdd').click();assert.deepEqual(Array.from(api.value().nfc_tags),['04112233445566']);
+ d.getElementById('attendanceNfcScan').click();w.dispatchEvent(new w.CustomEvent('omg:nfc-result',{detail:{request_id:request,uid:'DEADBEEF'}}));await tick();assert.equal(api.value().nfc_tags.length,2);
+ d.querySelector('.attendance-nfc-value button').click();assert.deepEqual(Array.from(api.value().nfc_tags),['DEADBEEF']);
+ d.getElementById('attendanceNfcScan').click();const old=request;api.set({basis:'report',report_offset_minutes:-10,nfc_tags:[]});w.dispatchEvent(new w.CustomEvent('omg:nfc-result',{detail:{request_id:old,uid:'DEADBEEF'}}));await tick();assert.equal(api.value().nfc_tags.length,0,'late NFC cannot modify a newly selected branch');
+ const scan=w.OMSAttendanceNfc.scan();w.dispatchEvent(new w.CustomEvent('omg:nfc-result',{detail:{request_id:request,error:'NFC 꺼짐'}}));await assert.rejects(scan.promise,/NFC 꺼짐/);
+ delete w.OMGNative;await assert.rejects(w.OMSAttendanceNfc.scan().promise,/최신 OMS 앱/);
+ assert.throws(()=>w.OMSAttendanceNfc.normalize('not a uid'));
+ api.reset();assert.throws(()=>api.value(),/불러오는 중/);dom.window.close();
+ console.log('PASS: one selected basis, conditional controls, signed offset, manual/scanned UID, deletion, stale scan, unsupported/disabled NFC, loading guard');
+})().catch(error=>{console.error(error);process.exitCode=1;});

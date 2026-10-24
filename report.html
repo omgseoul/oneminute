@@ -8,7 +8,7 @@
 .fields>.field-card.third{grid-column:span 2;min-width:0;padding:12px 8px}.custom-result.third .field-head{flex-direction:column;align-items:stretch;gap:8px}.custom-result.third h2{font-size:11px;line-height:1.35;margin:0;overflow-wrap:anywhere}.custom-result.third .custom-value{width:100%;min-width:0;min-height:34px;padding:6px 5px;font-size:11px}.custom-result.third .stepper{width:100%;grid-template-columns:24px minmax(0,1fr) 24px;gap:2px}.custom-result.third .stepper button{width:24px;height:34px;font-size:17px}.custom-result.third .stepper .compact-input{width:100%;min-width:0;height:34px;font-size:12px}.custom-result.third .custom-photo{width:100%;max-width:100%;flex-wrap:wrap;gap:4px}.custom-result.third .custom-photo .custom-choice{flex:1 1 auto;min-width:0;padding:6px 4px}.custom-result.third .custom-photo img{width:26px;height:26px}.custom-result.third .photo-remove{width:20px;height:20px;font-size:12px;padding:0}.custom-result.third .required-mark{font-size:10px}
 .fields>.empty{grid-column:1/-1;min-width:0;width:100%;line-height:1.6;word-break:keep-all;overflow-wrap:break-word}
 </style><link rel="stylesheet" href="home-link.css?v=20261001"><link rel="stylesheet" href="top-layout.css?v=20261005b">
-<link rel="stylesheet" href="housing-rooms.css?v=20261018-four-chars"><script src="housing-rooms.js?v=20261018-four-chars"></script></head><body>
+<link rel="stylesheet" href="housing-rooms.css?v=20261018-four-chars"><script src="housing-rooms.js?v=20261018-four-chars"></script><link rel="stylesheet" href="attendance-settings.css?v=20261024"></head><body>
 <main id="formPage" class="container">
   <div class="top"><a class="back" href="app.html">← Home</a><span id="propertyName" class="property">불러오는 중...</span></div>
   <section class="hero"><h1 id="reportTitle">업무 보고</h1><p id="reportIntro">직원별로 설정된 항목을 확인해주세요.</p><div id="clockInTime" class="clock"></div></section>
@@ -21,7 +21,7 @@
   </form>
 </main>
 <main id="donePage" class="container"><section class="done-card"><div class="check">✓</div><h1 id="doneTitle">보고 완료</h1><p id="doneText">보고가 저장되고 전달되었습니다.</p><a id="doneLink" href="app.html">메인으로</a></section></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="work-config.js?v=20261012-report-thirds"></script><script src="photo-codec.js?v=20261001"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="attendance-nfc.js?v=20261024"></script><script src="work-config.js?v=20261012-report-thirds"></script><script src="photo-codec.js?v=20261001"></script>
 <script src="notification-config.js"></script><script src="notification-client.js"></script><script src="report-session.js?v=20261001-weak"></script>
 <script>
 const reportType = new URLSearchParams(location.search).get("type");
@@ -87,12 +87,14 @@ function buildPayload(session, config){
 (async()=>{
   if(!["clock_in","clock_out"].includes(reportType)){location.replace("index.html");return;}
   const session=await window.omgReport.ready;if(!session)return;
+  const attendance=isClockIn?await window.OMSAttendanceNfc.mountWorker(session,document.querySelector(".hero")):null;
   pageConfig=await window.omgWorkConfig.load(session.accessToken);
   const enabled=new Set(pageConfig.report_config[reportType]);
   document.getElementById("propertyName").textContent=pageConfig.property.name;
   document.getElementById("reportTitle").textContent=title;document.title=`${pageConfig.property.name} ${title}`;
   document.getElementById("reportIntro").textContent=isClockIn?"오늘 업무 계획을 선택해주세요.":"완료한 객실을 선택해주세요.";
-  document.getElementById("clockInTime").textContent=isClockIn?`출근 기록 ${window.omgReport.clockInText()}`:"";
+  const clockNode=document.getElementById("clockInTime"),attendanceState=attendance?.state;
+  clockNode.textContent=!isClockIn?"":!session.checkinReportAt&&attendanceState?.basis==="nfc"?"NFC 최초 입장 시각으로 기록됩니다.":!session.checkinReportAt&&attendanceState?.basis==="report"?`출근보고 전송 시각 ${attendanceState.report_offset_minutes<0?"−":"+"} ${Math.abs(attendanceState.report_offset_minutes)}분 기준`:`출근 기록 ${window.omgReport.clockInText()}`;
   document.getElementById("submitButton").textContent=isClockIn?"출근보고 제출":"퇴근보고 제출";
   document.getElementById("doneTitle").textContent=`${title} 완료`;
   if(isClockIn)document.getElementById("doneText").textContent="출근 완료. 5분 후에 워치 연결 테스트 알람갑니다. 풀타임 착용하시고 개인폰 말고 게하폰 항상 소지하세요.";

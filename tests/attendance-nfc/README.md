@@ -14,8 +14,10 @@ The two public RPCs deliberately follow OMS's existing PIN/session-token authent
 
 NFC reads are foreground-only on the native app home/report pages, or explicitly requested on the settings page. They read UID bytes without writing the tag. Read callbacks are correlated to a request, discarded on navigation/cancel, and disabled while the activity is paused. Manual values use the same uppercase hex representation, accepting spaces/colons/hyphens. No tag IDs are written to application logs. A static UID is an identifier, not cryptographic proximity proof.
 
-First NFC entry is retained on the work-session row, not reset by subsequent taps. A new work session has no entry. NFC alone does not submit an attendance report. The existing session lifetime/relogin policy continues to define shift boundaries. Existing attendance is untouched when settings change; report resubmission does not recalculate clock-in.
+First NFC entry is retained on the work-session row, not reset by subsequent taps. A new work session has no entry. NFC alone does not submit an attendance report. Confirmed or NFC-entered shifts survive re-login across midnight. The existing 20-hour lifetime remains anchored to the original login, so positive/negative report offsets cannot extend or prematurely end a shift. An unreported, untagged previous-day login still starts a new shift. Existing attendance is untouched when settings change; report resubmission does not recalculate clock-in.
 
 Production migration applied as `20261024105646_attendance_nfc_report_offset`. Post-deploy checks confirm RLS, invalid-token rejection, zero offsets and empty tag lists for all pre-existing properties. No owner's selected attendance basis was changed.
 
 An additional legacy `supabase/tests/report-client.test.cjs` run stops at the pre-existing “PIN login does not flash a hard-coded property name” assertion; the unchanged baseline reproduces that failure. New settings/worker integration tests and existing `tests/attendance-time.cjs` pass.
+
+Follow-up migration `20261024111120_preserve_attendance_shift_across_midnight` preserves confirmed shift identity across midnight and anchors expiry to the original login. Isolated tests cover negative offsets crossing a work date, an NFC entry before reporting, and starting a fresh shift after the 20-hour limit.

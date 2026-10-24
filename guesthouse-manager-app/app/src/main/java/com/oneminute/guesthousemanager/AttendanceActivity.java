@@ -27,6 +27,7 @@ public class AttendanceActivity extends AppCompatActivity {
     private static final int FILE_CHOOSER_REQUEST = 2201;
     private static final int EXCEL_SAVE_REQUEST = 2202;
     private WebView webView;
+    private NativeAttendanceNfc attendanceNfc;
     private WebViewRecovery recovery;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExcel;
@@ -97,6 +98,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private void clearPushSession() {
+        runOnUiThread(()->{if(attendanceNfc!=null)attendanceNfc.clear();});
         runOnUiThread(()->{if(workerProfiles!=null)workerProfiles.clear();});
         NativePushRegistration.clear(this);
         NativeStaffChatApi.clearLocal(this);
@@ -127,6 +129,7 @@ public class AttendanceActivity extends AppCompatActivity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         webView = new WebView(this);
+        attendanceNfc = new NativeAttendanceNfc(this,webView);
         FrameLayout root = new FrameLayout(this);
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
@@ -142,7 +145,7 @@ public class AttendanceActivity extends AppCompatActivity {
         webView.addJavascriptInterface(new PushBridge(), "OMGNative");
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { if(workerProfiles!=null)workerProfiles.clear();recovery.started(url); }
+            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { if(attendanceNfc!=null)attendanceNfc.clear();if(workerProfiles!=null)workerProfiles.clear();recovery.started(url); }
             @Override public void onPageFinished(WebView view, String url) { recovery.finished(url); }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) recovery.fail(request.getUrl().toString());
@@ -235,6 +238,8 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private final class PushBridge {
+        @JavascriptInterface public void startAttendanceNfc(String requestId){runOnUiThread(()->attendanceNfc.start(requestId));}
+        @JavascriptInterface public void stopAttendanceNfc(String requestId){runOnUiThread(()->attendanceNfc.stop(requestId));}
         @JavascriptInterface
         public boolean openWorkerProfile(String peer) {
             java.util.concurrent.atomic.AtomicBoolean opened=new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -428,10 +433,10 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume();if(attendanceNfc!=null)attendanceNfc.resume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
-    protected void onPause() { if (recovery != null) recovery.pause(); super.onPause(); }
+    protected void onPause() { if(attendanceNfc!=null)attendanceNfc.pause(); if (recovery != null) recovery.pause(); super.onPause(); }
 
     @Override
     protected void onDestroy() {

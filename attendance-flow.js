@@ -12,12 +12,13 @@
     const promise=new Promise(resolve=>node.addEventListener('close',()=>{node.remove();activeDialog=null;resolve(node.returnValue==='proceed');},{once:true}));
     activeDialog={promise,node};document.body.append(node);node.showModal();okay.focus();return promise;
   }
-  function firstLabel(basis){return basis==='nfc'?'현장도착(NFC)':basis?'로그인':'확인중';}
+  function firstLabel(basis){return basis==='nfc'?'도착':basis?'로그인':'확인중';}
   function renderProgress(host,state,session){
     const completed=(state?.status||session.status)==='completed';
     const reported=!!(state?state.checkin_report_at:session.checkinReportAt);
     const arrived=state?.basis==='nfc'?!!state.entry_at:!!state;
-    const current=completed?3:reported?2:arrived?1:0;
+    // An untagged NFC shift has not reached any step. Opening a form is not a report.
+    const current=completed?3:reported?2:arrived?0:-1;
     const labels=[firstLabel(state?.basis),'출근보고','근무중','퇴근보고'];
     host.className='attendance-progress';host.setAttribute('aria-label','출퇴근 진행 상태');
     host.replaceChildren();
@@ -36,7 +37,7 @@
     const reported=!!(state?state.checkin_report_at:session.checkinReportAt),completed=(state?.status||session.status)==='completed';
     const dot=document.createElement('i');dot.className='online-dot'+(completed?' ended':reported?' reported':'');dot.setAttribute('aria-hidden','true');
     const name=document.createElement('span');name.className='working-self-name';name.textContent=session.employeeName||'근무자';
-    host.replaceChildren(dot,name,document.createTextNode(completed?' 근무 종료':' 근무중'));
+    host.replaceChildren(dot,name,document.createTextNode(completed?' 근무 종료':reported?' 근무중':' 로그인'));
     host.setAttribute('aria-label',`${session.employeeName||'근무자'} · ${completed?'근무 종료':reported?'근무중':'로그인 · 출근보고 전'}`);
   }
   async function mayOpenReport(controller){
@@ -48,6 +49,7 @@
     }catch(error){await dialog(error.message);return false;}
   }
   function bindCheckin(link,controller,navigate=url=>location.assign(url)){
+    link.setAttribute('data-oms-managed-navigation','');
     let pending=false;
     link.addEventListener('click',async event=>{
       event.preventDefault();if(pending)return;pending=true;

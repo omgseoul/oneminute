@@ -8,7 +8,7 @@
 .fields>.field-card.third{grid-column:span 2;min-width:0;padding:12px 8px}.custom-result.third .field-head{flex-direction:column;align-items:stretch;gap:8px}.custom-result.third h2{font-size:11px;line-height:1.35;margin:0;overflow-wrap:anywhere}.custom-result.third .custom-value{width:100%;min-width:0;min-height:34px;padding:6px 5px;font-size:11px}.custom-result.third .stepper{width:100%;grid-template-columns:24px minmax(0,1fr) 24px;gap:2px}.custom-result.third .stepper button{width:24px;height:34px;font-size:17px}.custom-result.third .stepper .compact-input{width:100%;min-width:0;height:34px;font-size:12px}.custom-result.third .custom-photo{width:100%;max-width:100%;flex-wrap:wrap;gap:4px}.custom-result.third .custom-photo .custom-choice{flex:1 1 auto;min-width:0;padding:6px 4px}.custom-result.third .custom-photo img{width:26px;height:26px}.custom-result.third .photo-remove{width:20px;height:20px;font-size:12px;padding:0}.custom-result.third .required-mark{font-size:10px}
 .fields>.empty{grid-column:1/-1;min-width:0;width:100%;line-height:1.6;word-break:keep-all;overflow-wrap:break-word}
 </style><link rel="stylesheet" href="home-link.css?v=20261001"><link rel="stylesheet" href="top-layout.css?v=20261005b">
-<link rel="stylesheet" href="housing-rooms.css?v=20261018-four-chars"><script src="housing-rooms.js?v=20261018-four-chars"></script><link rel="stylesheet" href="action-dialog.css?v=20261020"><link rel="stylesheet" href="attendance-flow.css?v=20261024-progress"></head><body>
+<link rel="stylesheet" href="housing-rooms.css?v=20261018-four-chars"><script src="housing-rooms.js?v=20261018-four-chars"></script><link rel="stylesheet" href="action-dialog.css?v=20261020"><link rel="stylesheet" href="attendance-flow.css?v=20261024-progress-fix"></head><body>
 <main id="formPage" class="container">
   <div class="top"><a class="back" href="app.html">← Home</a><span id="propertyName" class="property">불러오는 중...</span></div>
   <section class="hero"><h1 id="reportTitle">업무 보고</h1><p id="reportIntro">직원별로 설정된 항목을 확인해주세요.</p><div id="clockInTime" class="clock"></div></section>
@@ -21,8 +21,8 @@
   </form>
 </main>
 <main id="donePage" class="container"><section class="done-card"><div class="check">✓</div><h1 id="doneTitle">보고 완료</h1><p id="doneText">보고가 저장되고 전달되었습니다.</p><a id="doneLink" href="app.html">메인으로</a></section></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="attendance-nfc.js?v=20261024-progress"></script><script src="attendance-flow.js?v=20261024-progress"></script><script src="work-config.js?v=20261012-report-thirds"></script><script src="photo-codec.js?v=20261001"></script>
-<script src="notification-config.js"></script><script src="notification-client.js"></script><script src="report-session.js?v=20261024-progress"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="attendance-nfc.js?v=20261024-progress-fix"></script><script src="attendance-flow.js?v=20261024-progress-fix"></script><script src="work-config.js?v=20261012-report-thirds"></script><script src="photo-codec.js?v=20261001"></script>
+<script src="notification-config.js"></script><script src="notification-client.js"></script><script src="report-session.js?v=20261024-progress-fix"></script>
 <script>
 const reportType = new URLSearchParams(location.search).get("type");
 const isClockIn = reportType === "clock_in";

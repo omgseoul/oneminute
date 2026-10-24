@@ -53,7 +53,7 @@
   function nativeNavigation() { cancel(); document.getElementById('navigationFailure')?.remove(); }
   function menuLink(target) {
     var link = target && target.closest ? target.closest('a[href]') : null;
-    if (!link || link.target || link.hasAttribute('download') || link.getAttribute('href').charAt(0) === '#') return null;
+    if (!link || link.hasAttribute('data-oms-managed-navigation') || link.target || link.hasAttribute('download') || link.getAttribute('href').charAt(0) === '#') return null;
     var url = new URL(link.href, location.href);
     return /^https?:$/.test(url.protocol) && url.origin === location.origin ? link : null;
   }
@@ -102,7 +102,7 @@
     var id = ++attempt;
     // Do not cancel the real click. Retry only if this document never leaves.
     timer = setTimeout(function () {
-      if (document.hidden || pending !== link || id !== attempt) return;
+      if (event.defaultPrevented || document.hidden || pending !== link || id !== attempt) return;
       location.assign(link.href);
       if (pending === link && id === attempt) timer = setTimeout(function () { if (pending === link && id === attempt) showFailure(link, '클릭 후 이동 미완료'); }, 5000);
     }, 1500);

@@ -1,15 +1,19 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
-test('calendar opens in weekly view and bottom icons switch month, week, day',async()=>{
+test('calendar defaults to Sunday-first month and bottom icons switch month, week, day',async()=>{
  const html=fs.readFileSync('calendar.html','utf8');
  const dom=new JSDOM(html.replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/calendar.html',runScripts:'outside-only'}),w=dom.window;
- const calls=[],pastDue=new Date(Date.now()-48*60*60*1000).toISOString(),dueToday=new Date(Date.now()+60*60*1000).toISOString();w.omgSession={require:async()=>({sessionKind:'staff',accessToken:'token',timezone:'Asia/Seoul'})};
+ const testNow=Date.parse('2026-10-24T03:00:00Z');w.Date.now=()=>testNow;
+ const calls=[],pastDue=new Date(testNow-48*60*60*1000).toISOString(),dueToday=new Date(testNow+60*60*1000).toISOString();w.omgSession={require:async()=>({sessionKind:'staff',accessToken:'token',timezone:'Asia/Seoul'})};
  w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='list_missions'?{ok:true,missions:[{id:'late',title:'놓친 할 일',due_at:pastDue},{id:'today-task',title:'오늘 할 일',due_at:dueToday}]}:name==='list_overdue_calendar_tasks'?{ok:true,tasks:[{id:'late',title:'놓친 할 일',due_at:pastDue}]}:{ok:true,events:[],tasks:[{id:'today-task',title:'오늘 할 일',due_at:dueToday}],employees:[]}};}};
  w.omgTransition={ready(){}};w.eval(fs.readFileSync('worker-tasks.js','utf8'));w.eval(fs.readFileSync('calendar.js','utf8'));await tick();
  const d=w.document,actions=d.querySelector('.calendar-floating-actions');
  assert.deepEqual([...actions.querySelectorAll('button')].map(button=>button.dataset.view||button.id),['month','week','day','addEvent']);
  assert.equal(d.querySelector('.calendar-toolbar #viewButtons'),null);
- assert.equal(d.querySelector('.calendar-week-grid').children.length,7);const todayKey=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date()),todayCard=d.querySelector('.calendar-week-card[data-date="'+todayKey+'"]'),todayEntries=[...todayCard.querySelectorAll('.calendar-week-entry')];assert.deepEqual(todayEntries.map(entry=>entry.dataset.id),['late','today-task']);assert.equal(todayEntries[0].querySelector('.calendar-week-type').textContent,'To do');assert.equal(todayEntries[0].querySelector('.calendar-late-badge').textContent,'지연');
+ assert.ok(d.querySelector('.calendar-month'));assert.equal(actions.querySelector('[data-view=month]').getAttribute('aria-pressed'),'true');assert.deepEqual([...d.querySelectorAll('.calendar-weekdays span')].map(n=>n.textContent),['일','월','화','수','목','금','토']);
+ const first=d.querySelector('.calendar-day').dataset.date;assert.equal(new Date(first+'T12:00:00').getDay(),0);
+ actions.querySelector('[data-view=week]').click();await tick();
+ assert.equal(d.querySelector('.calendar-week-grid').children.length,7);const todayKey=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date(testNow)),todayCard=d.querySelector('.calendar-week-card[data-date="'+todayKey+'"]'),todayEntries=[...todayCard.querySelectorAll('.calendar-week-entry')];assert.deepEqual(todayEntries.map(entry=>entry.dataset.id),['late','today-task']);assert.equal(todayEntries[0].querySelector('.calendar-week-type').textContent,'To do');assert.equal(todayEntries[0].querySelector('.calendar-late-badge').textContent,'지연');
  assert.equal(actions.querySelector('[data-view=week]').getAttribute('aria-pressed'),'true');
  assert.equal(actions.querySelector('[data-view=day] svg path'),null);
  const monthPath=actions.querySelector('[data-view=month] svg path').getAttribute('d');

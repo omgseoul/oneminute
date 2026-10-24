@@ -110,7 +110,7 @@ async function loadTodayOverview(session,missionData){
     const paint=state=>{OMSAttendanceFlow.renderProgress(progress,state,session);OMSAttendanceFlow.renderHeading(document.getElementById("workingHeading"),state,session);};
     paint(null);
     const attendance=await OMSAttendanceNfc.mountWorker(session,null,{onChange:paint,onError:error=>OMSAttendanceFlow.dialog(error.message)});
-    OMSAttendanceFlow.bindCheckin(document.querySelector('#reportMenu a[href="report.html?type=clock_in" data-oms-managed-navigation]'),attendance);
+    OMSAttendanceFlow.bindCheckin(document.querySelector('#reportMenu a[data-oms-managed-navigation]'),attendance);
   }
   document.title = "OMS · 게하관리";
   document.getElementById("reportMenu").style.display = isOwner ? "none" : "";

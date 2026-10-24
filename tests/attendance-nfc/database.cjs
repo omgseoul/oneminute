@@ -46,5 +46,21 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  await db.query("insert into property_share_requests(requester_property_id,target_property_id,requested_permissions,status)values($1,$2,array['property_settings'],'approved')",[p1,p2]);assert((await save(settings('report',-10),own,p2)).ok);
  await db.query('update owners set active=false where id=$1',[owner]);assert(!(await save(settings('report'))).ok);
  const access=(await db.query("select has_function_privilege('anon','public.attendance_nfc_entry(uuid,text)','execute') allowed,has_function_privilege('anon','omg_private.normalize_attendance_uid(text)','execute') helper")).rows[0];assert(access.allowed);assert(!access.helper);
- await db.close();console.log('PASS: owner/shared authorization, UID normalization, missing/wrong/repeated NFC, server timestamps, idempotent reports, offsets -10/0/+10, completed shifts, privileges');
+ // Re-login preserves a confirmed or NFC-entered shift across a work-date boundary,
+ // while expiry remains anchored to the original login, never to an adjusted report time.
+ await db.exec(`create table public.businesses(id uuid primary key,code text);
+ create function omg_private.pin_matches(text,text) returns boolean language sql as 'select true';
+ create function public.evaluate_attendance_warnings(uuid,text) returns jsonb language sql as $q$select '{}'::jsonb$q$;
+ create function omg_private.session_result(p_id uuid) returns jsonb language sql set search_path='' as $q$select jsonb_build_object('ok',true,'session_id',s.id,'entry_at',s.nfc_entry_at,'clock_in_at',s.clock_in_at,'expires_at',s.token_expires_at) from public.work_sessions s where s.id=p_id$q$;`);
+ await db.exec(fs.readFileSync('supabase/migrations/20261024111120_preserve_attendance_shift_across_midnight.sql','utf8'));
+ await db.query("insert into businesses(id,code)values($1,'fixture')",[id(8)]);
+ await db.query("update properties set business_id=$1,code='own' where id=$2",[id(8),p1]);
+ await db.query("update employees set business_id=$1,pin_hash='test-only' where id=$2",[id(8),employee]);
+ await db.query("update work_sessions set business_id=$1,clock_out_at=null,status='working',work_date=current_date-1,clock_in_at=clock_timestamp()-interval '25 hours',first_login_at=clock_timestamp()-interval '1 hour',checkin_report_at=clock_timestamp(),nfc_entry_at=null where id=$2",[id(8),s1]);
+ const resumeReport=await rpc('start_work_session',[employee,'123456','general','fixture','own']);assert(resumeReport.resumed);assert.equal(resumeReport.session_id,s1,'adjusted previous-day clock-in does not split a shift');assert(new Date(resumeReport.expires_at)>Date.now());
+ await db.query("update work_sessions set checkin_report_at=null,nfc_entry_at=clock_timestamp()-interval '30 minutes' where id=$1",[s1]);
+ const resumeNfc=await rpc('start_work_session',[employee,'123456','general','fixture','own']);assert(resumeNfc.resumed);assert.equal(resumeNfc.session_id,s1);assert(resumeNfc.entry_at);
+ await db.query("update work_sessions set first_login_at=clock_timestamp()-interval '21 hours',clock_in_at=clock_timestamp()+interval '1 hour' where id=$1",[s1]);
+ const nextShift=await rpc('start_work_session',[employee,'123456','general','fixture','own']);assert(!nextShift.resumed);assert.notEqual(nextShift.session_id,s1);assert.equal(nextShift.entry_at,null,'new shift never reuses the previous NFC entry');
+ await db.close();console.log('PASS: owner/shared authorization, UID normalization, missing/wrong/repeated NFC, server timestamps, idempotent reports, offsets -10/0/+10, completed shifts, privileges, midnight re-login and original 20-hour expiry');
 })().catch(error=>{console.error(error);process.exitCode=1});

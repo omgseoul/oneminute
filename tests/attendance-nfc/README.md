@@ -21,3 +21,13 @@ Production migration applied as `20261024105646_attendance_nfc_report_offset`. P
 An additional legacy `supabase/tests/report-client.test.cjs` run stops at the pre-existing “PIN login does not flash a hard-coded property name” assertion; the unchanged baseline reproduces that failure. New settings/worker integration tests and existing `tests/attendance-time.cjs` pass.
 
 Follow-up migration `20261024111120_preserve_attendance_shift_across_midnight` preserves confirmed shift identity across midnight and anchors expiry to the original login. Isolated tests cover negative offsets crossing a work date, an NFC entry before reporting, and starting a fresh shift after the 20-hour limit.
+
+## Compact worker progress and optional NFC submission
+
+The home page uses the original connected-dot progress bar. NFC settings show `현장도착(NFC)`; first-login and report-offset settings show `로그인`. Employee identity moves to the working-list heading, with a yellow pre-report dot and green post-report dot. No worker NFC cards are mounted.
+
+Opening check-in without an NFC entry shows the shared OMS dialog: `확인` dismisses it; `무시하고 메뉴보기` opens the report. The server uses an existing NFC entry, or its own report timestamp when no entry exists. Report-mode offsets do not affect this fallback. Later scans cannot rewrite a submitted untagged shift. Existing authorization, row locking, idempotence and overnight shift boundaries remain in force.
+
+The check-in success flow shows only `출근완료`, then returns home on confirmation. Watch-test payload flags and instructions are removed; the save RPC also strips legacy clients' flags.
+
+`progress.cjs` exercises real home CSS at 320/360/412/520px, first-stage labels, state changes, both dialog buttons, and the real report/session submit and failure flow with mocked transports. The database fixture covers untagged fallback, spoofed client time, disabled watch flags, tagged shifts, and -10/0/+10 report offsets. No production attendance fixtures are created. Physical NFC radio operation remains an on-device check; the native bridge is unchanged and no APK rebuild is required.

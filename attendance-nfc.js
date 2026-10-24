@@ -12,20 +12,46 @@
     else{if(timeoutMs>0)timer=setTimeout(()=>{cleanup();reject(new Error('태그를 읽지 못했습니다. NFC를 켜고 다시 시도해주세요.'));},timeoutMs);try{window.OMGNative.startAttendanceNfc(id);}catch(error){cleanup();reject(error);}}
     return request;
   }
-  async function mountWorker(session,host){
-    if(!host||session.sessionKind!=='staff')return;
-    let state=null,disposed=false,pending=null,busy=false;
-    const card=document.createElement('section');card.className='attendance-nfc-worker';card.hidden=true;
-    const label=document.createElement('div'),button=document.createElement('button');button.type='button';button.textContent='NFC 태그하기';label.setAttribute('role','status');card.append(label,button);host.append(card);
-    const current=()=>!disposed&&window.omgSession.get()?.accessToken===session.accessToken;
-    const time=value=>new Date(value).toLocaleString('ko-KR',{timeZone:session.timezone||'Asia/Seoul'});
-    async function rpc(uid){const {data,error}=await window.omgSupabase.rpc('attendance_nfc_entry',{p_access_token:session.accessToken,p_tag_uid:uid||null});if(error||!data?.ok)throw new Error(data?.message||'입장 기록을 확인하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');return data;}
-    function paint(){card.hidden=state.basis!=='nfc'||!!(state.checkin_report_at&&!state.entry_at);if(card.hidden)return;label.textContent=state.entry_at?`입장 확인 · ${time(state.entry_at)}${state.checkin_report_at?'':' · 출근보고 미완료'}`:'현장 NFC 태그를 대면 입장이 기록됩니다.';button.hidden=!!state.entry_at||state.status!=='working';window.dispatchEvent(new CustomEvent('omg:attendance-entry',{detail:state}));}
-    async function read(){if(busy||!current())return;busy=true;button.disabled=true;label.textContent='휴대폰 뒷면에 현장 NFC 태그를 대주세요.';try{pending=scan({timeoutMs:0});const uid=await pending.promise;if(!current())return;label.textContent='입장 기록을 저장하고 있습니다…';const result=await rpc(uid);if(!current())return;state=result;paint();}catch(error){if(current())label.textContent=error.message;}finally{pending=null;busy=false;button.disabled=false;}}
-    button.onclick=read;
-    async function refresh(){try{state=await rpc();if(!current())return;paint();if(state.basis==='nfc'&&!state.entry_at&&!state.checkin_report_at&&state.status==='working'&&window.OMGNative?.startAttendanceNfc)read();}catch(error){if(current()){card.hidden=false;label.textContent=error.message;button.textContent='다시 확인';button.onclick=()=>{button.textContent='NFC 태그하기';button.onclick=read;refresh();};}}}
-    window.addEventListener('pagehide',()=>{disposed=true;pending?.cancel();},{once:true});
-    await refresh();return {get state(){return state;}};
+  // Read NFC silently: attendance status belongs in the compact home progress bar.
+  async function mountWorker(session,host,options={}){
+    if(session.sessionKind!=='staff')return null;
+    let state=null,pending=null,busy=false,paused=false,refreshing=null,retryTimer=null,revision=0,timer=null;
+    const current=()=>!paused&&window.omgSession.get()?.accessToken===session.accessToken;
+    async function rpc(uid){
+      let timeout;
+      try{
+        const {data,error}=await Promise.race([
+          window.omgSupabase.rpc('attendance_nfc_entry',{p_access_token:session.accessToken,p_tag_uid:uid||null}),
+          new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('출근 상태를 확인하지 못했습니다. 연결을 확인하고 다시 시도해주세요.')),12000);})
+        ]);
+        if(error||!data?.ok)throw new Error(data?.message||'출근 상태를 확인하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');return data;
+      }finally{clearTimeout(timeout);}
+    }
+    function paint(){options.onChange?.(state);window.dispatchEvent(new CustomEvent('omg:attendance-entry',{detail:state}));}
+    function canRead(){return current()&&!document.hidden&&state?.basis==='nfc'&&!state.entry_at&&!state.checkin_report_at&&state.status==='working'&&window.OMGNative?.startAttendanceNfc;}
+    async function read(){
+      if(busy||!canRead())return;busy=true;let received=false;
+      try{pending=scan({timeoutMs:0});const uid=await pending.promise;received=true;if(!current())return;const result=await rpc(uid);if(current()){revision++;state=result;paint();}}
+      catch(error){if(current()&&received){options.onError?.(error);retryTimer=setTimeout(read,1500);}}
+      finally{pending=null;busy=false;}
+    }
+    async function refresh(){
+      if(refreshing)return refreshing;
+      const startedRevision=revision;
+      refreshing=(async()=>{const result=await rpc();if(!current())return state;if(startedRevision===revision){state=result;paint();}read();return state;})().finally(()=>{refreshing=null;});
+      return refreshing;
+    }
+    const startTimer=()=>{if(!timer)timer=setInterval(()=>{if(current()&&!document.hidden)refresh().catch(()=>{});},30000);};
+    const resume=()=>{if(window.omgSession.get()?.accessToken!==session.accessToken)return;paused=false;startTimer();if(!document.hidden)refresh().catch(()=>{});};
+    const suspend=()=>{paused=true;clearTimeout(retryTimer);clearInterval(timer);timer=null;pending?.cancel();};
+    window.addEventListener('pagehide',suspend);
+    window.addEventListener('pageshow',resume);
+    window.addEventListener('focus',resume);
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else resume();});
+    startTimer();
+    const controller={get state(){return state;},refresh,read,stop:suspend};
+    try{await refresh();}catch(error){options.onLoadError?.(error);}
+    return controller;
   }
   window.addEventListener('pagehide',()=>active?.cancel());
   window.OMSAttendanceNfc={normalize,scan,mountWorker};

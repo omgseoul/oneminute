@@ -6,7 +6,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  create table work_reports(id uuid primary key,work_session_id uuid,business_id uuid,property_id uuid,employee_id uuid,report_type text,payload jsonb,submitted_at timestamptz,make_accepted_at timestamptz,unique(work_session_id,report_type));
  create function omg_private.can_manage_shared_property(token uuid,property uuid,scope text) returns boolean language sql as $$select exists(select 1 from public.owner_sessions s join public.owners o on o.id=s.owner_id where s.login_token_hash=omg_private.token_hash(token) and o.active and s.token_expires_at>clock_timestamp() and(s.property_id=property or exists(select 1 from public.property_share_requests r where r.requester_property_id=s.property_id and r.target_property_id=property and r.status='approved' and scope=any(r.requested_permissions))))$$;
  alter table work_sessions add check(clock_out_at is null or clock_out_at>=clock_in_at);`);
- await db.exec(fs.readFileSync('supabase/migrations/20261024104905_attendance_nfc_report_offset.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261024105646_attendance_nfc_report_offset.sql','utf8'));
  const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  const own=id(1),staff=id(2),p1=id(3),p2=id(4),employee=id(5),s1=id(6),owner=id(7);
  await db.query(`insert into properties(id,name)values($1,'Own'),($2,'Other');`,[p1,p2]);

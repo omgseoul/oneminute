@@ -1,0 +1,32 @@
+/* The staff top row replaces the name with the original compact dot stepper. */
+#appShell>.top.staff-attendance-top{gap:9px;margin-left:0;margin-right:0;flex-wrap:nowrap}
+.attendance-progress{display:grid;grid-template-columns:1fr 1.2fr 1fr 1.2fr;flex:1;min-width:0;height:30px;margin:0;padding:0;list-style:none;font-size:11px;line-height:14px;font-weight:600;letter-spacing:0;text-align:center}
+.attendance-progress.is-nfc{grid-template-columns:1.9fr 1.2fr 1fr 1.2fr}
+.attendance-progress li{position:relative;display:flex;align-items:center;justify-content:space-between;flex-direction:column;min-width:0;color:#8b97a6;--step:#e5b134;--step-pale:#fff3cf;--step-ink:#765500}
+.attendance-progress li[data-step="2"]{--step:#27a864;--step-pale:#dcf7e9;--step-ink:#176444}
+.attendance-progress li[data-step="3"]{--step:#2d71bd;--step-pale:#eaf3fd;--step-ink:#183153}
+.attendance-progress li:not(:last-child)::after{content:'';position:absolute;left:50%;top:5px;height:2px;width:100%;background:#dbe5f0}
+.attendance-progress li[data-step="0"]::after{width:110%}
+.attendance-progress li[data-step="1"]::after{width:91.666667%}
+.attendance-progress li[data-step="2"]::after{width:110%}
+.attendance-progress.is-nfc li[data-step="0"]::after{width:81.578947%}
+.attendance-progress li.is-done{color:#183153}
+.attendance-progress li.is-done::after{background:var(--step)}
+.attendance-progress li.is-current{color:var(--step-ink);font-weight:900}
+.attendance-progress-dot{position:relative;z-index:1;display:grid;place-items:center;width:10px;height:10px;margin-top:1px;border-radius:50%;background:#dbe5f0;color:var(--step-ink);font-family:Arial,sans-serif;font-size:8px;line-height:10px}
+.attendance-progress .is-done .attendance-progress-dot,.attendance-progress .is-current .attendance-progress-dot{background:var(--step)}
+.attendance-progress .is-current .attendance-progress-dot{box-shadow:0 0 0 3px var(--step-pale)}
+.attendance-progress-label{white-space:nowrap}
+.staff-attendance-top .top-actions{flex:none;gap:3px;white-space:nowrap}
+.staff-attendance-top .my-info{padding:7px 4px;font-size:11px}
+.staff-attendance-top .logout{padding:8px 3px;font-size:11px}
+.working-head #workingHeading{display:flex;align-items:center;gap:4px;min-width:0;line-height:1.5;white-space:nowrap}
+.working-self-name{color:#183153;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+#workingHeading .online-dot{margin-right:2px}
+.online-dot.ended{background:#94a3b8;box-shadow:0 0 0 2px #e8edf3}
+.attendance-dialog .oms-action-head{margin-bottom:22px}
+.attendance-dialog .oms-action-head h2{font-size:20px;word-break:keep-all}
+.attendance-dialog .oms-action-buttons>.oms-action-button{font-size:13px;padding:12px 8px;white-space:nowrap}
+.attendance-dialog .oms-action-buttons>.oms-action-button:first-child:not(:last-child){flex:1.6}
+.attendance-dialog .oms-action-buttons>.oms-action-button:last-child{flex:1}
+@media(max-width:360px){#appShell>.top.staff-attendance-top{gap:4px}.staff-attendance-top .top-actions{gap:0}.staff-attendance-top .my-info{padding:7px 2px}.staff-attendance-top .logout{padding:8px 2px}.working-self-name{max-width:75px}}

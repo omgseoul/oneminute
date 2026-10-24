@@ -74,6 +74,10 @@
   }
   async function finish() {
     notice.hidden = true;
+    if (context.reportType === "clock_in" && typeof api.onFinished === "function") {
+      await api.onFinished();
+      return;
+    }
     if (formPage) formPage.style.display = "none";
     if (donePage) donePage.style.display = "block";
     if (context.reportType === "clock_out") await window.omgSession.logout();

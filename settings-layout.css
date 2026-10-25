@@ -1,0 +1,33 @@
+/* WebView system bars may overlay content without exposing CSS safe-area insets. */
+:root{--settings-safe-top:env(safe-area-inset-top,0px);--settings-safe-bottom:env(safe-area-inset-bottom,0px)}
+.oms-native{--settings-safe-top:max(28px,env(safe-area-inset-top,0px));--settings-safe-bottom:max(48px,env(safe-area-inset-bottom,0px))}
+.ai-settings-page main,.property-settings-page main.shell{padding-bottom:calc(20px + var(--settings-safe-bottom));scroll-padding-bottom:calc(20px + var(--settings-safe-bottom))}
+.ai-settings-page main{padding-top:calc(20px + var(--settings-safe-top))!important}
+.property-settings-page .card{margin-top:10px;padding:14px 18px}
+.property-settings-page .card>summary h2,.property-settings-page .card>a h2{margin:0;font-size:18px}
+.property-settings-page .card>summary .help,.property-settings-page .card>a .help{margin:5px 0 0;line-height:1.5}
+.property-settings-page .card>summary,.property-settings-page .card>a{min-height:44px;gap:10px}
+.property-settings-page .card>summary>div,.property-settings-page .card>a>div{min-width:0}
+.property-settings-page .card>summary>span,.property-settings-page .card>a>span{flex-shrink:0}
+.ai-settings-page .card{padding:16px;margin:12px 0;border-radius:20px}
+.ai-settings-page .card>:last-child{margin-bottom:0}
+.ai-settings-page #status:empty,.ai-settings-page #dataError:empty{display:none}
+.ai-settings-page .ai-channels{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:8px;margin:8px 0}
+.ai-settings-page .ai-channels .check{min-width:0;min-height:44px;gap:6px;font-size:clamp(11px,3.3vw,13px);white-space:nowrap}
+.ai-settings-page .ai-channels input{flex:0 0 18px;width:18px;height:18px;margin:0}
+.ai-settings-page .ai-channels small{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.ai-settings-page .ai-mode{margin:16px 0 8px;gap:2px}
+.ai-settings-page .ai-mode legend{margin-bottom:6px;font-size:17px}
+.ai-settings-page .ai-mode label{min-height:40px;font-size:15px}
+.ai-settings-page .ai-menu{padding:14px 16px!important;margin-bottom:10px;min-height:68px}
+.ai-settings-page .ai-menu small{margin-top:4px;font-size:12px}
+.ai-settings-page .card .help{margin-top:8px;margin-bottom:10px}
+.ai-settings-page .card .help:last-child{margin-bottom:0}
+.ai-settings-page .ai-usage{gap:10px;margin:12px 0}
+.ai-settings-page .ai-usage>div{padding:12px 14px}
+.ai-settings-page .ai-dialog{margin: auto auto calc(8px + var(--settings-safe-bottom));max-height:calc(100dvh - var(--settings-safe-top) - var(--settings-safe-bottom) - 24px);padding:18px;border-radius:22px;overscroll-behavior:contain;scroll-padding-block:16px}
+.ai-settings-page .ai-dialog .top{margin-bottom:10px}
+.ai-settings-page #aiPrompt{height:clamp(140px,40dvh,420px);min-height:120px;resize:vertical;font-size:15px;line-height:1.55}
+.ai-settings-page:has(dialog[open]){overflow:hidden}
+.ai-settings-page #aiLeaveDialog{max-height:calc(100dvh - var(--settings-safe-top) - var(--settings-safe-bottom) - 32px)}
+.ai-settings-page #aiLeaveTitle{word-break:keep-all;font-size:20px}

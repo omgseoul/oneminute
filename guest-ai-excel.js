@@ -1,0 +1,4 @@
+window.GuestAIExcel={
+ async read(file){if(!/\.xlsx$/i.test(file.name))throw Error('.xlsx 엑셀 파일을 선택해주세요.');if(file.size>5*1024*1024)throw Error('엑셀 파일은 5MB 이하로 올려주세요.');const buffer=await file.arrayBuffer();return new Promise((resolve,reject)=>{const worker=new Worker('guest-ai-excel-worker.js?v=20261025');let timer;const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(Error(error)):resolve(result);};timer=setTimeout(()=>finish('파일을 읽는 시간이 초과되었습니다. DATA 시트만 새 파일에 저장해 다시 올려주세요.'),12000);worker.onerror=()=>finish('엑셀 읽기를 시작하지 못했습니다. 새로고침 후 다시 시도해주세요.');worker.onmessage=e=>e.data.ok?finish(null,e.data):finish(e.data.message);worker.postMessage(buffer,[buffer]);});},
+ async download(rows){return OMGAttendanceExport.download([['제목','답변 내용'],...rows.filter(r=>r.title.trim()||r.answer.trim()).map(r=>[r.title,r.answer])],'OMS_AI_자동답변_DATA.xlsx',{sheetName:'AI 자동답변 DATA',columnWidths:[24,90]});}
+};

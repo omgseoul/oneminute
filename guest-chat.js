@@ -20,7 +20,7 @@
  function renderMeta(){
   $('roomTitle').textContent=isGuest?room.property_name:room.guest_name+' · '+(room.room_number||'객실 미정');
   const info=$('roomInfo');
-  if(isGuest)info.textContent=room.ai_active?'AI가 숙소 안내 DATA를 참고해 답합니다. 필요한 경우 직원을 요청할 수 있습니다.':'직원과 대화 · 답변을 확인하려면 이 화면을 열어두세요.';
+  if(isGuest)info.textContent='직원과 대화 · 답변을 확인하려면 이 화면을 열어두세요.';
   else{
    info.replaceChildren(document.createTextNode(`${room.property_name} · ${room.room_number||'객실 미정'} · ${room.check_in} ~ ${room.check_out}`));
    if(room.email){const link=document.createElement('a');link.className='guest-email-link';link.href='mailto:'+room.email;link.textContent=room.email;link.title=room.email+'에게 메일 보내기';info.append(document.createTextNode(' · '),link);}
@@ -33,8 +33,8 @@
  let aiControlKey='';
  function renderAIControls(){
   const key=[isGuest,room.status,room.ai_handoff,room.ai_active,room.assigned_key].join(':');if(key===aiControlKey)return;aiControlKey=key;
-  const host=$('controls');host.replaceChildren();host.className='chat-controls ai-chat-controls';host.hidden=room.status!=='open';if(host.hidden)return;
-  const actions=isGuest?[['ai_human','직원 연결 / Staff'],['ai_urgent','긴급 호출 / Urgent']]:room.ai_handoff||room.assigned_key?[['ai_resume','AI 자동답변 재개']]:[['claim','직접 대응하기']];
+  const host=$('controls');host.replaceChildren();host.className='chat-controls ai-chat-controls';host.hidden=isGuest||room.status!=='open';if(host.hidden)return;
+  const actions=room.ai_handoff||room.assigned_key?[['ai_resume','AI 자동답변 재개']]:[['claim','직접 대응하기']];
   actions.forEach(([action,label])=>{const b=document.createElement('button');b.type='button';b.className='ai-chat-control'+(action==='ai_urgent'?' urgent':'');b.textContent=label;b.onclick=()=>showAIAction(action,label);host.append(b);});
  }
  function showAIAction(action,label){
@@ -46,7 +46,7 @@
   const day=new Date(m.created_at).toLocaleDateString('ko-KR',{month:'long',day:'numeric'});if(day!==lastDay){const d=document.createElement('div');d.className='day';d.textContent=day;timeline.append(d);lastDay=day;}
   if(m.sender_kind==='system')return;
   const el=document.createElement('div');el.className='bubble-row'+(mine(m)?' mine':'');
-  const name=document.createElement('div');name.className='bubble-name';name.textContent=mine(m)?'나':m.sender_name;el.append(name);
+  const name=document.createElement('div');name.className='bubble-name';name.textContent=m.sender_kind==='ai'?'직원':mine(m)?'나':m.sender_name;if(m.sender_kind==='ai'){const badge=document.createElement('span');badge.className='ai-sender-badge';badge.textContent='AI';badge.setAttribute('aria-label','AI 자동답변');name.append(badge);}el.append(name);
   const bubble=document.createElement('div');bubble.className='bubble';
   if(m.asset_id){const item=photoAssets.get(String(m.asset_id));if(item){const img=new Image();img.src=item.url;img.alt='첨부 사진';img.loading='lazy';img.width=320;img.style.aspectRatio='4/3';img.style.objectFit='contain';img.dataset.photoMessage=String(m.id);img.onclick=()=>openViewerById(m.id);bubble.append(img);}}
   if(m.body)bubble.append(document.createTextNode(m.body));const line=document.createElement('div');line.className='guest-message-line';line.append(bubble);el.append(line);const time=document.createElement('time');time.className='bubble-time';time.textContent=new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});line.append(time);timeline.append(el);

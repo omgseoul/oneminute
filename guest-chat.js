@@ -32,9 +32,9 @@
  }
  let aiControlKey='';
  function renderAIControls(){
-  const key=[isGuest,room.status,room.ai_handoff,room.ai_active,room.assigned_key].join(':');if(key===aiControlKey)return;aiControlKey=key;
+  const key=[isGuest,room.status,room.ai_handoff,room.ai_paused,room.ai_active,room.assigned_key].join(':');if(key===aiControlKey)return;aiControlKey=key;
   const host=$('controls');host.replaceChildren();host.className='chat-controls ai-chat-controls';host.hidden=isGuest||room.status!=='open';if(host.hidden)return;
-  const actions=room.ai_handoff||room.assigned_key?[['ai_resume','AI 자동답변 재개']]:[['claim','직접 대응하기']];
+  const actions=room.ai_paused||room.assigned_key?[['ai_resume','AI 자동답변 재개']]:[['claim','직접 대응하기']];
   actions.forEach(([action,label])=>{const b=document.createElement('button');b.type='button';b.className='ai-chat-control'+(action==='ai_urgent'?' urgent':'');b.textContent=label;b.onclick=()=>showAIAction(action,label);host.append(b);});
  }
  function showAIAction(action,label){

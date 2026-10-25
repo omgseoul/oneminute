@@ -1,9 +1,9 @@
 // Isolated gateway: custom app sessions and opaque guest tokens stay server-validated.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ACTIONS=new Set(['portal','start','settings','save_settings','save_preferences','rooms','messages','send','claim','release','close','reopen','read','retry_events']);
+const ACTIONS=new Set(['portal','start','settings','save_settings','save_preferences','rooms','messages','send','claim','release','close','reopen','read','retry_events','ai_human','ai_urgent','ai_resume']);
 const ORIGINS=new Set(['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io']);
 const LIMIT=4194304;
-export function createGuestSupportHandler({env,fetcher=fetch,cryptoApi=crypto}){
+export function createGuestSupportHandler({env,fetcher=fetch,cryptoApi=crypto,waitUntil=p=>p.catch(()=>{})}){
  const base=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
  const headers=()=>({apikey:key(),Authorization:'Bearer '+key()});
  async function rpc(action,data,token,guest,ip=''){
@@ -72,6 +72,7 @@ export function createGuestSupportHandler({env,fetcher=fetch,cryptoApi=crypto}){
     ip=[...new Uint8Array(await cryptoApi.subtle.digest('SHA-256',new TextEncoder().encode(key()+':'+addr)))].map(x=>x.toString(16).padStart(2,'0')).join('');
    }
    const result=await sign(await rpc(action,data,token,guest,ip));
+   if(result.ai_queued)waitUntil(fetcher(base()+'/functions/v1/guest-ai/worker',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:'{}',signal:AbortSignal.timeout(5000)}).catch(()=>{}));
    if(result.event_id)result.push_state=await dispatch(result.event_id);
    if(action==='retry_events')await Promise.all((result.event_ids||[]).map(dispatch));
    return reply(result);

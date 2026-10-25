@@ -1,0 +1,1 @@
+{"name":"oms-guest-ai-tests","private":true,"scripts":{"test":"cd ../.. && node tests/guest-ai/database.cjs && node tests/guest-ai/edge.mjs && node tests/guest-ai/ui.cjs"},"devDependencies":{"@electric-sql/pglite":"0.3.14","playwright":"1.51.1"}}

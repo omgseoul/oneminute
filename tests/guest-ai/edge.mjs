@@ -11,7 +11,7 @@ function setup({provider='ok',jobOverride={},output=answer,operator=true}={}){le
  if(url.includes('/v1/models/'))return res({id:MODEL});
  if(url.endsWith('/guest_ai_claim')){if(claimed)return res({empty:true});claimed=true;return res({...job,...jobOverride});}
  if(url.endsWith('/guest_ai_credentials'))return res({enabled:true,key:'sk-fixture_not_real_secret'});
- if(url==='https://api.openai.com/v1/responses'){if(provider==='timeout')throw Error('network timeout');if(provider==='rejected')return res({},429);return res({id:'resp-fixture',status:'completed',usage:{input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:100,cache_write_tokens:200}},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(output)}]}]});}
+ if(url==='https://api.openai.com/v1/responses'){if(provider==='timeout')throw Error('network timeout');if(provider==='rejected')return res({},429);if(provider==='truncated')return new Response('{',{status:200});return res({id:'resp-fixture',status:'completed',usage:{input_tokens:1000,output_tokens:100,input_tokens_details:{cached_tokens:100,cache_write_tokens:200}},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(output)}]}]});}
  if(url.endsWith('/guest_ai_finish')){settled=body.p_result;return res({ok:true,event_id:body.p_result.disposition==='answer'?null:'event-fixture'});}
  if(url.endsWith('/guest_ai_pending_alerts'))return res([]);
  if(url.includes('/dispatch-notification/'))return res({ok:true});
@@ -21,6 +21,7 @@ function setup({provider='ok',jobOverride={},output=answer,operator=true}={}){le
 let t=setup();await t.run();assert.equal(t.settled.reply,answer.reply);assert.equal(t.settled.cache_write_tokens,200);assert.equal(t.calls.filter(c=>c.url==='https://api.openai.com/v1/responses').length,1);
 t=setup({output:partial});await t.run();assert.equal(t.settled.disposition,'handoff');assert(t.calls.some(c=>c.url.includes('/dispatch-notification/')));
 t=setup({provider:'timeout'});await t.run();assert(t.settled.estimated);assert.equal(t.settled.disposition,'handoff');
+t=setup({provider:'truncated'});await t.run();assert(t.settled.estimated,'truncated successful body cannot silently release reserved cost');
 t=setup({provider:'rejected'});await t.run();assert.equal(t.settled.estimated,false);
 t=setup({jobOverride:{history:[{role:'user',content:'방에 불이 났어요'}]}});await t.run();assert.equal(t.settled.disposition,'urgent');assert(!t.calls.some(c=>c.url==='https://api.openai.com/v1/responses'),'obvious emergency escalates without paid call');
 t=setup();assert.equal((await t.handler(new Request('https://fixture.supabase.co/functions/v1/guest-ai/worker',{method:'POST'}))).status,401);assert(!t.calls.length);

@@ -38,9 +38,10 @@ export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
     received=true;
     if(!response.ok){result.reason='AI 서비스 연결 또는 사용 한도를 확인해주세요.';if(response.status>=500)result.estimated=true;}
     else{
+     result.estimated=true; // Headers alone do not prove a complete, billable usage record.
      const output=await response.json();responseId=output.id;
      usage={input_tokens:output.usage?.input_tokens||0,output_tokens:output.usage?.output_tokens||0,cached_tokens:output.usage?.input_tokens_details?.cached_tokens||0,cache_write_tokens:output.usage?.input_tokens_details?.cache_write_tokens||0};
-     if(!output.usage)result.estimated=true;
+     result.estimated=![output.usage?.input_tokens,output.usage?.output_tokens].every(n=>Number.isSafeInteger(n)&&n>=0);
      if(output.status!=='completed')throw Error('incomplete');
      const text=output.output?.filter(i=>i.type==='message').flatMap(i=>i.content||[]).filter(i=>i.type==='output_text').map(i=>i.text).join('');
      result={...result,...validateAnswer(JSON.parse(text),job)};

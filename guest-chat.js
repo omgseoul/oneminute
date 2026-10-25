@@ -20,7 +20,7 @@
  function renderMeta(){
   $('roomTitle').textContent=isGuest?room.property_name:room.guest_name+' · '+(room.room_number||'객실 미정');
   const info=$('roomInfo');
-  if(isGuest)info.textContent='직원과 대화 · 답변을 확인하려면 이 화면을 열어두세요.';
+  if(isGuest)info.textContent=room.ai_active?'AI가 숙소 안내 DATA를 참고해 답합니다. 필요한 경우 직원을 요청할 수 있습니다.':'직원과 대화 · 답변을 확인하려면 이 화면을 열어두세요.';
   else{
    info.replaceChildren(document.createTextNode(`${room.property_name} · ${room.room_number||'객실 미정'} · ${room.check_in} ~ ${room.check_out}`));
    if(room.email){const link=document.createElement('a');link.className='guest-email-link';link.href='mailto:'+room.email;link.textContent=room.email;link.title=room.email+'에게 메일 보내기';info.append(document.createTextNode(' · '),link);}
@@ -28,7 +28,19 @@
   const status=$('assignment');status.textContent=isGuest?'':window.omgGuestReplyStatus(room);status.hidden=!status.textContent;
   send.disabled=sending||uploading||!room.chat_enabled;
   if(!room.chat_enabled)G.message('현재 채팅 운영이 중지되어 있습니다. 기존 대화는 볼 수 있습니다.');
-  $('controls').hidden=true;
+  renderAIControls();
+ }
+ let aiControlKey='';
+ function renderAIControls(){
+  const key=[isGuest,room.status,room.ai_handoff,room.ai_active,room.assigned_key].join(':');if(key===aiControlKey)return;aiControlKey=key;
+  const host=$('controls');host.replaceChildren();host.className='chat-controls ai-chat-controls';host.hidden=room.status!=='open';if(host.hidden)return;
+  const actions=isGuest?[['ai_human','직원 연결 / Staff'],['ai_urgent','긴급 호출 / Urgent']]:room.ai_handoff||room.assigned_key?[['ai_resume','AI 자동답변 재개']]:[['claim','직접 대응하기']];
+  actions.forEach(([action,label])=>{const b=document.createElement('button');b.type='button';b.className='ai-chat-control'+(action==='ai_urgent'?' urgent':'');b.textContent=label;b.onclick=()=>showAIAction(action,label);host.append(b);});
+ }
+ function showAIAction(action,label){
+  const d=document.createElement('dialog');d.innerHTML='<div class="top"><h2></h2><button type="button" class="icon-btn" aria-label="닫기">×</button></div><p class="help"></p><div class="row"><button type="button" class="btn grow">취소 / Cancel</button><button type="button" class="btn primary grow">확인 / Confirm</button></div><p class="status" role="status"></p>';
+  d.querySelector('h2').textContent=label;d.querySelector('.help').textContent=action==='ai_urgent'?'관리자와 근무중인 직원에게 긴급 알림을 요청합니다. 즉시 위험한 경우 현지 긴급기관에 직접 연락해주세요. / Request urgent staff assistance. In immediate danger, contact local emergency services.':action==='ai_human'?'직원 연결을 요청하고 이 대화의 AI 자동답변을 멈춥니다. / Request staff assistance and pause AI replies.':action==='ai_resume'?'직원 대응을 해제하고 다음 메시지부터 설정된 조건에 따라 AI가 답변합니다.':'이 대화의 AI 답변을 멈추고 직접 대응합니다.';
+  const buttons=d.querySelectorAll('button');buttons[0].onclick=buttons[1].onclick=()=>d.close();buttons[2].onclick=async()=>{buttons[2].disabled=true;try{const result=await call(action);d.querySelector('.status').textContent=result.push_state==='pending'?'요청이 저장되었습니다. 알림 전달을 재시도 중입니다. / Request saved. Retrying notification delivery.':'요청을 처리했습니다. / Request submitted.';await poll();buttons[1].textContent='닫기 / Close';buttons[2].hidden=true;}catch(e){d.querySelector('.status').textContent=e.message;buttons[2].disabled=false;}};d.onclose=()=>d.remove();document.body.append(d);d.showModal();
  }
  function append(m){
   const day=new Date(m.created_at).toLocaleDateString('ko-KR',{month:'long',day:'numeric'});if(day!==lastDay){const d=document.createElement('div');d.className='day';d.textContent=day;timeline.append(d);lastDay=day;}

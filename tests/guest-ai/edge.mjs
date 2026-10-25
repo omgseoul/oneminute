@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
-import {createGuestAIHandler,buildRequest,validateAnswer,emergencyHint,MODEL} from '../../supabase/functions/guest-ai/handler.mjs';
+import {createGuestAIHandler,buildRequest,validateAnswer,emergencyHint,MODEL,SERVICE_DATA} from '../../supabase/functions/guest-ai/handler.mjs';
 const job={id:'fixture-job',lease_id:'fixture-lease',prompt:'정중한 말투',data:[{id:'1',title:'위치',answer:'종로8길15 4층'},{id:'2',title:'체크인',answer:'15시'}],history:[{role:'user',content:'거기가 어디예요? 체크인은 언제 가능한가요?'}]};
 const answer={reply:'종로8길15 4층에 있으며, 체크인은 오후 3시부터 가능합니다.',disposition:'answer',reason:'위치와 체크인 안내',parts:[{question:'위치',sources:['1'],needs_human:false},{question:'체크인',sources:['2'],needs_human:false}]};
 const request=buildRequest(job);assert.equal(request.model,MODEL);assert.equal(request.store,false);assert.equal(request.text.format.strict,true);assert(request.input[0].content.includes('EACH question'));assert(request.input[1].content.includes('체크인'));assert.equal(validateAnswer(answer,job).reply,answer.reply);
+const identity={reply:'저는 이 숙소의 AI 안내 도우미입니다. 궁금한 숙소 정보를 물어보세요.',disposition:'answer',reason:'AI 자기소개',parts:[{question:'넌 누구냐',sources:['service:identity'],needs_human:false}]};
+assert.equal(validateAnswer(identity,{...job,data:[],history:[{role:'user',content:'넌 누구냐'}]}).disposition,'answer');
+for(const source of SERVICE_DATA){assert(request.input[0].content.includes(source.id));assert.equal(validateAnswer({...identity,parts:[{question:'기본 대화',sources:[source.id],needs_human:false}]},{...job,data:[]}).disposition,'answer');}
+assert.equal(validateAnswer({...answer,parts:[...identity.parts,...answer.parts]},job).disposition,'answer','identity can be combined with several property questions');
+assert.throws(()=>validateAnswer({...answer,parts:[...identity.parts,{question:'주차 요금',sources:[],needs_human:false}]},job),/ungrounded_answer/,'a grounded identity must not hide an unsupported second answer');
+assert.throws(()=>validateAnswer({...identity,parts:[{question:'넌 누구냐',sources:['service:invented'],needs_human:false}]},job),/invalid_source/);
 const partial={...answer,disposition:'handoff',reply:'위치는 종로8길15 4층입니다. 주차는 직원 확인이 필요합니다.',parts:[answer.parts[0],{question:'주차',sources:[],needs_human:true}]};assert.equal(validateAnswer(partial,job).disposition,'handoff');assert.throws(()=>validateAnswer({...partial,disposition:'answer'},job));assert.throws(()=>validateAnswer({...answer,parts:[{question:'위치',sources:['other-property'],needs_human:false}]},job));assert.throws(()=>validateAnswer(answer,{...job,has_attachment:true}));assert(emergencyHint('가스 냄새가 나요'));assert(!emergencyHint('체크인은 몇 시인가요?'));
 const env=n=>({SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server-only-fixture',PUSH_ADMIN_SECRET:'internal-fixture'}[n]);
 function setup({provider='ok',jobOverride={},output=answer,operator=true}={}){let claimed=false,calls=[],settled,background;const fetcher=async(url,options={})=>{calls.push({url,options});const body=options.body?JSON.parse(options.body):{};const res=(v,status=200)=>new Response(JSON.stringify(v),{status});
@@ -19,6 +25,7 @@ function setup({provider='ok',jobOverride={},output=answer,operator=true}={}){le
  throw Error('Unexpected mock path '+url);
  };const handler=createGuestAIHandler({env,fetcher,waitUntil:p=>background=p});return {handler,calls,get settled(){return settled;},async run(){const r=await handler(new Request('https://fixture.supabase.co/functions/v1/guest-ai/worker',{method:'POST',headers:{'x-webhook-secret':'internal-fixture'}}));assert.equal(r.status,202);await background;}};}
 let t=setup();await t.run();assert.equal(t.settled.reply,answer.reply);assert.equal(t.settled.cache_write_tokens,200);assert.equal(t.calls.filter(c=>c.url==='https://api.openai.com/v1/responses').length,1);
+t=setup({jobOverride:{history:[{role:'user',content:'넌 누구냐'}]},output:identity});await t.run();assert.equal(t.settled.disposition,'answer');assert(!t.calls.some(c=>c.url.includes('/dispatch-notification/')),'basic conversation must not call staff');
 t=setup({output:partial});await t.run();assert.equal(t.settled.disposition,'handoff');assert(t.calls.some(c=>c.url.includes('/dispatch-notification/')));
 t=setup({provider:'timeout'});await t.run();assert(t.settled.estimated);assert.equal(t.settled.disposition,'handoff');
 t=setup({provider:'truncated'});await t.run();assert(t.settled.estimated,'truncated successful body cannot silently release reserved cost');

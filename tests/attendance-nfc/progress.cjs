@@ -40,7 +40,7 @@ const read=file=>fs.readFileSync(file,'utf8');
    assert((await page.locator('#workingHeading').textContent()).endsWith(' 로그인'));
    assert.equal(await page.locator('#appShell').evaluate(el=>getComputedStyle(el).paddingTop),'28px');
    const link=page.locator('#reportMenu a').first();await link.click();
-   await page.getByRole('heading',{name:'NFC 태그를 해주십시오',exact:true}).waitFor();
+   await page.getByRole('heading',{name:'현장도착 태그(NFC)를 먼저 해주세요',exact:true}).waitFor();
    if(width===320){await page.waitForTimeout(2200);assert.deepEqual(unwantedNavigation,[]);assert.equal(await page.locator('dialog[open]').count(),1);assert.equal(await page.evaluate(()=>navigation.length),0);}
    await page.getByRole('button',{name:'확인',exact:true}).click();if(width===320){await page.waitForTimeout(2200);assert.deepEqual(unwantedNavigation,[]);}assert.equal(await page.evaluate(()=>navigation.length),0);
    await link.click();await page.getByRole('button',{name:'무시하고 메뉴보기',exact:true}).click();await page.waitForFunction(()=>navigation.length===1);assert.equal(await page.evaluate(()=>navigation.length),1);

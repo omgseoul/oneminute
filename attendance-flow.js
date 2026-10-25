@@ -45,7 +45,7 @@
       const state=await controller.refresh();
       if(!state)throw new Error('출근 상태를 확인하지 못했습니다. 다시 시도해주세요.');
       if(state.basis!=='nfc'||state.entry_at||state.checkin_report_at||state.status==='completed')return true;
-      return await dialog('NFC 태그를 해주십시오',{secondary:'무시하고 메뉴보기'});
+      return await dialog('현장도착 태그(NFC)를 먼저 해주세요',{secondary:'무시하고 메뉴보기'});
     }catch(error){await dialog(error.message);return false;}
   }
   function bindCheckin(link,controller,navigate=url=>location.assign(url)){

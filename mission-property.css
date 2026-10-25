@@ -1,3 +1,5 @@
 .oms-mission-property{display:inline-flex;flex:0 0 42px;flex-direction:column;align-items:center;justify-content:center;align-self:center;box-sizing:border-box;width:42px;max-width:42px;min-height:13px;margin-right:4px;padding:2px 1px;border-radius:4px;background:#e9f1fb;color:#526f95;font-size:8px;font-weight:700;line-height:9px;vertical-align:middle}
 .oms-mission-property>b{display:block;max-width:100%;overflow:hidden;white-space:pre;font:inherit;line-height:9px}
 .calendar-day-view .calendar-item small.oms-mission-property{display:inline-flex;margin:0 4px 0 0;color:#526f95;font-size:8px;font-weight:700}
+
+.head-actions .task-manager-link{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;height:36px;padding:0 9px;border:1px solid #cad8e9;border-radius:12px;background:white;color:#276cc4;text-decoration:none;font-size:10px;font-weight:800;line-height:12px;box-shadow:0 3px 10px #23467008}.head-actions .task-manager-link[hidden]{display:none}@media(max-width:390px){.head-actions .task-manager-link{height:34px;padding:0 7px;font-size:9px;line-height:11px}.head-actions{gap:6px}}

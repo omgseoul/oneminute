@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko" class="omg-booting" data-omg-ready="manual"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f4f7fc"><title>Task manager · OMS</title><link rel="stylesheet" href="page-transition.css"><script src="page-transition.js?v=20260929-chat-taps"></script><script src="settings-layout.js"></script><link rel="stylesheet" href="action-dialog.css"><link rel="stylesheet" href="task-manager.css?v=20261025"></head>
+<body><main class="shell">
+<div class="top"><a class="back" href="mission.html">‹ To do list</a><div id="branchFilter"></div></div>
+<header><div><h1>Task manager</h1><p>반복되는 업무를 테스크로 관리하세요.</p></div><button id="addTask" class="add" aria-label="테스크 추가" disabled>＋</button></header>
+<nav class="views" aria-label="테스크 보기"><button id="listView" aria-pressed="true">리스트형</button><button id="calendarView" aria-pressed="false">캘린더</button></nav>
+<p id="status" role="status">테스크를 불러오는 중입니다.</p>
+<section id="listPanel" aria-label="반복 테스크 목록"><div class="table-head"><span>제목</span><span>시작일</span><span>반복주기</span><span>대상</span><span>대상지점</span><span></span></div><div id="taskList"></div></section>
+<section id="calendarPanel" hidden><div class="month-nav"><button id="prevMonth" aria-label="이전 달">‹</button><h2 id="monthTitle"></h2><button id="nextMonth" aria-label="다음 달">›</button><button id="thisMonth">오늘</button></div><div class="weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div id="calendar" class="calendar"></div><p class="help">등록한 반복 테스크만 표시됩니다. 날짜를 누르면 전체 내용을 볼 수 있습니다.</p></section>
+</main>
+<dialog id="editor"><form id="taskForm"><div class="sheet-top"><h2 id="editorTitle">테스크 추가</h2><button type="button" class="close" data-close="editor" aria-label="닫기">×</button></div>
+<label for="taskTitle">제목</label><input id="taskTitle" maxlength="100" placeholder="예: 바퀴벌레약 교체하기" required>
+<label for="taskDescription">상세 내용</label><textarea id="taskDescription" maxlength="2000" rows="3" placeholder="작업 방법이나 확인할 내용을 입력하세요."></textarea>
+<div class="form-grid"><div><label>대상지점</label><div id="taskBranchPicker"></div></div><div><label for="targetMode">대상</label><select id="targetMode"><option value="all">지점 전체 근무자</option><option value="selected">근무자 선택</option><option value="working">근무중인 근무자</option></select></div></div>
+<fieldset id="workerChoices" hidden><legend>해당 지점 근무자</legend><div id="workers"></div></fieldset><p id="targetHelp" class="help"></p>
+<div class="form-grid"><div><label for="startDate">실행 시작일</label><input type="date" id="startDate" required></div><div><label for="runTime">실행 시간</label><input type="time" id="runTime" value="09:00" required></div></div>
+<label for="repeatEvery">반복주기</label><div class="repeat"><span>매</span><input type="number" id="repeatEvery" min="1" max="365" value="1" required aria-label="반복 간격"><select id="repeatUnit" aria-label="반복 단위"><option value="day">일</option><option value="week">주</option><option value="month">개월</option></select><span>마다</span></div>
+<p class="help">지점 현지 시각 기준 · 월 반복은 시작일과 같은 날짜에 실행하며, 해당 날짜가 없으면 그달 말일에 실행합니다.</p>
+<label class="check"><input type="checkbox" id="photoRequired"> 완료 결과에 사진 필수</label><label class="check"><input type="checkbox" id="taskEnabled" checked> 반복 실행 사용</label>
+<p class="help">실행 시 To do를 자동 생성합니다. 수정·중지·종료는 이후 실행에 적용되며, 이미 생성된 To do는 유지됩니다.</p>
+<p id="formError" class="error" role="alert"></p><button id="saveTask" type="submit" class="primary">테스크 저장</button></form></dialog>
+<dialog id="dayDialog"><div class="sheet-top"><h2 id="dayTitle"></h2><button class="close" data-close="dayDialog" aria-label="닫기">×</button></div><div id="dayTasks"></div></dialog>
+<dialog id="confirmDialog" class="oms-action-dialog"><div class="oms-action-head"><h2 id="confirmTitle"></h2></div><p id="confirmText"></p><div class="oms-action-buttons"><button id="confirmNo">취소</button><button id="confirmYes" class="primary">확인</button></div></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="supabase-client.js"></script><script src="property-selector.js?v=20261005e"></script><script src="task-recurrence.js?v=20261025"></script><script src="task-manager.js?v=20261025"></script></body></html>

@@ -46,6 +46,14 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await rpc('guest_ai_finish',[job.id,job.lease_id,JSON.stringify(finish)]);await rpc('guest_ai_finish',[job.id,job.lease_id,JSON.stringify(finish)]);
  let usage=(await ownerCall('get')).usage;assert.equal(usage.balance,99.85);assert.equal(usage.reserved,0);assert.equal(usage.responses,1);
  assert.equal((await chat('messages')).messages.filter(m=>m.sender_kind==='ai').length,1);assert.equal((await chat('messages')).room.unanswered_since,null);
+ // The next claim reads newly saved references, and cache discounts reach the wallet.
+ const updatedCfg={...cfg,prompt:'수정된 안내 방식',data:[{title:'위치',answer:'수정된 숙소 주소'},{title:'체크인',answer:'16시'}]};
+ await ownerCall('save',updatedCfg);await chat('send',{client_id:id(40),body:'바뀐 체크인 시간은?'});job=await rpc('guest_ai_claim');
+ assert.equal(job.prompt,'수정된 안내 방식');assert.equal(job.data.find(r=>r.title==='체크인').answer,'16시');
+ await rpc('guest_ai_finish',[job.id,job.lease_id,JSON.stringify({...finish,input_tokens:1000,output_tokens:100,cached_tokens:800,cache_write_tokens:100})]);
+ const cacheBill=(await db.query('select charged_micro,cached_tokens,cache_write_tokens from omg_private.ai_jobs where id=$1',[job.id])).rows[0];
+ assert.equal(Number(cacheBill.charged_micro),81);assert.equal(Number(cacheBill.cached_tokens),800);assert.equal(Number(cacheBill.cache_write_tokens),100);
+ await ownerCall('save',cfg);
  // Regression: a repair handoff must not silence the next unrelated FAQ.
  await chat('send',{client_id:id(30),body:'카드키가 안먹히는데?'});job=await rpc('guest_ai_claim');
  const queuedBeforeHandoff=await chat('send',{client_id:id(31),body:'내일 체크아웃 후 짐 보관 가능한가요?'});

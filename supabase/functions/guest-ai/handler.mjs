@@ -17,7 +17,18 @@ export const FORMAT={type:'json_schema',name:'guest_reply',strict:true,schema:{t
 const FALLBACK='정확한 안내를 위해 직원 확인이 필요합니다. 숙소 관리자의 답변을 기다려주세요. / A staff member needs to check this. Please wait for their reply.';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function emergencyHint(text){return /불이\s*났|화재가|가스\s*(냄새|누출)|의식이\s*없|숨을?\s*(못\s*쉬|안\s*쉬)|폭행당|갇혔|\bon fire\b|\bgas (leak|smell)\b|\b(can.?t|cannot) breathe\b|\bunconscious\b|\bbeing attacked\b/i.test(text);}
-export function buildRequest(job){return {model:MODEL,store:false,service_tier:'default',reasoning:{effort:'low'},max_output_tokens:2048,input:[{role:'developer',content:RULES},{role:'user',content:JSON.stringify({property_preferences:job.prompt,DATA:job.data,conversation:job.history,attachment_requires_staff:job.has_attachment})}],text:{format:FORMAT}};}
+// Explicitly cache only stable reference material. Guest history stays outside the
+// write boundary, so each new question does not rewrite the whole cached prompt.
+// Content matching invalidates changed prompts/DATA automatically; never key by room.
+export function buildRequest(job){
+ const data=job.data.map(row=>({id:String(row.id),title:row.title,answer:row.answer}));
+ return {model:MODEL,store:false,service_tier:'default',reasoning:{effort:'low'},max_output_tokens:2048,
+  prompt_cache_options:{mode:'explicit',ttl:'30m'},
+  input:[{role:'developer',content:RULES},{role:'user',content:[
+   {type:'input_text',text:JSON.stringify({property_preferences:job.prompt,DATA:data}),prompt_cache_breakpoint:{mode:'explicit'}},
+   {type:'input_text',text:JSON.stringify({conversation:job.history,attachment_requires_staff:!!job.has_attachment})}
+  ]}],text:{format:FORMAT}};
+}
 export function validateAnswer(value,job){
  if(!value||!['answer','handoff','urgent'].includes(value.disposition)||typeof value.reply!=='string'||!value.reply.trim()||value.reply.length>4000||!Array.isArray(value.parts)||!value.parts.length)throw Error('invalid_output');
  const ids=new Set([...job.data,...SERVICE_DATA].map(r=>String(r.id)));let unknown=false;

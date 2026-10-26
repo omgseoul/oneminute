@@ -12,6 +12,7 @@ for(const [days,key] of [[-1,'overdue'],[0,'today'],[1,'this_week'],[7,'this_wee
  assert.equal(run(`sectionKey({due_at:dateAfterDays(${days})+'T23:59:59',target_count:1,completed_count:0})`),key);
 }
 run(`missions=[{id:'later',due_at:dateAfterDays(35),created_at:'2026-01-01',title:'later'},{id:'new',due_at:dateAfterDays(10),created_at:'2026-02-01',title:'new'},{id:'old',due_at:dateAfterDays(10),created_at:'2026-01-01',title:'old'}];expanded.anytime=true;render();`);
+assert.equal(w.document.querySelector('#section-overdue .empty'),null);assert(w.document.querySelector('#section-overdue .section-head'));
 assert.deepEqual([...w.document.querySelectorAll('#section-anytime h3')].map(n=>n.textContent),['old','new','later']);
 const active=run(`missionCard({title:'업무',description:'내용',priority:'normal',target_names:['니완'],target_count:5,completed_count:1,due_at:dateAfterDays(10)})`);
 assert.equal(active.querySelector('.mission-progress').textContent,'1/5');assert.equal(active.querySelector('.mission-status'),null);

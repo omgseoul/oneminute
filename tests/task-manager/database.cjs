@@ -10,7 +10,7 @@ const db=new PGlite(),id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0'
  create table employees(id uuid primary key,property_id uuid,display_name text,active boolean default true,role text default 'staff');
  create table work_sessions(employee_id uuid,property_id uuid,status text,checkin_report_at timestamptz,clock_out_at timestamptz,checkout_report_at timestamptz);
  create table property_share_requests(requester_property_id uuid,target_property_id uuid,status text,requested_permissions text[]);
- create table missions(id uuid primary key default gen_random_uuid(),business_id uuid,property_id uuid,title text,description text,timing text,priority text,target_employee_ids jsonb,photo_required boolean,due_at timestamptz,creator_type text,completion_mode text);
+ create table missions(id uuid primary key default gen_random_uuid(),business_id uuid,property_id uuid,title text,description text,description_photo text,timing text,priority text,target_employee_ids jsonb,photo_required boolean,due_at timestamptz,creator_type text,completion_mode text);
  insert into properties(id,business_id,name) values('${id(1)}','${id(99)}','Home'),('${id(2)}','${id(99)}','Shared'),('${id(3)}','${id(99)}','Unrelated');
  insert into owners values('${id(11)}','${id(1)}',true);
  insert into owner_sessions values('${id(11)}','${id(1)}','${id(101)}',now()+interval '1 hour');
@@ -18,6 +18,7 @@ const db=new PGlite(),id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0'
  insert into property_share_requests values('${id(1)}','${id(2)}','approved',array['missions']);`);
  await db.exec(fs.readFileSync('tests/fixtures/bot-shared-permission.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261025140842_recurring_task_manager.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261026015116_routine_schedule_and_photos.sql','utf8'));
  const query=async(sql,args=[])=>(await db.query(sql,args)).rows;
  const rpc=async(action,data={},token=id(101))=>(await query('select recurring_task_manager($1,$2,$3) r',[token,action,JSON.stringify(data)]))[0].r;
  const today=(await query("select (now() at time zone 'Asia/Seoul')::date::text d"))[0].d;
@@ -54,7 +55,57 @@ const db=new PGlite(),id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0'
  assert.equal((await query("select * from missions where title='제한된 테스크'")).length,1);
  await rpc('save',{...payload,id:saved.task_id,enabled:false});await db.exec("select omg_private.generate_recurring_tasks(now()+interval '35 days');");assert.equal((await query('select * from omg_private.recurring_task_runs where task_id=$1',[saved.task_id])).length,1,'pause stops future occurrences');
  const D=require('../../task-recurrence.js');for(const [start,unit,every,from,expected] of [['2027-01-31','month',1,'2027-02-01','2027-02-28'],['2027-01-31','month',1,'2027-03-01','2027-03-31'],['2028-01-31','month',1,'2028-02-01','2028-02-29'],['2026-10-25','week',2,'2026-10-26','2026-11-08'],['2026-10-25','day',3,'2026-10-26','2026-10-28']]){const result=(await query('select omg_private.task_date_on_or_after($1,$2,$3,$4)::text d',[start,unit,every,from]))[0].d;assert.equal(result,expected);assert(D.occurrence({start_date:start,repeat_unit:unit,repeat_every:every},expected));}
+
+ // New selection modes match the calendar, including late-month and leap-year boundaries.
+ for(const [start,unit,every,from,weekdays,monthDay,expected] of [
+  ['2026-10-26','week',1,'2026-10-27',[1,3,5],null,'2026-10-28'],
+  ['2026-10-28','week',2,'2026-10-29',[1,5],null,'2026-10-30'],
+  ['2026-10-28','week',2,'2026-10-31',[1,5],null,'2026-11-09'],
+  ['2026-10-26','month',1,'2026-10-26',null,20,'2026-11-20'],
+  ['2027-01-30','month',1,'2027-02-01',null,31,'2027-02-28'],
+  ['2028-01-01','month',1,'2028-02-01',null,0,'2028-02-29'],
+  ['2026-10-26','day',3,'2026-10-27',null,null,'2026-10-29']]){
+   const result=(await query('select omg_private.routine_date_on_or_after($1,$2,$3,$4,$5,$6)::text d',[start,unit,every,from,weekdays,monthDay]))[0].d;assert.equal(result,expected);
+   const task={start_date:start,repeat_unit:unit,repeat_every:every,repeat_weekdays:weekdays,repeat_month_day:monthDay};assert.equal(D.upcoming(task,from,1)[0],expected);assert(D.occurrence(task,expected));
+ }
+ const weeklySave=await rpc('save',{...payload,repeat_unit:'week',repeat_weekdays:[5,1,3]});assert.equal(weeklySave.ok,true,JSON.stringify(weeklySave));
+ const weeklyList=(await rpc('list')).tasks.find(t=>t.id===weeklySave.task_id);assert.deepEqual(weeklyList.repeat_weekdays,[1,3,5]);assert.equal(weeklyList.next_date,D.upcoming(weeklyList,today,1)[0]);
+ const monthSave=await rpc('save',{...payload,repeat_unit:'month',repeat_month_day:20});assert.equal(monthSave.ok,true,JSON.stringify(monthSave));
+ const monthList=(await rpc('list')).tasks.find(t=>t.id===monthSave.task_id);assert.equal(monthList.repeat_month_day,20);assert.equal(monthList.next_date,D.upcoming(monthList,today,1)[0]);
+ const photo='data:image/png;base64,iVBORw0KGgo=';
+ const photoTask=await rpc('save',{...payload,title:'첨부 사진 전달',description_photo:photo});assert.equal(photoTask.ok,true);
+ assert.equal((await rpc('detail',{id:photoTask.task_id})).description_photo,photo);
+ assert.equal((await rpc('detail',{id:photoTask.task_id},id(999))).ok,false);
+ const photoList=(await rpc('list')).tasks.find(t=>t.id===photoTask.task_id);assert.equal(photoList.has_description_photo,true);assert(!('description_photo' in photoList));
+ await rpc('save',{...payload,id:photoTask.task_id,title:'첨부 사진 전달'});assert.equal((await rpc('detail',{id:photoTask.task_id})).description_photo,photo,'older clients must preserve attachment');
+ await db.exec('select omg_private.generate_recurring_tasks()');assert.equal((await query("select description_photo from missions where title='첨부 사진 전달'"))[0].description_photo,photo);
+ await rpc('save',{...payload,id:photoTask.task_id,description_photo:''});assert.equal((await rpc('detail',{id:photoTask.task_id})).description_photo,'');
+ assert.equal((await rpc('save',{...payload,description_photo:'https://example.com/photo.png'})).ok,false);
+ assert.equal((await rpc('save',{...payload,description_photo:'data:image/png;base64,'+'A'.repeat(3000000)})).ok,false);
+ assert.equal((await rpc('save',{...payload,repeat_unit:'week',repeat_weekdays:[]})).ok,false);
+ assert.equal((await rpc('save',{...payload,repeat_unit:'week',repeat_weekdays:[7]})).ok,false);
+ assert.equal((await rpc('save',{...payload,repeat_unit:'month',repeat_month_day:32})).ok,false);
+
+ // Only a fresh check-in by an eligible worker unlocks the date; login and NFC do not.
+ await db.exec('update omg_private.recurring_tasks set enabled=false;delete from work_sessions;');
+ const checkPayload={...payload,title:'출근시 루틴',execution_mode:'checkin',run_time:'23:59',repeat_unit:'day',repeat_every:1};
+ const checkTask=await rpc('save',checkPayload);assert.equal(checkTask.ok,true);
+ await db.exec(`insert into work_sessions values('${id(22)}','${id(2)}','working',null,null,null);select omg_private.generate_recurring_tasks();`);
+ assert.equal((await query("select * from missions where title='출근시 루틴'")).length,0);
+ await db.exec("update work_sessions set checkin_report_at=now()-interval '1 hour';select omg_private.generate_recurring_tasks();");
+ assert.equal((await query("select * from missions where title='출근시 루틴'")).length,0,'old report cannot trigger newly enabled routine');
+ await db.exec(`insert into work_sessions values('${id(23)}','${id(2)}','working',now(),null,null);select omg_private.generate_recurring_tasks();`);
+ assert.equal((await query("select * from missions where title='출근시 루틴'")).length,0,'unselected worker cannot unlock selected target');
+ await db.exec(`update work_sessions set checkin_report_at=now() where employee_id='${id(22)}';select omg_private.generate_recurring_tasks();select omg_private.generate_recurring_tasks();`);
+ assert.equal((await query("select * from missions where title='출근시 루틴'")).length,1,'check-in ignores future run time and generates once');
+ await db.exec('update omg_private.recurring_tasks set enabled=false;delete from work_sessions;');
+ const once=await rpc('save',{...checkPayload,title:'최초 배정만',target_mode:'working'});assert.equal(once.ok,true);
+ await db.exec(`insert into work_sessions values('${id(22)}','${id(2)}','working',now(),null,null);select omg_private.generate_recurring_tasks();insert into work_sessions values('${id(23)}','${id(2)}','working',now(),null,null);select omg_private.generate_recurring_tasks();`);
+ const onceM=await query("select * from missions where title='최초 배정만'");assert.equal(onceM.length,1);assert.deepEqual(onceM[0].target_employee_ids,[id(22)]);
+ await db.exec("select omg_private.generate_recurring_tasks(now()+interval '2 days');");
+ assert.equal((await query("select * from missions where title='최초 배정만'")).length,1,'no stale check-in reused on next scheduled date');
+ assert.equal((await query("select status from omg_private.recurring_task_runs where task_id=$1 order by run_date",[once.task_id]))[1].status,'skipped');
  await db.exec('set role anon;');assert.equal((await rpc('list')).ok,true);assert.equal((await rpc('list',{},id(999))).ok,false);await assert.rejects(()=>db.exec('select * from omg_private.recurring_tasks'));await assert.rejects(()=>db.exec('select omg_private.generate_recurring_tasks()'));await db.exec('reset role');
  await db.exec("update owner_sessions set token_expires_at=now()-interval '1 second'");assert.equal((await rpc('list')).ok,false);
- console.log('PASS: schedule generation/idempotency, assignment snapshot, login vs working, property and revoked-share isolation, pause/archive preserving To do, photo flag, month-end/leap-year and weekly recurrence, private access and expired session');await db.close();
+ console.log('PASS: new check-in gating, first assignment only, photos/auth/preservation, multi-weekdays/monthly dates/calendar parity, schedule generation/idempotency, assignment snapshot, login vs working, property and revoked-share isolation, pause/archive preserving To do, photo flag, month-end/leap-year and weekly recurrence, private access and expired session');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

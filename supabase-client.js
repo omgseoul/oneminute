@@ -31,7 +31,7 @@
       return session;
     },
     async logout() {
-      window.omgSession?.clear();
+      await window.omgSession?.logout();
       await window.omgSupabase.auth.signOut();
       location.replace("account.html");
     }
@@ -89,8 +89,19 @@
       const { data, error } = await window.omgSupabase.rpc("get_app_session", {
         p_access_token: session.accessToken
       });
+      // A request from a previous page/account must not erase or restore a session.
+      if (this.get()?.accessToken !== session.accessToken) return null;
       if (error) throw new Error("로그인 상태를 확인하지 못했습니다. 연결을 확인하고 새로고침해주세요.");
-      if (!data?.ok || (data.session_kind !== "owner" && !allowCompleted && data.status !== "working")) {
+      if (data?.ok === false && data.code === "invalid_session") {
+        this.clear();
+        location.replace(loginPage);
+        return null;
+      }
+      // An empty/incomplete server response is not proof that the user signed out.
+      if (data?.ok !== true || !["owner", "staff"].includes(data.session_kind)) {
+        throw new Error("로그인 상태를 확인하지 못했습니다. 연결을 확인하고 새로고침해주세요.");
+      }
+      if (data.session_kind !== "owner" && !allowCompleted && data.status !== "working") {
         this.clear();
         location.replace(loginPage);
         return null;
@@ -101,6 +112,8 @@
     },
     async logout() {
       const session = this.get();
+      // Clear synchronously so an in-flight require() cannot log us back in.
+      this.clear();
       try {
         if (!session?.accessToken) return true;
         const { data, error } = await window.omgSupabase.rpc("end_app_session", {
@@ -109,8 +122,6 @@
         return !error && data?.ok === true;
       } catch (_) {
         return false;
-      } finally {
-        this.clear();
       }
     }
   };

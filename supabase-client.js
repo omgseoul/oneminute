@@ -49,9 +49,11 @@
     set(session) {
       localStorage.setItem(this.key, JSON.stringify(session));
       window.OMGNative?.bindAppSession?.(session.accessToken, session.expiresAt || "");
+      window.dispatchEvent(new Event("omg:session-changed"));
     },
     clear() {
       localStorage.removeItem(this.key);
+      window.dispatchEvent(new Event("omg:session-changed"));
       window.OMGNative?.clearPushSession?.();
     },
     fromResponse(data, token) {
@@ -74,7 +76,9 @@
         timezone: data.timezone || "Asia/Seoul",
         status: data.status,
         checkinReportAt: data.checkin_report_at,
-        checkoutReportAt: data.checkout_report_at
+        checkoutReportAt: data.checkout_report_at,
+        unconfirmedEndedAt: data.unconfirmed_ended_at,
+        nextConfirmationAt: data.next_confirmation_at
       };
     },
     async require({ allowCompleted = false } = {}) {
@@ -101,7 +105,7 @@
       if (data?.ok !== true || !["owner", "staff"].includes(data.session_kind)) {
         throw new Error("로그인 상태를 확인하지 못했습니다. 연결을 확인하고 새로고침해주세요.");
       }
-      if (data.session_kind !== "owner" && !allowCompleted && data.status !== "working") {
+      if (data.session_kind !== "owner" && !allowCompleted && data.status !== "working" && !data.unconfirmed_ended_at) {
         this.clear();
         location.replace(loginPage);
         return null;
@@ -125,4 +129,6 @@
       }
     }
   };
+  const continuationScript=document.createElement("script");
+  continuationScript.src="work-shift-confirmation.js?v=20261107";document.head.append(continuationScript);
 })();

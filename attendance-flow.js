@@ -18,14 +18,15 @@
     const reported=!!(state?state.checkin_report_at:session.checkinReportAt);
     const arrived=state?.basis==='nfc'?!!state.entry_at:!!state;
     // An untagged NFC shift has not reached any step. Opening a form is not a report.
-    const current=completed?3:reported?2:arrived?0:-1;
+    const missing=completed&&!!(state?.unconfirmed_ended_at||session.unconfirmedEndedAt)&&!(state?.clock_out_at||session.clockOutAt);
+    const current=missing?-1:completed?3:reported?2:arrived?0:-1;
     const labels=[firstLabel(state?.basis),'출근보고','근무중','퇴근보고'];
-    host.className='attendance-progress';host.setAttribute('aria-label','출퇴근 진행 상태');
+    host.className='attendance-progress';host.setAttribute('aria-label',missing?'근무 종료 · 퇴근 시각 미기록':'출퇴근 진행 상태');
     host.replaceChildren();
     labels.forEach((label,index)=>{
       const step=document.createElement('li'),dot=document.createElement('span'),text=document.createElement('span');
       step.dataset.step=String(index);dot.className='attendance-progress-dot';text.className='attendance-progress-label';text.textContent=label;dot.setAttribute('aria-hidden','true');
-      const done=index<current||completed;
+      const done=!missing&&(index<current||completed);
       step.className=done?'is-done':index===current?'is-current':'';
       if(index===current)step.setAttribute('aria-current','step');
       step.setAttribute('aria-label',label+(done?' 완료':index===current?(index===1?' 대기':' 현재 단계'):' 대기'));
@@ -42,7 +43,13 @@
   }
   async function mayOpenReport(controller){
     try{
-      const state=await controller.refresh();
+      let state=await controller.refresh();
+      if(state?.unconfirmed_ended_at&&state.status==='completed'){
+        const session=window.omgSession.get();
+        const {data,error}=await window.omgSupabase.rpc('begin_next_work_shift',{p_access_token:session.accessToken});
+        if(error||!data?.ok)throw new Error(data?.message||'새 근무를 시작하지 못했습니다. 다시 시도해주세요.');
+        window.omgSession.set(window.omgSession.fromResponse(data,session.accessToken));state=await controller.refresh();
+      }
       if(!state)throw new Error('출근 상태를 확인하지 못했습니다. 다시 시도해주세요.');
       if(state.basis!=='nfc'||state.entry_at||state.checkin_report_at||state.status==='completed')return true;
       return await dialog('현장도착 태그(NFC)를 먼저 해주세요',{secondary:'무시하고 메뉴보기'});

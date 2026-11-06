@@ -163,7 +163,13 @@
     return new Date(api.session.clockInAt).toLocaleString("ko-KR", { timeZone: api.session.timezone });
   };
   api.ready = (async () => {
-    const session = await window.omgSession.require({ allowCompleted: true });
+    let session = await window.omgSession.require({ allowCompleted: true });
+    if(session?.unconfirmedEndedAt&&session.status==='completed'){
+      if(context?.reportType==='clock_out'){location.replace('attendance.html');return null;}
+      const next=await rpc('begin_next_work_shift',{p_access_token:session.accessToken});
+      if(!next?.ok)throw new Error(next?.message||'새 근무를 시작하지 못했습니다.');
+      session=window.omgSession.fromResponse(next,session.accessToken);window.omgSession.set(session);
+    }
     if (!session) return null;
     if (session.sessionKind !== "staff" || !context || (context.shift && session.shift !== context.shift)) {
       location.replace("index.html");

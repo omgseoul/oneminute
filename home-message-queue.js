@@ -41,7 +41,7 @@
  }
  function update(items,accessToken,announce){
   bind(accessToken);flushReads();
-  const incoming=items.filter(i=>!i.is_sender&&!i.read_at&&!['announcement','attendance_warning'].includes(i.message_type)&&
+  const incoming=items.filter(i=>!i.is_sender&&!i.read_at&&!['announcement','attendance_warning','work_confirmation'].includes(i.message_type)&&
    (i.source==='reminder'||/^(To do 알림|일정 알림)$/.test(i.sender_label||'')||(announce&&observed&&!observed.has(i.message_id))))
    .sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||''))||String(a.message_id).localeCompare(String(b.message_id)));
   observed=new Set(items.map(i=>i.message_id));add(incoming,accessToken);

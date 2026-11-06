@@ -12,11 +12,11 @@ assert.equal(time.future('2026-10-11','09:00','18:48','Asia/Seoul',now),false);
 assert.equal(time.future('2026-10-11','09:00','09:00','Asia/Seoul',now),true);
 assert.equal(time.future('2026-10-11','09:00','19:00','Australia/Melbourne',now),false);
 (async()=>{
- const html=fs.readFileSync('attendance.html','utf8'),nodes={submitEdit:{disabled:false},editStart:{value:'09:00'},editEnd:{value:'18:00'},editError:{textContent:''}},calls=[];
+ const html=fs.readFileSync('attendance.html','utf8'),nodes={submitEdit:{disabled:false},editStart:{value:'09:00'},editEnd:{value:'18:00'},editError:{textContent:''},missingCheckoutDate:{value:'2026-01-02'}},calls=[];
  const context={document:{getElementById:id=>nodes[id]},OMSAttendanceTime:time,payload:{timezone:'Asia/Seoul'},editingItem:{work_date:time.nextDate(time.parts(new Date()).date),session_id:'test'},session:{accessToken:'test'},isOwner:true,message:{textContent:''},confirmOvernight:async()=>true,window:{omgSupabase:{rpc:async(name)=>{calls.push(name);return{data:{ok:true}};}}},closeEdit(){},load:async()=>{},pushApprovalMessage(){},Error};
  vm.createContext(context);
  const handler=html.match(/document.getElementById\("submitEdit"\).onclick=(async\(\)=>\{[\s\S]*?\});\n/)[1];
- vm.runInContext('submit='+handler,context);
+ vm.runInContext('missingCheckout='+html.match(/function missingCheckout\(item\)\{[^}]*\}/)[0]+';submit='+handler,context);
  for(const owner of [true,false]){context.isOwner=owner;await context.submit();assert.match(nodes.editError.textContent,/현재 시각 이후/);assert.equal(calls.length,0);assert.equal(nodes.submitEdit.disabled,false);}
  context.isOwner=true;context.editingItem.work_date='2026-01-01';nodes.editStart.value='18:52';nodes.editEnd.value='17:44';await context.submit();assert.deepEqual(calls,['owner_update_attendance']);
  for(const name of ['attendance.html','messages.html'])for(const m of fs.readFileSync(name,'utf8').matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g))if(!m[1].includes('src='))new vm.Script(m[2]);

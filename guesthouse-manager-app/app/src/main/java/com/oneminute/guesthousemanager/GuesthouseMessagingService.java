@@ -186,6 +186,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra("alertId", id).putExtra("senderLabel", sender).putExtra("message", body)
                 .putExtra("messageType", messageType).putExtra("notificationId", notificationId);
+        NativeMessagePopupQueue.offer(this,screen);
         PendingIntent fullScreen = PendingIntent.getActivity(this, notificationId, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String messageUrl = "guest_chat".equals(messageType)
@@ -248,6 +249,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .putExtra("message", body)
                 .putExtra("messageType", messageType)
                 .putExtra("notificationId", requestCode);
+        NativeMessagePopupQueue.offer(this,screen);
         PendingIntent fullScreen = PendingIntent.getActivity(this, requestCode, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         String messageUrl = "https://omgworks24.com/messages.html"

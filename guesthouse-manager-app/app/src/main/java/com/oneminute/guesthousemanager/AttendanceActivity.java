@@ -239,6 +239,11 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private final class PushBridge {
+        @JavascriptInterface public void showWorkConfirmation(String id) {
+            if(id==null||!id.matches("[0-9a-fA-F-]{36}"))return;
+            runOnUiThread(()->{if(trustedBadgePage()&&hasWindowFocus())startActivity(new Intent(AttendanceActivity.this,WorkConfirmationActivity.class).putExtra("alertId",id).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));});
+        }
+
         @JavascriptInterface public void showMessageAlerts(String json) {
             if(json==null||json.length()>1000000)return;
             runOnUiThread(()->{

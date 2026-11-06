@@ -25,6 +25,12 @@ jobs:
         with: {node-version: '22'}
       - name: Verify live Realtime transport without creating accounts
         run: node tests/chat-realtime/transport.cjs
+      - name: Verify attendance continuation and session preservation
+        run: |
+          npm ci --prefix tests/attendance-nfc
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/work-confirmation/database.cjs
+          node tests/session-persistence/client.cjs
+          node tests/attendance-time.cjs
       - name: Validate APK publication certificate parsing
         run: python3 guesthouse-manager-app/scripts/test-publish-apk.py
       - name: Firebase configuration
@@ -54,6 +60,8 @@ jobs:
             adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w -e phase popup-queue com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-popup-queue.txt"
             grep -q 'oms_popup_queue=ok' "$RUNNER_TEMP/oms-popup-queue.txt"
+            adb shell am instrument -w -e phase work-confirmation com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-work-confirmation.txt"
+            grep -q 'oms_work_confirmation=ok' "$RUNNER_TEMP/oms-work-confirmation.txt"
             bash guesthouse-manager-app/scripts/run-launcher-badge-probe.sh
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton

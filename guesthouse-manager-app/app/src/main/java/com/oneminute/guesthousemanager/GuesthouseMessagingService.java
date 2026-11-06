@@ -181,8 +181,9 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         String body = remote.getData().get("message");
         if (body == null || body.trim().isEmpty()) body = "채팅방을 확인해주세요.";
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
-        int notificationId = NativeMessageBadge.ID;
-        Intent screen = new Intent(this, MessageAlertActivity.class)
+        boolean continuation="work_confirmation".equals(messageType);
+        int notificationId = continuation?WorkConfirmationActivity.NOTIFICATION_ID:NativeMessageBadge.ID;
+        Intent screen = new Intent(this, continuation?WorkConfirmationActivity.class:MessageAlertActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra("alertId", id).putExtra("senderLabel", sender).putExtra("message", body)
                 .putExtra("messageType", messageType).putExtra("notificationId", notificationId);
@@ -199,13 +200,13 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new NotificationCompat.Builder(this, NORMAL_MESSAGE_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this)).setColor(Color.rgb(36, 103, 189))
-                .setContentTitle(isApproval(messageType) ? "결재 요청"
+                .setContentTitle(continuation?"근무 12시간 초과 알림":isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
                 .setContentText(sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(content).build();
-        NativeMessageBadge.postAlert(this,notification);
+                .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(continuation?fullScreen:content).build();
+        if(continuation)manager.notify(notificationId,notification);else NativeMessageBadge.postAlert(this,notification);
         Handler handler = new Handler(Looper.getMainLooper());
         Runnable showScreen = () -> { try { startActivity(screen); } catch (Exception ignored) {} };
         handler.post(showScreen);handler.postDelayed(showScreen, 350L);

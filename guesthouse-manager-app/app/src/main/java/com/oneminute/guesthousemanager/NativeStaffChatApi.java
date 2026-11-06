@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 
-/** Uses the same short-lived work session and permission-checked RPCs as the web client. */
+/** Uses the same server-validated work session and permission-checked RPCs as the web client. */
 class NativeStaffChatApi {
     private static final String BASE="https://rfcozgyvupvachhhblzn.supabase.co/";
     private static final String KEY="sb_publishable_Gy0_TtIcJ6xKDEiGWEnXAg_f4_eyXPI";
@@ -19,7 +19,10 @@ class NativeStaffChatApi {
     private final Context context;
     private final String token;
     final String scope;
-    NativeStaffChatApi(Context context) throws Exception {
+    private final boolean workConfirmationOnly;
+    NativeStaffChatApi(Context context) throws Exception {this(context,false);}
+    NativeStaffChatApi(Context context,boolean workConfirmationOnly) throws Exception {
+        this.workConfirmationOnly=workConfirmationOnly;
         this.context=context.getApplicationContext();
         token=prefs(context).getString("token","");
         if(!valid())throw new IOException("로그인이 만료되었습니다. OMS에서 다시 로그인해주세요.");
@@ -27,7 +30,7 @@ class NativeStaffChatApi {
     }
     static SharedPreferences prefs(Context c){return c.getSharedPreferences("omg_receipts",Context.MODE_PRIVATE);}
     boolean valid(){
-        try{return token!=null&&token.matches("[0-9a-fA-F-]{36}")&&token.equals(prefs(context).getString("token",""))&&Instant.parse(prefs(context).getString("expires","")).toEpochMilli()>System.currentTimeMillis();}
+        try{return token!=null&&token.matches("[0-9a-fA-F-]{36}")&&token.equals(prefs(context).getString("token",""))&&(workConfirmationOnly||Instant.parse(prefs(context).getString("expires","")).toEpochMilli()>System.currentTimeMillis());}
         catch(Exception e){return false;}
     }
     static boolean validPeer(String peer){return peer!=null&&peer.matches("(?i)(owner|employee):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");}
@@ -36,9 +39,12 @@ class NativeStaffChatApi {
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));
     }
     JSONObject rpc(String name,JSONObject args)throws Exception {
-        if(!name.matches("chat_live_ticket|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox"))throw new IOException("잘못된 요청입니다.");
+        if(!name.matches("chat_live_ticket|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
+        if(workConfirmationOnly&&!"work_shift_confirmation".equals(name))throw new IOException("잘못된 요청입니다.");
         args.put("p_access_token",token);
-        return request(BASE+"rest/v1/rpc/"+name,args,true);
+        JSONObject result=request(BASE+"rest/v1/rpc/"+name,args,true);
+        if(workConfirmationOnly&&result.optJSONObject("session")!=null&&valid())SupabaseMessageReceipt.bind(context,token,result.getJSONObject("session").optString("expires_at"));
+        return result;
     }
     JSONObject guestRooms(JSONObject cursor)throws Exception {
         return request(BASE+"functions/v1/guest-support",new JSONObject().put("action","rooms").put("data",cursor).put("access_token",token),true);

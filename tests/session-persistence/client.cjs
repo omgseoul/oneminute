@@ -4,9 +4,9 @@ const token='00000000-0000-0000-0000-000000000001',other='00000000-0000-0000-000
 function setup(storage=new Map()){
  const redirects=[],binds=[],calls=[];let reply=async()=>({data:{ok:true,session_kind:'owner',status:'active',expires_at:'9999-12-31T23:59:59Z'}});
  const client={auth:{getSession:async()=>({data:{session:{}}}),signOut:async()=>{calls.push('signOut');}},rpc:(name,args)=>{calls.push(name);return reply(name,args);}};
- const window={OMG_SUPABASE:{url:'fixture',publishableKey:'fixture'},supabase:{createClient:()=>client},OMGNative:{bindAppSession:(...v)=>binds.push(v),clearPushSession:()=>calls.push('clearPush')}};
+ const window={dispatchEvent(){},OMG_SUPABASE:{url:'fixture',publishableKey:'fixture'},supabase:{createClient:()=>client},OMGNative:{bindAppSession:(...v)=>binds.push(v),clearPushSession:()=>calls.push('clearPush')}};
  const localStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
- vm.runInNewContext(source,{window,localStorage,location:{replace:v=>redirects.push(v)}});
+ vm.runInNewContext(source,{window,Event,document:{createElement:()=>({}),head:{append(){}}},localStorage,location:{replace:v=>redirects.push(v)}});
  return {s:window.omgSession,a:window.omgAccount,storage,redirects,binds,calls,reply:fn=>reply=fn};
 }
 (async()=>{
@@ -25,5 +25,6 @@ function setup(storage=new Map()){
  t.reply(async()=>({data:{ok:false,code:'invalid_session'}}));await t.s.require();assert.equal(t.s.get(),null);assert.equal(t.redirects.at(-1),'login.html');
  t.s.set({accessToken:token});t.reply(async()=>({data:{ok:true}}));await t.a.logout();assert(t.calls.indexOf('end_app_session')<t.calls.indexOf('signOut'),'account logout also revokes app session');
  const staff=setup();staff.s.set({accessToken:token});staff.reply(async()=>({data:{ok:true,session_kind:'staff',status:'completed'}}));assert(await staff.s.require({allowCompleted:true}));assert.equal(await staff.s.require(),null);
+ const ended=setup();ended.s.set({accessToken:token});ended.reply(async()=>({data:{ok:true,session_kind:'staff',status:'completed',unconfirmed_ended_at:new Date().toISOString()}}));assert(await ended.s.require());assert.equal(ended.s.get().accessToken,token,'automatic end retains session even without allowCompleted');
  console.log('PASS: restart/native expiry, offline and incomplete response preservation, explicit logout, delayed response/account-switch races, server revocation and completed staff handling');
 })().catch(e=>{console.error(e);process.exitCode=1});

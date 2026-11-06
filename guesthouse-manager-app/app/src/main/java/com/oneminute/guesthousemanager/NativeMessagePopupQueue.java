@@ -13,7 +13,7 @@ final class NativeMessagePopupQueue {
     private static void save(Context c,MessagePopupQueue q){prefs(c).edit().putString("data",q.save()).commit();}
     static synchronized void clear(Context c){prefs(c).edit().clear().commit();}
     static synchronized boolean offer(Context c,Intent intent){
-        String scope=scope(c);if(scope.isEmpty())return false;
+        String scope=scope(c);if(scope.isEmpty()||"work_confirmation".equals(intent.getStringExtra("messageType")))return false;
         String incoming=intent.getStringExtra("popupScope");if(incoming!=null&&!scope.equals(incoming))return false;
         intent.putExtra("popupScope",scope);
         try{JSONObject item=new JSONObject();for(String key:FIELDS)item.put(key,intent.getStringExtra(key));

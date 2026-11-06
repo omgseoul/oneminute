@@ -36,5 +36,5 @@ window.AccountChatPreferences=(()=>{
  async function saveRow(row){const host=row?.querySelector('.cp-settings'),context=host&&contexts.get(host);if(!host||!context)throw new Error('알림 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');return save(host,context.key,context.account);}
  async function disableRow(row){const host=row?.querySelector('.cp-settings');if(!host)throw new Error('알림 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');const chosen=host.querySelector('.cp-mode input:checked');if(chosen)chosen.checked=false;try{return await saveRow(row);}catch(error){if(chosen)chosen.checked=true;throw error;}}
  function confirmEmployeeDeletion(name){return showDialog({title:'근무자 계정을 삭제할까요?',message:`‘${name}’님의 로그인이 중지됩니다. 기존 근무기록과 문서는 보관됩니다.`,confirmText:'계정 삭제',cancelText:'취소',danger:true});}
- return{mount,saveRow,disableRow,confirmEmployeeDeletion};
+ return{mount,saveRow,disableRow,confirmEmployeeDeletion,showDialog};
 })();

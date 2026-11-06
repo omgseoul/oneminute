@@ -21,6 +21,7 @@ insert into employees(id,property_id) values('${id(21)}','${id(1)}'),('${id(22)}
 insert into owners(id,property_id) values('${id(11)}','${id(1)}');`);
 const old=fs.readFileSync('supabase/migrations/20261005070600_multi_reminder_schedules.sql','utf8');await db.exec(old.slice(old.indexOf('CREATE OR REPLACE FUNCTION public.get_property_reminder_settings'),old.indexOf('CREATE OR REPLACE FUNCTION public.save_property_reminder_settings')));
 await db.exec(fs.readFileSync('supabase/migrations/20261105102827_reminder_checkin_and_overdue.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261106015155_daily_reminders_registration_alerts.sql','utf8'));
 const q=async(sql,args=[])=>(await db.query(sql,args)).rows;
 const rule=(extra={})=>({offset_days:0,send_time:'09:00',...extra});
 const section=(kind,schedules)=>({kind,schedules,notify_staff:true,notify_owner:true});
@@ -74,7 +75,7 @@ assert.equal(await run('2030-01-21T00:02Z'),2);
 const ownerCalendar=await q("select pr.recipient_type from property_message_recipients pr join reminder_deliveries d on d.message_id=pr.message_id where d.kind='calendar' and d.delivery_key like 'checkin:2030-01-21:%'");assert.deepEqual(ownerCalendar.map(x=>x.recipient_type),['owner']);
 await save([rule({offset_days:0})]);assert.equal(await run('2030-01-21T00:00Z'),0,'turning overdue off stops future reminders');
 // A historical fixed-time delivery with an empty key remains deduplicated after migration.
-await db.exec(`update missions set due_at='2030-01-22T00:00Z'`);assert.equal(await run('2030-01-22T00:00Z'),0,'existing fixed-time identity preserved');
+await db.exec(`update missions set due_at='2030-01-22T00:00Z'`);assert.equal(await run('2030-01-22T00:00Z'),1,'new due date gets a fresh daily notification');
 // Local time, not UTC, governs the fixed-time schedule.
 await db.exec(`insert into property_reminder_settings(property_id,kind,schedules) values('${id(2)}','todo','[{"offset_days":0,"send_time":"09:00"}]');insert into missions(id,title,property_id,due_at) values('${id(32)}','뉴욕 지점','${id(2)}','2030-02-01T17:00Z');`);
 assert.equal(await run('2030-02-01T00:00Z'),0);assert.equal(await run('2030-02-01T14:00Z'),1,'09:00 New York time');
@@ -84,6 +85,26 @@ await db.exec(`update property_reminder_settings set schedules=jsonb_set(schedul
 assert.equal(await run('2030-02-02T01:01Z'),0,'same-day report predating activation ignored');
 await db.exec(`update work_sessions set checkin_report_at='2030-02-02T01:02Z' where employee_id='${id(21)}'`);assert.equal(await run('2030-02-02T01:02Z'),1);
 assert.equal((await q("select has_function_privilege('anon','omg_private.enqueue_due_reminders_at(timestamptz)','execute') allowed"))[0].allowed,false);
+// A newly registered item alerts targets even with every reminder disabled.
+await db.exec("update missions set active=false;update property_reminder_settings set schedules='[]';delete from property_message_recipients;delete from reminder_deliveries;delete from property_messages;delete from net.calls");
+await db.exec(`insert into missions(id,title,property_id,due_at,target_employee_ids) values('${id(81)}','등록 즉시','${id(1)}','2030-03-06T00:00Z','["${id(21)}"]');`);
+assert.equal((await q('select count(*)::int n from net.calls'))[0].n,1);
+assert.deepEqual((await q('select employee_id from property_message_recipients')).map(x=>x.employee_id),[id(21)]);
+await db.exec(`update missions set title='등록 후 수정' where id='${id(81)}'`);
+assert.equal((await q('select count(*)::int n from net.calls'))[0].n,1,'editing does not resend creation alert');
+await db.exec(`insert into calendar_events values('${id(82)}','새 일정','${id(1)}','2030-03-06T00:00Z',array['${id(22)}'::uuid],null);`);
+assert.equal((await q('select count(*)::int n from net.calls'))[0].n,2,'calendar also alerts on registration');
+await save([rule({offset_days:5}),rule({offset_days:1})],[rule({offset_days:5})]);
+assert.equal(await run('2030-02-28T00:00Z'),0,'outside window');
+for(let day=1;day<=6;day++){
+ const date='2030-03-'+String(day).padStart(2,'0')+'T00:00Z';
+ assert.equal(await run(date),2,`${day}: daily window includes both endpoints and overlapping rules coalesce`);
+ assert.equal(await run(date),0,'retry idempotence');
+}
+assert.equal(await run('2030-03-07T00:00Z'),0,'stops after due date without overdue option');
+// Old scheduler already sent today: migration must not send that item twice today.
+await db.exec(`delete from reminder_deliveries where delivery_key='daily:2030-03-06';insert into reminder_deliveries(kind,item_id,offset_days,send_time,delivery_key,created_at) values('todo','${id(81)}',0,'09:00','','2030-03-06T00:00Z');`);
+assert.equal(await run('2030-03-06T00:00Z'),1,'legacy todo delivery suppressed while unsent calendar proceeds');
 console.log('PASS: settings validation/atomicity, legacy rules, daily overdue, completion/ending, check-in date and activation, per-worker delivery, owner dedupe, branch isolation, calendar and private ACL');
 await db.close();
 })().catch(e=>{console.error(e);process.exitCode=1;db.close();});

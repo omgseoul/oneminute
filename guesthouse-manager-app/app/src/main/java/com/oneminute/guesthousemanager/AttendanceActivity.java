@@ -103,6 +103,7 @@ public class AttendanceActivity extends AppCompatActivity {
         NativePushRegistration.clear(this);
         NativeStaffChatApi.clearLocal(this);
         SupabaseMessageReceipt.clear(this);
+        NativeMessagePopupQueue.clear(this);
         NativeMessageBadge.clear(this);
         String baseTopic = getSharedPreferences("omg_push", MODE_PRIVATE)
                 .getString("base_topic", "");
@@ -238,6 +239,22 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     private final class PushBridge {
+        @JavascriptInterface public void showMessageAlerts(String json) {
+            if(json==null||json.length()>1000000)return;
+            runOnUiThread(()->{
+                if(!trustedBadgePage())return;
+                try {org.json.JSONArray items=new org.json.JSONArray(json);
+                    for(int n=0;n<items.length();n++){
+                        org.json.JSONObject item=items.getJSONObject(n);
+                        NativeMessagePopupQueue.offer(AttendanceActivity.this,new Intent(AttendanceActivity.this,MessageAlertActivity.class)
+                          .putExtra("alertId",item.getString("message_id")).putExtra("senderLabel",item.optString("sender_label"))
+                          .putExtra("message",item.optString("message")).putExtra("messageType",item.optString("message_type")));
+                    }
+                    if(hasWindowFocus())NativeMessagePopupQueue.launch(AttendanceActivity.this);
+                }catch(Exception ignored){}
+            });
+        }
+
         @JavascriptInterface public void startAttendanceNfc(String requestId){runOnUiThread(()->attendanceNfc.start(requestId));}
         @JavascriptInterface public void stopAttendanceNfc(String requestId){runOnUiThread(()->attendanceNfc.stop(requestId));}
         @JavascriptInterface

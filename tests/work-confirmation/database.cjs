@@ -18,6 +18,8 @@ create table owners(id uuid primary key,property_id uuid,active boolean);
 create table owner_sessions(id uuid,owner_id uuid,property_id uuid,login_token_hash text,token_expires_at timestamptz);
 create table property_share_requests(requester_property_id uuid,target_property_id uuid,status text,requested_permissions text[]);
 create table attendance_adjustment_requests(id uuid primary key default gen_random_uuid(),business_id uuid,property_id uuid,employee_id uuid,work_session_id uuid,original_clock_in_at timestamptz,original_clock_out_at timestamptz,requested_clock_in_at timestamptz,requested_clock_out_at timestamptz,status text default 'pending',approved_at timestamptz,approved_by uuid);
+create table employee_payroll_settings(employee_id uuid,pay_type text,hourly_rate numeric,monthly_salary numeric,cycle_start_day int,pay_day int,pay_month_offset int);
+create function omg_private.can_manage_shared_property(uuid,uuid,text) returns boolean language sql as $$select true$$;
 create table native_push_devices(session_hash text,expires_at timestamptz);
 create table property_messages(id uuid primary key default gen_random_uuid(),business_id uuid,property_id uuid,sender_type text,message text,priority text,message_type text,source text,sender_employee_id uuid,attendance_request_id uuid);
 create table property_message_recipients(message_id uuid,recipient_key text,recipient_type text,employee_id uuid,owner_id uuid,read_at timestamptz);
@@ -29,6 +31,7 @@ create function omg_private.dispatch_chat_push(uuid) returns void language sql a
 create function cron.schedule(text,text,text) returns int language sql as $$select 1$$;`);
 await db.exec(fs.readFileSync(fs.readdirSync('supabase/migrations').map(n=>'supabase/migrations/'+n).find(n=>n.endsWith('_work_shift_confirmation.sql')),'utf8'));
 await db.exec('grant execute on function public.get_work_session(uuid),public.save_work_report(uuid,text,jsonb),public.attendance_nfc_entry(uuid,text),public.start_work_session(uuid,text,text,text,text) to anon,authenticated');
+await db.exec('grant execute on function public.list_employee_payroll(uuid,date,uuid[]),public.list_employee_payroll_range(uuid,date,date,uuid[]) to anon');
 const approval=fs.readFileSync('supabase/migrations/20261011093319_block_future_attendance_adjustments.sql','utf8');await db.exec(approval.slice(0,approval.indexOf('CREATE OR REPLACE FUNCTION public.owner_update_attendance(')).trim()+';');await db.exec('grant execute on function public.approve_attendance_adjustment(uuid,uuid) to anon');
 const emps=await q('select * from employees order by id');const stamp=new Date('2026-11-07T00:00:00Z');
 async function session(emp,n=0){const token=randomUUID();const s=await one(`insert into work_sessions(business_id,property_id,employee_id,shift,work_date,clock_in_at,login_token_hash,token_expires_at) values($1,$2,$3,'general','2026-11-06',$4,omg_private.token_hash($5),now()+interval '20 hours') returning id`,[emp.business_id,emp.property_id,emp.id,new Date(Date.now()-14*3600000).toISOString(),token]);await db.query('insert into native_push_devices values(omg_private.token_hash($1),now()+interval \'20 hours\')',[token]);return{id:s.id,token};}
@@ -55,13 +58,19 @@ result=await rpc('get_work_session',[a.token]);ok(result.ok&&result.status==='co
 ok(!(await rpc('save_work_report',[a.token,'clock_out',{}])).ok,'late checkout cannot silently fill missing timestamp');
 const newShift=await rpc('begin_next_work_shift',[a.token]);ok(newShift.ok&&newShift.session_id!==a.id&&newShift.status==='working','new shift starts without logout');ok((await rpc('begin_next_work_shift',[a.token])).session_id===newShift.session_id,'duplicate start is idempotent');
 ok((await one('select clock_out_at from work_sessions where id=$1',[a.id])).clock_out_at===null,'old missing checkout preserved');
+const owner=randomUUID(),ownerToken=randomUUID();await db.query('insert into owners values($1,$2,true)',[owner,emps[0].property_id]);await db.query("insert into owner_sessions values(gen_random_uuid(),$1,$2,omg_private.token_hash($3),now()+interval '1 day')",[owner,emps[0].property_id,ownerToken]);
+await db.query("update work_sessions set work_date=(clock_timestamp() at time zone 'Asia/Seoul')::date where id=$1",[a.id]);
+const today=(await one("select to_char(clock_timestamp() at time zone 'Asia/Seoul','YYYY-MM-DD') d")).d;
+const payroll=await rpc('list_employee_payroll_range',[ownerToken,today,today,null]);const pay=payroll.employees.find(e=>e.employee_id===emps[0].id);
+ok(pay.missing_count===1&&pay.working_count===1&&pay.work_minutes===0,'payroll counts timeout as missing, excludes its hours, and counts only the new active shift');
+const monthly=(await rpc('list_employee_payroll',[ownerToken,today,null])).employees.find(e=>e.employee_id===emps[0].id);ok(monthly.missing_count===1&&monthly.working_count===1&&monthly.work_minutes===0,'monthly payroll uses the same missing/working classification');
 // Missing checkout can be corrected for a multi-day shift through the existing owner approval.
 await db.query("update work_sessions set work_date='2026-10-01',clock_in_at='2026-10-01T00:00Z' where id=$1",[a.id]);
 ok(!(await rpc('request_missing_checkout_adjustment',[b.token,a.id,'09:00','22:00','2026-10-02'])).ok,'cannot edit another worker');
 ok(!(await rpc('request_missing_checkout_adjustment',[a.token,a.id,'09:00','22:00','2099-01-01'])).ok,'future correction denied');
 const correction=await rpc('request_missing_checkout_adjustment',[a.token,a.id,'09:00','22:00','2026-10-02']);ok(correction.ok,'employee requests actual multi-day checkout');
 ok((await one('select clock_out_at from work_sessions where id=$1',[a.id])).clock_out_at===null,'request does not invent approved payroll time');
-const owner=randomUUID(),ownerToken=randomUUID();await db.query('insert into owners values($1,$2,true)',[owner,emps[0].property_id]);await db.query("insert into owner_sessions values(gen_random_uuid(),$1,$2,omg_private.token_hash($3),now()+interval '1 day')",[owner,emps[0].property_id,ownerToken]);
+
 ok((await rpc('approve_attendance_adjustment',[ownerToken,correction.request_id])).ok,'owner approves correction');
 ok(Number((await one('select extract(epoch from clock_out_at-clock_in_at)/3600 hours from work_sessions where id=$1',[a.id])).hours)===37,'actual 37-hour correction stored without 24-hour truncation');
 // Normal checkout cancels an active prompt; subsequent confirmation cannot reopen.

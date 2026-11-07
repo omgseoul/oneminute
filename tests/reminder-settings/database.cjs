@@ -22,6 +22,7 @@ insert into owners(id,property_id) values('${id(11)}','${id(1)}');`);
 const old=fs.readFileSync('supabase/migrations/20261005070600_multi_reminder_schedules.sql','utf8');await db.exec(old.slice(old.indexOf('CREATE OR REPLACE FUNCTION public.get_property_reminder_settings'),old.indexOf('CREATE OR REPLACE FUNCTION public.save_property_reminder_settings')));
 await db.exec(fs.readFileSync('supabase/migrations/20261105102827_reminder_checkin_and_overdue.sql','utf8'));
 await db.exec(fs.readFileSync('supabase/migrations/20261106015155_daily_reminders_registration_alerts.sql','utf8'));
+const refresh=fs.readFileSync('supabase/migrations/20261107030048_notification_checkout_refresh.sql','utf8');await db.exec(refresh.slice(refresh.indexOf('CREATE OR REPLACE FUNCTION omg_private.enqueue_due_reminders_at'),refresh.indexOf('-- Enrich existing reminder bodies')));
 const q=async(sql,args=[])=>(await db.query(sql,args)).rows;
 const rule=(extra={})=>({offset_days:0,send_time:'09:00',...extra});
 const section=(kind,schedules)=>({kind,schedules,notify_staff:true,notify_owner:true});

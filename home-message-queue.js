@@ -11,10 +11,22 @@
    count.className='message-arrival-count';count.setAttribute('aria-live','polite');card.append(count);
    button.type='button';button.className='message-arrival-confirm';button.textContent='확인';button.onclick=confirm;card.append(button);
   }
-  root.querySelector('strong').textContent=active.report?'새 보고 도착':/^(To do 알림|일정 알림)$/.test(active.sender_label)?active.sender_label:'새 메세지 도착';
-  document.getElementById('messageArrivalSender').textContent=active.report?active.sender_label:/^(To do 알림|일정 알림)$/.test(active.sender_label)?'업무 알림':(active.sender_label||'새 메세지');
-  document.getElementById('messageArrivalBody').textContent=String(active.message||'메세지 메뉴에서 확인해주세요.').replace(/\\n/g,'\n').replace(/^(?:To do 알림|일정 알림)\s*\n/,'');
-  root.querySelector('.message-arrival-count').textContent=`남은 알림 ${queue.length+1}건`;
+  const reminder=active.report?null:window.OMSReminderPopup?.parse(active.message,active.sender_label);
+  root.classList.toggle('is-reminder',!!reminder);root.classList.toggle('is-overdue',!!reminder?.overdue);
+  let banner=root.querySelector('.reminder-banner'),hint=root.querySelector('.reminder-hint'),date=root.querySelector('.reminder-date'),open=root.querySelector('.reminder-open');
+  if(!banner){
+   const card=root.querySelector('.message-arrival-card');
+   banner=document.createElement('div');banner.className='reminder-banner';banner.innerHTML='<b></b><span></span>';card.prepend(banner);
+   date=document.createElement('div');date.className='reminder-date';hint=document.createElement('div');hint.className='reminder-hint';document.getElementById('messageArrivalBody').after(date,hint);
+   open=document.createElement('button');open.type='button';open.className='reminder-open';root.querySelector('.message-arrival-confirm').before(open);
+  }
+  banner.hidden=hint.hidden=date.hidden=open.hidden=!reminder;
+  document.getElementById('messageArrivalDog').src=reminder?(reminder.overdue?'oms-dog-overdue.webp':'oms-dog-normal.jpg'):'shiba-worker-logo.png';
+  if(reminder){banner.firstElementChild.textContent=reminder.heading;banner.lastElementChild.textContent=reminder.timing;hint.textContent=reminder.guidance;date.textContent=reminder.dateLine;date.hidden=!reminder.dateLine;open.textContent=reminder.button;open.onclick=()=>{const href=reminder.href;confirm();location.href=href;};}
+  root.querySelector('strong').textContent=reminder?'OMS':active.report?'새 보고 도착':/^(To do 알림|일정 알림)$/.test(active.sender_label)?active.sender_label:'새 메세지 도착';
+  document.getElementById('messageArrivalSender').textContent=reminder?'':active.report?active.sender_label:/^(To do 알림|일정 알림)$/.test(active.sender_label)?'업무 알림':(active.sender_label||'새 메세지');
+  document.getElementById('messageArrivalBody').textContent=reminder?reminder.title:String(active.message||'메세지 메뉴에서 확인해주세요.').replace(/\\n/g,'\n').replace(/^(?:To do 알림|일정 알림)\s*\n/,'');
+  root.querySelector('.message-arrival-count').textContent=`${queue.length+1}건 대기`;
   root.hidden=false;root.querySelector('button').focus({preventScroll:true});
  }
  function saveReads(){try{sessionStorage.setItem('oms-popup-pending:'+token,JSON.stringify([...pendingReads]));}catch{}}
@@ -37,7 +49,7 @@
   bind(accessToken);const ordinary=items.filter(i=>!i.report);
   if(typeof window.OMGNative?.showMessageAlerts==='function'&&ordinary.length){window.OMGNative.showMessageAlerts(JSON.stringify(ordinary));items=items.filter(i=>i.report);}
   for(const item of items)if(item.message_id&&!seen.has(item.message_id)&&active?.message_id!==item.message_id&&!queue.some(q=>q.message_id===item.message_id))queue.push(item);
-  if(!active&&queue.length)render();else if(active)popup().querySelector('.message-arrival-count').textContent=`남은 알림 ${queue.length+1}건`;
+  if(!active&&queue.length)render();else if(active)popup().querySelector('.message-arrival-count').textContent=`${queue.length+1}건 대기`;
  }
  function update(items,accessToken,announce){
   bind(accessToken);flushReads();

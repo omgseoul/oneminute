@@ -29,6 +29,8 @@ jobs:
         run: |
           npm ci --prefix tests/attendance-nfc
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/work-confirmation/database.cjs
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/notification-checkout/database.cjs
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/notification-checkout/web.cjs
           node tests/session-persistence/client.cjs
           node tests/attendance-time.cjs
       - name: Validate APK publication certificate parsing
@@ -62,6 +64,13 @@ jobs:
             grep -q 'oms_popup_queue=ok' "$RUNNER_TEMP/oms-popup-queue.txt"
             adb shell am instrument -w -e phase work-confirmation com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-work-confirmation.txt"
             grep -q 'oms_work_confirmation=ok' "$RUNNER_TEMP/oms-work-confirmation.txt"
+            adb shell am instrument -w -e phase login-ime com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-login-ime.txt"
+            grep -q 'oms_login_ime=ok' "$RUNNER_TEMP/oms-login-ime.txt"
+            adb shell am instrument -w -e phase reminder-design com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-reminder-design.txt"
+            grep -q 'oms_reminder_design=ok' "$RUNNER_TEMP/oms-reminder-design.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-0.png > "$RUNNER_TEMP/oms-native-reminder-0.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-1.png > "$RUNNER_TEMP/oms-native-reminder-1.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-2.png > "$RUNNER_TEMP/oms-native-reminder-2.png"
             bash guesthouse-manager-app/scripts/run-launcher-badge-probe.sh
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton

@@ -143,13 +143,14 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        ReminderPopup reminder=ReminderPopup.parse(body,sender);
         Notification notification = new NotificationCompat.Builder(this, WEAK_MESSAGE_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
                 .setColor(Color.rgb(36, 103, 189))
-                .setContentTitle(isApproval(messageType) ? "결재 요청"
+                .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
-                .setContentText(sender + " · " + body)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setContentText(reminder!=null?reminder.title:sender + " · " + body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -198,11 +199,12 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        ReminderPopup reminder=ReminderPopup.parse(body,sender);
         Notification notification = new NotificationCompat.Builder(this, NORMAL_MESSAGE_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this)).setColor(Color.rgb(36, 103, 189))
-                .setContentTitle(continuation?"근무 12시간 초과 알림":isApproval(messageType) ? "결재 요청"
+                .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:continuation?"근무 12시간 초과 알림":isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
-                .setContentText(sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setContentText(reminder!=null?reminder.title:sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(continuation?fullScreen:content).build();
@@ -261,12 +263,13 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, requestCode, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        ReminderPopup reminder=ReminderPopup.parse(body,sender);
         Notification notification = new NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
                 .setColor(Color.rgb(36, 103, 189))
-                .setContentTitle(isApproval(messageType) ? "결재 요청" : "새 메세지 도착")
-                .setContentText(sender + " · " + body)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:isApproval(messageType) ? "결재 요청" : "새 메세지 도착")
+                .setContentText(reminder!=null?reminder.title:sender + " · " + body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

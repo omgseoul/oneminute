@@ -18,7 +18,7 @@ final class MessagePopupQueueProbe {
    check(text(screen.getWindow().getDecorView(),"순서 검사 1")!=null,"First alert is not overwritten by last launch");
    test.runOnMainSync(()->screen.onNewIntent(item(c,3)));test.waitForIdleSync();check(NativeMessagePopupQueue.size(c)==4,"Repeated launch deduplicated");
    for(int n=1;n<=4;n++){
-    final int index=n;test.runOnMainSync(()->{check(text(screen.getWindow().getDecorView(),"순서 검사 "+index)!=null,"FIFO display "+index);check(text(screen.getWindow().getDecorView(),"남은 알림 "+(5-index)+"건")!=null,"Count matches queue");text(screen.getWindow().getDecorView(),"확인").performClick();});test.waitForIdleSync();Thread.sleep(250);
+    final int index=n;test.runOnMainSync(()->{check(text(screen.getWindow().getDecorView(),"순서 검사 "+index)!=null,"FIFO display "+index);check(text(screen.getWindow().getDecorView(),(5-index)+"건 대기")!=null,"Count matches queue");text(screen.getWindow().getDecorView(),"확인").performClick();});test.waitForIdleSync();Thread.sleep(250);
    }
    check(NativeMessagePopupQueue.size(c)==0,"All four consumed");check(!NativeMessagePopupQueue.offer(c,item(c,1)),"Delayed retry cannot reopen confirmed alert");
    NativeMessagePopupQueue.offer(c,item(c,5));c.getSharedPreferences("omg_push",0).edit().putString("member_id","other-user").commit();check(NativeMessagePopupQueue.peek(c)==null,"Account switch clears previous user's queue");

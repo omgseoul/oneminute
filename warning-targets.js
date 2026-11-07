@@ -46,7 +46,7 @@
         panel.querySelectorAll('input').forEach(control=>control.onchange=()=>{
           const values=[...panel.querySelectorAll('input:checked')].map(x=>x.value);
           if(!values.length){control.checked=true;return;}
-          input.value=values.length===2?'both':values[0];onChange?.();sync();if(!multiple)close(root);
+          input.value=values.length===2?'both':values[0];onChange?.();input.dispatchEvent(new Event("change",{bubbles:true}));sync();if(!multiple)close(root);
         });
       }
       button.onclick=()=>{const opening=panel.hidden;document.querySelectorAll('.warning-targets').forEach(close);if(opening){panel.hidden=false;button.setAttribute('aria-expanded','true');const rect=button.getBoundingClientRect();root.classList.toggle('open-up',window.innerHeight-rect.bottom<Math.min(panel.scrollHeight,300)&&rect.top>window.innerHeight-rect.bottom);}};

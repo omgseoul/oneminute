@@ -1,0 +1,23 @@
+(function(){
+ function show(warning,index,total){
+  return new Promise(resolve=>{
+   const overlay=document.createElement('div');overlay.className='checkout-warning-overlay';
+   const dialog=document.createElement('section');dialog.className='checkout-warning-card';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-labelledby','checkout-warning-title');
+   dialog.innerHTML='<div class="checkout-warning-banner">퇴근 전 확인</div><h2 id="checkout-warning-title">근무시간 경고</h2><p class="checkout-warning-message"></p><small></small><div class="checkout-warning-actions"><button type="button" data-cancel>돌아가기</button><button type="button" data-confirm>확인했습니다</button></div>';
+   dialog.querySelector('p').textContent=warning.message;dialog.querySelector('small').textContent=total>1?`${index+1} / ${total}`:'';
+   overlay.append(dialog);document.body.append(overlay);
+   const previous=document.activeElement;
+   const finish=value=>{overlay.remove();previous?.focus?.();resolve(value);};
+   dialog.querySelector('[data-cancel]').onclick=()=>finish(false);dialog.querySelector('[data-confirm]').onclick=()=>finish(true);
+   dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();finish(false);}if(event.key==='Tab'){event.preventDefault();const buttons=[...dialog.querySelectorAll('button')];buttons[document.activeElement===buttons[0]?1:0].focus();}});
+   dialog.querySelector('[data-confirm]').focus();
+  });
+ }
+ window.OMSCheckoutWarning={async confirm(rpc,token,warnings){
+  for(let i=0;i<warnings.length;i++){
+   if(!await show(warnings[i],i,warnings.length))throw new Error('퇴근보고를 취소했습니다. 입력한 내용은 유지됩니다.');
+   const result=await rpc('confirm_checkout_warning',{p_access_token:token,p_rule_id:warnings[i].rule_id,p_rule_updated_at:warnings[i].rule_updated_at});
+   if(!result?.ok)throw new Error(result?.message||'확인 내용을 저장하지 못했습니다. 다시 시도해주세요.');
+  }
+ }};
+})();

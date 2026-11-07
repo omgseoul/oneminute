@@ -22,6 +22,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import java.io.OutputStream;
 
 public class AttendanceActivity extends AppCompatActivity {
+    private NativeLoginInput loginInput;
     private static final String APP_URL = "https://omgworks24.com/app.html";
     private static final String MISSION_URL = "https://omgworks24.com/mission.html";
     private static final int FILE_CHOOSER_REQUEST = 2201;
@@ -129,13 +130,14 @@ public class AttendanceActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        webView = new MultilingualWebView(this);
+        webView = new WebView(this);
         attendanceNfc = new NativeAttendanceNfc(this,webView);
         FrameLayout root = new FrameLayout(this);
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         recovery = new WebViewRecovery(this, webView, root, appUrlFromIntent(getIntent()));
 
+        loginInput = new NativeLoginInput(this,webView,root);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -146,8 +148,8 @@ public class AttendanceActivity extends AppCompatActivity {
         webView.addJavascriptInterface(new PushBridge(), "OMGNative");
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { if(attendanceNfc!=null)attendanceNfc.clear();if(workerProfiles!=null)workerProfiles.clear();recovery.started(url); }
-            @Override public void onPageFinished(WebView view, String url) { recovery.finished(url); }
+            @Override public void onPageStarted(WebView view, String url, Bitmap icon) { if(loginInput!=null)loginInput.started();if(attendanceNfc!=null)attendanceNfc.clear();if(workerProfiles!=null)workerProfiles.clear();recovery.started(url); }
+            @Override public void onPageFinished(WebView view, String url) { recovery.finished(url);if(loginInput!=null)loginInput.finished(); }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) recovery.fail(request.getUrl().toString());
             }
@@ -462,6 +464,7 @@ public class AttendanceActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if(loginInput!=null)loginInput.close();
         if(workerProfiles!=null)workerProfiles.close();
         if (recovery != null) recovery.destroy();
         if (webView != null) {

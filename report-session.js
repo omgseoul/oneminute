@@ -108,6 +108,9 @@
       if (!record?.ok) throw new Error(record?.message || "보고를 저장하지 못했습니다. 다시 로그인해주세요.");
       saved = record;
       editing = false;
+      // Check-in warnings are created in the same transaction as the report.
+      // Dispatch immediately, even if later webhook delivery needs a retry.
+      for(const messageId of record.warning_message_ids||[]){try{await window.omgNotifications.send(session.accessToken,messageId);}catch(_){}}
       if(record.already_saved===false)await notifyNewReport(session.accessToken,record.report_id);
       notice.hidden = false;
       notice.textContent = "보고가 저장됐습니다. 전달 상태를 확인하고 있습니다…";

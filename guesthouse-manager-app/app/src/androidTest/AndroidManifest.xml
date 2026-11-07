@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <application><service android:name="com.oneminute.guesthousemanager.TestHangulIme" android:label="OMS test Hangul keyboard" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true">
+ <intent-filter><action android:name="android.view.InputMethod"/></intent-filter><meta-data android:name="android.view.im" android:resource="@xml/test_hangul_ime"/>
+ </service></application>
+</manifest>

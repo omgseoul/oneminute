@@ -1,11 +1,13 @@
 (function(){
   let activeDialog=null;
-  function dialog(title,{secondary=null}={}){
+  function dialog(title,{secondary=null,message=null,character=null}={}){
     if(activeDialog)return activeDialog.promise;
     const node=document.createElement('dialog');node.className='oms-action-dialog attendance-dialog';
     const heading=document.createElement('h2');heading.id='attendanceDialogTitle';heading.textContent=title;
     const head=document.createElement('div');head.className='oms-action-head';head.append(heading);node.append(head);
     node.setAttribute('aria-labelledby',heading.id);
+    if(character){node.classList.add('attendance-celebration');const dog=document.createElement('img');dog.className='attendance-dialog-character';dog.src=character;dog.alt='응원하는 OMS 강아지';head.prepend(dog);}
+    if(message){const text=document.createElement('p');text.className='attendance-dialog-message';text.textContent=message;head.append(text);}
     const buttons=document.createElement('div');buttons.className='oms-action-buttons';node.append(buttons);
     if(secondary){const bypass=document.createElement('button');bypass.type='button';bypass.className='oms-action-button';bypass.textContent=secondary;bypass.onclick=()=>node.close('proceed');buttons.append(bypass);}
     const okay=document.createElement('button');okay.type='button';okay.className='oms-action-button primary';okay.textContent='확인';okay.onclick=()=>node.close('dismiss');buttons.append(okay);

@@ -2,5 +2,5 @@
     <queries><intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.HOME" /></intent></queries>
     <application>
         <activity android:name=".ChatHandoffProbeActivity" android:exported="false" android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard" />
-    </application>
+    <activity android:name=".LoginImeTestActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/></application>
 </manifest>

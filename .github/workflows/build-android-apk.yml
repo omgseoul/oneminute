@@ -33,6 +33,8 @@ jobs:
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/notification-checkout/web.cjs
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/notification-checkout/report-flow.cjs
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/reminder-settings/database.cjs
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/checkin-report/database.cjs
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/checkin-report/web.cjs
           node tests/session-persistence/client.cjs
           node tests/attendance-time.cjs
       - name: Validate APK publication certificate parsing
@@ -45,6 +47,7 @@ jobs:
       - name: Compile Android changes
         run: |
           python3 scripts/prepare-chat-handoff-fixture.py
+          python3 scripts/prepare-login-ime-fixture.py
           OMS_CHAT_TEST_BUILD=debug gradle testDebugUnitTest assembleDebug assembleDebugAndroidTest --stacktrace
         working-directory: guesthouse-manager-app
       - name: Enable emulator acceleration
@@ -68,6 +71,7 @@ jobs:
             grep -q 'oms_work_confirmation=ok' "$RUNNER_TEMP/oms-work-confirmation.txt"
             adb shell am instrument -w -e phase login-ime com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-login-ime.txt"
             grep -q 'oms_login_ime=ok' "$RUNNER_TEMP/oms-login-ime.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-login-ime.png > "$RUNNER_TEMP/oms-native-login-ime.png"
             adb shell am instrument -w -e phase reminder-design com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-reminder-design.txt"
             grep -q 'oms_reminder_design=ok' "$RUNNER_TEMP/oms-reminder-design.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-0.png > "$RUNNER_TEMP/oms-native-reminder-0.png"

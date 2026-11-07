@@ -27,3 +27,6 @@
 .attendance-dialog .oms-action-buttons>.oms-action-button:first-child:not(:last-child){flex:1.6}
 .attendance-dialog .oms-action-buttons>.oms-action-button:last-child{flex:1}
 @media(max-width:360px){#appShell>.top.staff-attendance-top{gap:4px}.staff-attendance-top .top-actions{gap:0}.staff-attendance-top .my-info{padding:7px 2px}.staff-attendance-top .logout{padding:8px 2px}.working-self-name{max-width:75px}}
+
+.attendance-dialog-character{display:block;width:144px;height:144px;object-fit:contain;margin:0 auto 12px}.attendance-dialog-message{margin:12px 0 0;color:#6d7b90;font-size:16px;line-height:1.6;text-align:center}
+.attendance-celebration .oms-action-head{display:flex;flex-direction:column;align-items:center;gap:0;text-align:center}

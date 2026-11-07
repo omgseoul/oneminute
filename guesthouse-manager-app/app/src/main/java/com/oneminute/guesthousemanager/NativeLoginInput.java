@@ -13,7 +13,7 @@ import android.widget.*;
 import org.json.JSONObject;
 
 /** A native username editor in the existing web form; PIN/auth remain unchanged. */
-final class NativeLoginInput {
+public final class NativeLoginInput {
  private final Activity activity;private final WebView web;private final EditText editor;
  private volatile String value="";private String documentId="";private boolean allowed,initialized,syncing;
  NativeLoginInput(Activity activity,WebView web,FrameLayout root){

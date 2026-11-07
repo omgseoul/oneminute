@@ -2,14 +2,14 @@ const{chromium}=require('playwright'),fs=require('fs'),path=require('path'),http
 const root=path.resolve(__dirname,'../..');const source=fs.readFileSync(path.join(root,'tests/notification-bot-ui.cjs'),'utf8');const sandbox={require,process,__dirname:path.join(root,'tests')};vm.runInNewContext(source.slice(0,source.indexOf('(async()=>'))+';globalThis.fixture=fixture;',sandbox);
 const extra=`
 window.__items=[
- ['To do 알림','1일 지연: 냉장고 점검\\n마감: 2026-11-06 23:59'],
+ ['To do 알림','지연: 냉장고 점검'],
  ['To do 알림','3일 지연: 공용공간 정리\\n마감: 2026-11-04 23:59'],
  ['To do 알림','오늘: 수건 재고 확인\\n마감: 2026-11-07 23:59'],
  ['일정 알림','오늘: 오후 3시 소방점검\\n일정: 2026-11-07 15:00'],
  ['일정 알림','2일 후: 에어컨 필터 청소\\n일정: 2026-11-09 15:00'],
  ['일정 알림','3일 후: 정기 방역\\n일정: 2026-11-10 15:00'],
  ['To do 알림','오늘: 체크인 안내문 확인\\n마감: 2026-11-07 23:59']
-].map((x,i)=>({message_id:'r'+i,property_id:pid,message:x[0]+'\\n'+x[1]+'\\n시간대: Asia/Seoul',sender_type:'system',sender_label:x[0],message_type:'general',created_at:'2026-11-07T02:29:0'+i+'Z',read_at:'2026-11-07T02:30Z'}));
+].map((x,i)=>({message_id:'r'+i,property_id:pid,reminder_at:i===0?'2026-11-06T14:59:00Z':null,reminder_timezone:'Asia/Seoul',message:x[0]+'\\n'+x[1]+'\\n시간대: Asia/Seoul',sender_type:'system',sender_label:x[0],message_type:'general',created_at:'2026-11-07T02:29:0'+i+'Z',read_at:'2026-11-07T02:30Z'}));
 `;
 const server=http.createServer((req,res)=>{const file=path.resolve(root,'.'+new URL(req.url,'http://local').pathname);if(!file.startsWith(root+path.sep)||!fs.existsSync(file)){res.writeHead(404);res.end();return}res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.webp':'image/webp','.jpg':'image/jpeg'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file))});
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port+'/';const browser=await chromium.launch();try{

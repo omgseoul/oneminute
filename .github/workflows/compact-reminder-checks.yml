@@ -1,7 +1,7 @@
 name: Verify compact reminders and checkout schedule
 on:
   pull_request:
-    paths: ['notification-bot.js', 'message-hub.css', 'messages.html', 'reminder-popup.js', 'checkout-warning.*', 'supabase/migrations/*checkout_warning_schedule_cycle.sql', 'tests/compact-reminders/**', '.github/workflows/compact-reminder-checks.yml']
+    paths: ['notification-bot.js', 'message-hub.css', 'messages.html', 'reminder-popup.js', 'checkout-warning.*', 'supabase/migrations/*checkout_warning_schedule_cycle.sql', 'supabase/migrations/*bot_reminder_dates.sql', 'tests/compact-reminders/**', '.github/workflows/compact-reminder-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,6 +18,7 @@ jobs:
         env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
         run: |
           node tests/compact-reminders/database.cjs
+          node tests/notification-bot-db.cjs
           node tests/notification-checkout/database.cjs
           node tests/notification-checkout/web.cjs
           node tests/notification-checkout/report-flow.cjs

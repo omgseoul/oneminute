@@ -90,11 +90,21 @@
       if (!session) throw initialError || new Error("다시 로그인해주세요.");
       if (formPage) formPage.inert = true;
       const args = { p_access_token: session.accessToken, p_report_type: context.reportType };
-      const record = saved && !editing
+      if(context.reportType==='clock_out'&&!saved&&!editing){
+        const preview=await rpc('preview_checkout_warnings',{p_access_token:session.accessToken});
+        if(!preview?.ok)throw new Error(preview?.message||'퇴근 경고를 확인하지 못했습니다.');
+        await window.OMSCheckoutWarning.confirm(rpc,session.accessToken,preview.warnings||[]);
+      }
+      let record = saved && !editing
         ? await rpc("get_work_report", args)
         : editing
           ? await rpc("update_work_report", { ...args, p_payload: payload })
           : await rpc("save_work_report", { ...args, p_payload: payload });
+      // Recheck at commit time: a threshold/rule may change while the dialog is open.
+      for(let attempt=0;record?.code==='checkout_warning_required'&&attempt<3;attempt++){
+        await window.OMSCheckoutWarning.confirm(rpc,session.accessToken,record.warnings||[]);
+        record=await rpc('save_work_report',{...args,p_payload:payload});
+      }
       if (!record?.ok) throw new Error(record?.message || "보고를 저장하지 못했습니다. 다시 로그인해주세요.");
       saved = record;
       editing = false;

@@ -5,7 +5,7 @@ w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:tr
 w.eval(fs.readFileSync('home-message-queue.js','utf8'));
 const items=Array.from({length:4},(_,n)=>({message_id:'m'+n,message:'To do 알림\n지연: 점검 '+n,sender_label:n%2?'일정 알림':'To do 알림',message_type:'general',created_at:'2026-11-06T00:00:0'+n+'Z'}));
 (async()=>{w.HomeMessageQueue.update(items,'staff-token',false);assert.equal(w.document.getElementById('messageArrivalBody').textContent,'지연: 점검 0');
-w.HomeMessageQueue.update(items,'staff-token',true);assert.equal(w.document.querySelector('.message-arrival-count').textContent,'남은 알림 4건');
+w.HomeMessageQueue.update(items,'staff-token',true);assert.equal(w.document.querySelector('.message-arrival-count').textContent,'4건 대기');
 await new Promise(r=>setTimeout(r,4300));assert.equal(w.document.getElementById('messageArrival').hidden,false,'no automatic timeout');
 for(let i=0;i<4;i++){assert.equal(w.document.getElementById('messageArrivalBody').textContent,'지연: 점검 '+i);w.document.querySelector('.message-arrival-confirm').click();await new Promise(r=>setTimeout(r,210));}
 assert.equal(w.document.getElementById('messageArrival').hidden,true);assert.deepEqual(calls.map(c=>c.args.p_message_id),['m0','m1','m2','m3']);

@@ -48,7 +48,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         Intent next=NativeMessagePopupQueue.peek(this);
         if(next==null){cancelNotification();finish();return;}
         if(!next.getStringExtra("alertId").equals(alertId)) {setIntent(next);buildMessageScreen(next);}
-        if(queueCount!=null)queueCount.setText("남은 알림 "+NativeMessagePopupQueue.size(this)+"건");
+        if(queueCount!=null)queueCount.setText(NativeMessagePopupQueue.size(this)+"건 대기");
     }
 
     private void showOverLockScreen() {
@@ -72,6 +72,8 @@ public class MessageAlertActivity extends AppCompatActivity {
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         if (message == null || message.trim().isEmpty()) message = "메세지 메뉴에서 확인해주세요.";
 
+        ReminderPopup reminder=ReminderPopup.parse(message,sender);
+        if(reminder!=null){buildReminderScreen(reminder);return;}
         FrameLayout shade = new FrameLayout(this);
         shade.setBackgroundColor(Color.argb(120, 13, 25, 42));
         shade.setPadding(dp(22), dp(32), dp(22), dp(32));
@@ -137,6 +139,30 @@ public class MessageAlertActivity extends AppCompatActivity {
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
         shade.addView(scroll, cardParams);
         setContentView(shade);
+    }
+
+    private void buildReminderScreen(ReminderPopup reminder){
+        FrameLayout shade=new FrameLayout(this);shade.setBackgroundColor(Color.argb(120,13,25,42));shade.setPadding(dp(22),dp(32),dp(22),dp(32));
+        ScrollView scroll=new ScrollView(this);scroll.setBackground(rounded(Color.WHITE,27));scroll.setClipToOutline(true);
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);scroll.addView(card,new ScrollView.LayoutParams(-1,-2));
+        LinearLayout banner=new LinearLayout(this);banner.setGravity(Gravity.CENTER_VERTICAL);banner.setPadding(dp(20),dp(17),dp(20),dp(17));banner.setBackgroundColor(reminder.overdue?Color.rgb(202,60,73):BLUE);
+        banner.addView(label(reminder.heading,15,Color.WHITE,true,Gravity.LEFT),new LinearLayout.LayoutParams(0,-2,1));
+        banner.addView(label(reminder.timing,13,Color.WHITE,false,Gravity.RIGHT),new LinearLayout.LayoutParams(-2,-2));card.addView(banner,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(24),dp(16),dp(24),dp(22));card.addView(body,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout hero=new LinearLayout(this);hero.setGravity(Gravity.CENTER_VERTICAL);hero.addView(label("OMS",13,Color.rgb(112,131,154),true,Gravity.LEFT),new LinearLayout.LayoutParams(0,-2,1));
+        ImageView dog=new ImageView(this);dog.setImageResource(reminder.overdue?R.drawable.oms_dog_overdue:R.drawable.oms_dog_normal);dog.setScaleType(ImageView.ScaleType.FIT_CENTER);dog.setContentDescription(reminder.overdue?"지친 표정의 OMS 강아지":"OMS 강아지");hero.addView(dog,new LinearLayout.LayoutParams(dp(86),dp(86)));body.addView(hero);
+        TextView title=label(reminder.title,27,NAVY,true,Gravity.LEFT);title.setPadding(0,dp(9),0,dp(12));body.addView(title,new LinearLayout.LayoutParams(-1,-2));
+        if(!reminder.dateLine.isEmpty()){TextView date=label(reminder.dateLine,13,Color.rgb(112,131,154),false,Gravity.LEFT);date.setPadding(0,0,0,dp(15));body.addView(date,new LinearLayout.LayoutParams(-1,-2));}
+        TextView hint=label(reminder.guidance,13,reminder.overdue?Color.rgb(186,52,65):BLUE,false,Gravity.LEFT);hint.setPadding(dp(14),dp(14),dp(14),dp(14));hint.setBackground(rounded(reminder.overdue?Color.rgb(255,240,241):Color.rgb(237,245,255),14));body.addView(hint,new LinearLayout.LayoutParams(-1,-2));
+        queueCount=label("",11,Color.rgb(112,131,154),false,Gravity.RIGHT);queueCount.setPadding(0,dp(13),0,dp(9));body.addView(queueCount,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout actions=new LinearLayout(this);Button open=actionButton(reminder.button,BLUE,Color.WHITE);open.setTextSize(14);open.setOnClickListener(v->openReminder(reminder.path));LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,dp(50),1);a.setMargins(0,0,dp(10),0);actions.addView(open,a);
+        Button close=actionButton("확인",Color.rgb(234,241,250),NAVY);close.setTextSize(14);close.setOnClickListener(v->closePopup());actions.addView(close,new LinearLayout.LayoutParams(dp(80),dp(50)));body.addView(actions,new LinearLayout.LayoutParams(-1,-2));
+        int width=Math.min(dp(366),getResources().getDisplayMetrics().widthPixels-dp(44));
+        int maxHeight=getResources().getDisplayMetrics().heightPixels-dp(96);scroll.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(maxHeight,android.view.View.MeasureSpec.AT_MOST));
+        shade.addView(scroll,new FrameLayout.LayoutParams(width,Math.min(scroll.getMeasuredHeight(),maxHeight),Gravity.CENTER));setContentView(shade);
+    }
+    private void openReminder(String path){
+        confirmCurrent();startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/"+path)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));finish();
     }
 
     private Button actionButton(String text, int background, int foreground) {

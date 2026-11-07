@@ -129,7 +129,7 @@ public class AttendanceActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        webView = new WebView(this);
+        webView = new MultilingualWebView(this);
         attendanceNfc = new NativeAttendanceNfc(this,webView);
         FrameLayout root = new FrameLayout(this);
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));

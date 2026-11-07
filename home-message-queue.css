@@ -1,1 +1,17 @@
 #messageArrival{z-index:1000}#messageArrival .message-arrival-card{max-height:calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto}#messageArrival .message-arrival-count{display:block;color:#70839a;font-size:12px;margin:12px 0 8px}#messageArrival .message-arrival-confirm{display:block;width:100%;min-height:46px;margin:0;border:0;border-radius:13px;background:#2467bd;color:#fff;font:inherit;font-weight:800;cursor:pointer}#messageArrivalBody{max-height:35dvh!important}
+
+#messageArrival.is-reminder .message-arrival-card{width:min(100%,366px);padding:0 24px 22px;border-radius:27px;display:grid;grid-template-columns:1fr 80px;gap:0 10px;text-align:left;overflow:auto;position:relative}
+#messageArrival .reminder-banner[hidden],#messageArrival .reminder-date[hidden],#messageArrival .reminder-hint[hidden],#messageArrival .reminder-open[hidden]{display:none}
+#messageArrival.is-reminder .reminder-banner{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#2467bd;color:white;margin:0 -24px 16px;padding:17px 20px;font-size:15px;line-height:1.5}
+#messageArrival.is-reminder .reminder-banner span{color:#fff;font-size:13px;white-space:nowrap}
+#messageArrival.is-overdue .reminder-banner{background:#ca3c49}
+#messageArrival.is-reminder #messageArrivalDog{grid-column:2;grid-row:2;width:86px;height:86px;object-fit:contain;margin:0;background:white;border:0;border-radius:0}
+#messageArrival.is-reminder strong{grid-column:1;grid-row:2;align-self:center;color:#70839a;font-size:13px;margin:0}
+#messageArrival.is-reminder #messageArrivalSender{display:none}
+#messageArrival.is-reminder #messageArrivalBody{grid-column:1/-1;padding:0;margin:9px 0 12px;background:none;color:#183153;font-size:27px;font-weight:850;line-height:1.35;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
+#messageArrival.is-reminder .reminder-date{grid-column:1/-1;color:#70839a;font-size:13px;margin-bottom:15px}
+#messageArrival.is-reminder .reminder-hint{grid-column:1/-1;padding:14px;border-radius:14px;background:#edf5ff;color:#2467bd;font-size:13px;line-height:1.6}
+#messageArrival.is-overdue .reminder-hint{background:#fff0f1;color:#ba3441}
+#messageArrival.is-reminder .message-arrival-count{grid-column:1/-1;text-align:right;margin:13px 0 9px;font-size:11px}
+#messageArrival.is-reminder .reminder-open{grid-column:1;min-height:50px;border:0;border-radius:14px;background:#2467bd;color:white;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
+#messageArrival.is-reminder .message-arrival-confirm{grid-column:2;min-height:50px;background:#eaf1fa;color:#183153;font-size:14px}

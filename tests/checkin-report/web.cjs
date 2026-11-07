@@ -1,0 +1,5 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+(async()=>{const w=new JSDOM('<body><main id="formPage"></main><main id="donePage"></main></body>',{url:'https://omgworks24.com/report.html?type=clock_in',runScripts:'outside-only'}).window,order=[];
+w.scrollTo=()=>{};w.omgSession={require:async()=>({sessionKind:'staff',accessToken:'test',status:'working'})};w.omgSupabase={rpc:async name=>{order.push(name);return{data:name==='get_work_report'?{code:'not_found'}:{ok:true,make_accepted:true,warning_message_ids:['warning1']}}}};w.omgNotifications={send:async(t,id)=>order.push('send:'+id)};
+w.eval(fs.readFileSync('report-session.js','utf8'));w.omgReport.onFinished=async()=>order.push('finished');await w.omgReport.ready;await w.omgReport.submit({});assert.deepEqual(order,['get_work_report','save_work_report','send:warning1','finished']);w.close();
+console.log('PASS check-in warnings dispatch after save and before completion, no login-triggered delivery');})().catch(e=>{console.error(e);process.exitCode=1});

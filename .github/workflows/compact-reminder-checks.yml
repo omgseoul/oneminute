@@ -1,0 +1,35 @@
+name: Verify compact reminders and checkout schedule
+on:
+  pull_request:
+    paths: ['notification-bot.js', 'message-hub.css', 'messages.html', 'reminder-popup.js', 'checkout-warning.*', 'supabase/migrations/*checkout_warning_schedule_cycle.sql', 'tests/compact-reminders/**', '.github/workflows/compact-reminder-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: tests/attendance-nfc/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify warning schedule and report gates
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/compact-reminders/database.cjs
+          node tests/notification-checkout/database.cjs
+          node tests/notification-checkout/web.cjs
+          node tests/notification-checkout/report-flow.cjs
+          node tests/checkin-report/database.cjs
+          node tests/work-confirmation/database.cjs
+      - name: Verify compact mobile layouts and detail targets
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/compact-reminders/browser.cjs
+          node tests/notification-checkout/browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: OMS-compact-reminder-preview
+          path: /tmp/oms-compact-bot-*.png

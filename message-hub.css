@@ -172,3 +172,15 @@
 
 /* Bot portraits open the same profile card as staff identities. */
 .bot-conversation-head .bot-profile-trigger,.bot-profile-trigger{display:inline-flex;flex-shrink:0;align-self:flex-start;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.bot-profile-trigger:focus-visible{outline:2px solid #286bbc;outline-offset:3px}
+
+/* Compact grouped reminders: one identity and receipt for consecutive alerts. */
+#botTimeline{padding:12px 12px 20px}.bot-date{margin:2px 0 12px}
+.bot-reminder-group{margin-bottom:12px}.bot-reminder-panel{width:100%;max-width:100%;padding:0 11px;border-radius:17px;box-sizing:border-box}
+.bot-reminder-item{padding:9px 0}.bot-reminder-item+.bot-reminder-item{border-top:1px solid #e6edf5}
+.bot-reminder-heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:#2467bd;font-size:13px;font-weight:750;line-height:1.4}
+.bot-overdue,.bot-overdue-days{color:#cf3943}.bot-overdue-days{flex:none;white-space:nowrap;font-size:12px}
+.bot-reminder-line{display:flex;align-items:center;gap:8px;margin-top:3px}.bot-reminder-line p{flex:1;min-width:0;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.bot-reminder-line .bot-chat-action{flex:none;width:auto;min-height:28px;margin:0;padding:3px 8px;border-radius:9px;font-size:12px;line-height:20px;white-space:nowrap}
+.bot-reminder-line .bot-chat-action:focus-visible{outline:2px solid #2467bd;outline-offset:2px}
+#botConversation .bot-chat-footer{padding:9px 12px calc(9px + env(safe-area-inset-bottom));font-size:11px}
+@media(max-width:360px){.bot-reminder-panel{padding:0 9px}.bot-reminder-line{gap:5px}.bot-reminder-line .bot-chat-action{padding:3px 6px}.bot-reminder-heading{font-size:12px}}

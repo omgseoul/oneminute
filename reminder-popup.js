@@ -10,7 +10,7 @@
   if(dateLine){try{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);const v=t=>parts.find(p=>p.type===t).value;days=Math.round((Date.parse(dateLine.slice(4,14)+'T00:00:00Z')-Date.parse(`${v('year')}-${v('month')}-${v('day')}T00:00:00Z`))/86400000);overdue=!calendar&&days<0;}catch(_){}}
   const title=(lines[0]||'').replace(prefix?.[0]||/^$/,'')||'내용을 확인해주세요.';
   const timing=days===null?'':days===0?'(오늘)':days<0?(overdue?`(${-days}일 지연)`:'(지난 일정)'):`(${days}일 후)`;
-  return {calendar,overdue,title,dateLine,heading:overdue?'지연된 업무':category,timing,
+  return {calendar,overdue,days,title,dateLine,heading:overdue?'지연된 업무':category,timing,
    guidance:overdue?'기한이 지났습니다. 지금 확인해주세요.':calendar?'예정된 일정을 확인해주세요.':'할 일을 확인하고 완료해주세요.',
    href:calendar?'calendar.html':'mission.html',button:calendar?'일정 보기':'할 일 보기'};
  }

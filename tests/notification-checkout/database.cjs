@@ -39,6 +39,7 @@ alter table owner_sessions add business_id uuid;
 create table attendance_warning_rules(id uuid primary key default gen_random_uuid(),business_id uuid,property_id uuid,employee_id uuid,target_employee_ids uuid[] default '{}',target_all boolean default false,event_type text,comparison text,threshold_minutes int,message text,active boolean default true,created_at timestamptz default clock_timestamp(),updated_at timestamptz default clock_timestamp());
 create table attendance_warning_deliveries(rule_id uuid,work_session_id uuid,event_type text,message_id uuid);
 create table attendance_login_checks(employee_id uuid,property_id uuid,login_date date,first_login_at timestamptz,unique(employee_id,property_id,login_date));
+create function omg_private.property_service_state(uuid) returns jsonb language sql as $$select '{"restricted":false}'::jsonb$$;
 create table missions(id uuid,property_id uuid,title text,due_at timestamptz);
 create table calendar_events(id uuid,property_id uuid,title text,start_at timestamptz);
 create table reminder_deliveries(kind text,item_id uuid,message_id uuid);

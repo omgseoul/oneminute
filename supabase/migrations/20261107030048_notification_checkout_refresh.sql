@@ -506,7 +506,7 @@ END $function$;
 -- Enrich existing reminder bodies linked to their original assignment; IDs/receipts stay intact.
 update public.property_messages msg set message=omg_private.reminder_popup_text('todo',m.title,m.due_at,p.timezone,clock_timestamp())
 from public.reminder_deliveries d join public.missions m on d.kind='todo' and m.id=d.item_id join public.properties p on p.id=m.property_id
-where msg.id=d.message_id and exists(select 1 from public.property_message_recipients r where r.message_id=msg.id and r.read_at is null) and msg.source='reminder' and msg.message like 'To do 알림%' and m.due_at is not null;
+where msg.id=d.message_id and not coalesce((omg_private.property_service_state(msg.property_id)->>'restricted')::boolean,false) and exists(select 1 from public.property_message_recipients r where r.message_id=msg.id and r.read_at is null) and msg.source='reminder' and msg.message like 'To do 알림%' and m.due_at is not null;
 update public.property_messages msg set message=omg_private.reminder_popup_text('calendar',c.title,c.start_at,p.timezone,clock_timestamp())
 from public.reminder_deliveries d join public.calendar_events c on d.kind='calendar' and c.id=d.item_id join public.properties p on p.id=c.property_id
-where msg.id=d.message_id and exists(select 1 from public.property_message_recipients r where r.message_id=msg.id and r.read_at is null) and msg.source='reminder' and msg.message like '일정 알림%';
+where msg.id=d.message_id and not coalesce((omg_private.property_service_state(msg.property_id)->>'restricted')::boolean,false) and exists(select 1 from public.property_message_recipients r where r.message_id=msg.id and r.read_at is null) and msg.source='reminder' and msg.message like '일정 알림%';

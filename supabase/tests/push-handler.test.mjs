@@ -14,6 +14,7 @@ function harness(options={}) {
   const body=url.endsWith('/token')?null:JSON.parse(init.body);calls.push({url,body});
   if(url.endsWith('/token'))return Response.json({access_token:'fake-token',expires_in:3600});
   if(url.includes('fcm.googleapis.com'))return Response.json({}, {status:options.failFcm?500:200});
+  if(url.endsWith('verify_notification_worker'))return Response.json(body.p_secret==='test-worker');
   if(url.endsWith('finish_chat_push'))return Response.json({ok:true});
   if(url.endsWith('get_message_push_dispatch_v2')||url.endsWith('get_chat_push_dispatch'))return Response.json(auth?{ok:true,message_id:id,recipient_topics:options.topics||[topic],recipient_modes:options.recipientModes||{},message:options.message||'한'.repeat(2000),message_type:options.messageType||'attendance_warning',sender_label:'근태관리',priority:options.priority||'normal'}:{ok:false,code:'invalid_session'});
   if(url.endsWith('resolve_native_push_targets'))return Response.json(options.devices||[]);
@@ -72,3 +73,26 @@ test('device resolver cannot route outside authorized recipients',async()=>{cons
 test('guest notification includes the guest name',async()=>{const h=harness({guestName:'나야나'});assert.equal((await h.request({event_id:id},'/guest-chat',{'x-webhook-secret':'test-admin'})).status,200);const d=h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.message.data;assert.equal(d.senderLabel,'현장게스트 나야나');});
 
 test('durable staff queue requires worker secret, completes only after push, and deduplicates legacy callers',async()=>{const h=harness();assert.equal((await h.request({message_id:id},'/staff-outbox')).status,401);assert.equal(h.calls.length,0);assert.equal((await h.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'test-worker'})).status,200);assert(h.calls.some(c=>c.url.endsWith('finish_chat_push')));await h.request();assert.equal(h.calls.filter(c=>c.url.includes('fcm.googleapis.com')).length,1);const f=harness({failFcm:true});assert.equal((await f.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'test-worker'})).status,502);assert(!f.calls.some(c=>c.url.endsWith('finish_chat_push')));});
+
+test('worker auth uses Vault despite a missing or stale Edge environment secret',async()=>{
+ for(const legacy of ['', 'stale-secret']){const h=harness({config:{GUEST_EMAIL_WORKER_SECRET:legacy}});
+ assert.equal((await h.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'test-worker'})).status,200);
+ assert(h.calls.some(c=>c.url.endsWith('verify_notification_worker')));
+ const denied=harness({config:{GUEST_EMAIL_WORKER_SECRET:'stale-secret'}});
+ assert.equal((await denied.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'stale-secret'})).status,401);
+ assert(!denied.calls.some(c=>c.url.includes('fcm.googleapis.com')));}
+});
+test('group fanout honors the same per-person modes as direct chat',async()=>{
+ const owner='property_123_owner_'+id, other='property_123_employee_00000000-0000-4000-8000-000000000002';
+ const h=harness({topics:[owner,other],recipientModes:{[owner]:'weak',[other]:'strong'},messageType:'general'});
+ assert.equal((await h.request({message_id:id},'/staff-outbox',{'x-webhook-secret':'test-worker'})).status,200);
+ const sends=h.calls.filter(c=>c.url.includes('fcm.googleapis.com')).map(c=>c.body.message);
+ assert.deepEqual(sends.map(x=>[x.topic,x.data.mode]).sort(),[[owner,'weak'],[other,'strong']].sort());
+ assert(sends.every(x=>x.data.alertId===id));
+});
+test('worker transport validation does not notify, claim, or complete the real queued message',async()=>{
+ const h=harness();const response=await h.request({message_id:id,validate_only:true},'/staff-outbox',{'x-webhook-secret':'test-worker'});
+ assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,sent:0,validated:1,duplicates:0,failed:0,message_id:id});
+ assert(h.calls.find(c=>c.url.includes('fcm.googleapis.com')).body.validate_only);
+ assert(!h.calls.some(c=>/claim_push_delivery|finish_chat_push|finish_push_delivery/.test(c.url)));
+});

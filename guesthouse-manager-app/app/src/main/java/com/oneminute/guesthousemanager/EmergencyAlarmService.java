@@ -179,7 +179,7 @@ public class EmergencyAlarmService extends Service {
                 (ringing ? "미확인 긴급 메세지" : senderIntro());
         String content = ringing ? "확인할 때까지 긴급 알람이 계속 울립니다." : message;
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_oms_notification).setLargeIcon(OmsNotificationIcon.largeIcon(this)).setNumber(NativeMessageBadge.currentCount(this))
+                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
                 .setColor(Color.rgb(217, 54, 62))
                 .setContentTitle(title)
                 .setContentText(content)

@@ -49,6 +49,12 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
     if (!response.ok) throw new Error('database_failed');
     return value;
   }
+  async function authorizedWorker(req) {
+    const secret = req.headers.get('x-webhook-secret');
+    if (!secret || secret.length > 4096) return false;
+    // Cron and Edge authenticate against the same Vault value; no duplicated env secret.
+    return await rpc('verify_notification_worker', { p_secret: secret }) === true;
+  }
   async function send(topic, data, deliveryId, validateOnly = false, device = null) {
     if (!topicPattern.test(topic)) throw new Error('invalid_topic');
     // Obtain transport authorization before taking a delivery lease.
@@ -107,10 +113,10 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         await send('property_0_staff', { mode: 'message', message: 'validation' }, 'validation', true);
         return reply({ ok: true, validated: true });
       }
-      let payload, topics, deliveryId, recipientDeadlines = {}, recipientModes = {};
+      let payload, topics, deliveryId, recipientDeadlines = {}, recipientModes = {}, validateOnly = false;
       if (path.endsWith('/staff-outbox')) {
-        const secret=env('GUEST_EMAIL_WORKER_SECRET');
-        if (!secret || req.headers.get('x-webhook-secret')!==secret) return reply({ok:false,code:'unauthorized'},401);
+        if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
+        validateOnly = body.validate_only === true;
         if (!uuid.test(body.message_id||'')) return reply({ok:false,code:'invalid_request'},400);
         const dispatch=await rpc('get_chat_push_dispatch',{p_message_id:body.message_id});
         if (!dispatch.ok) return reply({ok:false,code:'not_found'},404);
@@ -118,8 +124,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
         payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:dispatch.priority==='urgent'?'urgent':'message',priority:dispatch.priority||'normal',messageType:dispatch.message_type||'general',senderLabel:dispatch.sender_label||'메세지'};
       } else if (path.endsWith('/reminder')) {
-        const secret = env('GUEST_EMAIL_WORKER_SECRET');
-        if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ok:false,code:'unauthorized'},401);
+        if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);
         const dispatch = await rpc('get_reminder_push_dispatch',{p_message_id:body.message_id});
         if (!dispatch.ok) return reply({ok:false,code:'not_found'},404);
@@ -216,7 +221,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
             mode,
             priority:mode === 'urgent' ? 'urgent' : 'normal'
           };
-          return send(t.topic, data, deliveryId, false, t.token ? t : null);
+          return send(t.topic, data, deliveryId, validateOnly, t.token ? t : null);
         }));
         for (const result of results) {
           if (result.status === 'rejected') failed++;
@@ -224,9 +229,9 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
           else sent++;
         }
       }
-      if (!failed && path.endsWith('/staff-outbox')) await rpc('finish_chat_push',{p_message_id:body.message_id});
+      if (!failed && !validateOnly && path.endsWith('/staff-outbox')) await rpc('finish_chat_push',{p_message_id:body.message_id});
       if (!failed && path.endsWith('/guest-chat')) await rpc('finish_guest_chat_dispatch',{p_event_id:body.event_id});
-      return reply({ ok: failed === 0, sent, duplicates, failed, message_id: deliveryId,
+      return reply({ ok: failed === 0, sent: validateOnly ? 0 : sent, ...(validateOnly ? {validated:sent} : {}), duplicates, failed, message_id: deliveryId,
         ...(failed ? { message: '메세지는 저장됐지만 일부 알림 발송을 확인하지 못했습니다.' } : {}) }, failed ? 502 : 200);
     } catch (error) {
       // Never return provider bodies, access tokens, or service-account values.

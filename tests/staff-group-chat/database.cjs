@@ -41,6 +41,21 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  await db.exec(fs.readFileSync('tests/staff-group-chat/baseline.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261109072052_staff_group_conversations.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261109141206_group_member_profiles.sql','utf8'));
+ await db.exec(`create role service_role;create schema vault;
+ create table vault.decrypted_secrets(name text,decrypted_secret text);
+ insert into vault.decrypted_secrets values('omg_guest_email_worker_secret','test-worker');
+ create table omg_private.chat_push_outbox(message_id uuid primary key,created_at timestamptz default now(),sent_at timestamptz);
+ create table public.notification_bots(property_id uuid,alert_mode text,display_name text);
+ create table public.guest_chat_alert_preferences(actor_key text,home_property_id uuid,schedules jsonb);
+ create function omg_private.dispatch_chat_push(uuid default null) returns void language sql as $$select$$;
+ `);
+ const durable=fs.readFileSync('supabase/migrations/20261020071326_chat_realtime_durable_outbox.sql','utf8');
+ await db.exec(durable.match(/create function omg_private.enqueue_chat_push\(\)[\s\S]*?create trigger oms_chat_enqueue_push[^;]+;/i)[0]);
+ await db.exec(durable.match(/CREATE OR REPLACE FUNCTION omg_private.chat_push_payload[\s\S]*?\$function\$\s*;/)[0]);
+ await db.exec(fs.readFileSync('supabase/migrations/20261109153853_notification_worker_auth.sql','utf8'));
+ ok(await rpc('verify_notification_worker',['test-worker'],'service_role'),'worker verifies against Vault');
+ ok(!await rpc('verify_notification_worker',['wrong'],'service_role'),'wrong worker secret rejected');
+ await assert.rejects(()=>rpc('verify_notification_worker',['test-worker']),/permission denied/);checks++;
  const call=(token,action,data={})=>rpc('staff_chat_rpc',[token,action,data]);
  const o=id(201),s1=id(301),s2=id(302),peer1='employee:'+id(31),peer2='employee:'+id(32),peer3='employee:'+id(34);
  await assert.rejects(()=>call(id(999),'create_group',{peers:[peer1,peer2],client_id:id(401)}),/로그인/);checks++;
@@ -53,7 +68,11 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok((await call(s1,'rooms')).rooms.some(r=>r.peer===g&&r.member_count===3),'members see same initially empty room');
  let sent=await call(o,'send',{peer:g,body:'단체 테스트',client_id:id(501)});
  ok(sent.message.unread_count===2,'sender sees two unread recipients');
- ok((await q('select * from property_messages')).length===1,'one shared message instead of two DMs');
+ ok((await q('select count(*) n from omg_private.chat_push_outbox where message_id=$1',[sent.message_id]))[0].n===1,'group send automatically queues exactly one durable push');
+ let dispatch=await rpc('get_chat_push_dispatch',[sent.message_id],'service_role');
+ ok(dispatch.recipient_topics.length===2,'group routes to both staff recipients');
+
+ ok((await q('select * from property_messages where id=$1',[sent.message_id])).length===1,'one shared message instead of two DMs');
  ok((await q('select * from omg_private.staff_conversation_items($1)',['owner:'+id(21)])).length===0,'group messages excluded from direct conversations');
  ok((await call(s1,'messages',{peer:g})).messages[0].sender_name==='관리자','sender identity in group');
  let repeated=await call(o,'send',{peer:g,body:'단체 테스트',client_id:id(501)});ok(repeated.message_id===sent.message_id,'send retry idempotent');
@@ -62,6 +81,16 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  await call(s1,'read_room',{peer:g,through_id:sent.message_id});
  let receipt=(await call(o,'messages',{peer:g,receipt_ids:[sent.message_id],after_time:sent.message.created_at,after_id:sent.message_id})).receipts[0];ok(receipt.unread_count===1&&receipt.read_at===null,'partial read decrements without all-read');
  await call(s2,'read',{peer:g,ids:[sent.message_id]});receipt=(await call(o,'messages',{peer:g,receipt_ids:[sent.message_id]})).receipts[0];ok(receipt.unread_count===0&&receipt.read_at,'all-read receipt');
+ ok((await rpc('get_chat_push_dispatch',[sent.message_id],'service_role')).recipient_topics.length===0,'all-read message has no push targets');
+ const staffMessage=await call(s1,'send',{peer:g,body:'관리자도 알림',client_id:id(550)});
+ await db.exec(`insert into public.guest_chat_alert_preferences values('owner:${id(21)}','${id(11)}','[{"enabled":true,"days":[0,1,2,3,4,5,6],"property_ids":["${id(11)}"],"alert_mode":"weak"}]');`);
+ dispatch=await rpc('get_chat_push_dispatch',[staffMessage.message_id],'service_role');
+ ok(dispatch.recipient_modes['property_1_owner_'+id(21)]==='weak','admin receives group message using configured weak mode');
+ ok(dispatch.recipient_topics.length===2,'sender excluded, admin and other staff included');
+ await call(o,'read',{peer:g,ids:[staffMessage.message_id]});
+ dispatch=await rpc('get_chat_push_dispatch',[staffMessage.message_id],'service_role');
+ ok(!dispatch.recipient_topics.includes('property_1_owner_'+id(21)),'already-read admin is skipped on delayed retry');
+
  const jpeg='data:image/jpeg;base64,/9j/AA==';const media=await call(s1,'send',{peer:g,body:'사진',photo:jpeg,client_id:id(502)});
  ok((await call(s2,'attachment',{peer:g,message_id:media.message_id})).attachment===jpeg,'shared attachment retrieval');
  ok(!(await rpc('staff_chat_native_messages',[s2,{peer:g}])).messages.find(x=>x.id===media.message_id).photo,'native response omits inline photo');
@@ -75,6 +104,7 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  await assert.rejects(()=>call(s2,'resolve',{message_id:sent.message_id}),/참여/);checks++;
  const after=await call(o,'send',{peer:g,body:'나간후',client_id:id(505)});
  ok((await q('select * from property_message_recipients where message_id=$1',[after.message_id])).length===1,'departed member gets no future recipient or notification');
+ ok((await rpc('get_chat_push_dispatch',[after.message_id],'service_role')).recipient_topics.length===1,'departure also removes push target');
  ok((await call(s1,'messages',{peer:g})).messages.some(x=>x.system&&x.body.includes('나갔습니다')),'departure event shown');
  ok((await call(o,'messages',{peer:g,receipt_ids:[media.message_id]})).peer.member_count===2,'member count refreshes');
  const dm=await call(o,'send',{peer:peer1,body:'1:1 유지',client_id:id(506)});ok((await call(s1,'messages',{peer:'owner:'+id(21)})).messages.some(x=>x.id===dm.message_id),'direct chat preserved');

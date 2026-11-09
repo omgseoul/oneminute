@@ -16,7 +16,7 @@ async function checkHub(native){
  w.eval(read('staff-chat-client.js'));w.eval(read('notification-bot.js'));w.eval(read('message-hub.js'));
  await w.MessageHub.init({propertyId:'home',accessToken:'fake'},{mailbox(){},clearSearch(){},render(){},compose(){},load(){},openDetail:item=>details.push(item)});
  const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};await flush();
- const tabs=d.querySelector('.hub-tabs'),property=d.getElementById('hubProperty');
+ const tabs=d.querySelector('.hub-tabs'),property=d.getElementById('hubProperty');assert.equal(w.MessageHub.isStaff(),true,'plain message entry defaults to staff');assert.deepEqual([...d.querySelectorAll('[data-hub]')].map(el=>el.dataset.hub),['staff','guest','reports','approvals']);
  const click=tab=>d.querySelector('[data-hub='+tab+']').click();
  click('staff');await flush();
  assert.equal(launches.length,0,'staff tab must stay inside the shared hub even in the app');

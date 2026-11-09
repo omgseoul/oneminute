@@ -91,6 +91,7 @@ jobs:
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-messages.png > "$RUNNER_TEMP/oms-native-messages.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-stickers.png > "$RUNNER_TEMP/oms-native-stickers.png"
             grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-group-members.png > "$RUNNER_TEMP/oms-native-group-members.png"
             adb shell wm size 720x1280
             adb shell wm density 360
             adb shell settings put system font_scale 1.3

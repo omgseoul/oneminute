@@ -1,7 +1,7 @@
 name: Verify staff group conversations
 on:
   pull_request:
-    paths: ['staff-chat*', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
+    paths: ['staff-chat*', 'message-hub.js', 'assets/staff-group-avatar.svg', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,4 +27,4 @@ jobs:
         if: always()
         with:
           name: OMS-group-chat-preview
-          path: /tmp/oms-group-chat-*.png
+          path: /tmp/oms-group-*.png

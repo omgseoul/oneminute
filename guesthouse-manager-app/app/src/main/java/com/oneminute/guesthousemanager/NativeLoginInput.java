@@ -44,7 +44,7 @@ public final class NativeLoginInput {
    float scale=(float)(web.getWidth()/viewport);int width=Math.round((float)data.optDouble("width")*scale),height=Math.round((float)data.optDouble("height")*scale);
    if(width<=0||height<=0||width>web.getWidth()+dp(2)||height>dp(120))return;
    if(!initialized){documentId=id;initialized=true;syncing=true;editor.setText(data.optString("value",""));editor.setSelection(editor.length());syncing=false;}
-   FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(width,height);lp.leftMargin=Math.round(web.getX()+(float)data.optDouble("x")*scale);lp.topMargin=Math.round(web.getY()+(float)data.optDouble("y")*scale);editor.setLayoutParams(lp);
+   FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(width,height);lp.leftMargin=Math.round(web.getX()+(float)data.optDouble("x")*scale)-((View)web.getParent()).getPaddingLeft();lp.topMargin=Math.round(web.getY()+(float)data.optDouble("y")*scale)-((View)web.getParent()).getPaddingTop();editor.setLayoutParams(lp);
    editor.setTextSize(TypedValue.COMPLEX_UNIT_PX,(float)data.optDouble("fontSize",16)*scale);int padding=Math.round(14*scale);editor.setPadding(padding,0,padding,0);editor.setGravity(Gravity.CENTER_VERTICAL);border(editor.hasFocus());editor.setVisibility(View.VISIBLE);
    web.evaluateJavascript("window.OMSNativeLoginInput?.attach("+JSONObject.quote(documentId)+")",null);
   });

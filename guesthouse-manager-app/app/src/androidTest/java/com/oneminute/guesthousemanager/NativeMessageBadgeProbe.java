@@ -34,6 +34,19 @@ final class NativeMessageBadgeProbe {
             return new org.json.JSONObject().put("rooms",rows);
         }
     }
+    private static void verifyLogo(Context c, Notification notification) {
+        check(notification.getLargeIcon()!=null,"Notification drawer has full-color OMS logo");
+        android.graphics.Bitmap logo=OmsNotificationIcon.largeIcon(c);
+        check(android.graphics.Color.alpha(logo.getPixel(96,96))==0,"OMS center stays transparent");
+        check(logo.getPixel(48,48)==0xff2467bd,"Upper-left ring is OMS blue");
+        check(logo.getPixel(144,144)==0xff0e2b3d,"Lower-right ring stays navy");
+        android.graphics.drawable.Drawable icon=c.getDrawable(R.drawable.ic_oms_notification);
+        android.graphics.Bitmap small=android.graphics.Bitmap.createBitmap(240,240,android.graphics.Bitmap.Config.ARGB_8888);
+        icon.setBounds(0,0,240,240);icon.draw(new android.graphics.Canvas(small));
+        check(android.graphics.Color.alpha(small.getPixel(120,14))>240,"Status ring reaches expanded outer edge");
+        check(android.graphics.Color.alpha(small.getPixel(120,65))>240,"Status ring has thicker stroke");
+        check(android.graphics.Color.alpha(small.getPixel(120,120))==0,"Status ring hole remains clear");
+    }
     static void run(Instrumentation instrumentation){
         Bundle result=new Bundle();Context c=instrumentation.getTargetContext();
         NativeMessageBadge.Loader original=NativeMessageBadge.loader;
@@ -45,6 +58,7 @@ final class NativeMessageBadgeProbe {
             NativeMessageBadge.loader=ctx->{throw new java.io.IOException("synthetic offline");};
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
             Notification n=summary(c);
+            verifyLogo(c,n);
             check(n.getSmallIcon().getResId()==R.drawable.ic_oms_notification,"OMS status icon");
             check((n.flags&Notification.FLAG_GROUP_SUMMARY)==0,"Badge must not be a launcher-filtered group header");
             check(n.getGroup()==null,"Badge remains independent of alert groups");
@@ -54,6 +68,7 @@ final class NativeMessageBadgeProbe {
             NativeMessageBadge.postAlert(c,actual);NativeMessageBadge.postAlert(c,actual);
             check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==1,"One real message notification, no extra unread bulletin");
             NativeMessageBadge.fromWeb(c,TOKEN,2);expect(c,2);
+            verifyLogo(c,summary(c));
             check("보낸 사람 · 안녕하세요".contentEquals(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT)),"Count updates preserve actual message content");
             NativeLauncherBadgeProbe.verify(instrumentation,c,TOKEN);
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);

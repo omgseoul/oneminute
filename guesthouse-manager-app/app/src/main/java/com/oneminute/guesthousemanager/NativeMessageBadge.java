@@ -74,7 +74,7 @@ final class NativeMessageBadge {
     static synchronized void postAlert(Context c,Notification alert){
         NotificationManager manager=c.getSystemService(NotificationManager.class);if(manager==null)return;
         removeLegacy(manager);
-        Notification n=Notification.Builder.recoverBuilder(c,alert).setNumber(Math.max(1,prefs(c).getInt("count",0))).build();
+        Notification n=Notification.Builder.recoverBuilder(c,alert).setLargeIcon(OmsNotificationIcon.largeIcon(c)).setNumber(Math.max(1,prefs(c).getInt("count",0))).build();
         manager.notify(ID,n);
     }
     private static void removeLegacy(NotificationManager manager){
@@ -97,7 +97,7 @@ final class NativeMessageBadge {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content=PendingIntent.getActivity(c,ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification notification=new NotificationCompat.Builder(c,CHANNEL)
-                .setSmallIcon(R.drawable.ic_oms_notification).setColor(0xff2467bd)
+                .setSmallIcon(R.drawable.ic_oms_notification).setLargeIcon(OmsNotificationIcon.largeIcon(c)).setColor(0xff2467bd)
                 .setContentTitle("새 메세지 도착").setContentText("미확인 메세지 "+count+"개 · 메세지 메뉴에서 확인해주세요.")
                 .setNumber(count).setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -117,7 +117,7 @@ final class NativeMessageBadge {
                 if(!repost&&previous.getGroup()==null&&!CHANNEL.equals(previous.getChannelId())
                         &&!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))return;
                 // Keep the real sender/body and destination; count changes stay quiet.
-                if(!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))notification=Notification.Builder.recoverBuilder(c,previous).setChannelId(CHANNEL)
+                if(!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))notification=Notification.Builder.recoverBuilder(c,previous).setLargeIcon(OmsNotificationIcon.largeIcon(c)).setChannelId(CHANNEL)
                     .setGroup(null).setGroupSummary(false).setNumber(count).setOnlyAlertOnce(true)
                     .setFullScreenIntent(null,false).build();
                 if(repost)manager.cancel(ID);

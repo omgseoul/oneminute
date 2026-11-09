@@ -240,7 +240,7 @@ public final class NativeStaffChatProbe {
     private void awaitProfileDrawn(Dialog dialog)throws Exception{
         long until=SystemClock.uptimeMillis()+6000;
         while(SystemClock.uptimeMillis()<until){
-            Rect heading=ui(()->{Rect bounds=new Rect();dialog.getWindow().getDecorView().findViewWithTag("staff-profile-title").getGlobalVisibleRect(bounds);return bounds;});
+            Rect heading=ui(()->{View title=dialog.getWindow().getDecorView().findViewWithTag("staff-profile-title");int[] screen=new int[2];title.getLocationOnScreen(screen);return new Rect(screen[0],screen[1],screen[0]+title.getWidth(),screen[1]+title.getHeight());});
             Bitmap frame=instrumentation.getUiAutomation().takeScreenshot();int ink=0;
             if(frame!=null){for(int y=Math.max(0,heading.top);y<Math.min(frame.getHeight(),heading.bottom);y+=2)for(int x=Math.max(0,heading.left);x<Math.min(frame.getWidth(),heading.right);x+=2){int c=frame.getPixel(x,y);if(Color.red(c)<100&&Color.green(c)<130&&Color.blue(c)>Color.green(c)+10)ink++;}frame.recycle();}
             if(ink>12)return;Thread.sleep(100);
@@ -304,6 +304,7 @@ public final class NativeStaffChatProbe {
                 waitFor(()->{WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(host.getWindow().getDecorView());return insets!=null&&insets.isVisible(WindowInsetsCompat.Type.ime())==keyboard;});
                 ui(()->{View decor=host.getWindow().getDecorView();WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(decor);androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.ime());int[] p=new int[2];web.getLocationOnScreen(p);check(p[1]>=safe.top&&p[1]+web.getHeight()<=decor.getHeight()-safe.bottom,"all web menus avoid system bars/IME: "+mode);return null;});
                 check("true".equals(js(web,"(()=>{const b=document.getElementById('staffStart').getBoundingClientRect();return b.top>=0&&b.bottom<=innerHeight-12})()")),"start button is visible: "+mode+" keyboard="+keyboard);
+                capture(keyboard?"native-web-picker-keyboard.png":"native-web-picker.png");
             }
             ui(()->{((InputMethodManager)host.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(web.getWindowToken(),0);return null;});js(web,"document.querySelector('#staffPeople .target-search').blur();document.getElementById('staffPickerClose').click();true");awaitJs(web,"!document.getElementById('staffPicker').open");Thread.sleep(350);
         }

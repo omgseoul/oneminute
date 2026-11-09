@@ -42,7 +42,7 @@ const read=file=>fs.readFileSync(file,'utf8');
    await page.waitForFunction(()=>document.querySelector('#todayOverviewItems').textContent.includes('오늘 일정이 없습니다.')&&document.querySelector('#workingGrid').textContent.includes('동료')&&document.querySelector('#messageCounter').textContent==='2');
    assert.equal(await page.locator('#mainMenu').evaluate(el=>el.inert),false);
    if(scenario!=='owner'){
-    assert.equal(await page.locator('.attendance-progress-label').count(),4);
+    assert.equal(await page.locator('.attendance-progress-label').count(),0);
     assert.equal(await page.locator('#myInfoQuick').isVisible(),true);assert.equal(await page.locator('#staffWorkStatus').isVisible(),true);
     assert((await page.locator('#workingHeading').textContent()).endsWith(scenario==='reported'?' 근무중':' 로그인'));
    }

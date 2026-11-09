@@ -294,6 +294,12 @@ public class AttendanceActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public String getAppInfo() {
+            try { return new org.json.JSONObject().put("version_name",BuildConfig.VERSION_NAME).put("version_code",BuildConfig.VERSION_CODE).toString(); }
+            catch(org.json.JSONException error) { return "{}"; }
+        }
+
+        @JavascriptInterface
         public void checkForUpdate() { runOnUiThread(() -> AppUpdateChecker.check(AttendanceActivity.this, true)); }
 
         @JavascriptInterface

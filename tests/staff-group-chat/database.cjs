@@ -11,6 +11,7 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  create function omg_private.emit_system_notice(uuid,text,text) returns void language sql as $$select$$;
  create function omg_private.pin_matches(text,text) returns boolean language sql as $$select $1=$2$$;
  create function omg_private.owner_session_result(uuid) returns jsonb language sql as $$select jsonb_build_object('ok',true,'owner_id',(select owner_id from public.owner_sessions where id=$1))$$;
+ alter table employees add job_title text,add contact_phone text;
  alter table missions add completion_mode text default 'all',add owner_completed_at timestamptz;
  alter table calendar_events add holiday_request_id uuid;
  alter table property_messages add require_signature boolean default true,add require_understanding boolean default true,add holiday_request_id uuid;
@@ -39,6 +40,7 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  `);
  await db.exec(fs.readFileSync('tests/staff-group-chat/baseline.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20261109072052_staff_group_conversations.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261109141206_group_member_profiles.sql','utf8'));
  const call=(token,action,data={})=>rpc('staff_chat_rpc',[token,action,data]);
  const o=id(201),s1=id(301),s2=id(302),peer1='employee:'+id(31),peer2='employee:'+id(32),peer3='employee:'+id(34);
  await assert.rejects(()=>call(id(999),'create_group',{peers:[peer1,peer2],client_id:id(401)}),/로그인/);checks++;
@@ -78,6 +80,14 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  const dm=await call(o,'send',{peer:peer1,body:'1:1 유지',client_id:id(506)});ok((await call(s1,'messages',{peer:'owner:'+id(21)})).messages.some(x=>x.id===dm.message_id),'direct chat preserved');
  ok((await q("select has_table_privilege('anon','omg_private.staff_group_members','select') v"))[0].v===false,'group membership not directly exposed');
  ok((await q("select has_function_privilege('anon','omg_private.staff_group_rpc(uuid,text,jsonb)','execute') v"))[0].v===false,'private group RPC not directly exposed');
+ ok((await rpc('staff_chat_peer_profile',[s1,peer1])).profile.display_name==='가직원','own row opens own full profile');
+ ok(!(await rpc('staff_chat_peer_profile',[s2,'employee:'+id(33)])).ok,'unrelated branch profile forbidden');
+ await db.exec(`insert into property_share_requests(requester_property_id,target_property_id,status,requested_permissions) values('${id(11)}','${id(13)}','approved',array['messages']);`);
+ const isolated=(await call(o,'create_group',{peers:[peer2,'employee:'+id(33)],client_id:id(407)})).peer;
+ ok((await rpc('staff_chat_peer_profile',[s2,'employee:'+id(33)])).profile.display_name==='숨김직원','same-group peer profile without direct branch sharing');
+ await call(s2,'leave',{peer:isolated});
+ ok(!(await rpc('staff_chat_peer_profile',[s2,'employee:'+id(33)])).ok,'leaving group revokes membership-only profile access');
+ ok(!(await rpc('staff_chat_peer_profile',[id(999),peer1])).ok,'invalid token still denied');
  console.log('PASS '+checks+' group membership, shared history, receipts, photos, departure, permissions, retries and direct-chat isolation');
  await db.close();
 })().catch(async e=>{console.error(e);await db.close();process.exitCode=1});

@@ -47,5 +47,9 @@ window.MessageProfiles=(()=>{
    StaffChat.profile(session,person.peer).then(profile=>{if(version!==revision||!button.isConnected)return;entry.profile=profile;render(profile);}).catch(()=>{});
   });
  }
- return {bind,restore,openBot};
+ function showPerson(session,peer,button){
+  if(!/^(employee|owner):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(peer||''))return;
+  open({session,peer},button);
+ }
+ return {bind,restore,openBot,showPerson};
 })();

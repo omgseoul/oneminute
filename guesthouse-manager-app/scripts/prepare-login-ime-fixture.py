@@ -9,5 +9,5 @@ def inline(m):
 s=re.sub(r'<script src="([^"]+)"></script>',inline,s)
 s=s.replace('<link rel="stylesheet" href="page-transition.css">','<style>'+(root/'page-transition.css').read_text()+'</style>')
 s=s.replace('src="oms-logo-signature.webp?v=20261010-login"','src="data:image/webp;base64,'+base64.b64encode((root/'oms-logo-signature.webp').read_bytes()).decode()+'"')
-s=s.replace('<head>','<head><script>window.omgSession={get:()=>null};window.omgAccount={require:async()=>({user:{email:"ime.fixture"}})};window.omgSupabase={rpc:async(name,args)=>{if(name==="get_or_create_account_property")return{data:{ok:true}};if(name==="list_account_login_admins")return{data:[{owner_id:"fixture",display_name:"테스트 관리자"}]};window.testSubmittedLoginId=args.p_login_id;return{data:{ok:false,message:"테스트 제출 완료"}};}};</script>')
+s=s.replace('<head>','<head><script>window.omgSession={get:()=>null};window.omgAccount={require:async()=>({user:{email:"ime.fixture"}})};window.omgSupabase={rpc:async(name,args)=>{if(name==="get_or_create_account_property")return{data:{ok:true}};if(name==="list_account_login_admins")return{data:[{owner_id:"fixture",display_name:"테스트 관리자"}]};window.testSubmittedRpc=name;window.testSubmittedLoginId=args.p_login_id;return{data:{ok:false,message:"테스트 제출 완료"}};}};</script>')
 dest.write_text(s)

@@ -29,7 +29,10 @@ final class LoginImeProbe {
    // First user tap, then the real Android IME connection sends composing syllables.
    tap(test,editor);key(test,"한글 조합 입력");key(test,"영문 입력");check("\"한글abc\"".equals(js(test,web,"document.getElementById('employeeLoginId').value")),"first-focus Hangul/Latin reaches real form");
    key(test,"다음 입력칸");check("\"pin\"".equals(js(test,web,"document.activeElement.id")),"Next moves to PIN");
-   js(test,web,"setRole('admin')");Thread.sleep(300);check(editor.getVisibility()==View.GONE,"native username hidden in admin tab");js(test,web,"setRole('staff')");Thread.sleep(300);check(editor.getVisibility()==View.VISIBLE,"staff tab restores native username");
+   js(test,web,"setRole('admin')");Thread.sleep(300);check(editor.getVisibility()==View.VISIBLE,"admin tab keeps typed native username");
+   test.runOnMainSync(()->editor.setText(""));tap(test,editor);key(test,"한글 조합 입력");key(test,"영문 입력");check("\"한글abc\"".equals(js(test,web,"document.getElementById('employeeLoginId').value")),"admin first-focus Hangul/Latin reaches real form");
+   js(test,web,"document.getElementById('pin').value='1234';document.getElementById('loginForm').requestSubmit()");Thread.sleep(300);check("\"start_account_admin_session_by_login\"".equals(js(test,web,"window.testSubmittedRpc")),"admin uses typed-ID login RPC");check("\"한글abc\"".equals(js(test,web,"window.testSubmittedLoginId")),"admin submit receives composed username");
+   js(test,web,"setRole('staff')");Thread.sleep(300);check(editor.getVisibility()==View.VISIBLE,"staff tab keeps native username");
    check("\"한글abc\"".equals(js(test,web,"document.getElementById('employeeLoginId').value")),"switching tabs preserves entered ID");
    js(test,web,"document.getElementById('pin').value='123456';document.getElementById('loginForm').requestSubmit()");Thread.sleep(300);check("\"한글abc\"".equals(js(test,web,"window.testSubmittedLoginId")),"real submit receives composed username");
    try(FileOutputStream f=test.getTargetContext().openFileOutput("native-login-ime.png",0)){test.getUiAutomation().takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG,100,f);}

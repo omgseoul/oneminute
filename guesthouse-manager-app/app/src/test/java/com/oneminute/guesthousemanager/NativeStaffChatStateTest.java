@@ -4,6 +4,11 @@ import org.json.*;
 import static org.junit.Assert.*;
 
 public class NativeStaffChatStateTest {
+ @Test public void groupReceiptsCountDownUntilAllMembersRead()throws Exception{
+  NativeStaffChatState state=new NativeStaffChatState();state.merge(new JSONArray("[{id:'group-message',mine:true,body:'공유 대화',created_at:'2026-11-09T00:00:00Z',read_at:null,unread_count:2}]"));
+  assertTrue(state.mergeReceipts(new JSONArray("[{id:'group-message',read_at:null,unread_count:1}]")));assertEquals(1,state.messages.get(0).getInt("unread_count"));assertTrue(state.messages.get(0).isNull("read_at"));assertEquals(1,state.receiptIds(0,200).length());
+  assertTrue(state.mergeReceipts(new JSONArray("[{id:'group-message',read_at:'2026-11-09T00:01:00Z',unread_count:0}]")));assertEquals(0,state.messages.get(0).getInt("unread_count"));assertEquals(0,state.receiptIds(0,200).length());assertEquals("공유 대화",state.messages.get(0).getString("body"));
+ }
  @Test public void pagingDeduplicatesAndRefreshesExistingReceipts()throws Exception{
   NativeStaffChatState state=new NativeStaffChatState();
   state.merge(new JSONArray("[{id:'b',created_at:'2026-10-18T01:00:00Z',read_at:null},{id:'c',created_at:'2026-10-18T01:01:00Z',attachment_type:'video/mp4'}]"));

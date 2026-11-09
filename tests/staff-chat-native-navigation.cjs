@@ -6,6 +6,7 @@ async function checkHub(native){
  let launches=[],selected,details=[],reportVisible=false;
  w.setTimeout=()=>0;w.clearTimeout=()=>{};
  if(native)w.OMGNative={openStaffChat:(peer,properties)=>{launches.push({peer,properties:JSON.parse(properties)});return true;}};
+ w.OMSBotAvatar={upgrade:async image=>image};
  w.GuestSupport={esc:s=>String(s??'').replaceAll('<','&lt;'),call:async()=>({rooms:[],properties:[{id:'home',name:'본점'},{id:'remote',name:'타지점'}]})};
  const room={peer:'employee:11111111-1111-4111-8111-111111111111',name:'직원',preview:'확인했습니다',property_id:'remote',property_name:'타지점',updated_at:'2026-10-18T00:00:00Z',unread:1};
  const notice={message_id:'notice',property_id:'home',created_at:'2026-10-18T01:00:00Z',message:'공지 내용',message_type:'announcement',require_signature:false,require_understanding:false};
@@ -32,4 +33,4 @@ async function checkHub(native){
  if(native){assert.deepEqual(launches,[{peer:room.peer,properties:['remote']}]);w.OMGNative.openStaffChat=()=>false;assert.equal(w.StaffChat.nativeOpen(room.peer),false,'failed bridge retains web fallback');}
  dom.window.close();
 }
-(async()=>{await checkHub(true);await checkHub(false);console.log('PASS: Android/browser share hub tabs, branch filter, actual bot list/detail actions; only individual rooms hand off to native');})().catch(error=>{console.error(error);process.exitCode=1;});
+(async()=>{await checkHub(true);await checkHub(false);console.log('PASS: Android/browser share hub tabs, branch filter, actual bot list/detail actions; selected conversations hand off to native');})().catch(error=>{console.error(error);process.exitCode=1;});

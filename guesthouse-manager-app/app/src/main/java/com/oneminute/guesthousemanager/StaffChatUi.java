@@ -30,6 +30,7 @@ final class StaffChatUi {
         Symbol(String symbol){this.symbol=symbol;}
         @Override public void draw(Canvas canvas){Rect b=getBounds();canvas.save();canvas.translate(b.left,b.top);canvas.scale(b.width()/24f,b.height()/24f);paint.setColor(BLUE);paint.setStrokeWidth(1.7f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setStyle(Paint.Style.STROKE);Path path=new Path();
             if("photo".equals(symbol)){canvas.drawRoundRect(3,3,21,21,3,3,paint);canvas.drawCircle(8,8,1.5f,paint);path.moveTo(3,17);path.lineTo(8,12);path.lineTo(12,16);path.lineTo(15,13);path.lineTo(21,19);canvas.drawPath(path,paint);}
+            else if("leave".equals(symbol)){path.moveTo(9,4);path.lineTo(4,4);path.lineTo(4,20);path.lineTo(9,20);path.moveTo(9,12);path.lineTo(21,12);path.moveTo(17,8);path.lineTo(21,12);path.lineTo(17,16);canvas.drawPath(path,paint);}
             else if("search".equals(symbol)){canvas.drawCircle(10.5f,10.5f,7,paint);canvas.drawLine(16,16,21,21,paint);}
             else if("back".equals(symbol)){path.moveTo(15,5);path.lineTo(8,12);path.lineTo(15,19);canvas.drawPath(path,paint);}
             else if("plus".equals(symbol)){canvas.drawLine(12,4,12,20,paint);canvas.drawLine(4,12,20,12,paint);}

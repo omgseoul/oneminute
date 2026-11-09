@@ -33,7 +33,7 @@ class NativeStaffChatApi {
         try{return token!=null&&token.matches("[0-9a-fA-F-]{36}")&&token.equals(prefs(context).getString("token",""))&&(workConfirmationOnly||Instant.parse(prefs(context).getString("expires","")).toEpochMilli()>System.currentTimeMillis());}
         catch(Exception e){return false;}
     }
-    static boolean validPeer(String peer){return peer!=null&&peer.matches("(?i)(owner|employee):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");}
+    static boolean validPeer(String peer){return peer!=null&&peer.matches("(?i)(owner|employee|group):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");}
     JSONObject chat(String action,JSONObject data)throws Exception {
         if("messages".equals(action))return rpc("staff_chat_native_messages",new JSONObject().put("p_data",data));
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));

@@ -12,6 +12,10 @@ const fs=require('fs'),assert=require('node:assert/strict'),{chromium}=require('
   await page.goto('https://omgworks24.com/app.html');await page.waitForFunction(()=>document.getElementById('appVersion').textContent==='Ver 18.6');
   if(scenario!=='offline')await page.waitForFunction(()=>document.querySelector('[data-apk-download]').hasAttribute('href'));
   assert.equal(await page.locator('#appVersionUpdate').isVisible(),scenario==='new');
+  const top=await page.locator('#appShell>.top').boundingBox(),hero=await page.locator('.oms-hero').boundingBox();
+  assert.equal(top.y,8,'Home top spacing is identical in web and native bridge modes');
+  assert.equal(hero.y-top.y-top.height,10,'Compact gap below home actions');
+  assert(top.height>=40,'Home actions retain their touch area');
   assert.equal(await page.locator('[data-check-app-update]').count(),0);assert.equal(await page.locator('.attendance-progress').count(),0);
   const box=await page.locator('.app-version').boundingBox();assert(box.x>=0&&box.x+box.width<=width);assert.equal(await page.locator('#appVersion').evaluate(e=>getComputedStyle(e).fontSize),'10px');
   if(scenario==='new'){await page.locator('#appVersionUpdate').click();assert.equal(await page.evaluate(()=>updateClicks),1);await page.screenshot({path:'/tmp/oms-home-version-'+width+'.png'});next=1203;await page.evaluate(()=>dispatchEvent(new Event('pageshow')));await page.waitForFunction(()=>document.getElementById('appVersionUpdate').hidden);assert.equal(await page.locator('#appVersion').textContent(),'Ver 18.6');}

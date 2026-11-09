@@ -21,7 +21,8 @@
    open=document.createElement('button');open.type='button';open.className='reminder-open';root.querySelector('.message-arrival-confirm').before(open);
   }
   banner.hidden=hint.hidden=date.hidden=open.hidden=!reminder;
-  document.getElementById('messageArrivalDog').src=reminder?(reminder.overdue?'oms-dog-overdue.webp':'oms-dog-normal.jpg'):'shiba-worker-logo.png';
+  const conversation=!active.report&&active.sender_type!=='system'&&(!active.message_type||['general','guest_chat'].includes(active.message_type));
+  document.getElementById('messageArrivalDog').src=reminder?(reminder.overdue?'oms-dog-overdue-plain.webp':'oms-dog-normal-plain.webp'):conversation?'shiba-worker-logo.png':'oms-dog-normal-plain.webp';
   if(reminder){banner.firstElementChild.textContent=reminder.heading;banner.lastElementChild.textContent=reminder.timing;hint.textContent=reminder.guidance;date.textContent=reminder.dateLine;date.hidden=!reminder.dateLine;open.textContent=reminder.button;open.onclick=()=>{const href=reminder.href;confirm();location.href=href;};}
   root.querySelector('strong').textContent=reminder?'OMS':active.report?'새 보고 도착':/^(To do 알림|일정 알림)$/.test(active.sender_label)?active.sender_label:'새 메세지 도착';
   document.getElementById('messageArrivalSender').textContent=reminder?'':active.report?active.sender_label:/^(To do 알림|일정 알림)$/.test(active.sender_label)?'업무 알림':(active.sender_label||'새 메세지');

@@ -1,7 +1,7 @@
 name: Verify staff group conversations
 on:
   pull_request:
-    paths: ['app.html', 'apk-download.js', 'message-profiles.js', 'tests/home-version/**', 'tests/attendance-nfc/home-bootstrap.cjs', 'staff-chat*', 'message-hub.js', 'assets/staff-group-avatar.svg', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'supabase/migrations/*group_member_profiles.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
+    paths: ['supabase/functions/dispatch-notification/**', 'supabase/tests/push-handler.test.mjs', 'supabase/migrations/*notification_worker_auth.sql', 'home-message-queue.js', 'report.html', 'oms-dog-*-plain.webp', 'app.html', 'apk-download.js', 'message-profiles.js', 'tests/home-version/**', 'tests/attendance-nfc/home-bootstrap.cjs', 'staff-chat*', 'message-hub.js', 'assets/staff-group-avatar.svg', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'supabase/migrations/*group_member_profiles.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,11 +18,15 @@ jobs:
       - name: Verify group authorization and existing direct conversations
         env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
         run: |
+          node --test supabase/tests/push-handler.test.mjs
           node tests/staff-group-chat/database.cjs
           node tests/staff-group-chat/browser.cjs
           node tests/staff-chat-receipts.cjs
           node tests/staff-chat-send-state.cjs
           node tests/staff-chat-native-navigation.cjs
+          node tests/notification-checkout/web.cjs
+          node tests/notification-checkout/browser.cjs
+          node tests/notification-checkout/report-flow.cjs
           node tests/home-version/browser.cjs
           node tests/attendance-nfc/home-bootstrap.cjs
       - uses: actions/upload-artifact@v4

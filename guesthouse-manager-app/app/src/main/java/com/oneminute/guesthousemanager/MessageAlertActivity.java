@@ -90,8 +90,11 @@ public class MessageAlertActivity extends AppCompatActivity {
         scroll.addView(card, new ScrollView.LayoutParams(-1, -2));
 
         ImageView dog = new ImageView(this);
-        byte[] dogBytes = Base64.decode(MESSAGE_DOG_BASE64, Base64.DEFAULT);
-        dog.setImageBitmap(BitmapFactory.decodeByteArray(dogBytes, 0, dogBytes.length));
+        boolean conversation = messageType == null || "general".equals(messageType) || "guest_chat".equals(messageType);
+        if (conversation) {
+            byte[] dogBytes = Base64.decode(MESSAGE_DOG_BASE64, Base64.DEFAULT);
+            dog.setImageBitmap(BitmapFactory.decodeByteArray(dogBytes, 0, dogBytes.length));
+        } else dog.setImageResource(R.drawable.oms_dog_normal_plain);
         dog.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         dog.setPadding(dp(8), dp(8), dp(8), dp(8));
         dog.setBackground(oval(Color.rgb(237, 245, 255)));
@@ -150,7 +153,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         banner.addView(label(reminder.timing,13,Color.WHITE,false,Gravity.RIGHT),new LinearLayout.LayoutParams(-2,-2));card.addView(banner,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(24),dp(16),dp(24),dp(22));card.addView(body,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout hero=new LinearLayout(this);hero.setGravity(Gravity.CENTER_VERTICAL);hero.addView(label("OMS",13,Color.rgb(112,131,154),true,Gravity.LEFT),new LinearLayout.LayoutParams(0,-2,1));
-        ImageView dog=new ImageView(this);dog.setImageResource(reminder.overdue?R.drawable.oms_dog_overdue:R.drawable.oms_dog_normal);dog.setScaleType(ImageView.ScaleType.FIT_CENTER);dog.setContentDescription(reminder.overdue?"지친 표정의 OMS 강아지":"OMS 강아지");hero.addView(dog,new LinearLayout.LayoutParams(dp(86),dp(86)));body.addView(hero);
+        ImageView dog=new ImageView(this);dog.setImageResource(reminder.overdue?R.drawable.oms_dog_overdue_plain:R.drawable.oms_dog_normal_plain);dog.setScaleType(ImageView.ScaleType.FIT_CENTER);dog.setContentDescription(reminder.overdue?"지친 표정의 OMS 강아지":"OMS 강아지");hero.addView(dog,new LinearLayout.LayoutParams(dp(86),dp(86)));body.addView(hero);
         TextView title=label(reminder.title,27,NAVY,true,Gravity.LEFT);title.setPadding(0,dp(9),0,dp(12));body.addView(title,new LinearLayout.LayoutParams(-1,-2));
         if(!reminder.dateLine.isEmpty()){TextView date=label(reminder.dateLine,13,Color.rgb(112,131,154),false,Gravity.LEFT);date.setPadding(0,0,0,dp(15));body.addView(date,new LinearLayout.LayoutParams(-1,-2));}
         TextView hint=label(reminder.guidance,13,reminder.overdue?Color.rgb(186,52,65):BLUE,false,Gravity.LEFT);hint.setPadding(dp(14),dp(14),dp(14),dp(14));hint.setBackground(rounded(reminder.overdue?Color.rgb(255,240,241):Color.rgb(237,245,255),14));body.addView(hint,new LinearLayout.LayoutParams(-1,-2));

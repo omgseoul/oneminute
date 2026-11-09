@@ -35,11 +35,7 @@ final class NativeMessageBadgeProbe {
         }
     }
     private static void verifyLogo(Context c, Notification notification) {
-        check(notification.getLargeIcon()!=null,"Notification drawer has full-color OMS logo");
-        android.graphics.Bitmap logo=OmsNotificationIcon.largeIcon(c);
-        check(android.graphics.Color.alpha(logo.getPixel(96,96))==0,"OMS center stays transparent");
-        check(logo.getPixel(48,48)==0xff2467bd,"Upper-left ring is OMS blue");
-        check(logo.getPixel(144,144)==0xff0e2b3d,"Lower-right ring stays navy");
+        check(notification.getLargeIcon()==null,"No duplicate logo on right of notification");
         android.graphics.drawable.Drawable icon=c.getDrawable(R.drawable.ic_oms_notification);
         android.graphics.Bitmap small=android.graphics.Bitmap.createBitmap(240,240,android.graphics.Bitmap.Config.ARGB_8888);
         icon.setBounds(0,0,240,240);icon.draw(new android.graphics.Canvas(small));
@@ -64,7 +60,7 @@ final class NativeMessageBadgeProbe {
             check(n.getGroup()==null,"Badge remains independent of alert groups");
             check(c.getSystemService(NotificationManager.class).getNotificationChannel(NativeMessageBadge.CHANNEL).canShowBadge(),"Badge channel enabled");
             NativeNotificationModesProbe.verify(c,TOKEN);
-            Notification actual=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("보낸 사람 · 안녕하세요").build();
+            Notification actual=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setLargeIcon(android.graphics.Bitmap.createBitmap(24,24,android.graphics.Bitmap.Config.ARGB_8888)).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("보낸 사람 · 안녕하세요").build();
             NativeMessageBadge.postAlert(c,actual);NativeMessageBadge.postAlert(c,actual);
             check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==1,"One real message notification, no extra unread bulletin");
             NativeMessageBadge.fromWeb(c,TOKEN,2);expect(c,2);

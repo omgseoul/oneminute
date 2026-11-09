@@ -1,0 +1,34 @@
+name: Verify administrator IDs and shared target picker
+on:
+  pull_request:
+    paths: ['login.html', 'staff-management.html', 'target-picker.*', 'mission.html', 'calendar.*', 'messages.html', 'staff-chat-client.js', 'owner-settings.html', 'guest-icons.js', 'guest.html', 'guest-support-settings.html', 'supabase/migrations/*admin_target_picker.sql', 'tests/target-picker/**', '.github/workflows/admin-target-picker-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: tests/attendance-nfc/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify access boundaries and branch save transactions
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: node tests/target-picker/database.cjs
+      - name: Verify mobile and desktop forms
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/target-picker/browser.cjs
+          node tests/employee-login/mobile.cjs
+          node --test tests/settings-room-types.cjs tests/calendar-controls-ui.cjs tests/calendar-view-memory.cjs
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/oms-http.log 2>&1 &
+          node tests/notification-bot-ui.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: OMS-target-picker-preview
+          path: |
+            /tmp/oms-target-picker-*.png
+            /tmp/oms-housing-*.png

@@ -112,21 +112,12 @@
       events=result.events||[];tasks=result.tasks||[];employees=result.employees||[];renderTargets();render();
     }catch(error){$('calendarMessage').textContent=error.message;render();}
   }
-  function updateTargetLabel(){
-    const chosen=[...document.querySelectorAll('#targetOptions input:checked')];
-    const names=chosen.map(input=>input.value==='owner'?'본인':employees.find(e=>String(e.id)===input.value)?.name||'직원');
-    $('targetPickerButton').textContent=names.length===1?names[0]:names.length?`${names.length}명 선택`:'대상 선택';
-  }
-  function closeTargetPanel(){
-    $('targetPanel').hidden=true;
-    $('targetPickerButton').setAttribute('aria-expanded','false');
-  }
-  function renderTargets(){
-    if(!isOwner)return;
-    $('targetOptions').innerHTML=`<label class="calendar-target-option"><span>본인</span><input type="checkbox" value="owner" checked></label>`+employees.map(e=>`<label class="calendar-target-option"><span>${escape(e.name)}</span><input type="checkbox" value="${escape(e.id)}"></label>`).join('');
-    updateTargetLabel();
-  }
-  function openEditor(date,event=null){
+  let targetPicker=null,targetDirectory={people:[],properties:[]};
+  function closeTargetPanel(){targetPicker?.close();}
+  function renderTargets(){}
+  async function openEditor(date,event=null){
+    if(isOwner){try{targetDirectory=await OMSTargetPicker.load(session);}catch(error){$('calendarMessage').textContent=error.message;return;}}
+
     $('eventForm').reset();$('eventFormMessage').textContent='';$('eventId').value=event?.id||'';
     $('dialogTitle').textContent=event?'일정 수정':'일정 추가';
     $('eventDate').value=event?zonedKey(event.start_at):date;
@@ -136,11 +127,11 @@
     else{$('startTime').value='09:00';$('endTime').value='10:00';}
     $('timeFields').hidden=$('allDay').checked;
     $('startTime').required=$('endTime').required=!$('allDay').checked;
-    if(isOwner){document.querySelectorAll('#targetOptions input').forEach(input=>input.checked=input.value==='owner'?event?!!event.owner_target:true:!!event?.target_employee_ids?.includes(input.value));updateTargetLabel();closeTargetPanel();}
+    if(isOwner){const propertyId=event?.property_id||ownPropertyId;targetPicker?.destroy();targetPicker=OMSTargetPicker.mount({host:$('calendarTargets'),ownPropertyId,items:[...targetDirectory.people.filter(e=>!event||e.property_id===propertyId),{key:'owner',name:propertyId===ownPropertyId?'본인':'지점 관리자',is_employee:false,property_id:propertyId,property_name:targetDirectory.properties.find(p=>p.id===propertyId)?.name}],properties:targetDirectory.properties.filter(p=>!event||p.id===propertyId),title:'일정 대상',selected:event?[...(event.target_employee_ids||[]),...(event.owner_target?['owner']:[])]:['owner']});}
     const readonly=!!event&&!event.can_edit;
     $('dialogTitle').textContent=readonly?'일정 보기':event?'일정 수정':'일정 추가';
     $('eventForm').querySelectorAll('input:not([type=hidden]),textarea').forEach(input=>input.disabled=readonly);
-    $('targetPickerButton').disabled=readonly;
+    targetPicker?.setDisabled(readonly);
     $('saveEvent').hidden=readonly;$('deleteEvent').hidden=!event||readonly;
     const dialog=$('eventDialog');
     dialog.style.top='';
@@ -170,11 +161,8 @@
     const item=event.target.closest('[data-kind]');
     if(item){if(item.dataset.kind==='task'){location.href='mission.html';return;}const record=events.find(e=>e.id===item.dataset.id);if(record)openEditor(zonedKey(record.start_at),record);return;}
     const date=event.target.closest('[data-create-date]')?.dataset.createDate||event.target.closest('[data-date]')?.dataset.date;
-    if(date){if(view==='day')focusDate=parseKey(date);if(!isOwner||selectedPropertyIds.includes(ownPropertyId))openEditor(date);else $('calendarMessage').textContent='일정 추가는 본지점을 선택해주세요.';}
+    if(date){if(view==='day')focusDate=parseKey(date);openEditor(date);}
   };
-  $('targetPickerButton').onclick=()=>{const panel=$('targetPanel');panel.hidden=!panel.hidden;$('targetPickerButton').setAttribute('aria-expanded',String(!panel.hidden));};
-  $('targetOptions').onchange=updateTargetLabel;
-  document.addEventListener('click',event=>{if(!event.target.closest('.calendar-target-selector'))closeTargetPanel();});
   $('closeDialog').onclick=closeEditor;
   $('eventDialog').onclick=event=>{if(event.target===$('eventDialog'))closeEditor();};
   $('allDay').onchange=()=>{$('timeFields').hidden=$('allDay').checked;$('startTime').required=$('endTime').required=!$('allDay').checked;};
@@ -183,10 +171,10 @@
     const start=allDay?dayStart(parseKey(date)):zonedISO(date,$('startTime').value);
     const end=allDay?dayStart(addDays(parseKey(date),1)):zonedISO(date,$('endTime').value);
     if(new Date(end)<=new Date(start)){$('eventFormMessage').textContent='종료 시간을 시작 시간보다 늦게 선택해주세요.';return;}
-    const selected=isOwner?[...document.querySelectorAll('#targetOptions input:checked')].map(input=>input.value):[];
+    const selected=isOwner?targetPicker.value():[];
     if(isOwner&&!selected.length){$('eventFormMessage').textContent='일정 대상을 선택해주세요.';return;}
     const button=$('saveEvent');button.disabled=true;$('eventFormMessage').textContent='';
-    try{await rpc('save',{id:$('eventId').value||null,title:$('eventTitle').value.trim(),details:$('eventDetails').value.trim(),start_at:start,end_at:end,all_day:allDay,owner_target:selected.includes('owner'),target_employee_ids:selected.filter(value=>value!=='owner')});closeEditor();if(view==='day')focusDate=parseKey(date);await refresh();}
+    try{const item={id:$('eventId').value||null,title:$('eventTitle').value.trim(),details:$('eventDetails').value.trim(),start_at:start,end_at:end,all_day:allDay,owner_target:selected.includes('owner'),target_employee_ids:selected.filter(value=>value!=='owner')};if(isOwner){const {data,error}=await omgSupabase.rpc('save_targeted_tasks',{p_access_token:session.accessToken,p_kind:'calendar',p_item:item,p_targets:targetPicker.groups()});if(error||!data?.ok)throw Error(data?.message||'저장하지 못했습니다.');}else await rpc('save',item);closeEditor();if(view==='day')focusDate=parseKey(date);await refresh();}
     catch(error){$('eventFormMessage').textContent=error.message;}finally{button.disabled=false;}
   };
   $('deleteEvent').onclick=async()=>{if(!confirm('이 일정을 삭제할까요?'))return;const button=$('deleteEvent');button.disabled=true;try{await rpc('delete',{id:$('eventId').value});closeEditor();await refresh();}catch(error){$('eventFormMessage').textContent=error.message;}finally{button.disabled=false;}};
@@ -194,7 +182,7 @@
   (async()=>{session=await window.omgSession.require({allowCompleted:true});if(!session)return;
     isOwner=session.sessionKind==='owner';timezone=session.timezone||'Asia/Seoul';focusDate=today();restoreView();
     $('targetFieldset').hidden=!isOwner;
-    if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=!ids.includes(ownPropertyId);await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=!selectedPropertyIds.includes(ownPropertyId);}
+    if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=false;await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=false;}
     await refresh();window.omgTransition.ready();
   })().catch(error=>{$('calendarMessage').textContent=error.message;window.omgTransition.ready();});
 })();

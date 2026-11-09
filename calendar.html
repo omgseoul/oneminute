@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="calendar.css?v=20261014-overdue-todo">
   <script src="page-transition.js?v=20260929-chat-taps"></script>
 <link rel="stylesheet" href="top-layout.css?v=20261005b">
-<link rel="stylesheet" href="mission-property.css?v=20261020-tasks"></head>
+<link rel="stylesheet" href="mission-property.css?v=20261020-tasks"><link rel="stylesheet" href="target-picker.css?v=20261109"><script src="target-picker.js?v=20261109"></script></head>
 <body>
   <main class="calendar-shell">
     <header class="calendar-top"><a href="app.html">← Home</a><div id="calendarPropertyPicker"></div></header>
@@ -47,14 +47,7 @@
       </div>
       <label>내용<textarea id="eventDetails" maxlength="2000" rows="3" placeholder="필요한 내용을 적어주세요"></textarea></label>
       <div id="targetFieldset" class="calendar-target-field" hidden>
-        <label for="targetPickerButton">대상</label>
-        <div class="calendar-target-selector">
-          <button id="targetPickerButton" type="button" class="calendar-target-button" aria-expanded="false" aria-controls="targetPanel">본인</button>
-          <div id="targetPanel" class="calendar-target-panel" hidden>
-            <p>일정 대상 · 여러 명 선택 가능</p>
-            <div id="targetOptions"></div>
-          </div>
-        </div>
+        <label>대상</label><div id="calendarTargets"></div>
       </div>
       <div id="eventFormMessage" role="alert"></div>
       <div class="calendar-form-actions"><button id="deleteEvent" class="delete-event" type="button" hidden>삭제</button><button id="saveEvent" class="save-event" type="submit">저장</button></div>
@@ -63,7 +56,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="supabase-client.js"></script>
-  <script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script><script src="worker-tasks.js?v=20261020-tasks"></script><script src="calendar.js?v=20261024-view-memory"></script>
+  <script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script><script src="worker-tasks.js?v=20261020-tasks"></script><script src="calendar.js?v=20261109-targets"></script>
 </body>
 </html>
 

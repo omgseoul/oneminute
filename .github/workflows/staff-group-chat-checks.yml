@@ -1,0 +1,30 @@
+name: Verify staff group conversations
+on:
+  pull_request:
+    paths: ['staff-chat*', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: npm install --no-save --prefix tests/attendance-nfc fake-indexeddb@6.0.0
+      - run: tests/attendance-nfc/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify group authorization and existing direct conversations
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/staff-group-chat/database.cjs
+          node tests/staff-group-chat/browser.cjs
+          node tests/staff-chat-receipts.cjs
+          node tests/staff-chat-send-state.cjs
+          node tests/staff-chat-native-navigation.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: OMS-group-chat-preview
+          path: /tmp/oms-group-chat-*.png

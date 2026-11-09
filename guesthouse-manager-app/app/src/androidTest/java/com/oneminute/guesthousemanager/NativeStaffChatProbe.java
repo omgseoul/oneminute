@@ -51,7 +51,7 @@ public final class NativeStaffChatProbe {
             stage="room read clears native badge";waitFor(()->c.getSharedPreferences("omg_message_badge",0).getInt("count",-1)==0);
             ui(()->{fake.onlyOutgoing=false;Method build=activity.getClass().getDeclaredMethod("build");build.setAccessible(true);build.invoke(activity);return null;});
             waitFor(()->((EditText)field(activity,"input")).isEnabled()&&fake.readIds.contains(VIDEO));
-            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
+            verifyGroupRows();verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
             check(ui(()->((EditText)field(activity,"input")).length()==0&&((EditText)field(activity,"input")).isEnabled()),"queued send clears input without blocking next draft");
             waitFor(()->fake.sendCalls>=2);
@@ -76,10 +76,16 @@ public final class NativeStaffChatProbe {
         try{
             activity=(NativeStaffChatActivity)instrumentation.startActivitySync(new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             waitFor(()->((EditText)field(activity,"input")).isEnabled());stage="room cursor reaches server through snapshot";waitFor(()->fake.readIds.contains(VIDEO));
-            verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
+            verifyGroupRows();verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-layout.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             stage="back to hub";instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->activity.isFinishing());
         }finally{NativeStaffChatActivity.apiFactory=NativeStaffChatApi::new;c.getSharedPreferences("omg_receipts",0).edit().clear().commit();NativeStaffChatApi.clearLocal(c);}
+    }
+    private void verifyGroupRows()throws Exception{
+        stage="group header and sender identity";
+        ui(()->{String group="group:12345678-1234-4234-8234-123456789abc";check(NativeStaffChatApi.validPeer(group),"group deep link accepted");Field peer=activity.getClass().getDeclaredField("peer");peer.setAccessible(true);peer.set(activity,group);Method build=activity.getClass().getDeclaredMethod("build");build.setAccessible(true);build.invoke(activity);LinearLayout root=(LinearLayout)field(activity,"root"),header=(LinearLayout)root.getChildAt(0);int n=header.getChildCount();check("단체 채팅방 나가기".contentEquals(header.getChildAt(n-3).getContentDescription()),"leave precedes search and gallery");check("대화 검색".contentEquals(header.getChildAt(n-2).getContentDescription()),"search middle");check("사진·동영상 모아보기".contentEquals(header.getChildAt(n-1).getContentDescription()),"gallery last");
+        Method row=activity.getClass().getDeclaredMethod("messageRow",JSONObject.class,boolean.class);row.setAccessible(true);JSONObject m=new JSONObject().put("id","group-test").put("mine",false).put("body","단체 대화").put("sender_name","둘째 직원").put("created_at","2026-11-09T00:00:00Z").put("unread_count",2);View incoming=(View)row.invoke(activity,m,false);check("둘째 직원".contentEquals(((TextView)incoming.findViewWithTag("message-name-group-test")).getText()),"per-message sender identity");check(incoming.findViewWithTag("message-unread-group-test")==null,"incoming group row omits others unread count");m.put("mine",true);View outgoing=(View)row.invoke(activity,m,false);check("2".contentEquals(((TextView)outgoing.findViewWithTag("message-unread-group-test")).getText()),"outgoing group unread count");peer.set(activity,PEER);build.invoke(activity);return null;});
+        waitFor(()->((EditText)field(activity,"input")).isEnabled());
     }
     private boolean safeLayout(boolean keyboard)throws Exception{
         View root=(View)field(activity,"root"),input=(View)field(activity,"input"),send=(View)field(activity,"send"),title=(View)field(activity,"title");

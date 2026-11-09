@@ -1,5 +1,5 @@
 (async()=>{
- const $=id=>document.getElementById(id),e=GuestSupport.esc,params=new URLSearchParams(location.search),peer=params.get('peer');
+ const $=id=>document.getElementById(id),e=GuestSupport.esc,params=new URLSearchParams(location.search),peer=params.get('peer'),isGroup=peer?.startsWith('group:');
  let session,messages=[],busy=false,sending=false,timer,delay=2000,priority='normal',pending=null,started=false,photo=null,preparing=false,loadNotice=false,canSend=false;
  let receiptCursor=0,readBusy=false,readTimer,outbox,live,refreshAgain=false,enqueueing=false,fetched=false;
  function outboxChanged(){if(!outbox)return;for(const item of outbox.items(peer))if(item.message)mergeMessages([{...item.message,...(item.photo?{photo:item.photo}:{})}]);render();syncComposer();}
@@ -36,19 +36,21 @@
  let draftKey='';
  const call=(a,d={})=>StaffChat.call(session,a,{peer,...d});
  function receiptIds(){const pending=messages.filter(m=>m.mine&&!m.read_at);if(!pending.length)return [];const ids=Array.from({length:Math.min(200,pending.length)},(_,i)=>pending[(receiptCursor+i)%pending.length].id);receiptCursor=(receiptCursor+ids.length)%pending.length;return ids;}
- function mergeReceipts(receipts=[]){let changed=false;const byId=new Map(messages.map(m=>[m.id,m]));for(const receipt of receipts){const m=byId.get(receipt.id);if(m?.mine&&!m.read_at&&receipt.read_at){m.read_at=receipt.read_at;changed=true;}}return changed;}
+ function mergeReceipts(receipts=[]){let changed=false;const byId=new Map(messages.map(m=>[m.id,m]));for(const r of receipts){const m=byId.get(r.id);if(!m?.mine)continue;if(r.unread_count!==undefined&&m.unread_count!==r.unread_count){m.unread_count=r.unread_count;changed=true;}if(!m.read_at&&r.read_at){m.read_at=r.read_at;changed=true;}}return changed;}
  function showPeerProfile(){
+  if(isGroup){$('groupMembers').innerHTML=(peerProfile?.members||[]).map(m=>`<div class="group-member">${StaffChat.avatar(m.display_name,m.profile_image)}<span><b>${e(m.display_name)}</b><small>${e(m.property_name)}</small></span></div>`).join('');$('groupMembersDialog').showModal();return;}
   try{if(typeof window.OMGNative?.openWorkerProfile==='function'&&window.OMGNative.openWorkerProfile(peer)===true)return;}catch{}
   if(!peerProfile)return;$('peerProfileDialog').showModal?.()||$('peerProfileDialog').setAttribute('open','');
  }
  const isVideo=message=>/^video\//i.test(message.attachment_type||'')||/^data:video\//i.test(message.photo||'');
  const photos=()=>messages.filter(message=>message.photo||isVideo(message));
  function status(t='',bad=false){$('status').textContent=t;$('status').className='status'+(bad?' error':'');}
- function keepDraft(){try{sessionStorage.setItem(draftKey,JSON.stringify({body:input.value,priority,pending,photo}));}catch{}}
+ let leftGroup=false;
+ function keepDraft(){if(leftGroup)return;try{sessionStorage.setItem(draftKey,JSON.stringify({body:input.value,priority,pending,photo}));}catch{}}
  function mergeMessages(incoming){const map=new Map(messages.map(message=>[message.id,message]));incoming.forEach(message=>{const old=map.get(message.id);map.set(message.id,old?.read_at&&!message.read_at?{...message,read_at:old.read_at}:message);});messages=[...map.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));}
  function applyProfile(profile){
   if(!profile)return;peerProfile={...peerProfile,...profile};
-  $('roomTitle').textContent=peerProfile.display_name||'대화 상대';
+  $('roomTitle').textContent=(peerProfile.display_name||'대화 상대')+(isGroup?' · '+Number(peerProfile.member_count||0)+'명':'');
   $('peerAvatar').innerHTML=StaffChat.avatar(peerProfile.display_name,peerProfile.profile_image);
   $('peerProfileAvatar').innerHTML=StaffChat.avatar(peerProfile.display_name,peerProfile.profile_image);
   $('peerProfileName').textContent=peerProfile.display_name||'근무자';
@@ -95,8 +97,8 @@
   const markup=displayMessages().map(m=>{
    const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;
    if(m.system)return label+`<div class="chat-system-event" data-id="${e(m.id)}">${e(m.body)}</div>`;
-   const name=peerProfile?.display_name||'근무자',face=m.mine?'':`<button type="button" class="message-avatar" data-peer-profile aria-label="${e(name)} 근무자 정보 보기">${StaffChat.avatar(name,peerProfile?.profile_image)}</button>`;
-   return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<div class="bubble-name">${e(name)}</div>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-meta">${m.pending?`<button class="send-state" type="button" data-retry="${e(m.client_id)}">${m.pending==='failed'?'전송 실패 · 재시도':'전송 중…'}</button>`:!m.read_at?'<span class="message-unread" aria-label="안 읽은 사람 1명">1</span>':''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
+   const name=(isGroup?m.sender_name:peerProfile?.display_name)||'근무자',face=m.mine?'':`<button type="button" class="message-avatar" data-peer-profile aria-label="${e(name)} 근무자 정보 보기">${StaffChat.avatar(name,isGroup?m.sender_profile_image:peerProfile?.profile_image)}</button>`;
+   return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<div class="bubble-name">${e(name)}</div>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}</div><div class="bubble-meta">${m.pending?`<button class="send-state" type="button" data-retry="${e(m.client_id)}">${m.pending==='failed'?'전송 실패 · 재시도':'전송 중…'}</button>`:(isGroup?m.mine&&Number(m.unread_count)>0:!m.read_at)?`<span class="message-unread" aria-label="안 읽은 사람 ${isGroup?Number(m.unread_count):1}명">${isGroup?Number(m.unread_count):1}</span>`:''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
   }).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
   const bubbles=$('bubbles'),fragment=document.createElement('div');fragment.innerHTML=markup;
   const old=new Map([...bubbles.children].map((node,i)=>[node.dataset.id||'day:'+node.textContent,node]));
@@ -130,7 +132,7 @@
    const cursor=older&&first?{before_time:first.created_at,before_id:first.id}:last?{after_time:last.created_at,after_id:last.id}:{};
    const v=await call('messages',{...cursor,receipt_ids:receiptIds()});
    if(loadNotice){status('');loadNotice=false;}
-   if(v.peer&&!peerProfile)applyProfile(v.peer);
+   if(v.peer&&(!peerProfile||isGroup))applyProfile(v.peer);
    canSend=v.can_send===true;input.disabled=!canSend;syncComposer();
    if(!v.can_send)status('현재 이 계정에 메세지를 보낼 수 없습니다.',true);
    fetched=true;mergeMessages(v.messages);await outbox?.acknowledge(v.messages);const receiptChanged=mergeReceipts(v.receipts);if(older||initial)$('older').hidden=v.messages.length<50;if(v.messages.length||!started||receiptChanged)render(older);
@@ -144,7 +146,7 @@
   const list=photos(),item=list[viewerIndex];if(!item){closeViewer();return;}
   const version=++viewerVersion;viewerMediaId=String(item.id);resetVideo();const video=isVideo(item),stage=$('photoStage');
   photoZoom.setKey(String(item.id));photoZoom.setEnabled(!video);$('photoViewerImage').hidden=video;
-  $('photoViewerName').textContent=item.mine?'나':peerProfile?.display_name||'대화 상대';
+  $('photoViewerName').textContent=item.mine?'나':(isGroup?item.sender_name:peerProfile?.display_name)||'대화 상대';
   $('photoViewerDate').textContent=new Date(item.created_at).toLocaleString('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   $('photoCount').textContent=`${list.length}개 중 ${viewerIndex+1}번째 · ${video?'동영상':'사진'}`;
   $('photoPrevious').disabled=viewerIndex===0;$('photoNext').disabled=viewerIndex===list.length-1;
@@ -186,6 +188,12 @@
   catch(error){status('보낼 메시지를 보관하지 못했습니다. 저장 공간을 확인하고 다시 시도해주세요.',true);}
   finally{enqueueing=false;syncComposer();resizeComposer();}
  };
+ $('groupLeave').hidden=!isGroup;
+ $('groupLeave').onclick=()=>$('groupLeaveDialog').showModal();
+ $('groupLeaveCancel').onclick=()=>$('groupLeaveDialog').close();
+ $('groupMembersClose').onclick=()=>$('groupMembersDialog').close();
+ $('chatGalleryToggle').onclick=openGallery;
+ $('groupLeaveConfirm').onclick=async()=>{const b=$('groupLeaveConfirm');b.disabled=true;try{await call('leave');leftGroup=true;canSend=false;live?.close();outbox?.close();clearTimeout(timer);sessionStorage.removeItem(draftKey);location.replace('messages.html?tab=staff');}catch(error){$('groupLeaveStatus').textContent=error.message;}finally{b.disabled=false;}};
  $('peerIdentity').onclick=showPeerProfile;
  $('peerProfileClose').onclick=()=>$('peerProfileDialog').close?.()||$('peerProfileDialog').removeAttribute('open');
  $('photoViewerClose').onclick=()=>closeViewer();$('photoPrevious').onclick=()=>moveViewer(-1);$('photoNext').onclick=()=>moveViewer(1);$('photoGalleryOpen').onclick=openGallery;$('photoGalleryClose').onclick=()=>closeGallery();
@@ -199,7 +207,7 @@
  addEventListener('pagehide',()=>{videoObserver?.disconnect();previewObserver?.disconnect();viewerVersion++;$('photoViewerVideo').pause();for(const url of videoUrls.values())URL.revokeObjectURL(url);videoUrls.clear();});
  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)load();});addEventListener('online',()=>load());addEventListener('pagehide',()=>{clearTimeout(timer);clearTimeout(readTimer);keepDraft();});
  try{
-  session=await omgSession.require({allowCompleted:true});if(!session)return;if(!/^(owner|employee):[0-9a-f-]{36}$/i.test(peer||''))throw new Error('대화 상대를 선택해주세요.');
+  session=await omgSession.require({allowCompleted:true});if(!session)return;if(!/^(owner|employee|group):[0-9a-f-]{36}$/i.test(peer||''))throw new Error('대화 상대를 선택해주세요.');
   if(StaffChat.nativeOpen?.(peer)){location.replace('messages.html?tab=staff');return;}
   draftKey='staff-chat:'+session.accessToken+':'+peer;try{const draft=JSON.parse(sessionStorage.getItem(draftKey)||'null');if(draft){input.value=draft.body||'';pending=draft.pending;photo=draft.photo||null;renderPhoto();if(draft.priority==='urgent')$('priority').click();}}catch{}
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(session.accessToken));

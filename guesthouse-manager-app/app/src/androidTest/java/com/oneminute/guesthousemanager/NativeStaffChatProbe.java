@@ -294,6 +294,21 @@ public final class NativeStaffChatProbe {
         if(!done.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("WebView script timed out: "+stage+" script="+code.substring(0,Math.min(code.length(),160)));return result.get();
     }
     private void awaitJs(WebView view,String code)throws Exception{long until=SystemClock.uptimeMillis()+20000;while(SystemClock.uptimeMillis()<until){if("true".equals(js(view,code)))return;Thread.sleep(100);}throw new AssertionError("WebView condition timed out: "+code);}
+    private void awaitWebPickerDrawn(WebView web)throws Exception{
+        java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
+        instrumentation.runOnMainSync(()->web.postVisualStateCallback(SystemClock.uptimeMillis(),new WebView.VisualStateCallback(){@Override public void onComplete(long id){drawn.countDown();}}));
+        check(drawn.await(10,java.util.concurrent.TimeUnit.SECONDS),"picker web frame committed");
+        instrumentation.waitForIdleSync();Thread.sleep(500);
+        long until=SystemClock.uptimeMillis()+6000;
+        while(SystemClock.uptimeMillis()<until){
+            JSONArray bounds=new JSONArray(js(web,"(()=>{const b=document.getElementById('staffStart').getBoundingClientRect();return [b.left+20,b.top+b.height/2,innerWidth]})()"));
+            int[] point=ui(()->{int[] origin=new int[2];web.getLocationOnScreen(origin);double scale=web.getWidth()/bounds.getDouble(2);return new int[]{origin[0]+(int)(bounds.getDouble(0)*scale),origin[1]+(int)(bounds.getDouble(1)*scale)};});
+            Bitmap frame=instrumentation.getUiAutomation().takeScreenshot();boolean visible=false;
+            if(frame!=null){if(point[0]>=0&&point[0]<frame.getWidth()&&point[1]>=0&&point[1]<frame.getHeight()){int color=frame.getPixel(point[0],point[1]);visible=Color.blue(color)>Color.green(color)+20&&Color.green(color)>Color.red(color)+15;}frame.recycle();}
+            if(visible)return;Thread.sleep(100);
+        }
+        throw new AssertionError("Start button bounds exist but blue button is not drawn on screen: "+stage);
+    }
     private void verifyWebPickerSafeArea(AttendanceActivity host,WebView web)throws Exception{
         {
             String mode="current navigation mode";stage="web recipient picker";
@@ -304,6 +319,7 @@ public final class NativeStaffChatProbe {
                 waitFor(()->{WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(host.getWindow().getDecorView());return insets!=null&&insets.isVisible(WindowInsetsCompat.Type.ime())==keyboard;});
                 ui(()->{View decor=host.getWindow().getDecorView();WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(decor);androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.ime());int[] p=new int[2];web.getLocationOnScreen(p);check(p[1]>=safe.top&&p[1]+web.getHeight()<=decor.getHeight()-safe.bottom,"all web menus avoid system bars/IME: "+mode);return null;});
                 check("true".equals(js(web,"(()=>{const b=document.getElementById('staffStart').getBoundingClientRect();return b.top>=0&&b.bottom<=innerHeight-12})()")),"start button is visible: "+mode+" keyboard="+keyboard);
+                awaitWebPickerDrawn(web);
                 capture(keyboard?"native-web-picker-keyboard.png":"native-web-picker.png");
             }
             ui(()->{((InputMethodManager)host.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(web.getWindowToken(),0);return null;});js(web,"document.querySelector('#staffPeople .target-search').blur();document.getElementById('staffPickerClose').click();true");awaitJs(web,"!document.getElementById('staffPicker').open");Thread.sleep(350);

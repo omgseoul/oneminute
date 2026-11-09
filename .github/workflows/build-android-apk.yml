@@ -82,6 +82,8 @@ jobs:
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb shell am instrument -w -e phase chat-handoff com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-handoff.txt"
             adb logcat -d -b crash
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-web-picker.png > "$RUNNER_TEMP/oms-native-web-picker.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-web-picker-keyboard.png > "$RUNNER_TEMP/oms-native-web-picker-keyboard.png"
             grep -q 'oms_handoff=ok' "$RUNNER_TEMP/oms-handoff.txt"
             adb shell am instrument -w -e phase chat com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-chat.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-probe.png > "$RUNNER_TEMP/oms-native-chat.png"
@@ -91,6 +93,7 @@ jobs:
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-messages.png > "$RUNNER_TEMP/oms-native-messages.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-stickers.png > "$RUNNER_TEMP/oms-native-stickers.png"
             grep -q 'oms_chat=ok' "$RUNNER_TEMP/oms-chat.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-group-members.png > "$RUNNER_TEMP/oms-native-group-members.png"
             adb shell wm size 720x1280
             adb shell wm density 360
             adb shell settings put system font_scale 1.3
@@ -106,6 +109,10 @@ jobs:
             adb shell wm density 480
             adb shell settings put system font_scale 1.0
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
+            adb shell am instrument -w -e phase chat-handoff com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-handoff-gesture.txt"
+            grep -q 'oms_handoff=ok' "$RUNNER_TEMP/oms-handoff-gesture.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-web-picker.png > "$RUNNER_TEMP/oms-native-web-picker-gesture.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-web-picker-keyboard.png > "$RUNNER_TEMP/oms-native-web-picker-gesture-keyboard.png"
             adb shell am instrument -w -e phase chat-layout com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-layout-gesture.txt"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-layout.png > "$RUNNER_TEMP/oms-native-gesture.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-chat-messages.png > "$RUNNER_TEMP/oms-native-gesture-messages.png"

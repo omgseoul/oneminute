@@ -12,10 +12,13 @@ window.fixtureNonce=Math.random().toString();
 window.GuestSupport={esc:s=>String(s??'')};
 window.omgSupabase={rpc:async(name)=>({data:{ok:true,profile:{display_name:'김한울',job_title:'평일 오전',property_name:'One Minute'},rooms:[{peer:'employee:12345678-1234-4234-8234-123456789def',name:'근무자',preview:'확인',property_id:'home',updated_at:'2026-10-18T00:00:00Z'}]}})};
 </script>'''
+html += '<style>'+ (root/'message-hub.css').read_text()+(root/'target-picker.css').read_text()+'</style>'
+html += script('target-picker.js')
 html += script('page-transition.js') + script('staff-chat-client.js') + script('message-profiles.js')
 html += '''<script>
 StaffConversations.init({propertyId:'home',accessToken:'fixture'},document.getElementById('fixtureNav'));
 StaffConversations.show(true);
+StaffConversations.update({recipients:Array.from({length:30},(_,i)=>({recipient_key:'employee:person'+i,display_name:'직원 '+i,property_id:'home',property_name:'본점'}))});
 history.replaceState({omgMessageLayer:true},'',location.href);
 MessageProfiles.bind({sender_employee_id:'12345678-1234-4234-8234-123456789def',sender_label:'김한울'},{accessToken:'fixture'});
 window.fixtureReady=true;

@@ -18,6 +18,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.io.OutputStream;
 
@@ -133,8 +136,17 @@ public class AttendanceActivity extends AppCompatActivity {
         webView = new WebView(this);
         attendanceNfc = new NativeAttendanceNfc(this,webView);
         FrameLayout root = new FrameLayout(this);
+        // Keep every web menu, modal and keyboard inside the actual system safe area.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
+        root.setBackgroundColor(0xfff4f7fc);
+        ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
+            androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout()|WindowInsetsCompat.Type.ime());
+            view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
+        root.post(()->ViewCompat.requestApplyInsets(root));
         recovery = new WebViewRecovery(this, webView, root, appUrlFromIntent(getIntent()));
 
         loginInput = new NativeLoginInput(this,webView,root);

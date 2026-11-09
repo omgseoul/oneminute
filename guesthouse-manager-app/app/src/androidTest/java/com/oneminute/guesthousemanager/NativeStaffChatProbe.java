@@ -84,7 +84,10 @@ public final class NativeStaffChatProbe {
     private void verifyGroupRows()throws Exception{
         stage="group header and sender identity";
         ui(()->{String group="group:12345678-1234-4234-8234-123456789abc";check(NativeStaffChatApi.validPeer(group),"group deep link accepted");Field peer=activity.getClass().getDeclaredField("peer");peer.setAccessible(true);peer.set(activity,group);Method build=activity.getClass().getDeclaredMethod("build");build.setAccessible(true);build.invoke(activity);LinearLayout root=(LinearLayout)field(activity,"root"),header=(LinearLayout)root.getChildAt(0);int n=header.getChildCount();check("단체 채팅방 나가기".contentEquals(header.getChildAt(n-3).getContentDescription()),"leave precedes search and gallery");check("대화 검색".contentEquals(header.getChildAt(n-2).getContentDescription()),"search middle");check("사진·동영상 모아보기".contentEquals(header.getChildAt(n-1).getContentDescription()),"gallery last");
-        Method row=activity.getClass().getDeclaredMethod("messageRow",JSONObject.class,boolean.class);row.setAccessible(true);JSONObject m=new JSONObject().put("id","group-test").put("mine",false).put("body","단체 대화").put("sender_name","둘째 직원").put("created_at","2026-11-09T00:00:00Z").put("unread_count",2);View incoming=(View)row.invoke(activity,m,false);check("둘째 직원".contentEquals(((TextView)incoming.findViewWithTag("message-name-group-test")).getText()),"per-message sender identity");check(incoming.findViewWithTag("message-unread-group-test")==null,"incoming group row omits others unread count");m.put("mine",true);View outgoing=(View)row.invoke(activity,m,false);check("2".contentEquals(((TextView)outgoing.findViewWithTag("message-unread-group-test")).getText()),"outgoing group unread count");peer.set(activity,PEER);build.invoke(activity);return null;});
+        Method row=activity.getClass().getDeclaredMethod("messageRow",JSONObject.class,boolean.class);row.setAccessible(true);JSONObject m=new JSONObject().put("id","group-test").put("mine",false).put("body","단체 대화").put("sender_name","둘째 직원").put("created_at","2026-11-09T00:00:00Z").put("unread_count",2);View incoming=(View)row.invoke(activity,m,false);check("둘째 직원".contentEquals(((TextView)incoming.findViewWithTag("message-name-group-test")).getText()),"per-message sender identity");check(incoming.findViewWithTag("message-unread-group-test")==null,"incoming group row omits others unread count");m.put("mine",true);View outgoing=(View)row.invoke(activity,m,false);check("2".contentEquals(((TextView)outgoing.findViewWithTag("message-unread-group-test")).getText()),"outgoing group unread count");JSONObject groupProfile=new JSONObject().put("kind","group").put("display_name","단체 테스트").put("member_count",30);JSONArray members=new JSONArray();for(int i=0;i<30;i++)members.put(new JSONObject().put("display_name","직원 "+i).put("property_name",i%2==0?"본점":"타지점").put("profile_image","data:image/jpeg;base64,"+fake.jpeg));groupProfile.put("members",members);Field profile=activity.getClass().getDeclaredField("profile");profile.setAccessible(true);profile.set(activity,groupProfile);Method show=activity.getClass().getDeclaredMethod("profileDialog");show.setAccessible(true);show.invoke(activity);check("단체 채팅방".contentEquals(((ImageView)field(activity,"headerAvatar")).getContentDescription()),"three-person group avatar");return null;});
+        stage="custom group popup photographs";waitFor(()->{Dialog dialog=(Dialog)field(activity,"groupMembersDialog");FrameLayout face=dialog.getWindow().getDecorView().findViewWithTag("group-member-avatar-0");return face!=null&&((ImageView)face.getChildAt(1)).getDrawable()!=null;});
+        ui(()->{Dialog dialog=(Dialog)field(activity,"groupMembersDialog");View decor=dialog.getWindow().getDecorView(),card=decor.findViewWithTag("group-members-card");check(card!=null,"OMS rounded participant card");check(decor.findViewWithTag("group-member-name-29")!=null,"all members remain available");int[] position=new int[2];card.getLocationOnScreen(position);WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(activity.getWindow().getDecorView());androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars());check(position[1]>=safe.top&&position[1]+card.getHeight()<=activity.getWindow().getDecorView().getHeight()-safe.bottom,"group popup avoids system bars");return null;});capture("native-group-members.png");
+        ui(()->{((Dialog)field(activity,"groupMembersDialog")).dismiss();Field peer=activity.getClass().getDeclaredField("peer");peer.setAccessible(true);peer.set(activity,PEER);Method build=activity.getClass().getDeclaredMethod("build");build.setAccessible(true);build.invoke(activity);return null;});
         waitFor(()->((EditText)field(activity,"input")).isEnabled());
     }
     private boolean safeLayout(boolean keyboard)throws Exception{
@@ -237,7 +240,7 @@ public final class NativeStaffChatProbe {
     private void awaitProfileDrawn(Dialog dialog)throws Exception{
         long until=SystemClock.uptimeMillis()+6000;
         while(SystemClock.uptimeMillis()<until){
-            Rect heading=ui(()->{Rect bounds=new Rect();dialog.getWindow().getDecorView().findViewWithTag("staff-profile-title").getGlobalVisibleRect(bounds);return bounds;});
+            Rect heading=ui(()->{View title=dialog.getWindow().getDecorView().findViewWithTag("staff-profile-title");int[] screen=new int[2];title.getLocationOnScreen(screen);return new Rect(screen[0],screen[1],screen[0]+title.getWidth(),screen[1]+title.getHeight());});
             Bitmap frame=instrumentation.getUiAutomation().takeScreenshot();int ink=0;
             if(frame!=null){for(int y=Math.max(0,heading.top);y<Math.min(frame.getHeight(),heading.bottom);y+=2)for(int x=Math.max(0,heading.left);x<Math.min(frame.getWidth(),heading.right);x+=2){int c=frame.getPixel(x,y);if(Color.red(c)<100&&Color.green(c)<130&&Color.blue(c)>Color.green(c)+10)ink++;}frame.recycle();}
             if(ink>12)return;Thread.sleep(100);
@@ -288,9 +291,40 @@ public final class NativeStaffChatProbe {
     private String js(WebView view,String code)throws Exception{
         java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
         instrumentation.runOnMainSync(()->view.evaluateJavascript(code,value->{result.set(value);done.countDown();}));
-        if(!done.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("WebView script timed out");return result.get();
+        if(!done.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("WebView script timed out: "+stage+" script="+code.substring(0,Math.min(code.length(),160)));return result.get();
     }
     private void awaitJs(WebView view,String code)throws Exception{long until=SystemClock.uptimeMillis()+20000;while(SystemClock.uptimeMillis()<until){if("true".equals(js(view,code)))return;Thread.sleep(100);}throw new AssertionError("WebView condition timed out: "+code);}
+    private void awaitWebPickerDrawn(WebView web)throws Exception{
+        java.util.concurrent.CountDownLatch drawn=new java.util.concurrent.CountDownLatch(1);
+        instrumentation.runOnMainSync(()->web.postVisualStateCallback(SystemClock.uptimeMillis(),new WebView.VisualStateCallback(){@Override public void onComplete(long id){drawn.countDown();}}));
+        check(drawn.await(10,java.util.concurrent.TimeUnit.SECONDS),"picker web frame committed");
+        instrumentation.waitForIdleSync();Thread.sleep(500);
+        long until=SystemClock.uptimeMillis()+6000;
+        while(SystemClock.uptimeMillis()<until){
+            JSONArray bounds=new JSONArray(js(web,"(()=>{const b=document.getElementById('staffStart').getBoundingClientRect();return [b.left+20,b.top+b.height/2,innerWidth]})()"));
+            int[] point=ui(()->{int[] origin=new int[2];web.getLocationOnScreen(origin);double scale=web.getWidth()/bounds.getDouble(2);return new int[]{origin[0]+(int)(bounds.getDouble(0)*scale),origin[1]+(int)(bounds.getDouble(1)*scale)};});
+            Bitmap frame=instrumentation.getUiAutomation().takeScreenshot();boolean visible=false;
+            if(frame!=null){if(point[0]>=0&&point[0]<frame.getWidth()&&point[1]>=0&&point[1]<frame.getHeight()){int color=frame.getPixel(point[0],point[1]);visible=Color.blue(color)>Color.green(color)+20&&Color.green(color)>Color.red(color)+15;}frame.recycle();}
+            if(visible)return;Thread.sleep(100);
+        }
+        throw new AssertionError("Start button bounds exist but blue button is not drawn on screen: "+stage);
+    }
+    private void verifyWebPickerSafeArea(AttendanceActivity host,WebView web)throws Exception{
+        {
+            String mode="current navigation mode";stage="web recipient picker";
+            js(web,"StaffConversations.picker();true");awaitJs(web,"document.getElementById('staffPicker').open && document.getElementById('staffStart').getBoundingClientRect().bottom<=innerHeight-12");
+            for(boolean keyboard:new boolean[]{false,true}){
+                stage="web recipient picker keyboard="+keyboard;
+                if(keyboard){js(web,"document.querySelector('#staffPeople .target-search').focus();true");ui(()->{web.requestFocus();((InputMethodManager)host.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(web,InputMethodManager.SHOW_IMPLICIT);return null;});Thread.sleep(700);}
+                waitFor(()->{WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(host.getWindow().getDecorView());return insets!=null&&insets.isVisible(WindowInsetsCompat.Type.ime())==keyboard;});
+                ui(()->{View decor=host.getWindow().getDecorView();WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(decor);androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.ime());int[] p=new int[2];web.getLocationOnScreen(p);check(p[1]>=safe.top&&p[1]+web.getHeight()<=decor.getHeight()-safe.bottom,"all web menus avoid system bars/IME: "+mode);return null;});
+                check("true".equals(js(web,"(()=>{const b=document.getElementById('staffStart').getBoundingClientRect();return b.top>=0&&b.bottom<=innerHeight-12})()")),"start button is visible: "+mode+" keyboard="+keyboard);
+                awaitWebPickerDrawn(web);
+                capture(keyboard?"native-web-picker-keyboard.png":"native-web-picker.png");
+            }
+            ui(()->{((InputMethodManager)host.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(web.getWindowToken(),0);return null;});js(web,"document.querySelector('#staffPeople .target-search').blur();document.getElementById('staffPickerClose').click();true");awaitJs(web,"!document.getElementById('staffPicker').open");Thread.sleep(350);
+        }
+    }
     private void verifyHandoff()throws Exception{
         Context c=instrumentation.getTargetContext();c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);return fake;};
@@ -300,6 +334,7 @@ public final class NativeStaffChatProbe {
             host=(AttendanceActivity)instrumentation.startActivitySync(new Intent().setClassName(c,"com.oneminute.guesthousemanager.ChatHandoffProbeActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             Field webField=AttendanceActivity.class.getDeclaredField("webView");webField.setAccessible(true);WebView web=(WebView)webField.get(host);
             awaitJs(web,"window.fixtureReady===true && !!document.querySelector('.staff-room')");String nonce=js(web,"window.fixtureNonce");
+            verifyWebPickerSafeArea(host,web);
             String before=ui(()->web.getUrl())+" "+js(web,"JSON.stringify({href:location.href,origin:location.origin,bridge:typeof window.OMGNative?.openStaffChat})");
             js(web,"window.fixtureLinkCancelled=null;document.querySelector('.staff-room').addEventListener('click',event=>setTimeout(()=>window.fixtureLinkCancelled=event.defaultPrevented,0),{once:true});document.querySelector('.staff-room').click();true");activity=(NativeStaffChatActivity)monitor.waitForActivityWithTimeout(10000);check(activity!=null,"real WebView link opens one native conversation: "+before+" after="+ui(()->web.getUrl())+" cancelled="+js(web,"window.fixtureLinkCancelled"));
             waitFor(()->((EditText)field(activity,"input")).isEnabled());verifySendStates();

@@ -38,7 +38,7 @@
  function receiptIds(){const pending=messages.filter(m=>m.mine&&!m.read_at);if(!pending.length)return [];const ids=Array.from({length:Math.min(200,pending.length)},(_,i)=>pending[(receiptCursor+i)%pending.length].id);receiptCursor=(receiptCursor+ids.length)%pending.length;return ids;}
  function mergeReceipts(receipts=[]){let changed=false;const byId=new Map(messages.map(m=>[m.id,m]));for(const r of receipts){const m=byId.get(r.id);if(!m?.mine)continue;if(r.unread_count!==undefined&&m.unread_count!==r.unread_count){m.unread_count=r.unread_count;changed=true;}if(!m.read_at&&r.read_at){m.read_at=r.read_at;changed=true;}}return changed;}
  function showPeerProfile(){
-  if(isGroup){$('groupMembers').innerHTML=(peerProfile?.members||[]).map(m=>`<div class="group-member">${StaffChat.avatar(m.display_name,m.profile_image)}<span><b>${e(m.display_name)}</b><small>${e(m.property_name)}</small></span></div>`).join('');$('groupMembersDialog').showModal();return;}
+  if(isGroup){$('groupMembersCount').textContent=(peerProfile?.member_count||0)+'명 참여 중';$('groupMembers').innerHTML=(peerProfile?.members||[]).map(m=>`<div class="group-member">${StaffChat.avatar(m.display_name,m.profile_image)}<span><b>${e(m.display_name)}</b><small>${e(m.property_name)}</small></span></div>`).join('');$('groupMembersDialog').showModal();return;}
   try{if(typeof window.OMGNative?.openWorkerProfile==='function'&&window.OMGNative.openWorkerProfile(peer)===true)return;}catch{}
   if(!peerProfile)return;$('peerProfileDialog').showModal?.()||$('peerProfileDialog').setAttribute('open','');
  }
@@ -51,7 +51,7 @@
  function applyProfile(profile){
   if(!profile)return;peerProfile={...peerProfile,...profile};
   $('roomTitle').textContent=(peerProfile.display_name||'대화 상대')+(isGroup?' · '+Number(peerProfile.member_count||0)+'명':'');
-  $('peerAvatar').innerHTML=StaffChat.avatar(peerProfile.display_name,peerProfile.profile_image);
+  $('peerAvatar').innerHTML=StaffChat.avatar(peerProfile.display_name,peerProfile.profile_image,isGroup);
   $('peerProfileAvatar').innerHTML=StaffChat.avatar(peerProfile.display_name,peerProfile.profile_image);
   $('peerProfileName').textContent=peerProfile.display_name||'근무자';
   $('peerProfileDisplayName').textContent=peerProfile.display_name||'-';

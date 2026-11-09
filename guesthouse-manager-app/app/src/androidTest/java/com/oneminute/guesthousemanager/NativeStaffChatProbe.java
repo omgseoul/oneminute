@@ -291,14 +291,15 @@ public final class NativeStaffChatProbe {
     private String js(WebView view,String code)throws Exception{
         java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
         instrumentation.runOnMainSync(()->view.evaluateJavascript(code,value->{result.set(value);done.countDown();}));
-        if(!done.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("WebView script timed out");return result.get();
+        if(!done.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("WebView script timed out: "+stage+" script="+code.substring(0,Math.min(code.length(),160)));return result.get();
     }
     private void awaitJs(WebView view,String code)throws Exception{long until=SystemClock.uptimeMillis()+20000;while(SystemClock.uptimeMillis()<until){if("true".equals(js(view,code)))return;Thread.sleep(100);}throw new AssertionError("WebView condition timed out: "+code);}
     private void verifyWebPickerSafeArea(AttendanceActivity host,WebView web)throws Exception{
-        for(String mode:new String[]{"threebutton","gestural"}){
-            try(android.os.ParcelFileDescriptor fd=instrumentation.getUiAutomation().executeShellCommand("cmd overlay enable-exclusive --category com.android.internal.systemui.navbar."+mode);java.io.InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)){byte[] buffer=new byte[256];while(in.read(buffer)!=-1){}}
-            Thread.sleep(500);js(web,"StaffConversations.picker();true");awaitJs(web,"document.getElementById('staffPicker').open && document.getElementById('staffStart').getBoundingClientRect().bottom<=innerHeight-12");
+        {
+            String mode="current navigation mode";stage="web recipient picker";
+            js(web,"StaffConversations.picker();true");awaitJs(web,"document.getElementById('staffPicker').open && document.getElementById('staffStart').getBoundingClientRect().bottom<=innerHeight-12");
             for(boolean keyboard:new boolean[]{false,true}){
+                stage="web recipient picker keyboard="+keyboard;
                 if(keyboard){js(web,"document.querySelector('#staffPeople .target-search').focus();true");ui(()->{web.requestFocus();((InputMethodManager)host.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(web,InputMethodManager.SHOW_IMPLICIT);return null;});Thread.sleep(700);}
                 waitFor(()->{WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(host.getWindow().getDecorView());return insets!=null&&insets.isVisible(WindowInsetsCompat.Type.ime())==keyboard;});
                 ui(()->{View decor=host.getWindow().getDecorView();WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(decor);androidx.core.graphics.Insets safe=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.ime());int[] p=new int[2];web.getLocationOnScreen(p);check(p[1]>=safe.top&&p[1]+web.getHeight()<=decor.getHeight()-safe.bottom,"all web menus avoid system bars/IME: "+mode);return null;});

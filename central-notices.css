@@ -23,3 +23,5 @@
 .awr-reason{display:block;margin-top:18px;font-size:13px}.awr-reason[hidden]{display:none}.awr-reason>span{display:block;margin-bottom:8px;font-weight:700}.awr-reason textarea{box-sizing:border-box;width:100%;min-height:94px;resize:vertical;border:1px solid #cddaea;border-radius:13px;background:#f8fafc;padding:12px;color:#183153;font:inherit;font-size:16px;line-height:1.6}.awr-reason textarea:focus{outline:2px solid #a9c8ef}.awr-reason small{display:block;margin-top:6px;color:#7b8a9c;font-size:11px;text-align:right}
 .checkout-warning-overlay{padding:calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom))}.checkout-warning-card{max-height:100%}.checkout-warning-card h2{padding-right:70px;min-height:65px;display:flex;align-items:center;background:url('oms-dog-normal-plain.webp') right center/65px no-repeat}
 @media(max-width:360px){#detail.dc-central{padding-left:12px;padding-right:12px}.awr-choice{font-size:12px;gap:6px}.awr-choice button{min-width:43px}}
+
+#detail.dc-central .ack-status[hidden]{display:none}#detail.dc-central #ackHint:empty{display:none}

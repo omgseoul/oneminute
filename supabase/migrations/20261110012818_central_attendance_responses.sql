@@ -39,7 +39,7 @@ begin
  for update of r;
  if not found then return jsonb_build_object('ok',false,'message','확인할 근태 경고를 찾을 수 없습니다.');end if;
  insert into omg_private.attendance_warning_responses(work_session_id,response_key,event_type,agreed,reason)
- values(target_session,'message:'||p_message_id,event,p_agreed,case when p_agreed then '' else btrim(p_reason) end)
+ values(target_session,'message:'||p_message_id,case when event='clock_out' then 'clock_out' else 'clock_in' end,p_agreed,case when p_agreed then '' else btrim(p_reason) end)
  on conflict do nothing;
  select display_name into employee_name from public.employees where id=s.employee_id;
  update public.property_message_recipients set acknowledged_at=coalesce(acknowledged_at,clock_timestamp()),

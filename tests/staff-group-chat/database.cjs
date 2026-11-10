@@ -121,7 +121,7 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok(!(await rpc('staff_chat_peer_profile',[s2,'employee:'+id(33)])).ok,'leaving group revokes membership-only profile access');
  ok(!(await rpc('staff_chat_peer_profile',[id(999),peer1])).ok,'invalid token still denied');
 
- const buffer=Buffer.alloc(20971520,73);buffer.write('ftyp',4);
+ const buffer=require('node:crypto').randomBytes(20971520);buffer.write('ftyp',4);
  const uploadId=id(801),upload=(who,index,chunk,peer=peer1)=>rpc('staff_chat_upload_chunk',[who,uploadId,peer,'video/mp4',index,20,chunk]);
  await assert.rejects(()=>upload(id(999),0,buffer.subarray(0,1048576).toString('base64')),/로그인/);checks++;
  await assert.rejects(()=>call(o,'send',{peer:peer1,body:'video',client_id:uploadId,uploaded:true}),/업로드/);checks++;

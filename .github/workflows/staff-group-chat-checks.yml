@@ -27,6 +27,7 @@ jobs:
           node tests/notification-checkout/database.cjs
           node tests/notice-responses-owner-completion.cjs
           node tests/central-notices/browser.cjs
+          node tests/central-notices/video-client.cjs
           node tests/attendance-ui.cjs
           node tests/notification-checkout/web.cjs
           node tests/notification-checkout/browser.cjs

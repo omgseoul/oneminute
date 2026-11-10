@@ -388,12 +388,14 @@ public final class NativeStaffChatProbe {
         final java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);
         final java.util.concurrent.atomic.AtomicInteger bytes=new java.util.concurrent.atomic.AtomicInteger();
         final Set<Integer> parts=java.util.Collections.synchronizedSet(new HashSet<>());
+        final java.util.concurrent.atomic.AtomicBoolean loseReply=new java.util.concurrent.atomic.AtomicBoolean(true);
         NativeStaffChatApi chunkApi=new NativeStaffChatApi(c){
             @Override JSONObject rpc(String name,JSONObject args)throws Exception {
                 check("staff_chat_upload_chunk".equals(name),"video uses chunk endpoint");
                 byte[] data=Base64.decode(args.getString("p_chunk"),Base64.DEFAULT);
                 check(data.length<=1048576,"request bounded to 1MiB");
                 int part=args.getInt("p_part_index");if(parts.add(part))bytes.addAndGet(data.length);
+                if(part==5&&loseReply.getAndSet(false))throw new IOException("Simulated lost chunk response");
                 return new JSONObject().put("ok",true);
             }
             @Override JSONObject chat(String action,JSONObject args)throws Exception {

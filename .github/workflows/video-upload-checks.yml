@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: oms-large-video-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   native-video:
     runs-on: ubuntu-24.04
@@ -16,9 +19,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.9'}
       - name: Generate a real 60MB video and add isolated instrumentation
+        timeout-minutes: 5
         run: |
+          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y --no-install-recommends ffmpeg
           python3 tests/video-upload/prepare.py
       - name: Configure Firebase
         env: {GOOGLE_SERVICES_JSON: '${{ secrets.GOOGLE_SERVICES_JSON }}'}

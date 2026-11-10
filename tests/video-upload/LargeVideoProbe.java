@@ -54,6 +54,13 @@ public final class LargeVideoProbe {
      }
     };
     NativeChatOutbox box=NativeChatOutbox.get(c,api);box.enqueue(role.equals("employee")?"owner:00000000-0000-4000-8000-000000000001":"employee:00000000-0000-4000-8000-000000000002","video","normal",compressed,"video/mp4");
+    long retryDeadline=System.currentTimeMillis()+30000;boolean retried=false;
+    while(!retried&&System.currentTimeMillis()<retryDeadline){
+     String peer=role.equals("employee")?"owner:00000000-0000-4000-8000-000000000001":"employee:00000000-0000-4000-8000-000000000002";
+     for(JSONObject row:box.rows(peer))if("failed".equals(row.optString("pending"))){box.retry(row.optString("client_id"));retried=true;break;}
+     Thread.sleep(20);
+    }
+    check(retried,"explicit retry required");
     check(sent.await(60,TimeUnit.SECONDS),role+" outbox timeout");check(error.get()==null,role+" "+error.get());check(lost.get(),"retry exercised");report.putString(role,"compressed, chunked, retried, received byte-identical");
     NativeChatOutbox.clearInstances();received.delete();
    }

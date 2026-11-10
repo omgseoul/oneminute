@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Durable FIFO, independent of an Activity. Server client_id makes lost replies safe. */
+/** Durable per-room lanes. Text remains independent of attachments. Server client_id makes lost replies safe. */
 final class NativeChatOutbox {
  private static final Map<String,NativeChatOutbox> instances=new HashMap<>();
  static synchronized NativeChatOutbox get(Context c,NativeStaffChatApi api)throws Exception{
@@ -18,9 +18,9 @@ final class NativeChatOutbox {
  static synchronized void clearInstances(){for(NativeChatOutbox box:instances.values()){box.closed=true;box.main.removeCallbacksAndMessages(null);box.sender.shutdownNow();}instances.clear();}
  static void resume(Context c){Context app=c.getApplicationContext();new Thread(()->{try{NativeStaffChatApi api=new NativeStaffChatApi(app);File file=new File(app.getFilesDir(),"staff-chat-drafts/"+api.scope+"/outbox.json");if(file.exists())get(app,api).pump();}catch(Exception ignored){}},"oms-outbox-resume").start();}
  private final NativeStaffChatApi api;private final AtomicFile disk;private final Handler main=new Handler(Looper.getMainLooper());
- private final ExecutorService sender=Executors.newSingleThreadExecutor();private final List<JSONObject> items=new ArrayList<>();
- private final Set<Runnable> listeners=new HashSet<>();private boolean running,closed;private final Runnable retry=this::pump;
- private NativeChatOutbox(Context c,NativeStaffChatApi api)throws Exception{this.api=api;File dir=new File(c.getFilesDir(),"staff-chat-drafts/"+api.scope);dir.mkdirs();disk=new AtomicFile(new File(dir,"outbox.json"));if(disk.getBaseFile().exists()){JSONArray a=new JSONArray(new String(disk.readFully(),java.nio.charset.StandardCharsets.UTF_8));for(int i=0;i<a.length();i++)items.add(a.getJSONObject(i));}}
+ private final ExecutorService sender=Executors.newFixedThreadPool(3);private final List<JSONObject> items=new ArrayList<>();
+ private final Set<Runnable> listeners=new HashSet<>();private boolean closed;private final Set<String> activeLanes=new HashSet<>();
+ private NativeChatOutbox(Context c,NativeStaffChatApi api)throws Exception{this.api=api;File dir=new File(c.getFilesDir(),"staff-chat-drafts/"+api.scope);dir.mkdirs();disk=new AtomicFile(new File(dir,"outbox.json"));if(disk.getBaseFile().exists()){JSONArray a=new JSONArray(new String(disk.readFully(),java.nio.charset.StandardCharsets.UTF_8));for(int i=0;i<a.length();i++){JSONObject item=a.getJSONObject(i);if("sending".equals(item.optString("status"))||"saving".equals(item.optString("status")))item.put("status","failed").put("error","전송이 중단되었습니다. 재시도를 눌러주세요.");items.add(item);}persist();}}
  synchronized void observe(Runnable r){listeners.add(r);}synchronized void unobserve(Runnable r){listeners.remove(r);}
  private void changed(){List<Runnable> copy;synchronized(this){copy=new ArrayList<>(listeners);}main.post(()->{for(Runnable r:copy)r.run();});}
  private synchronized void persist()throws Exception{if(closed)throw new IOException("Queue closed");FileOutputStream out=null;try{out=disk.startWrite();out.write(new JSONArray(items).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));disk.finishWrite(out);}catch(Exception e){if(out!=null)disk.failWrite(out);throw e;}}
@@ -30,30 +30,55 @@ final class NativeChatOutbox {
  }
  synchronized List<JSONObject> rows(String peer){List<JSONObject> result=new ArrayList<>();for(JSONObject item:items)if(peer.equals(item.optString("peer")))try{JSONObject m=item.optJSONObject("message");if(m==null)m=new JSONObject(item.toString()).put("id","local:"+item.getString("client_id")).put("mine",true).put("pending",item.optString("status"));result.add(new JSONObject(m.toString()));}catch(Exception ignored){}return result;}
  synchronized void acknowledge(JSONArray messages){if(messages==null)return;Set<String> ids=new HashSet<>(),clients=new HashSet<>();for(int i=0;i<messages.length();i++){JSONObject m=messages.optJSONObject(i);if(m!=null){ids.add(m.optString("id"));clients.add(m.optString("client_id"));}}List<JSONObject> done=new ArrayList<>();for(JSONObject item:items)if("sent".equals(item.optString("status"))&&(ids.contains(item.optString("message_id"))||clients.contains(item.optString("client_id"))))done.add(item);if(done.isEmpty())return;items.removeAll(done);try{persist();for(JSONObject item:done){String path=item.optString("file");if(!path.isEmpty())new File(path).delete();}}catch(Exception e){items.addAll(done);}}
- synchronized void retry(String id){for(JSONObject item:items)if(id.equals(item.optString("client_id")))try{item.put("blocked",false).put("attempts",0).put("error","").put("status","queued");persist();}catch(Exception ignored){}pump();}
+ private String lane(JSONObject item){return (item.optString("file").isEmpty()?"text:":"media:")+item.optString("peer");}
+ synchronized void retry(String id){
+  for(JSONObject item:items)if(id.equals(item.optString("client_id"))&&"failed".equals(item.optString("status"))){
+   try{item.put("blocked",false).put("error","").put("status","queued");item.remove("upload_percent");persist();}
+   catch(Exception error){try{item.put("status","failed");}catch(JSONException ignored){}}
+  }
+  changed();pump();
+ }
+ synchronized void cancel(String id){
+  for(JSONObject item:new ArrayList<>(items))if(id.equals(item.optString("client_id"))&&
+      ("failed".equals(item.optString("status"))||"queued".equals(item.optString("status")))){
+   int index=items.indexOf(item);items.remove(item);
+   try{persist();String path=item.optString("file");if(!path.isEmpty())new File(path).delete();}
+   catch(Exception error){items.add(index,item);}
+  }
+  changed();pump();
+ }
  synchronized void pump(){
-  if(closed||running||!api.valid())return;JSONObject next=null;for(JSONObject item:items)if(!"sent".equals(item.optString("status"))){next=item;break;}if(next==null||next.optBoolean("blocked"))return;
-  main.removeCallbacks(retry);final JSONObject item=next;running=true;
-  sender.execute(()->{
-   boolean failed=false;
+  if(closed||!api.valid())return;
+  for(JSONObject item:items){
+   if(!"queued".equals(item.optString("status")))continue;
+   String key=lane(item);boolean media=key.startsWith("media:");int count=0;
+   for(String active:activeLanes)if(active.startsWith(media?"media:":"text:"))count++;
+   if(activeLanes.contains(key)||count>=(media?2:1))continue;
+   try{item.put("status","sending");persist();}catch(Exception error){try{item.put("status","failed");}catch(JSONException ignored){}continue;}
+   activeLanes.add(key);sender.execute(()->send(item,key));
+  }
+  changed();
+ }
+ private void send(JSONObject item,String key){
+   final long deadline=System.nanoTime()+TimeUnit.MINUTES.toNanos(3);
    try{
-    synchronized(this){item.put("status","sending");persist();}changed();
     JSONObject args=new JSONObject().put("peer",item.getString("peer")).put("body",item.getString("body")).put("priority",item.getString("priority")).put("client_id",item.getString("client_id"));
     String path=item.optString("file"),type=item.optString("attachment_type");if(!path.isEmpty()){
      File file=new File(path);if(!file.exists()||file.length()>(type.startsWith("video/")?20971520:1572864))throw new NativeStaffChatApi.ChatException("첨부 파일을 확인해주세요.",false);
      if(type.startsWith("video/")) {
       int total=(int)((file.length()+1048575)/1048576);byte[] chunk=new byte[1048576];
       try(DataInputStream in=new DataInputStream(new FileInputStream(file))){for(int part=0;part<total;part++){
+       if(closed||System.nanoTime()>deadline)throw new IOException("전송 시간이 초과되었습니다. 재시도를 눌러주세요.");
        int length=(int)Math.min(1048576,file.length()-(long)part*1048576);in.readFully(chunk,0,length);
        api.rpc("staff_chat_upload_chunk",new JSONObject().put("p_client_id",item.getString("client_id")).put("p_peer",item.getString("peer")).put("p_mime_type",type).put("p_part_index",part).put("p_total_parts",total).put("p_chunk",android.util.Base64.encodeToString(chunk,0,length,android.util.Base64.NO_WRAP)));
        synchronized(this){item.put("upload_percent",(part+1)*100/total);persist();}changed();
       }}args.put("uploaded",true);
      }else{byte[] bytes=new byte[(int)file.length()];try(DataInputStream in=new DataInputStream(new FileInputStream(file))){in.readFully(bytes);}args.put("photo","data:"+type+";base64,"+android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP));}
     }
+    synchronized(this){item.put("status","saving");persist();}changed();
     JSONObject result=api.chat("send",args);
     synchronized(this){item.put("message_id",result.getString("message_id")).put("message",result.optJSONObject("message")).put("status","sent").put("attempts",0);persist();}
-   }catch(Exception error){failed=true;synchronized(this){try{int attempts=item.optInt("attempts")+1;item.put("status","failed").put("error",error.getMessage()).put("blocked",attempts>=3||(error instanceof NativeStaffChatApi.ChatException&&!((NativeStaffChatApi.ChatException)error).retryable)).put("attempts",attempts);persist();}catch(Exception ignored){}}}
-   finally{synchronized(this){running=false;}changed();final boolean delayed=failed;main.post(()->{main.removeCallbacks(retry);main.postDelayed(retry,delayed?Math.min(30000,1000L<<Math.min(item.optInt("attempts"),5)):0);});}
-  });
+   }catch(Exception error){synchronized(this){try{int attempts=item.optInt("attempts")+1;item.put("status","failed").put("error",error.getMessage()).put("blocked",true).put("attempts",attempts);persist();}catch(Exception ignored){}}}
+   finally{synchronized(this){activeLanes.remove(key);}changed();main.post(this::pump);}
  }
 }

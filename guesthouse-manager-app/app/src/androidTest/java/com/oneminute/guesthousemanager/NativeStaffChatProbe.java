@@ -54,6 +54,9 @@ public final class NativeStaffChatProbe {
             verifyGroupRows();verifySendStates();verifySafeLayout();verifyProfile();verifyApprovalProfile();verifyConversationRows();verifyStickerPicker();
             ui(()->{EditText input=(EditText)field(activity,"input");input.setText("확인 ");input.setSelection(input.length());((ImageButton)field(activity,"emoji")).performClick();GridView grid=(GridView)field(activity,"emojis");grid.performItemClick(grid.getChildAt(0),0,0);check(input.getText().toString().equals("확인 [시바:환영해요]"),"sticker cursor insertion");check(input.getText().getSpans(0,input.length(),android.text.style.ImageSpan.class).length==1,"selected sticker draws in input");grid.performItemClick(null,28,28);check(input.getText().toString().endsWith("😀"),"original Unicode emojis follow four Shiba rows");((TextView)field(activity,"send")).performClick();return null;});
             check(ui(()->((EditText)field(activity,"input")).length()==0&&((EditText)field(activity,"input")).isEnabled()),"queued send clears input without blocking next draft");
+            NativeChatOutbox pendingBox=(NativeChatOutbox)field(activity,"outbox");
+            waitFor(()->pendingBox.rows(PEER).stream().anyMatch(m->"failed".equals(m.optString("pending"))));
+            for(JSONObject row:pendingBox.rows(PEER))if("failed".equals(row.optString("pending")))pendingBox.retry(row.optString("client_id"));
             waitFor(()->fake.sendCalls>=2);
             check(fake.sendCalls==2&&fake.saved.size()==1,"ambiguous send retry must use one client id");
             verifyDurableQueue(c);
@@ -407,7 +410,9 @@ public final class NativeStaffChatProbe {
         File video=new File(c.getCacheDir(),"chunk-test.mp4");try(RandomAccessFile f=new RandomAccessFile(video,"rw")){f.setLength(20971520);f.seek(4);f.writeBytes("ftyp");}
         NativeChatOutbox.clearInstances();NativeStaffChatApi.clearLocal(c);
         NativeChatOutbox box=NativeChatOutbox.get(c,chunkApi);box.enqueue(PEER,"동영상","normal",video,"video/mp4");
-        check(done.await(25,java.util.concurrent.TimeUnit.SECONDS),"chunked upload completes");
+        waitFor(()->box.rows(PEER).stream().anyMatch(m->"failed".equals(m.optString("pending"))));
+        for(JSONObject row:box.rows(PEER))if("failed".equals(row.optString("pending")))box.retry(row.optString("client_id"));
+        check(done.await(25,java.util.concurrent.TimeUnit.SECONDS),"chunked upload completes after manual retry");
         NativeChatOutbox.clearInstances();NativeStaffChatApi.clearLocal(c);video.delete();
     }
     private static final class FakeApi extends NativeStaffChatApi {

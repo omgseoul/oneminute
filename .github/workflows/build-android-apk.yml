@@ -65,6 +65,8 @@ jobs:
           script: |
             adb install guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
             adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e phase chat-queue com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-chat-queue.txt"
+            grep -q 'oms_chat_queue=ok' "$RUNNER_TEMP/oms-chat-queue.txt"
             adb shell am instrument -w -e phase popup-queue com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-popup-queue.txt"
             grep -q 'oms_popup_queue=ok' "$RUNNER_TEMP/oms-popup-queue.txt"
             adb shell am instrument -w -e phase work-confirmation com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-work-confirmation.txt"

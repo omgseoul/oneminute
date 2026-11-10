@@ -16,6 +16,12 @@ class NativeStaffChatApi {
     private static final String KEY="sb_publishable_Gy0_TtIcJ6xKDEiGWEnXAg_f4_eyXPI";
     static final String REALTIME="wss://rfcozgyvupvachhhblzn.supabase.co/realtime/v1/websocket?apikey="+KEY+"&vsn=1.0.0";
     static class ChatException extends IOException {final boolean retryable;ChatException(String message,boolean retryable){super(message);this.retryable=retryable;}}
+    private static final okhttp3.OkHttpClient HTTP=new okhttp3.OkHttpClient.Builder()
+        .connectTimeout(15,java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(45,java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(20,java.util.concurrent.TimeUnit.SECONDS)
+        .callTimeout(55,java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false).followRedirects(false).build();
     private final Context context;
     private final String token;
     final String scope;
@@ -54,16 +60,13 @@ class NativeStaffChatApi {
     }
     private JSONObject request(String url,JSONObject args,boolean apiKey)throws Exception {
         if(!valid())throw new IOException("로그인이 만료되었습니다. OMS에서 다시 로그인해주세요.");
-        HttpURLConnection connection=(HttpURLConnection)new URL(url).openConnection();
-        try{
-            connection.setInstanceFollowRedirects(false);connection.setRequestMethod("POST");connection.setDoOutput(true);
-            connection.setConnectTimeout(15000);connection.setReadTimeout(45000);connection.setRequestProperty("Content-Type","application/json");
-            if(apiKey)connection.setRequestProperty("apikey",KEY);
-            byte[] body=args.toString().getBytes(StandardCharsets.UTF_8);connection.setFixedLengthStreamingMode(body.length);
-            try(OutputStream out=connection.getOutputStream()){out.write(body);}
-            int code=connection.getResponseCode();InputStream stream=code>=200&&code<300?connection.getInputStream():connection.getErrorStream();
-            if(stream==null)throw new IOException("서버에 연결하지 못했습니다. 다시 시도해주세요.");
-            StringBuilder text=new StringBuilder();try(Reader reader=new InputStreamReader(stream,StandardCharsets.UTF_8)){
+        okhttp3.Request.Builder request=new okhttp3.Request.Builder().url(url).post(
+            okhttp3.RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),args.toString()));
+        if(apiKey)request.header("apikey",KEY);
+        try(okhttp3.Response response=HTTP.newCall(request.build()).execute()){
+            int code=response.code();okhttp3.ResponseBody responseBody=response.body();
+            if(responseBody==null)throw new IOException("서버에 연결하지 못했습니다. 다시 시도해주세요.");
+            StringBuilder text=new StringBuilder();try(Reader reader=responseBody.charStream()){
                 char[] buffer=new char[8192];int n;while((n=reader.read(buffer))!=-1){if(text.length()+n>32*1024*1024)throw new IOException("첨부 파일이 너무 큽니다.");text.append(buffer,0,n);}
             }
             if(!valid())throw new IOException("로그인이 변경되었습니다. 채팅을 다시 열어주세요.");
@@ -73,7 +76,7 @@ class NativeStaffChatApi {
         }catch(Exception error){
             if(error instanceof ChatException)throw error;String message=error.getMessage();if(message!=null&&message.matches("(?s).*[가-힣].*"))throw error;
             throw new IOException("연결을 확인하고 다시 시도해주세요.");
-        }finally{connection.disconnect();}
+        }
     }
     File cacheDirectory(){File dir=new File(context.getCacheDir(),"staff-chat/"+scope);dir.mkdirs();return dir;}
     static String hash(String value){

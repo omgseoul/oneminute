@@ -22,6 +22,8 @@ jobs:
           node tests/staff-group-chat/database.cjs
           node tests/staff-group-chat/browser.cjs
           node tests/staff-chat-receipts.cjs
+          node tests/chat-realtime/outbox.cjs
+          node tests/chat-realtime/queue-isolation.cjs
           node tests/staff-chat-send-state.cjs
           node tests/staff-chat-native-navigation.cjs
           node tests/notification-checkout/database.cjs

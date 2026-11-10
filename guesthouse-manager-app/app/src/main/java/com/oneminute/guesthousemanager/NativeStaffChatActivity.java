@@ -26,6 +26,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private static final int PICK_MEDIA=7301;
     private final Handler main=new Handler(Looper.getMainLooper());
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final ExecutorService profileWorker=Executors.newSingleThreadExecutor();
     private final NativeStaffChatState state=new NativeStaffChatState();
     private NativeStaffChatApi api;
     private NativeStaffChatMedia media;
@@ -270,7 +271,14 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         if(!mine){TextView name=text(this,isGroup()?message.optString("sender_name","근무자"):profile==null?title.getText().toString():profile.optString("display_name","근무자"),12,INK);name.setTypeface(null,Typeface.BOLD);name.setPadding(dp(this,2),0,0,dp(this,4));name.setTag("message-name-"+id);name.setOnClickListener(v->{if(isGroup())showMemberProfile(message.optString("sender_key"));else showProfile();});copy.addView(name);}
         LinearLayout messageLine=row(this);messageLine.setGravity(Gravity.BOTTOM|(mine?Gravity.RIGHT:Gravity.LEFT));copy.addView(messageLine,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout meta=column(this);meta.setTag("message-meta-"+id);meta.setGravity(mine?Gravity.RIGHT:Gravity.LEFT);
-        if(message.has("pending")){TextView progress=text(this,"failed".equals(message.optString("pending"))?"전송 실패 · 재시도":message.has("upload_percent")?"전송 중 "+message.optInt("upload_percent")+"%":"전송 중…",10,MUTED);progress.setTag("send-state-"+message.optString("client_id"));progress.setOnClickListener(v->{if("failed".equals(message.optString("pending"))){String error=message.optString("error");if(!error.isEmpty())notice(error,false);outbox.retry(message.optString("client_id"));}});meta.addView(progress);}else if(isGroup()?mine&&message.optInt("unread_count")>0:message.isNull("read_at")){int count=isGroup()?message.optInt("unread_count"):1;TextView unread=text(this,String.valueOf(count),11,BLUE);unread.setTypeface(null,Typeface.BOLD);unread.setTag("message-unread-"+id);unread.setContentDescription("안 읽은 사람 "+count+"명");meta.addView(unread);}
+        if(message.has("pending")){
+            String sendState=message.optString("pending"),client=message.optString("client_id");
+            boolean failed="failed".equals(sendState),queued="queued".equals(sendState);
+            String label=failed?"전송 실패 · 재시도":queued?"전송 대기":"saving".equals(sendState)?"저장 중…":message.has("upload_percent")?"전송 중 "+message.optInt("upload_percent")+"%":"전송 중…";
+            TextView progress=text(this,label,10,failed?BLUE:MUTED);progress.setTag("send-state-"+client);
+            if(failed)progress.setOnClickListener(v->outbox.retry(client));meta.addView(progress);
+            if(failed||queued){TextView cancel=button(this,"취소","전송 취소");cancel.setTextSize(10);cancel.setOnClickListener(v->outbox.cancel(client));meta.addView(cancel);}
+        }else if(isGroup()?mine&&message.optInt("unread_count")>0:message.isNull("read_at")){int count=isGroup()?message.optInt("unread_count"):1;TextView unread=text(this,String.valueOf(count),11,BLUE);unread.setTypeface(null,Typeface.BOLD);unread.setTag("message-unread-"+id);unread.setContentDescription("안 읽은 사람 "+count+"명");meta.addView(unread);}
         TextView time=text(this,date(message.optString("created_at"),true),10,MUTED);time.setSingleLine(true);time.setTag("message-time-"+id);meta.addView(time);
         meta.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
         LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-2,-2);mp.gravity=Gravity.BOTTOM;if(mine)mp.rightMargin=dp(this,6);else mp.leftMargin=dp(this,6);
@@ -334,14 +342,14 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void loadMemberProfile(String person,NativeStaffProfileDialog target){
         target.loading();final int request=generation;
-        worker.execute(()->{try{
+        profileWorker.execute(()->{try{
             JSONObject selected=api.rpc("staff_chat_peer_profile",new JSONObject().put("p_peer",person)).getJSONObject("profile");
             main.post(()->{if(!destroyed&&request==generation&&memberProfileDialog==target&&target.isShowing())target.bind(selected);});
         }catch(Exception error){main.post(()->{if(!destroyed&&request==generation&&memberProfileDialog==target&&target.isShowing())target.failed("근무자 정보를 불러오지 못했습니다.",()->loadMemberProfile(person,target));});}});
     }
     private void showProfile(){if(profile!=null)profileDialog();else loadProfile(true);}
     private void loadProfile(boolean show){
-        if(profileLoading)return;profileLoading=true;final String room=peer;final int request=generation;worker.execute(()->{try{JSONObject p=api.rpc("staff_chat_peer_profile",new JSONObject().put("p_peer",room)).getJSONObject("profile");main.post(()->{if(!destroyed&&request==generation){profileLoading=false;profile=p;title.setText(profileTitle(p));if(headerAvatar!=null){if(isGroup())headerAvatar.setImageResource(R.drawable.ic_staff_group);else media.avatar(headerAvatar,p.optString("profile_image"));((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(p.optString("display_name","?")));}refreshList(false);if(show)profileDialog();}});}catch(Exception e){main.post(()->{if(request!=generation)return;profileLoading=false;if(show)notice("근무자 정보를 불러오지 못했습니다.",true);});}});
+        if(profileLoading)return;profileLoading=true;final String room=peer;final int request=generation;profileWorker.execute(()->{try{JSONObject p=api.rpc("staff_chat_peer_profile",new JSONObject().put("p_peer",room)).getJSONObject("profile");main.post(()->{if(!destroyed&&request==generation){profileLoading=false;profile=p;title.setText(profileTitle(p));if(headerAvatar!=null){if(isGroup())headerAvatar.setImageResource(R.drawable.ic_staff_group);else media.avatar(headerAvatar,p.optString("profile_image"));((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(p.optString("display_name","?")));}refreshList(false);if(show)profileDialog();}});}catch(Exception e){main.post(()->{if(request!=generation)return;profileLoading=false;if(show)notice("근무자 정보를 불러오지 못했습니다.",true);});}});
     }
     private void profileDialog(){if(isGroup()&&profile!=null){if(groupMembersDialog!=null&&groupMembersDialog.isShowing())return;groupMembersDialog=new NativeGroupMembersDialog(this,profile,media,this::showMemberProfile);groupMembersDialog.show();return;}if(profile==null||peerProfileDialog!=null&&peerProfileDialog.isShowing())return;peerProfileDialog=new NativeStaffProfileDialog(this,profile,media);peerProfileDialog.show();}
     private void searchHistory(int pages){if(pages==0&&searching||complete||peer.isEmpty())return;if(pages==0)searching=true;notice("이전 대화에서 검색 중…",false);int request=generation;load(true,()->{if(request!=generation)return;if(!complete&&pages<19)searchHistory(pages+1);else{searching=false;refreshList(false);notice(complete?"검색을 완료했습니다.":"검색을 다시 누르면 더 이전 대화도 검색합니다.",false);}});}
@@ -365,10 +373,10 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void back(){if(memberProfileDialog!=null&&memberProfileDialog.isShowing()){memberProfileDialog.dismiss();return;}if(groupMembersDialog!=null&&groupMembersDialog.isShowing()){groupMembersDialog.dismiss();return;}if(peerProfileDialog!=null&&peerProfileDialog.isShowing()){peerProfileDialog.dismiss();return;}if(viewer!=null&&viewer.showing()){viewer.dismiss();return;}if(emojis!=null&&emojis.getVisibility()==View.VISIBLE){emojis.setVisibility(View.GONE);return;}if(preparing){Toast.makeText(this,"첨부 파일 준비가 끝난 후 이동해주세요.",Toast.LENGTH_SHORT).show();return;}saveDraft();finish();}
     @Override public void onBackPressed(){back();}
-    @Override protected void onResume(){super.onResume();NativeMessageBadge.refresh(this);active=true;if(live!=null)live.start();if(outbox!=null)outbox.pump();if(api!=null){if(!api.valid()){finish();return;}load(false,null);}}
+    @Override protected void onResume(){super.onResume();NativeMessageBadge.refresh(this);active=true;if(live!=null)live.start();if(outbox!=null)outbox.pump();if(api!=null){if(!api.valid()){finish();return;}if(!peer.isEmpty()&&profile==null)loadProfile(false);load(false,null);}}
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)scheduleRead();}
     @Override protected void onPause(){active=false;if(live!=null)live.stop();main.removeCallbacks(poll);main.removeCallbacks(readVisible);if(viewer!=null)viewer.pause();saveDraft();super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state){state.putString("peer",peer);saveDraft();super.onSaveInstanceState(state);}
-    @Override protected void onDestroy(){destroyed=true;if(live!=null)live.destroy();if(outbox!=null)outbox.unobserve(outboxChanged);active=false;generation++;main.removeCallbacksAndMessages(null);if(memberProfileDialog!=null)memberProfileDialog.dismiss();if(groupMembersDialog!=null)groupMembersDialog.dismiss();if(peerProfileDialog!=null)peerProfileDialog.dismiss();if(viewer!=null)viewer.dismiss();if(upload!=null)upload.close();if(media!=null)media.close();worker.shutdown();super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;if(live!=null)live.destroy();if(outbox!=null)outbox.unobserve(outboxChanged);active=false;generation++;main.removeCallbacksAndMessages(null);if(memberProfileDialog!=null)memberProfileDialog.dismiss();if(groupMembersDialog!=null)groupMembersDialog.dismiss();if(peerProfileDialog!=null)peerProfileDialog.dismiss();if(viewer!=null)viewer.dismiss();if(upload!=null)upload.close();if(media!=null)media.close();worker.shutdown();profileWorker.shutdownNow();super.onDestroy();}
     private abstract static class SimpleWatcher implements TextWatcher{public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){}}
 }

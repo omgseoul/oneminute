@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class ChatQueueProbe {
  static void run(Instrumentation instrument){
   Bundle result=new Bundle();Context context=instrument.getTargetContext();
-  CountDownLatch release=new CountDownLatch(1);
+  CountDownLatch release=new CountDownLatch(1),releaseText=new CountDownLatch(1),textEntered=new CountDownLatch(1),otherTextSent=new CountDownLatch(1);
   try{
    NativeStaffChatApi.clearLocal(context);
    NativeStaffChatApi.prefs(context).edit().putString("token",UUID.randomUUID().toString()).putString("expires",Instant.now().plusSeconds(600).toString()).commit();
@@ -28,6 +28,8 @@ final class ChatQueueProbe {
      return new JSONObject().put("ok",true);
     }
     @Override JSONObject chat(String action,JSONObject args)throws Exception{
+     if("stalled text".equals(args.getString("body"))){textEntered.countDown();releaseText.await(20,TimeUnit.SECONDS);}
+     if("other text".equals(args.getString("body")))otherTextSent.countDown();
      if("text".equals(args.getString("body")))textSent.countDown();else otherSent.countDown();
      return new JSONObject().put("ok",true).put("message_id",args.getString("client_id"));
     }
@@ -46,9 +48,11 @@ final class ChatQueueProbe {
    box.retry(id);check(id.equals(waitFailed(box)),"retry preserves client ID");
    check(attempts.get()==2,"only explicit retry sends again");
    box.cancel(id);check(box.rows("room-a").stream().noneMatch(row->id.equals(row.optString("client_id"))),"cancel removes failed row");
+   box.enqueue("room-a","stalled text","normal",null,"");check(textEntered.await(5,TimeUnit.SECONDS),"text starts");
+   box.enqueue("room-b","other text","normal",null,"");check(otherTextSent.await(5,TimeUnit.SECONDS),"other room text bypasses stalled text");releaseText.countDown();
    NativeStaffChatApi.clearLocal(context);result.putString("oms_chat_queue","ok");instrument.finish(-1,result);
   }catch(Throwable error){result.putString("oms_chat_queue","failed: "+error);instrument.finish(0,result);}
-  finally{release.countDown();NativeChatOutbox.clearInstances();}
+  finally{release.countDown();releaseText.countDown();NativeChatOutbox.clearInstances();}
  }
  private static String waitFailed(NativeChatOutbox box)throws Exception{
   long deadline=System.currentTimeMillis()+5000;

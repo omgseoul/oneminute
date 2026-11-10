@@ -4,9 +4,10 @@ async function until(condition){for(let n=0;n<200;n++){if(condition())return;awa
 (async()=>{
  const w=new JSDOM('',{url:'https://omgworks24.com',runScripts:'outside-only'}).window;
  w.indexedDB=indexedDB;w.eval(fs.readFileSync('chat-outbox.js','utf8'));
- let release;const calls=[];
+ let release,releaseText;const calls=[];
  const box=await w.OMSChatOutbox.open('queue-isolation',async item=>{
   calls.push({id:item.client_id,body:item.body});
+  if(item.body==='stalled text')await new Promise(resolve=>releaseText=resolve);
   if(item.body==='stalled video'){await new Promise(resolve=>release=resolve);throw Error('timeout');}
   return {message_id:item.client_id};
  },()=>{});
@@ -23,6 +24,9 @@ async function until(condition){for(let n=0;n<200;n++){if(condition())return;awa
   await box.retry(video.client_id);await until(()=>calls.length===4);assert.equal(calls[3].id,video.client_id);
   release();await until(()=>video.status==='failed');await box.cancel(video.client_id);
   assert(!box.items('a').some(item=>item.client_id===video.client_id));
+  await box.enqueue({peer:'a',body:'stalled text'});await until(()=>releaseText);
+  await box.enqueue({peer:'b',body:'other text'});
+  await until(()=>calls.some(c=>c.body==='other text'));releaseText();
   console.log('PASS: stalled media isolation, same-room text, other-room media, manual retry with stable ID, cancellation');
  }finally{box.close();w.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

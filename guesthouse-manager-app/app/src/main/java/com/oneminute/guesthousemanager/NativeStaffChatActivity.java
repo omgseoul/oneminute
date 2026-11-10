@@ -33,10 +33,10 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private NativeChatUpload upload;
     private NativeChatOutbox outbox;
     private NativeChatLive live;
-    private boolean refreshAgain;
+    private boolean refreshAgain;private int outboxSentRevision;
     private final Runnable liveRefresh=()->{refreshNow();if(outbox!=null)outbox.pump();NativeMessageBadge.refresh(this);};
     private final Runnable outboxChanged=this::onOutboxChanged;
-    private void onOutboxChanged(){if(destroyed||outbox==null)return;refreshList(true);enableComposer();if(active)refreshNow();}
+    private void onOutboxChanged(){if(destroyed||outbox==null)return;refreshList(true);enableComposer();int revision=outbox.sentRevision();if(revision!=outboxSentRevision){outboxSentRevision=revision;if(active)refreshNow();}}
     private void refreshNow(){if(busy){refreshAgain=true;return;}load(false,null);}
     private NativeStaffMediaViewer viewer;
     private LinearLayout root,composer;

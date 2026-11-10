@@ -18,9 +18,10 @@ final class NativeChatOutbox {
  static synchronized void clearInstances(){for(NativeChatOutbox box:instances.values()){box.closed=true;box.main.removeCallbacksAndMessages(null);box.sender.shutdownNow();}instances.clear();}
  static void resume(Context c){Context app=c.getApplicationContext();new Thread(()->{try{NativeStaffChatApi api=new NativeStaffChatApi(app);File file=new File(app.getFilesDir(),"staff-chat-drafts/"+api.scope+"/outbox.json");if(file.exists())get(app,api).pump();}catch(Exception ignored){}},"oms-outbox-resume").start();}
  private final NativeStaffChatApi api;private final AtomicFile disk;private final Handler main=new Handler(Looper.getMainLooper());
- private final ExecutorService sender=Executors.newFixedThreadPool(3);private final List<JSONObject> items=new ArrayList<>();
- private final Set<Runnable> listeners=new HashSet<>();private boolean closed;private final Set<String> activeLanes=new HashSet<>();
+ private final ExecutorService sender=Executors.newFixedThreadPool(4);private final List<JSONObject> items=new ArrayList<>();
+ private final Set<Runnable> listeners=new HashSet<>();private boolean closed;private int sentRevision;private final Set<String> activeLanes=new HashSet<>();
  private NativeChatOutbox(Context c,NativeStaffChatApi api)throws Exception{this.api=api;File dir=new File(c.getFilesDir(),"staff-chat-drafts/"+api.scope);dir.mkdirs();disk=new AtomicFile(new File(dir,"outbox.json"));if(disk.getBaseFile().exists()){JSONArray a=new JSONArray(new String(disk.readFully(),java.nio.charset.StandardCharsets.UTF_8));for(int i=0;i<a.length();i++){JSONObject item=a.getJSONObject(i);if("sending".equals(item.optString("status"))||"saving".equals(item.optString("status")))item.put("status","failed").put("error","전송이 중단되었습니다. 재시도를 눌러주세요.");items.add(item);}persist();}}
+ synchronized int sentRevision(){return sentRevision;}
  synchronized void observe(Runnable r){listeners.add(r);}synchronized void unobserve(Runnable r){listeners.remove(r);}
  private void changed(){List<Runnable> copy;synchronized(this){copy=new ArrayList<>(listeners);}main.post(()->{for(Runnable r:copy)r.run();});}
  private synchronized void persist()throws Exception{if(closed)throw new IOException("Queue closed");FileOutputStream out=null;try{out=disk.startWrite();out.write(new JSONArray(items).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));disk.finishWrite(out);}catch(Exception e){if(out!=null)disk.failWrite(out);throw e;}}
@@ -48,16 +49,16 @@ final class NativeChatOutbox {
   changed();pump();
  }
  synchronized void pump(){
-  if(closed||!api.valid())return;
+  if(closed||!api.valid())return;boolean updated=false;
   for(JSONObject item:items){
    if(!"queued".equals(item.optString("status")))continue;
    String key=lane(item);boolean media=key.startsWith("media:");int count=0;
    for(String active:activeLanes)if(active.startsWith(media?"media:":"text:"))count++;
-   if(activeLanes.contains(key)||count>=(media?2:1))continue;
+   if(activeLanes.contains(key)||count>=2)continue;
    try{item.put("status","sending");persist();}catch(Exception error){try{item.put("status","failed");}catch(JSONException ignored){}continue;}
-   activeLanes.add(key);sender.execute(()->send(item,key));
+   updated=true;activeLanes.add(key);sender.execute(()->send(item,key));
   }
-  changed();
+  if(updated)changed();
  }
  private void send(JSONObject item,String key){
    final long deadline=System.nanoTime()+TimeUnit.MINUTES.toNanos(3);
@@ -77,7 +78,7 @@ final class NativeChatOutbox {
     }
     synchronized(this){item.put("status","saving");persist();}changed();
     JSONObject result=api.chat("send",args);
-    synchronized(this){item.put("message_id",result.getString("message_id")).put("message",result.optJSONObject("message")).put("status","sent").put("attempts",0);persist();}
+    synchronized(this){item.put("message_id",result.getString("message_id")).put("message",result.optJSONObject("message")).put("status","sent").put("attempts",0);persist();sentRevision++;}
    }catch(Exception error){synchronized(this){try{int attempts=item.optInt("attempts")+1;item.put("status","failed").put("error",error.getMessage()).put("blocked",true).put("attempts",attempts);persist();}catch(Exception ignored){}}}
    finally{synchronized(this){activeLanes.remove(key);}changed();main.post(this::pump);}
  }

@@ -18,7 +18,7 @@
    if(closed||navigator.onLine===false)return;
    for(const item of entries){
     if(item.status!=='queued')continue;
-    const key=lane(item),type=item.photo?'media:':'text:',limit=item.photo?2:1;
+    const key=lane(item),type=item.photo?'media:':'text:',limit=2;
     if(active.has(key)||[...active].filter(k=>k.startsWith(type)).length>=limit)continue;
     active.add(key);item.status='sending';deliver(item,key);
    }

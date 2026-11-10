@@ -1,0 +1,54 @@
+name: Verify large video compression and delivery
+on:
+  pull_request:
+    paths: ['tests/video-upload/**', 'supabase/migrations/*staff_chat_upload_authorization.sql', '.github/workflows/video-upload-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: oms-large-video-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.9'}
+      - name: Generate a real 60MB video and add isolated instrumentation
+        timeout-minutes: 5
+        run: |
+          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          python3 tests/video-upload/prepare.py
+      - name: Configure Firebase
+        env: {GOOGLE_SERVICES_JSON: '${{ secrets.GOOGLE_SERVICES_JSON }}'}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > guesthouse-manager-app/app/google-services.json
+      - name: Compile existing app and video probe
+        working-directory: guesthouse-manager-app
+        run: OMS_CHAT_TEST_BUILD=debug gradle assembleDebug assembleDebugAndroidTest --stacktrace
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install guesthouse-manager-app/app/build/outputs/apk/debug/app-debug.apk
+            adb install -t guesthouse-manager-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e phase large-video com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-large-video.txt"
+            grep -q 'oms_large_video=ok' "$RUNNER_TEMP/oms-large-video.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: OMS-large-video-result
+          path: ${{ runner.temp }}/oms-large-video.txt

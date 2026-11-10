@@ -57,7 +57,12 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok(!await rpc('verify_notification_worker',['wrong'],'service_role'),'wrong worker secret rejected');
  await assert.rejects(()=>rpc('verify_notification_worker',['test-worker']),/permission denied/);checks++;
  await db.exec('create schema cron;create function cron.schedule(text,text,text) returns int language sql as $$select 1$$;');
- for(const migration of ['20261110012924_chat_attachment_decode_once.sql','20261110013317_staff_chat_chunked_upload.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
+ for(const migration of ['20261110012924_chat_attachment_decode_once.sql','20261110013317_staff_chat_chunked_upload.sql','20261110025205_staff_chat_upload_authorization.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
+ for(const token of [id(201),id(301),id(302)]){
+  const legacy=(await rpc('list_property_messages',[token])).recipients;
+  const fast=(await q('select omg_private.staff_chat_recipients($1) recipients',[token]))[0].recipients;
+  assert.deepEqual(fast,legacy);checks++;
+ }
  const call=(token,action,data={})=>rpc('staff_chat_rpc',[token,action,data]);
  const o=id(201),s1=id(301),s2=id(302),peer1='employee:'+id(31),peer2='employee:'+id(32),peer3='employee:'+id(34);
  await assert.rejects(()=>call(id(999),'create_group',{peers:[peer1,peer2],client_id:id(401)}),/로그인/);checks++;
@@ -121,6 +126,8 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok(!(await rpc('staff_chat_peer_profile',[s2,'employee:'+id(33)])).ok,'leaving group revokes membership-only profile access');
  ok(!(await rpc('staff_chat_peer_profile',[id(999),peer1])).ok,'invalid token still denied');
 
+ // Fail if the upload, final send or attachment retrieval ever materializes the legacy inbox.
+ await db.exec(`create or replace function public.list_property_messages(p_access_token uuid) returns jsonb language plpgsql as $$begin raise exception 'Legacy inbox must not run in video transport';end$$;`);
  const buffer=require('node:crypto').randomBytes(20971520);buffer.write('ftyp',4);
  const uploadId=id(801),upload=(who,index,chunk,peer=peer1)=>rpc('staff_chat_upload_chunk',[who,uploadId,peer,'video/mp4',index,20,chunk]);
  await assert.rejects(()=>upload(id(999),0,buffer.subarray(0,1048576).toString('base64')),/로그인/);checks++;
@@ -135,6 +142,15 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  console.log('20MiB chunk upload ms',before-t,'final message ms',Date.now()-before);
  ok(((await q('select octet_length(image_bytes) n from omg_private.staff_chat_photos where message_id=$1',[video.message_id]))[0]).n===20971520,'full 20MiB stored');
  ok((await call(o,'send',{peer:peer1,body:'video',client_id:uploadId,uploaded:true})).message_id===video.message_id,'final retry creates no duplicate');
+ const received=await call(s1,'attachment',{peer:'owner:'+id(21),message_id:video.message_id});
+ ok(Buffer.from(received.attachment.split(',')[1],'base64').equals(buffer),'employee receives all administrator video bytes');
+ const staffUpload=id(803),staffPeer='owner:'+id(21);
+ for(let i=0;i<20;i++)await rpc('staff_chat_upload_chunk',[s1,staffUpload,staffPeer,'video/mp4',i,20,buffer.subarray(i*1048576,(i+1)*1048576).toString('base64')]);
+ const staffVideo=await call(s1,'send',{peer:staffPeer,body:'staff video',client_id:staffUpload,uploaded:true});
+ const ownerReceived=await call(o,'attachment',{peer:peer1,message_id:staffVideo.message_id});
+ ok(Buffer.from(ownerReceived.attachment.split(',')[1],'base64').equals(buffer),'administrator receives all employee video bytes');
+ await assert.rejects(()=>rpc('staff_chat_upload_chunk',[s2,id(804),'employee:'+id(33),'video/mp4',0,20,buffer.subarray(0,1048576).toString('base64')]),/접근/);checks++;
+ await db.exec('set role anon');await assert.rejects(()=>db.query('select omg_private.staff_chat_recipients($1)',[o]),/permission denied/);checks++;await db.exec('reset role');
  await assert.rejects(()=>call(o,'send',{peer:peer1,body:'bad',client_id:id(802),photo:'data:video/mp4;base64,%%%%'}),/손상/);checks++;
  await assert.rejects(()=>call(o,'send',{peer:peer1,body:'bad',client_id:id(802),photo:'data:video/mp4;base64,'+Buffer.alloc(15).toString('base64')}),/MP4/);checks++;
  await db.exec("set role anon");await assert.rejects(()=>db.query("select * from omg_private.staff_chat_upload_chunks"),/permission denied/);checks++;await db.exec('reset role');

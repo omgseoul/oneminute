@@ -69,7 +69,7 @@ final class NativeStaffChatMedia {
                     control.check();if(!api.valid()||closed)throw new IOException("채팅을 다시 열어주세요.");
                     if(!temp.renameTo(file))throw new IOException("첨부 파일을 저장하지 못했습니다.");
                 }
-                control.check();file.setLastModified(System.currentTimeMillis());
+                control.check();file.setLastModified(System.currentTimeMillis());prune();
                 main.post(()->{if(!closed&&!control.stopped&&api.valid())result.done(file);});
             }catch(Exception e){main.post(()->{if(!closed&&!control.stopped)result.failed("첨부 파일을 불러오지 못했습니다.");});}
             finally{if(temp!=null)temp.delete();api.endTransfer();}
@@ -103,6 +103,6 @@ final class NativeStaffChatMedia {
     }
     private static boolean black(Bitmap bitmap){for(int y=1;y<=4;y++)for(int x=1;x<=4;x++){int pixel=bitmap.getPixel(Math.min(bitmap.getWidth()-1,bitmap.getWidth()*x/5),Math.min(bitmap.getHeight()-1,bitmap.getHeight()*y/5));if(Math.max(Color.red(pixel),Math.max(Color.green(pixel),Color.blue(pixel)))>20)return false;}return true;}
     static Bitmap fullImage(File file){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/2048);return BitmapFactory.decodeFile(file.getPath(),o);}
-    private void prune(){File[] list=api.cacheDirectory().listFiles();if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
+    private void prune(){File[] list=api.cacheDirectory().listFiles((dir,name)->name.endsWith(".media"));if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
     void close(){closed=true;downloads.shutdownNow();worker.shutdownNow();avatars.shutdownNow();thumbs.evictAll();}
 }

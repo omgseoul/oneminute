@@ -30,7 +30,7 @@ final class NativeChatOutbox {
  }
  synchronized List<JSONObject> rows(String peer){List<JSONObject> result=new ArrayList<>();for(JSONObject item:items)if(peer.equals(item.optString("peer")))try{JSONObject m=item.optJSONObject("message");if(m==null)m=new JSONObject(item.toString()).put("id","local:"+item.getString("client_id")).put("mine",true).put("pending",item.optString("status"));result.add(new JSONObject(m.toString()));}catch(Exception ignored){}return result;}
  synchronized void acknowledge(JSONArray messages){if(messages==null)return;Set<String> ids=new HashSet<>(),clients=new HashSet<>();for(int i=0;i<messages.length();i++){JSONObject m=messages.optJSONObject(i);if(m!=null){ids.add(m.optString("id"));clients.add(m.optString("client_id"));}}List<JSONObject> done=new ArrayList<>();for(JSONObject item:items)if("sent".equals(item.optString("status"))&&(ids.contains(item.optString("message_id"))||clients.contains(item.optString("client_id"))))done.add(item);if(done.isEmpty())return;items.removeAll(done);try{persist();for(JSONObject item:done){String path=item.optString("file");if(!path.isEmpty())new File(path).delete();}}catch(Exception e){items.addAll(done);}}
- synchronized void retry(String id){for(JSONObject item:items)if(id.equals(item.optString("client_id")))try{item.put("blocked",false).put("status","queued");persist();}catch(Exception ignored){}pump();}
+ synchronized void retry(String id){for(JSONObject item:items)if(id.equals(item.optString("client_id")))try{item.put("blocked",false).put("attempts",0).put("error","").put("status","queued");persist();}catch(Exception ignored){}pump();}
  synchronized void pump(){
   if(closed||running||!api.valid())return;JSONObject next=null;for(JSONObject item:items)if(!"sent".equals(item.optString("status"))){next=item;break;}if(next==null||next.optBoolean("blocked"))return;
   main.removeCallbacks(retry);final JSONObject item=next;running=true;
@@ -41,11 +41,18 @@ final class NativeChatOutbox {
     JSONObject args=new JSONObject().put("peer",item.getString("peer")).put("body",item.getString("body")).put("priority",item.getString("priority")).put("client_id",item.getString("client_id"));
     String path=item.optString("file"),type=item.optString("attachment_type");if(!path.isEmpty()){
      File file=new File(path);if(!file.exists()||file.length()>(type.startsWith("video/")?20971520:1572864))throw new NativeStaffChatApi.ChatException("첨부 파일을 확인해주세요.",false);
-     byte[] bytes=new byte[(int)file.length()];try(DataInputStream in=new DataInputStream(new FileInputStream(file))){in.readFully(bytes);}args.put("photo","data:"+type+";base64,"+android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP));
+     if(type.startsWith("video/")) {
+      int total=(int)((file.length()+1048575)/1048576);byte[] chunk=new byte[1048576];
+      try(DataInputStream in=new DataInputStream(new FileInputStream(file))){for(int part=0;part<total;part++){
+       int length=(int)Math.min(1048576,file.length()-(long)part*1048576);in.readFully(chunk,0,length);
+       api.rpc("staff_chat_upload_chunk",new JSONObject().put("p_client_id",item.getString("client_id")).put("p_peer",item.getString("peer")).put("p_mime_type",type).put("p_part_index",part).put("p_total_parts",total).put("p_chunk",android.util.Base64.encodeToString(chunk,0,length,android.util.Base64.NO_WRAP)));
+       synchronized(this){item.put("upload_percent",(part+1)*100/total);persist();}changed();
+      }}args.put("uploaded",true);
+     }else{byte[] bytes=new byte[(int)file.length()];try(DataInputStream in=new DataInputStream(new FileInputStream(file))){in.readFully(bytes);}args.put("photo","data:"+type+";base64,"+android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP));}
     }
     JSONObject result=api.chat("send",args);
     synchronized(this){item.put("message_id",result.getString("message_id")).put("message",result.optJSONObject("message")).put("status","sent").put("attempts",0);persist();}
-   }catch(Exception error){failed=true;synchronized(this){try{item.put("status","failed").put("blocked",error instanceof NativeStaffChatApi.ChatException&&!((NativeStaffChatApi.ChatException)error).retryable).put("attempts",item.optInt("attempts")+1);persist();}catch(Exception ignored){}}}
+   }catch(Exception error){failed=true;synchronized(this){try{int attempts=item.optInt("attempts")+1;item.put("status","failed").put("error",error.getMessage()).put("blocked",attempts>=3||(error instanceof NativeStaffChatApi.ChatException&&!((NativeStaffChatApi.ChatException)error).retryable)).put("attempts",attempts);persist();}catch(Exception ignored){}}}
    finally{synchronized(this){running=false;}changed();final boolean delayed=failed;main.post(()->{main.removeCallbacks(retry);main.postDelayed(retry,delayed?Math.min(30000,1000L<<Math.min(item.optInt("attempts"),5)):0);});}
   });
  }

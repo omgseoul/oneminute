@@ -39,7 +39,7 @@ class NativeStaffChatApi {
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));
     }
     JSONObject rpc(String name,JSONObject args)throws Exception {
-        if(!name.matches("chat_live_ticket|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
+        if(!name.matches("chat_live_ticket|staff_chat_upload_chunk|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
         if(workConfirmationOnly&&!"work_shift_confirmation".equals(name))throw new IOException("잘못된 요청입니다.");
         args.put("p_access_token",token);
         JSONObject result=request(BASE+"rest/v1/rpc/"+name,args,true);
@@ -68,7 +68,7 @@ class NativeStaffChatApi {
             }
             if(!valid())throw new IOException("로그인이 변경되었습니다. 채팅을 다시 열어주세요.");
             JSONObject result=new JSONObject(text.toString());
-            if(code<200||code>=300||!result.optBoolean("ok"))throw new ChatException(result.optString("message","연결을 확인하고 다시 시도해주세요."),code>=500||code==429);
+            if(code<200||code>=300||!result.optBoolean("ok"))throw new ChatException("57014".equals(result.optString("code"))?"서버 처리 시간이 초과되었습니다. 다시 시도해주세요.":result.optString("message","연결을 확인하고 다시 시도해주세요."),code>=500||code==429);
             return result;
         }catch(Exception error){
             if(error instanceof ChatException)throw error;String message=error.getMessage();if(message!=null&&message.matches("(?s).*[가-힣].*"))throw error;

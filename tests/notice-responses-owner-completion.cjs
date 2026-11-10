@@ -6,7 +6,7 @@ function inline(w){w.eval(read('worker-tasks.js'));for(const s of w.document.que
  const {dom,w,d}=create('messages.html'),calls=[];
  w.StaffChat={cleanText:String,contractId:()=>null,contractBody:String};w.OMSAttendanceTime={range:()=>'-'};w.MessageHub={isStaff:()=>false,search(){},updateCounts(){}};w.omgNotifications={send:async()=>{}};
  w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});return{data:{ok:true,message_id:'m',employee_name:args?.p_employee_name,acknowledged_at:new Date().toISOString()}}}};
- w.eval(read('notice-composer.js'));w.eval(read('dialog-cards.js'));inline(w);await tick();w.ntTest.setup();
+ w.eval(read('attendance-warning-response.js'));w.eval(read('notice-composer.js'));w.eval(read('dialog-cards.js'));inline(w);await tick();w.ntTest.setup();
  assert.equal(d.querySelectorAll('.notice-response-options input[type="checkbox"]').length,2);assert(!d.querySelector('.notice-confirm-help'));assert.equal(d.getElementById('noticeRequireSignature').checked,false);
  for(const sig of [false,true])for(const understood of [false,true]){
   w.ntTest.prepare();
@@ -18,7 +18,13 @@ function inline(w){w.eval(read('worker-tasks.js'));for(const s of w.document.que
   if(sig||understood){assert.equal(d.getElementById('ack').hidden,false);d.getElementById('ackName').value=sig?'직원':'';d.getElementById('understood').checked=understood;await d.getElementById('ack').onclick();assert.equal(calls[0].name,'acknowledge_announcement');assert.equal(calls[0].args.p_employee_name,sig?'직원':'');assert.equal(calls[0].args.p_understood,understood);}else{assert.equal(d.getElementById('ack').hidden,true);assert.equal(calls[0].name,'mark_property_message_read');}
  }
  // Older notices keep both confirmation controls.
- await w.openDetail({message_id:'legacy',message_type:'announcement',sender_type:'owner',message:'기존 공지',created_at:new Date().toISOString()});assert(!d.querySelector('.understood').hidden);assert(!d.getElementById('ackName').parentElement.hidden);dom.window.close();
+ await w.openDetail({message_id:'legacy',message_type:'announcement',sender_type:'owner',message:'기존 공지',created_at:new Date().toISOString()});assert(!d.querySelector('.understood').hidden);assert(!d.getElementById('ackName').parentElement.hidden);// Attendance uses a server-backed reason form, independent from announcement flags.
+ const warning={message_id:'warning',message_type:'attendance_warning',sender_type:'system',message:'출근시간이 다릅니다.',created_at:new Date().toISOString(),require_signature:false,require_understanding:false};
+ await w.openDetail(warning);assert(d.getElementById('detail').classList.contains('dc-central'));assert(d.getElementById('announcementConfirm').hidden);assert(d.getElementById('ack').disabled);
+ d.querySelector('[data-agreed="no"]').click();const reason=d.querySelector('.awr-reason textarea');reason.value='두자';reason.dispatchEvent(new w.Event('input'));assert(d.getElementById('ack').disabled);reason.value='교통 지연';reason.dispatchEvent(new w.Event('input'));assert(!d.getElementById('ack').disabled);
+ await d.getElementById('ack').onclick();assert.equal(calls.at(-1).name,'respond_attendance_warning');assert.equal(calls.at(-1).args.p_reason,'교통 지연');assert.equal(calls.at(-1).args.p_agreed,false);
+ await w.openDetail({...warning,message_id:'yes',acknowledged_at:null});d.querySelector('[data-agreed="yes"]').click();assert(!d.getElementById('ack').disabled);assert(d.querySelector('.awr-reason').hidden);await d.getElementById('ack').onclick();assert.equal(calls.at(-1).args.p_agreed,true);
+ dom.window.close();
  const todo=create('mission.html'),mw=todo.w,md=todo.d;let completeCalls=0;mw.confirm=()=>true;mw.omgSupabase={rpc:async(name,args)=>{if(name==='complete_mission'){completeCalls++;assert.equal(args.p_mission_id,'task');assert.equal(args.p_access_token,'owner');return {data:{ok:true}}}return {data:{ok:true}}}};inline(mw);await tick();mw.ntTest.setup();
  const task={id:'task',title:'줄넘기',timing:'today',priority:'normal',target_count:6,completed_count:2};mw.openDetails(task);assert.deepEqual([...md.querySelectorAll('#detailActions button')].map(x=>x.textContent),['수정','종료','완료']);await md.querySelector('.owner-complete').onclick();assert.equal(completeCalls,1);
  const done={...task,owner_completed_at:new Date().toISOString(),completions:[{employee_name:'관리자',completer_type:'owner',completed_at:new Date().toISOString()}]};assert.equal(mw.sectionKey(done),'completed');assert.equal(mw.completerNames(done),'관리자');mw.openDetails(done);assert.equal(md.querySelector('.owner-complete').disabled,true);assert(md.querySelector('#completionDetails').textContent.includes('관리자'));

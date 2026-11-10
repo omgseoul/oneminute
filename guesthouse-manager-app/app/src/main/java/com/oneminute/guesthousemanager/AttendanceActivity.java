@@ -216,7 +216,20 @@ public class AttendanceActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (webView != null) webView.loadUrl(appUrlFromIntent(intent));
+        if (webView != null) {
+            String target=appUrlFromIntent(intent),current=webView.getUrl();
+            if (intent.getBooleanExtra("centralNotice",false) && current!=null) {
+                Uri shown=Uri.parse(current),next=Uri.parse(target);
+                // Let report persistence/delivery finish; Home then opens its unread notice.
+                if ("/report.html".equals(shown.getPath())) return;
+                if ("/messages.html".equals(shown.getPath())) {
+                    String id=next.getQueryParameter("message_id");
+                    webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('omg:central-notice',{detail:"+org.json.JSONObject.quote(id==null?"":id)+"}))",null);
+                    return;
+                }
+            }
+            if (!target.equals(current)) webView.loadUrl(target);
+        }
     }
 
     private boolean openNativeStaffChat(String peer, String propertyIds) {

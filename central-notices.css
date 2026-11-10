@@ -1,0 +1,25 @@
+/* Central notices keep the OMS rounded card and respect both system safe areas. */
+#detail.dc-central{align-items:center;padding:calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom));backdrop-filter:blur(3px)}
+#detail.dc-central .sheet{width:min(100%,420px);height:auto;max-height:100%;padding:0 22px 22px;border-radius:26px;box-shadow:0 24px 70px #112a4847}
+#detail.dc-central .sheet-handle{display:none}
+#detail.dc-central .sheet-top{margin:0 -22px 16px;padding:18px 58px 18px 22px;min-height:62px;align-items:center;background:#2467bd;color:#fff}
+#detail.dc-central.dc-announcement .sheet-top{background:#dcefe3;color:#285e43}
+#detail.dc-central .dc-kicker{color:inherit;font-size:16px;font-weight:800}
+#detail.dc-central .dc-state{display:none}
+#detail.dc-central #detailTitle{display:none}
+#detail.dc-central .close{top:13px;right:14px;background:#ffffff40;color:inherit}
+#detail.dc-central .detail-scroll{margin:0;overflow:auto}
+#detail.dc-central .detail-identity{padding:0 76px 10px 0;min-height:70px;position:relative;grid-template-columns:36px minmax(0,1fr);gap:9px}
+#detail.dc-central .detail-identity:after{content:'';position:absolute;right:0;top:0;width:68px;height:68px;background:url('oms-dog-normal-plain.webp') center/contain no-repeat}
+#detail.dc-central .detail-avatar{width:36px;height:36px}
+#detail.dc-central .body{background:#f4f7fc;color:#183153;border:0;font-size:15px;margin-top:5px;padding:15px}
+#detail.dc-central .approval-actions{margin-top:18px}
+#detail.dc-central .ack{background:#2467bd;min-height:49px}
+#detail.dc-central .ack:disabled,.checkout-warning-actions button:disabled{background:#d9e2ef;color:#8c9eb4;cursor:default}
+#detail.dc-central .announcement-confirm{margin-top:18px}
+#detail.dc-central.dc-announcement .understood input{accent-color:#43885f}
+.attendance-warning-response{margin-top:18px;color:#183153}.attendance-warning-response[hidden]{display:none}
+.awr-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:700}.awr-choice>div{display:flex;flex:none;gap:4px;padding:4px;border-radius:12px;background:#eff4fa}.awr-choice button{min-width:48px;min-height:36px;border:0;border-radius:9px;background:transparent;color:#677b92;font:inherit;cursor:pointer}.awr-choice button[aria-pressed=true]{background:#2467bd;color:white}
+.awr-reason{display:block;margin-top:18px;font-size:13px}.awr-reason[hidden]{display:none}.awr-reason>span{display:block;margin-bottom:8px;font-weight:700}.awr-reason textarea{box-sizing:border-box;width:100%;min-height:94px;resize:vertical;border:1px solid #cddaea;border-radius:13px;background:#f8fafc;padding:12px;color:#183153;font:inherit;font-size:16px;line-height:1.6}.awr-reason textarea:focus{outline:2px solid #a9c8ef}.awr-reason small{display:block;margin-top:6px;color:#7b8a9c;font-size:11px;text-align:right}
+.checkout-warning-overlay{padding:calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom))}.checkout-warning-card{max-height:100%}.checkout-warning-card h2{padding-right:70px;min-height:65px;display:flex;align-items:center;background:url('oms-dog-normal-plain.webp') right center/65px no-repeat}
+@media(max-width:360px){#detail.dc-central{padding-left:12px;padding-right:12px}.awr-choice{font-size:12px;gap:6px}.awr-choice button{min-width:43px}}

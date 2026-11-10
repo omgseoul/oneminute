@@ -3,7 +3,18 @@ window.StaffChat={
  rawText(text){return String(text||'').replace(/\n?\[OMS-CONTRACT:[0-9a-f-]{36}\]/gi,'');},
  cleanText(text){const value=this.rawText(text);return window.OMSStickers?OMSStickers.preview(value):value;},
  contractBody(text){const id=this.contractId(text),raw=this.rawText(text),clean=window.OMSStickers?OMSStickers.html(raw,GuestSupport.esc):GuestSupport.esc(raw);return clean+(id?'<a class="staff-contract-link" href="contracts.html?id='+encodeURIComponent(id)+'&from=notification">근로계약서 확인·서명 ›</a>':'');},
- async call(session,action,data={}){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data});if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
+ async call(session,action,data={}){
+  if(action==='send'&&/^data:video\/(mp4|webm);base64,/.test(data.photo||'')){
+   const mime=data.photo.slice(5,data.photo.indexOf(';')),binary=atob(data.photo.slice(data.photo.indexOf(',')+1));
+   if(binary.length>20971520)throw new Error('동영상은 압축 후 20MB 이하만 보낼 수 있습니다.');
+   const total=Math.ceil(binary.length/1048576);
+   for(let part=0;part<total;part++){
+    const {data:chunk,error}=await window.omgSupabase.rpc('staff_chat_upload_chunk',{p_access_token:session.accessToken,p_client_id:data.client_id,p_peer:data.peer,p_mime_type:mime,p_part_index:part,p_total_parts:total,p_chunk:btoa(binary.slice(part*1048576,(part+1)*1048576))});
+    if(error||!chunk?.ok){const failure=new Error(chunk?.message||error?.message||'동영상 전송에 실패했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}
+   }
+   data={...data,uploaded:true};delete data.photo;
+  }
+  const {data:value,error}=await window.omgSupabase.rpc('staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data});if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
  async profile(session,peer){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_peer_profile',{p_access_token:session.accessToken,p_peer:peer});if(error||!value?.ok)throw new Error(value?.message||error?.message||'근무자 정보를 불러오지 못했습니다.');return value.profile;},
  nativeOpen(peer='',propertyIds=null){if(!peer||typeof window.OMGNative?.openStaffChat!=='function')return false;try{if(window.OMGNative.openStaffChat(peer,JSON.stringify(propertyIds||[]))!==true)return false;window.dispatchEvent(new Event('omg:native-navigation'));return true;}catch{return false;}},
  url:peer=>'staff-chat.html?peer='+encodeURIComponent(peer),

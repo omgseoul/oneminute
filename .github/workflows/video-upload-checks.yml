@@ -1,7 +1,7 @@
 name: Verify large video compression and delivery
 on:
   pull_request:
-    paths: ['tests/video-upload/**', 'supabase/migrations/*staff_chat_upload_authorization.sql', '.github/workflows/video-upload-checks.yml']
+    paths: ['guesthouse-manager-app/app/src/main/java/com/oneminute/guesthousemanager/NativeChat*.java', 'guesthouse-manager-app/app/src/main/java/com/oneminute/guesthousemanager/NativeStaffChatApi.java', 'tests/video-upload/**', 'supabase/migrations/*staff_chat_upload_authorization.sql', '.github/workflows/video-upload-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read

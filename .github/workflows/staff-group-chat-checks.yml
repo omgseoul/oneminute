@@ -24,6 +24,8 @@ jobs:
           node tests/staff-chat-receipts.cjs
           node tests/chat-realtime/outbox.cjs
           node tests/chat-realtime/queue-isolation.cjs
+          node tests/chat-realtime/transfer-controls.cjs
+          node tests/chat-realtime/transfer-layout.cjs
           node tests/staff-chat-send-state.cjs
           node tests/staff-chat-native-navigation.cjs
           node tests/notification-checkout/database.cjs
@@ -40,4 +42,6 @@ jobs:
         if: always()
         with:
           name: OMS-group-chat-preview
-          path: /tmp/oms-group-*.png
+          path: |
+            /tmp/oms-group-*.png
+            /tmp/oms-transfer-*.png

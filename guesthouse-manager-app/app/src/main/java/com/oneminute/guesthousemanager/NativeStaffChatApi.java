@@ -20,6 +20,17 @@ class NativeStaffChatApi {
         .writeTimeout(20,java.util.concurrent.TimeUnit.SECONDS)
         .callTimeout(55,java.util.concurrent.TimeUnit.SECONDS)
         .retryOnConnectionFailure(false).followRedirects(false).build();
+    static final class TransferControl {
+        volatile boolean stopped;private okhttp3.Call call;
+        synchronized void bind(okhttp3.Call next)throws IOException{if(stopped){next.cancel();throw new IOException("전송 중지");}call=next;}
+        synchronized void stop(){stopped=true;if(call!=null)call.cancel();}
+        void check()throws IOException{if(stopped)throw new IOException("전송 중지");}
+    }
+    private final ThreadLocal<TransferControl> transfer=new ThreadLocal<>();
+    void beginTransfer(TransferControl control){transfer.set(control);}
+    void endTransfer(){transfer.remove();}
+    private final java.util.Set<okhttp3.Call> reads=java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    void cancelReads(){synchronized(reads){for(okhttp3.Call call:reads)call.cancel();}}
     private final Context context;
     private final String token;
     final String scope;
@@ -61,7 +72,8 @@ class NativeStaffChatApi {
         okhttp3.Request.Builder request=new okhttp3.Request.Builder().url(url).post(
             okhttp3.RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),args.toString()));
         if(apiKey)request.header("apikey",KEY);
-        try(okhttp3.Response response=HTTP.newCall(request.build()).execute()){
+        okhttp3.Call call=HTTP.newCall(request.build());TransferControl control=transfer.get();if(control!=null)control.bind(call);else reads.add(call);
+        try(okhttp3.Response response=call.execute()){
             int code=response.code();okhttp3.ResponseBody responseBody=response.body();
             if(responseBody==null)throw new IOException("서버에 연결하지 못했습니다. 다시 시도해주세요.");
             StringBuilder text=new StringBuilder();try(Reader reader=responseBody.charStream()){
@@ -74,13 +86,13 @@ class NativeStaffChatApi {
         }catch(Exception error){
             if(error instanceof ChatException)throw error;String message=error.getMessage();if(message!=null&&message.matches("(?s).*[가-힣].*"))throw error;
             throw new IOException("연결을 확인하고 다시 시도해주세요.");
-        }
+        }finally{reads.remove(call);}
     }
     File cacheDirectory(){File dir=new File(context.getCacheDir(),"staff-chat/"+scope);dir.mkdirs();return dir;}
     static String hash(String value){
         try{byte[] bytes=MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:bytes)out.append(String.format("%02x",b&255));return out.toString();}
         catch(Exception e){throw new IllegalStateException(e);}
     }
-    static void clearLocal(Context c){NativeChatOutbox.clearInstances();delete(new File(c.getCacheDir(),"staff-chat"));delete(new File(c.getFilesDir(),"staff-chat-drafts"));c.getSharedPreferences("omg_chat_drafts",Context.MODE_PRIVATE).edit().clear().apply();}
+    static void clearLocal(Context c){NativeChatSnapshots.clear();NativeChatOutbox.clearInstances();delete(new File(c.getCacheDir(),"staff-chat"));delete(new File(c.getFilesDir(),"staff-chat-drafts"));c.getSharedPreferences("omg_chat_drafts",Context.MODE_PRIVATE).edit().clear().apply();}
     private static void delete(File f){File[] children=f.listFiles();if(children!=null)for(File child:children)delete(child);f.delete();}
 }

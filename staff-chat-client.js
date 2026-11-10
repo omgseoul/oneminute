@@ -24,6 +24,22 @@ window.StaffChat={
    data={...data,uploaded:true};delete data.photo;
   }
   check();const {data:value,error}=await this.rpc('staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data},transfer.signal);if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
+ async download(session,peer,id,{signal,onProgress}={}){
+  const call=(action,data={})=>this.call(session,action,{peer,message_id:id,...data},{signal});
+  const info=await call('download_info'),total=info.byte_length,size=info.part_size,mime=info.mime_type;
+  if(!Number.isInteger(total)||total<3||total>20971520||size!==1048576||!['image/jpeg','video/mp4','video/webm'].includes(mime))throw new Error('첨부 파일을 확인해주세요.');
+  const chunks=[],deadline=Date.now()+180000;let received=0;onProgress?.(0,total);
+  for(let part=0;received<total;part++){
+   if(signal?.aborted)throw new DOMException('불러오기 취소','AbortError');
+   if(Date.now()>deadline)throw new Error('불러오는 시간이 초과되었습니다. 다시 시도해주세요.');
+   const data=await call('download_part',{part_index:part});
+   if(signal?.aborted)throw new DOMException('불러오기 취소','AbortError');
+   const binary=atob(data.chunk),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
+   if(data.part_index!==part||data.byte_length!==total||data.mime_type!==mime||bytes.length!==Math.min(size,total-received))throw new Error('첨부 파일을 확인해주세요.');
+   chunks.push(bytes);received+=bytes.length;onProgress?.(received,total);
+  }
+  return new Blob(chunks,{type:mime});
+ },
  async profile(session,peer){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_peer_profile',{p_access_token:session.accessToken,p_peer:peer});if(error||!value?.ok)throw new Error(value?.message||error?.message||'근무자 정보를 불러오지 못했습니다.');return value.profile;},
  nativeOpen(peer='',propertyIds=null){if(!peer||typeof window.OMGNative?.openStaffChat!=='function')return false;try{if(window.OMGNative.openStaffChat(peer,JSON.stringify(propertyIds||[]))!==true)return false;window.omsNativeChatOpen=true;window.dispatchEvent(new Event('omg:native-navigation'));return true;}catch{return false;}},
  url:peer=>'staff-chat.html?peer='+encodeURIComponent(peer),

@@ -6,7 +6,7 @@
  function displayMessages(){const ids=new Set(messages.map(m=>m.client_id).filter(Boolean));return [...messages,...(outbox?.items(peer)||[]).filter(x=>!ids.has(x.client_id)&&!messages.some(m=>m.id===x.message_id)).map(x=>({id:'local:'+x.client_id,client_id:x.client_id,body:x.body,photo:x.photo,priority:x.priority,created_at:x.created_at,mine:true,pending:x.status,upload_percent:x.upload_percent,attachment_type:x.photo?.slice(5,x.photo.indexOf(';'))}))];}
  function refreshNow(){if(busy){refreshAgain=true;return;}clearTimeout(timer);load();}
 
- let peerProfile=null,viewerIndex=0,galleryLoading=false,galleryComplete=false;const videoUrls=new Map(),videoRequests=new Map(),videoPosters=new Map(),videoPosterRequests=new Map();let videoObserver,previewObserver,viewerVersion=0,viewerMediaId=null;
+ let peerProfile=null,viewerIndex=0,galleryLoading=false,galleryComplete=false;const videoUrls=new Map(),videoRequests=new Map(),videoPosters=new Map(),videoPosterRequests=new Map();let videoObserver,previewObserver,viewerVersion=0,viewerMediaId=null,viewerDownload=null;
  const line=$('timeline'),input=$('body');
  function syncComposer(){$('send').disabled=!canSend||input.disabled||enqueueing||preparing||(!input.value.trim()&&!photo);}
  let searchVersion=0,searchIds=[],searchIndex=-1,searchQuery='',searchLoading=false;
@@ -62,17 +62,16 @@
  }
  async function loadPeerProfile(){try{applyProfile(await StaffChat.profile(session,peer));}catch(error){console.warn('Staff profile load',error);}}
  function pruneVideoUrls(){for(const [id,url] of videoUrls){if(videoUrls.size<=6)break;if(String(id)===viewerMediaId||videoPosterRequests.has(id)||videoRequests.has(id))continue;URL.revokeObjectURL(url);videoUrls.delete(id);}}
- async function videoUrl(id){
+ async function videoUrl(id,transfer={}){
   if(videoUrls.has(id))return videoUrls.get(id);
   if(videoRequests.has(id))return videoRequests.get(id);
   const request=(async()=>{
-   const entry=messages.find(message=>String(message.id)===String(id));const result=/^data:video\//i.test(entry?.photo||'')?{attachment:entry.photo,mime_type:entry.photo.slice(5,entry.photo.indexOf(';'))}:await call('attachment',{message_id:id});
-   if(!result?.attachment)throw new Error('동영상을 불러오지 못했습니다.');
-   const encoded=result.attachment.split(',')[1]||'',binary=atob(encoded),bytes=new Uint8Array(binary.length);
-   for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-   const url=URL.createObjectURL(new Blob([bytes],{type:result.mime_type||'video/webm'}));
-   videoUrls.set(id,url);return url;
-  })().finally(()=>{videoRequests.delete(id);pruneVideoUrls();});
+   const entry=messages.find(message=>String(message.id)===String(id));let blob;
+   if(/^data:video\//i.test(entry?.photo||'')){const binary=atob(entry.photo.split(',')[1]);blob=new Blob([Uint8Array.from(binary,c=>c.charCodeAt(0))],{type:entry.photo.slice(5,entry.photo.indexOf(';'))});}
+   else blob=await StaffChat.download(session,peer,id,transfer);
+   if(transfer.signal?.aborted)throw new DOMException('불러오기 취소','AbortError');
+   const url=URL.createObjectURL(blob);videoUrls.set(id,url);return url;
+  })().finally(()=>{if(videoRequests.get(id)===request)videoRequests.delete(id);pruneVideoUrls();});
   videoRequests.set(id,request);return request;
  }
  function videoPoster(url){return window.OMSVideoPreview.poster(url);}
@@ -94,11 +93,16 @@
  }
  function mediaThumb(item){return isVideo(item)?'<img class="video-poster" alt="동영상 미리보기" hidden><span class="media-video-badge">▶</span>':'<img src="'+e(item.photo)+'" alt="사진" loading="lazy">';}
  function transferFooter(m){
-  if(!m.pending||m.pending==='sent')return '';
+  if(!m.pending||m.pending==='sent'||!isVideo(m))return '';
   const failed=m.pending==='failed',paused=m.pending==='paused',queued=m.pending==='queued';
   const label=failed?'전송 실패':paused?'일시정지':queued?'전송 대기':Number.isFinite(m.upload_percent)?'전송 중 '+m.upload_percent+'%':'전송 중…';
   const action=failed?'재시도':paused?'전송 재개':'일시정지',icon=failed?'<path d="M19 7V3m0 4h-4M19 7a8 8 0 1 0 1 8"/>':paused?'<path d="m8 4 12 8-12 8Z"/>':'<path d="M8 4v16M16 4v16"/>';
   return `<div class="transfer-footer ${failed?'failed':''}" data-transfer="${e(m.client_id)}"><div class="transfer-track"><i style="width:${Math.max(0,Math.min(100,Number(m.upload_percent)||0))}%"></i></div><div class="transfer-row"><span class="send-state">${label}</span><button type="button" ${failed||paused?'data-retry':'data-pause-send'}="${e(m.client_id)}" aria-label="${action}" title="${action}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg></button><button type="button" data-cancel-send="${e(m.client_id)}" aria-label="전송 취소" title="전송 취소"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></div>`;
+ }
+ function simpleSendState(m){
+  if(!m.pending||m.pending==='sent'||isVideo(m))return '';
+  const retry=['failed','paused'].includes(m.pending),label=m.pending==='failed'?'전송 실패':m.pending==='paused'?'일시정지':'전송 중…';
+  return `<span class="simple-send ${m.pending==='failed'?'failed':''}" data-transfer="${e(m.client_id)}"><span class="send-state">${label}</span>${retry?`<button type="button" data-retry="${e(m.client_id)}" aria-label="재시도">재시도</button>`:''}<button type="button" data-cancel-send="${e(m.client_id)}" aria-label="전송 취소">×</button></span>`;
  }
  function render(older=false){
   const near=line.scrollHeight-line.scrollTop-line.clientHeight<110,prev=line.scrollHeight;let day='';
@@ -106,7 +110,7 @@
    const d=new Date(m.created_at).toLocaleDateString('ko-KR'),label=d!==day?`<div class="day">${e(d)}</div>`:'';day=d;
    if(m.system)return label+`<div class="chat-system-event" data-id="${e(m.id)}">${e(m.body)}</div>`;
    const name=(isGroup?m.sender_name:peerProfile?.display_name)||'근무자',face=m.mine?'':`<button type="button" class="message-avatar" data-peer-profile="${e(isGroup?m.sender_key:peer)}" aria-label="${e(name)} 근무자 정보 보기">${StaffChat.avatar(name,isGroup?m.sender_profile_image:peerProfile?.profile_image)}</button>`;
-   return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<button type="button" class="bubble-name" data-peer-profile="${e(isGroup?m.sender_key:peer)}">${e(name)}</button>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}${transferFooter(m)}</div><div class="bubble-meta">${!m.pending&&((isGroup?m.mine&&Number(m.unread_count)>0:!m.read_at))?`<span class="message-unread" aria-label="안 읽은 사람 ${isGroup?Number(m.unread_count):1}명">${isGroup?Number(m.unread_count):1}</span>`:''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
+   return label+`<div class="bubble-row ${m.mine?'mine':''}" data-id="${e(m.id)}">${face}<div class="message-copy">${m.mine?'':`<button type="button" class="bubble-name" data-peer-profile="${e(isGroup?m.sender_key:peer)}">${e(name)}</button>`}${m.priority==='urgent'?'<span class="staff-urgent">긴급</span>':''}${m.broadcast?'<span class="staff-broadcast">여러 사람에게 보낸 메세지</span>':''}<div class="message-line"><div class="bubble">${isVideo(m)?'<div class="chat-video"><img class="video-poster" alt="동영상 미리보기" hidden><button type="button" data-video-load="'+e(m.id)+'" aria-label="동영상 재생"><span class="video-play">▶</span><span class="video-label">동영상</span></button></div>':m.photo?`<img src="${e(m.photo)}" alt="첨부 사진" width="320" loading="lazy" style="aspect-ratio:4/3;object-fit:contain" data-photo="${e(m.id)}">`:''}${StaffChat.contractBody(m.body)}${transferFooter(m)}</div><div class="bubble-meta">${simpleSendState(m)}${!m.pending&&((isGroup?m.mine&&Number(m.unread_count)>0:!m.read_at))?`<span class="message-unread" aria-label="안 읽은 사람 ${isGroup?Number(m.unread_count):1}명">${isGroup?Number(m.unread_count):1}</span>`:''}<time class="bubble-time">${e(new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time></div></div></div></div>`;
   }).join('')||'<div class="empty">첫 메세지를 보내 대화를 시작하세요.</div>';
   const bubbles=$('bubbles'),fragment=document.createElement('div');fragment.innerHTML=markup;
   const old=new Map([...bubbles.children].map((node,i)=>[node.dataset.id||'day:'+node.textContent,node]));
@@ -151,27 +155,35 @@
   finally{busy=false;if(refreshAgain){refreshAgain=false;timer=setTimeout(load,0);}else timer=setTimeout(load,delay);}
  }
  function renderPhoto(){syncComposer();const el=$('photoPending'),video=String(photo||'').startsWith('data:video/');el.hidden=!photo;el.innerHTML=photo?(video?'<video muted playsinline controls></video><span>동영상 첨부 (20MB 이하)</span><button type="button" aria-label="첨부 취소">×</button>':'<img alt="선택한 사진"><span>사진 첨부</span><button type="button" aria-label="첨부 취소">×</button>'):'';if(photo){el.querySelector(video?'video':'img').src=photo;el.querySelector('button').onclick=()=>{if(sending)return;photo=null;pending=null;renderPhoto();keepDraft();};}}
- function resetVideo(){const video=$('photoViewerVideo');video.onloadeddata=video.onerror=video.ontimeupdate=video.onplaying=null;video.pause();video.removeAttribute('src');video.removeAttribute('poster');video.load();video.hidden=true;$('videoFullscreen').hidden=true;$('videoViewerStatus').hidden=true;$('videoViewerRetry').hidden=true;$('photoStage').classList.remove('is-video');$('photoViewer').classList.remove('video-expanded');$('videoFullscreen').setAttribute('aria-pressed','false');$('videoFullscreen').setAttribute('aria-label','동영상 화면 확대');$('videoFullscreen').textContent='⛶';}
+ function showMediaLoading(received=null,total=null,label='동영상 불러오는 중'){
+  const panel=$('mediaLoading'),ring=$('mediaProgress'),known=Number.isFinite(total)&&total>0,percent=known?Math.floor(received*100/total):null;
+  panel.hidden=false;panel.classList.toggle('indeterminate',!known);$('mediaLoadingLabel').textContent=label;
+  $('mediaPercent').textContent=known?percent+'%':'';ring.style.strokeDashoffset=String(known?283*(1-percent/100):210);
+  $('mediaLoadingBytes').textContent=known?(received/1048576).toFixed(1)+' / '+(total/1048576).toFixed(1)+' MB':label==='동영상 불러오는 중'?'파일 정보를 확인하는 중…':'';
+  if(known)panel.setAttribute('aria-valuenow',percent);else panel.removeAttribute('aria-valuenow');
+ }
+ $('mediaLoadingCancel').onclick=()=>closeViewer();
+ function resetVideo(){if(viewerDownload){viewerDownload.abort();viewerDownload=null;}if(viewerMediaId&&!videoUrls.has(viewerMediaId))videoRequests.delete(viewerMediaId);$('mediaLoading').hidden=true;const video=$('photoViewerVideo');video.onloadeddata=video.onerror=video.ontimeupdate=video.onplaying=null;video.pause();video.removeAttribute('src');video.removeAttribute('poster');video.load();video.hidden=true;$('videoFullscreen').hidden=true;$('videoViewerStatus').hidden=true;$('videoViewerRetry').hidden=true;$('photoStage').classList.remove('is-video');$('photoViewer').classList.remove('video-expanded');$('videoFullscreen').setAttribute('aria-pressed','false');$('videoFullscreen').setAttribute('aria-label','동영상 화면 확대');$('videoFullscreen').textContent='⛶';}
  async function renderViewer(autoplay=false){
   const list=photos(),item=list[viewerIndex];if(!item){closeViewer();return;}
-  const version=++viewerVersion;viewerMediaId=String(item.id);resetVideo();const video=isVideo(item),stage=$('photoStage');
+  const version=++viewerVersion;resetVideo();viewerMediaId=String(item.id);const video=isVideo(item),stage=$('photoStage');
   photoZoom.setKey(String(item.id));photoZoom.setEnabled(!video);$('photoViewerImage').hidden=video;
-  $('photoViewerName').textContent=item.mine?'나':(isGroup?item.sender_name:peerProfile?.display_name)||'대화 상대';
+  $('photoViewerName').textContent=video?'동영상':'사진';
   $('photoViewerDate').textContent=new Date(item.created_at).toLocaleString('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
-  $('photoCount').textContent=`${list.length}개 중 ${viewerIndex+1}번째 · ${video?'동영상':'사진'}`;
+  $('photoCount').textContent=`${viewerIndex+1} / ${list.length}`;
   $('photoPrevious').disabled=viewerIndex===0;$('photoNext').disabled=viewerIndex===list.length-1;
   $('photoThumbs').innerHTML=list.map((entry,index)=>`<button type="button" class="${index===viewerIndex?'active':''}" data-photo-index="${index}" ${isVideo(entry)?'data-video-preview="'+e(entry.id)+'"':''} aria-label="${index+1}번째 ${isVideo(entry)?'동영상':'사진'}">${mediaThumb(entry)}</button>`).join('');
   $('photoThumbs').querySelectorAll('[data-photo-index]').forEach(button=>button.onclick=()=>{viewerIndex=Number(button.dataset.photoIndex);renderViewer();});observePreviews($('photoThumbs'));
   $('photoThumbs').querySelector('.active')?.scrollIntoView?.({block:'nearest',inline:'center'});
   if(!video){$('photoViewerImage').src=item.photo;return;}
   $('photoViewerImage').removeAttribute('src');stage.classList.add('is-video');$('videoFullscreen').hidden=false;
-  const player=$('photoViewerVideo');player.hidden=false;$('videoViewerStatus').textContent='동영상을 불러오는 중…';$('videoViewerStatus').hidden=false;
+  const player=$('photoViewerVideo');player.hidden=false;viewerDownload=new AbortController();showMediaLoading();$('videoViewerStatus').textContent='동영상을 불러오는 중…';$('videoViewerStatus').hidden=false;
   const cached=videoPosters.get(String(item.id));if(cached)player.poster=cached;
-  try{const url=await videoUrl(item.id);if(version!==viewerVersion||$('photoViewer').hidden)return;player.src=url;player.onloadeddata=()=>{if(version===viewerVersion)$('videoViewerStatus').hidden=true;};player.onerror=()=>{if(version!==viewerVersion)return;$('videoViewerStatus').textContent='동영상을 재생하지 못했습니다.';$('videoViewerStatus').hidden=false;$('videoViewerRetry').hidden=false;};player.ontimeupdate=()=>{if(version!==viewerVersion||player.currentTime<.08)return;const poster=window.OMSVideoPreview.frame(player);if(!poster)return;videoPosters.set(String(item.id),poster);player.poster=poster;player.ontimeupdate=null;document.querySelectorAll('.chat-video,[data-video-preview]').forEach(holder=>{if(String(holder.dataset.messageId||holder.dataset.videoPreview)!==String(item.id))return;const image=holder.querySelector('.video-poster');if(image){image.src=poster;image.hidden=false;holder.classList.add('has-poster');}});};player.onplaying=()=>{if(version===viewerVersion)$('videoViewerStatus').hidden=true;};player.load();ensureVideoPoster(item.id).then(poster=>{if(version===viewerVersion&&poster)player.poster=poster;}).catch(()=>{});if(autoplay){try{await player.play();if(version===viewerVersion)$('videoViewerStatus').hidden=true;}catch{if(version===viewerVersion){$('videoViewerStatus').textContent='재생 버튼을 눌러주세요.';}}}}
-  catch(error){if(version!==viewerVersion)return;$('videoViewerStatus').textContent=error.message||'동영상을 불러오지 못했습니다.';$('videoViewerRetry').hidden=false;}
+  try{const url=await videoUrl(item.id,{signal:viewerDownload.signal,onProgress:(received,total)=>{if(version===viewerVersion)showMediaLoading(received,total);}});if(version!==viewerVersion||$('photoViewer').hidden)return;showMediaLoading(null,null,'재생 준비 중…');player.src=url;player.onloadeddata=()=>{if(version===viewerVersion){$('videoViewerStatus').hidden=true;$('mediaLoading').hidden=true;}};player.onerror=()=>{if(version!==viewerVersion)return;$('mediaLoading').hidden=true;$('videoViewerStatus').textContent='동영상을 재생하지 못했습니다.';$('videoViewerStatus').hidden=false;$('videoViewerRetry').hidden=false;};player.ontimeupdate=()=>{if(version!==viewerVersion||player.currentTime<.08)return;const poster=window.OMSVideoPreview.frame(player);if(!poster)return;videoPosters.set(String(item.id),poster);player.poster=poster;player.ontimeupdate=null;document.querySelectorAll('.chat-video,[data-video-preview]').forEach(holder=>{if(String(holder.dataset.messageId||holder.dataset.videoPreview)!==String(item.id))return;const image=holder.querySelector('.video-poster');if(image){image.src=poster;image.hidden=false;holder.classList.add('has-poster');}});};player.onplaying=()=>{if(version===viewerVersion){$('videoViewerStatus').hidden=true;$('mediaLoading').hidden=true;}};player.load();ensureVideoPoster(item.id).then(poster=>{if(version===viewerVersion&&poster)player.poster=poster;}).catch(()=>{});if(autoplay){try{await player.play();if(version===viewerVersion){$('videoViewerStatus').hidden=true;$('mediaLoading').hidden=true;}}catch{if(version===viewerVersion){$('videoViewerStatus').textContent='재생 버튼을 눌러주세요.';}}}}
+  catch(error){if(version!==viewerVersion)return;$('mediaLoading').hidden=true;$('videoViewerStatus').textContent=error.message||'동영상을 불러오지 못했습니다.';$('videoViewerRetry').hidden=false;}
  }
  function openViewerById(id){const list=photos(),index=list.findIndex(item=>String(item.id)===String(id));if(index<0)return;if($('photoViewer').hidden)history.pushState({...history.state,staffMediaViewer:true},'',location.href);viewerIndex=index;$('photoViewer').hidden=false;document.body.classList.add('media-open');renderViewer(true);$('photoViewerClose').focus();}
- function closeViewer(fromHistory=false){if(document.fullscreenElement){document.exitFullscreen?.().catch(()=>{});}viewerVersion++;viewerMediaId=null;resetVideo();photoZoom.reset();$('photoGallery').hidden=true;$('photoViewer').hidden=true;document.body.classList.remove('media-open');$('photoViewerImage').removeAttribute('src');if(!fromHistory&&history.state?.staffMediaViewer)history.go(history.state.staffMediaGallery?-2:-1);}
+ function closeViewer(fromHistory=false){if(document.fullscreenElement){document.exitFullscreen?.().catch(()=>{});}viewerVersion++;resetVideo();viewerMediaId=null;photoZoom.reset();$('photoGallery').hidden=true;$('photoViewer').hidden=true;document.body.classList.remove('media-open');$('photoViewerImage').removeAttribute('src');if(!fromHistory&&history.state?.staffMediaViewer)history.go(history.state.staffMediaGallery?-2:-1);}
  function moveViewer(step){const next=viewerIndex+step;if(next<0||next>=photos().length)return;viewerIndex=next;renderViewer();}
  function closeGallery(fromHistory=false){$('photoGallery').hidden=true;if(!fromHistory&&history.state?.staffMediaGallery)history.back();}
  function renderGallery(){const list=photos();$('galleryCount').textContent=`${list.length}개`;$('galleryStatus').textContent=list.length?'':'대화에 사진이나 동영상이 없습니다.';$('photoGrid').innerHTML=list.map((item,index)=>`<button type="button" data-gallery-index="${index}" ${isVideo(item)?'data-video-preview="'+e(item.id)+'"':''} aria-label="${index+1}번째 ${isVideo(item)?'동영상':'사진'} 열기">${mediaThumb(item)}<time>${e(new Date(item.created_at).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'}))}</time></button>`).join('');$('photoGrid').querySelectorAll('[data-gallery-index]').forEach(button=>button.onclick=()=>{viewerIndex=Number(button.dataset.galleryIndex);closeGallery();renderViewer();});observePreviews($('photoGrid'));}

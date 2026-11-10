@@ -32,40 +32,49 @@ final class NativeStaffMediaViewer {
     private List<JSONObject> items;
     private int index,version;
     private ExoPlayer player;
+    private NativeStaffChatApi.TransferControl download;
     private boolean closed,galleryOpen;
     NativeStaffMediaViewer(Context c,NativeStaffChatMedia media,String peer,List<JSONObject> source,String id,History history){
         context=c;this.media=media;this.peer=peer;this.history=history;items=new ArrayList<>(source);
         dialog=new Dialog(c,android.R.style.Theme_Black_NoTitleBar_Fullscreen);LinearLayout root=column(c);root.setBackgroundColor(Color.BLACK);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{androidx.core.graphics.Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});
-        LinearLayout header=row(c);TextView close=button(c,"‹","미디어 닫기");title=text(c,"사진 · 동영상",15,Color.WHITE);TextView album=button(c,"▦","사진·동영상 모아보기");header.addView(close);header.addView(title,weighted());header.addView(album);root.addView(header);
+        LinearLayout header=row(c);TextView close=viewerButton(c,"‹","미디어 닫기");title=text(c,"사진 · 동영상",15,Color.WHITE);title.setGravity(Gravity.CENTER);TextView album=viewerButton(c,"▦","사진·동영상 모아보기");header.addView(close);header.addView(title,weighted());header.addView(album);root.addView(header);
         stage=new FrameLayout(c);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
-        gallery=column(c);grid=new GridView(c);grid.setNumColumns(3);grid.setHorizontalSpacing(dp(c,4));grid.setVerticalSpacing(dp(c,4));gallery.addView(grid,new LinearLayout.LayoutParams(-1,0,1));older=button(c,"이전 사진·동영상 더 보기","이전 미디어 더 보기");gallery.addView(older);gallery.setVisibility(View.GONE);root.addView(gallery,new LinearLayout.LayoutParams(-1,0,1));
+        gallery=column(c);grid=new GridView(c);grid.setNumColumns(3);grid.setHorizontalSpacing(dp(c,4));grid.setVerticalSpacing(dp(c,4));gallery.addView(grid,new LinearLayout.LayoutParams(-1,0,1));older=viewerButton(c,"이전 사진·동영상 더 보기","이전 미디어 더 보기");gallery.addView(older);gallery.setVisibility(View.GONE);root.addView(gallery,new LinearLayout.LayoutParams(-1,0,1));
         strip=new HorizontalScrollView(c);strip.setHorizontalScrollBarEnabled(false);thumbs=row(c);strip.addView(thumbs);root.addView(strip,new LinearLayout.LayoutParams(-1,dp(c,66)));
-        LinearLayout navigation=row(c);TextView previous=button(c,"‹","이전 사진 또는 동영상"),next=button(c,"›","다음 사진 또는 동영상");count=text(c,"",12,Color.WHITE);count.setGravity(Gravity.CENTER);navigation.addView(previous);navigation.addView(count,weighted());navigation.addView(next);root.addView(navigation);
+        LinearLayout navigation=row(c);TextView previous=viewerButton(c,"‹","이전 사진 또는 동영상"),next=viewerButton(c,"›","다음 사진 또는 동영상");count=text(c,"",12,Color.WHITE);count.setGravity(Gravity.CENTER);navigation.addView(previous);navigation.addView(count,weighted());navigation.addView(next);root.addView(navigation);
         previous.setOnClickListener(v->move(-1));next.setOnClickListener(v->move(1));close.setOnClickListener(v->{if(galleryOpen)showGallery(false);else dialog.dismiss();});album.setOnClickListener(v->showGallery(!galleryOpen));
         older.setOnClickListener(v->{older.setEnabled(false);older.setText("불러오는 중…");String current=items.get(index).optString("id");history.older(()->{if(closed)return;items=new ArrayList<>(history.items());index=find(current);refreshGallery();older.setEnabled(true);older.setText("이전 사진·동영상 더 보기");});});
         dialog.setContentView(root);dialog.setOnDismissListener(d->{closed=true;version++;release();media.pin(null);});dialog.setOnKeyListener((d,key,event)->{if(key==android.view.KeyEvent.KEYCODE_BACK&&event.getAction()==android.view.KeyEvent.ACTION_UP&&galleryOpen){showGallery(false);return true;}return false;});
         index=find(id);dialog.show();if(dialog.getWindow()!=null)dialog.getWindow().setLayout(-1,-1);render();
     }
+    private TextView viewerButton(Context c,String value,String description){
+        TextView view=text(c,value,value.length()>2?14:30,Color.WHITE);view.setGravity(Gravity.CENTER);view.setPadding(dp(c,8),0,dp(c,8),0);view.setMinWidth(dp(c,48));view.setMinHeight(dp(c,48));view.setBackgroundColor(Color.TRANSPARENT);view.setContentDescription(description);view.setClickable(true);return view;
+    }
+    private void addLoading(MediaLoadingView view){FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);stage.addView(view,params);}
     private int find(String id){for(int i=0;i<items.size();i++)if(id.equals(items.get(i).optString("id")))return i;return 0;}
     private void move(int delta){int next=index+delta;if(next<0||next>=items.size())return;index=next;showGallery(false);render();}
-    private void release(){if(player!=null){player.release();player=null;}}
+    private void release(){if(download!=null){download.stop();download=null;}if(player!=null){player.release();player=null;}}
     private void render(){
         if(closed||items.isEmpty())return;release();final int request=++version;stage.removeAllViews();JSONObject item=items.get(index);String id=item.optString("id");boolean video=item.optString("attachment_type").startsWith("video/");
-        title.setText(video?"동영상":"사진");count.setText((index+1)+" / "+items.size());TextView loading=text(context,"불러오는 중…",14,Color.WHITE);loading.setGravity(Gravity.CENTER);stage.addView(loading,new FrameLayout.LayoutParams(-1,-1));
-        thumbs.removeAllViews();for(int i=Math.max(0,index-10);i<Math.min(items.size(),index+11);i++){final int n=i;JSONObject entry=items.get(i);FrameLayout tile=thumbnail(entry,dp(context,60));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(context,60),dp(context,60));params.setMargins(dp(context,3),dp(context,3),dp(context,3),dp(context,3));tile.setAlpha(i==index?1:.55f);tile.setOnClickListener(v->{index=n;render();});thumbs.addView(tile,params);if(i==index)tile.post(()->strip.smoothScrollTo(Math.max(0,tile.getLeft()-strip.getWidth()/2),0));}
-        media.get(peer,id,new NativeStaffChatMedia.Result(){public void done(File file){
-            if(closed||request!=version)return;media.pin(file);stage.removeAllViews();
+        title.setText(video?"동영상":"사진");count.setText((index+1)+" / "+items.size());MediaLoadingView loading=new MediaLoadingView(context,()->dialog.dismiss());addLoading(loading);
+        thumbs.removeAllViews();for(int i=Math.max(0,index-10);i<Math.min(items.size(),index+11);i++){final int n=i;JSONObject entry=items.get(i);FrameLayout tile=thumbnail(entry,dp(context,60));LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(dp(context,60),dp(context,60));params.setMargins(dp(context,3),dp(context,3),dp(context,3),dp(context,3));tile.setAlpha(i==index?1:.55f);if(i==index){android.graphics.drawable.GradientDrawable outline=new android.graphics.drawable.GradientDrawable();outline.setColor(Color.TRANSPARENT);outline.setStroke(dp(context,2),Color.WHITE);tile.setForeground(outline);}tile.setOnClickListener(v->{index=n;render();});thumbs.addView(tile,params);if(i==index)tile.post(()->strip.smoothScrollTo(Math.max(0,tile.getLeft()-strip.getWidth()/2),0));}
+        download=media.get(peer,id,new NativeStaffChatMedia.Result(){public void progress(long received,long total){if(!closed&&request==version)loading.progress(received,total,video);}
+        public void done(File file){
+            if(closed||request!=version)return;media.pin(file);stage.removeAllViews();loading.preparing(video);
             if(video){
-                PlayerView view=new PlayerView(context);stage.addView(view,new FrameLayout.LayoutParams(-1,-1));player=new ExoPlayer.Builder(context).build();view.setPlayer(player);view.setKeepScreenOn(true);
-                player.addListener(new Player.Listener(){@Override public void onPlayerError(androidx.media3.common.PlaybackException error){if(request==version){loading.setText("재생하지 못했습니다. 눌러서 다시 시도해주세요.");loading.setOnClickListener(v->render());if(loading.getParent()==null)stage.addView(loading,new FrameLayout.LayoutParams(-1,-1));}}});
+                PlayerView view=new PlayerView(context);stage.addView(view,new FrameLayout.LayoutParams(-1,-1));player=new ExoPlayer.Builder(context).build();view.setPlayer(player);view.setKeepScreenOn(true);view.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS);addLoading(loading);
+                player.addListener(new Player.Listener(){
+                    @Override public void onPlaybackStateChanged(int state){if(!closed&&request==version&&state==Player.STATE_READY)stage.removeView(loading);}
+                    @Override public void onPlayerError(androidx.media3.common.PlaybackException error){if(!closed&&request==version){loading.failed("동영상을 재생하지 못했습니다.",()->render());if(loading.getParent()==null)addLoading(loading);}}
+                });
                 final float[] down=new float[2];view.setOnTouchListener((v,event)->{if(event.getPointerCount()!=1)return false;if(event.getActionMasked()==MotionEvent.ACTION_DOWN){down[0]=event.getX();down[1]=event.getY();}else if(event.getActionMasked()==MotionEvent.ACTION_UP&&down[1]<view.getHeight()-dp(context,80)){float dx=event.getX()-down[0],dy=event.getY()-down[1];if(Math.abs(dx)>dp(context,55)&&Math.abs(dx)>Math.abs(dy)*1.5){move(dx<0?1:-1);return true;}}return false;});
                 player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)));player.prepare();if(!galleryOpen)player.play();
             }else{
-                StaffChatZoomImage image=new StaffChatZoomImage(context,NativeStaffMediaViewer.this::move);image.setContentDescription("대화 첨부 사진");stage.addView(image,new FrameLayout.LayoutParams(-1,-1));
-                media.worker.execute(()->{android.graphics.Bitmap bitmap=NativeStaffChatMedia.fullImage(file);image.post(()->{if(!closed&&request==version)image.setImageBitmap(bitmap);});});
+                StaffChatZoomImage image=new StaffChatZoomImage(context,NativeStaffMediaViewer.this::move);image.setContentDescription("대화 첨부 사진");stage.addView(image,new FrameLayout.LayoutParams(-1,-1));addLoading(loading);
+                media.worker.execute(()->{android.graphics.Bitmap bitmap=NativeStaffChatMedia.fullImage(file);image.post(()->{if(!closed&&request==version){if(bitmap!=null){image.setImageBitmap(bitmap);stage.removeView(loading);}else loading.failed("사진을 열지 못했습니다.",()->render());}});});
             }
-        }public void failed(String message){if(!closed&&request==version){loading.setText(message);loading.setOnClickListener(v->render());}}});
+        }public void failed(String message){if(!closed&&request==version){loading.failed(message,()->render());}}});
     }
     private FrameLayout thumbnail(JSONObject item,int size){FrameLayout tile=new FrameLayout(context);ImageView image=new ImageView(context);image.setScaleType(ImageView.ScaleType.CENTER_CROP);tile.addView(image,new FrameLayout.LayoutParams(-1,-1));boolean video=item.optString("attachment_type").startsWith("video/");media.bind(image,peer,item.optString("id"),video);if(video){TextView play=text(context,"▶",18,Color.WHITE);play.setShadowLayer(3,0,1,Color.BLACK);play.setGravity(Gravity.CENTER);tile.addView(play,new FrameLayout.LayoutParams(-1,-1));}tile.setContentDescription(video?"동영상 열기":"사진 열기");return tile;}
     void showGallery(boolean show){galleryOpen=show;if(player!=null)player.pause();stage.setVisibility(show?View.GONE:View.VISIBLE);strip.setVisibility(show?View.GONE:View.VISIBLE);gallery.setVisibility(show?View.VISIBLE:View.GONE);if(show)refreshGallery();}

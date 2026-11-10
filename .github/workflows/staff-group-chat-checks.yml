@@ -26,6 +26,8 @@ jobs:
           node tests/chat-realtime/queue-isolation.cjs
           node tests/chat-realtime/transfer-controls.cjs
           node tests/chat-realtime/transfer-layout.cjs
+          node tests/media-viewer/client.cjs
+          node tests/media-viewer/browser.cjs
           node tests/staff-chat-send-state.cjs
           node tests/staff-chat-native-navigation.cjs
           node tests/notification-checkout/database.cjs
@@ -45,3 +47,4 @@ jobs:
           path: |
             /tmp/oms-group-*.png
             /tmp/oms-transfer-*.png
+            /tmp/oms-media-*.png

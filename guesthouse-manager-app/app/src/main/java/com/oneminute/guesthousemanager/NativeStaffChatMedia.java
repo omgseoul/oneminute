@@ -13,7 +13,8 @@ import java.util.concurrent.*;
 
 /** Private per-session cache. Large attachments are fetched only when a recycled row is visible. */
 final class NativeStaffChatMedia {
-    interface Result {void done(File file);void failed(String message);}
+    interface Result {void done(File file);void failed(String message);default void progress(long received,long total){}}
+    private final ExecutorService downloads=Executors.newSingleThreadExecutor();
     final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService avatars=Executors.newSingleThreadExecutor();
     private final NativeStaffChatApi api;
@@ -41,7 +42,39 @@ final class NativeStaffChatMedia {
         }finally{temp.delete();}
         prune();return file;
     }
-    void get(String peer,String id,Result result){worker.execute(()->{try{File file=file(peer,id);main.post(()->{if(!closed&&api.valid())result.done(file);});}catch(Exception e){main.post(()->{if(!closed)result.failed("첨부 파일을 불러오지 못했습니다. 다시 눌러주세요.");});}});}
+    NativeStaffChatApi.TransferControl get(String peer,String id,Result result){
+        NativeStaffChatApi.TransferControl control=new NativeStaffChatApi.TransferControl();
+        downloads.execute(()->{
+            api.beginTransfer(control);File temp=null;
+            try{
+                control.check();if(!api.valid()||!id.matches("[0-9a-fA-F-]{36}"))throw new IOException("첨부 파일을 확인해주세요.");
+                File file=new File(api.cacheDirectory(),id+".media");
+                if(!file.exists()||file.length()==0){
+                    JSONObject args=new JSONObject().put("peer",peer).put("message_id",id);
+                    JSONObject info=api.chat("download_info",args);int total=info.getInt("byte_length"),partSize=info.getInt("part_size");String mime=info.getString("mime_type");
+                    if(total<3||total>20*1024*1024||partSize!=1048576||!mime.matches("image/jpeg|video/mp4|video/webm"))throw new IOException("첨부 파일을 확인해주세요.");
+                    main.post(()->{if(!closed&&!control.stopped&&api.valid())result.progress(0,total);});
+                    temp=File.createTempFile("download-",".tmp",api.cacheDirectory());long deadline=android.os.SystemClock.elapsedRealtime()+180000;
+                    try(FileOutputStream out=new FileOutputStream(temp)){
+                        int received=0;
+                        for(int part=0;received<total;part++){
+                            control.check();if(android.os.SystemClock.elapsedRealtime()>deadline)throw new IOException("불러오는 시간이 초과되었습니다. 다시 시도해주세요.");
+                            JSONObject chunk=api.chat("download_part",new JSONObject().put("peer",peer).put("message_id",id).put("part_index",part));control.check();
+                            byte[] bytes=Base64.decode(chunk.getString("chunk"),Base64.DEFAULT);
+                            if(chunk.getInt("part_index")!=part||chunk.getInt("byte_length")!=total||!mime.equals(chunk.getString("mime_type"))||bytes.length!=Math.min(partSize,total-received))throw new IOException("첨부 파일을 확인해주세요.");
+                            out.write(bytes);received+=bytes.length;final int done=received;
+                            main.post(()->{if(!closed&&!control.stopped&&api.valid())result.progress(done,total);});
+                        }
+                    }
+                    control.check();if(!api.valid()||closed)throw new IOException("채팅을 다시 열어주세요.");
+                    if(!temp.renameTo(file))throw new IOException("첨부 파일을 저장하지 못했습니다.");
+                }
+                control.check();file.setLastModified(System.currentTimeMillis());
+                main.post(()->{if(!closed&&!control.stopped&&api.valid())result.done(file);});
+            }catch(Exception e){main.post(()->{if(!closed&&!control.stopped)result.failed("첨부 파일을 불러오지 못했습니다.");});}
+            finally{if(temp!=null)temp.delete();api.endTransfer();}
+        });return control;
+    }
     void bind(ImageView image,String peer,String id,boolean video){
         String key=id+(video?":video":":image");image.setTag(key);image.setImageDrawable(null);image.setBackgroundColor(0xffdce8f7);
         Bitmap hit=thumbs.get(key);if(hit!=null){image.setImageBitmap(hit);return;}
@@ -71,5 +104,5 @@ final class NativeStaffChatMedia {
     private static boolean black(Bitmap bitmap){for(int y=1;y<=4;y++)for(int x=1;x<=4;x++){int pixel=bitmap.getPixel(Math.min(bitmap.getWidth()-1,bitmap.getWidth()*x/5),Math.min(bitmap.getHeight()-1,bitmap.getHeight()*y/5));if(Math.max(Color.red(pixel),Math.max(Color.green(pixel),Color.blue(pixel)))>20)return false;}return true;}
     static Bitmap fullImage(File file){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/2048);return BitmapFactory.decodeFile(file.getPath(),o);}
     private void prune(){File[] list=api.cacheDirectory().listFiles();if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
-    void close(){closed=true;worker.shutdownNow();avatars.shutdownNow();thumbs.evictAll();}
+    void close(){closed=true;downloads.shutdownNow();worker.shutdownNow();avatars.shutdownNow();thumbs.evictAll();}
 }

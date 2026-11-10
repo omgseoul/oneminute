@@ -13,7 +13,7 @@ window.omgSupabase={rpc(name,args){
  })();
  return {then:(resolve,reject)=>value.then(resolve,reject),abortSignal(signal){return Promise.race([value,new Promise((resolve,reject)=>{if(signal.aborted)reject(Error('cancelled'));else signal.addEventListener('abort',()=>reject(Error('cancelled')),{once:true});})]);}};
 }};
-HTMLMediaElement.prototype.load=function(){};HTMLMediaElement.prototype.pause=function(){};HTMLMediaElement.prototype.play=function(){return Promise.reject(Error('fixture waits for data'));};
+window.viewerPlayCalls=0;HTMLMediaElement.prototype.load=function(){};HTMLMediaElement.prototype.pause=function(){};HTMLMediaElement.prototype.play=function(){if(this.id==='photoViewerVideo')window.viewerPlayCalls++;return Promise.reject(Error('fixture waits for data'));};
 `;
 const server=http.createServer((req,res)=>{const f=path.join(root,new URL(req.url,'http://local').pathname);try{res.setHeader('content-type',f.endsWith('.js')?'application/javascript':f.endsWith('.css')?'text/css':f.endsWith('.html')?'text/html':f.endsWith('.webp')?'image/webp':'application/octet-stream');res.end(fs.readFileSync(f));}catch{res.writeHead(404);res.end();}});
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;const browser=await chromium.launch();try{for(const width of [320,390,900]){
@@ -30,5 +30,15 @@ const server=http.createServer((req,res)=>{const f=path.join(root,new URL(req.ur
  await page.locator('#mediaLoadingCancel').click();await page.waitForFunction(()=>document.getElementById('photoViewer').hidden);const calls=await page.evaluate(()=>partCalls);
  await page.evaluate(()=>partWaiters.shift()?.());await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>partCalls),calls,'cancel prevents next part');
  assert(await page.locator('#mediaLoading').isHidden());
+ await page.locator('[data-video-load="video"]').click();
+ for(let part=0;part<3;part++){await page.waitForFunction(()=>partWaiters.length===1);await page.evaluate(()=>partWaiters.shift()());}
+ await page.waitForFunction(()=>document.getElementById('photoViewerVideo').getAttribute('src')?.startsWith('blob:'));
+ await page.evaluate(()=>document.getElementById('photoViewerVideo').dispatchEvent(new Event('loadeddata')));
+ assert.equal(await page.evaluate(()=>viewerPlayCalls),0,'opening a video never starts playback');
+ assert(await page.locator('#photoViewerVideo').evaluate(v=>v.paused&&v.controls&&!v.autoplay));
+ await page.locator('#photoPrevious').click();await page.locator('[data-photo-index="1"]').click();
+ await page.waitForFunction(()=>document.getElementById('photoViewerVideo').getAttribute('src')?.startsWith('blob:'));
+ assert.equal(await page.evaluate(()=>viewerPlayCalls),0,'thumbnail selection never starts playback');
+ await page.locator('#photoViewerClose').click();
  console.log('PASS black viewer, bare controls, photo no loader, true 33%, cancellation '+width+'px');await page.close();
  }}finally{await browser.close();server.close();}})().catch(e=>{console.error(e);server.close();process.exitCode=1});

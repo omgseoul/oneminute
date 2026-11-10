@@ -274,6 +274,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         LinearLayout meta=column(this);meta.setTag("message-meta-"+id);meta.setGravity(mine?Gravity.RIGHT:Gravity.LEFT);
         if(!message.has("pending")&&(isGroup()?mine&&message.optInt("unread_count")>0:message.isNull("read_at"))){int count=isGroup()?message.optInt("unread_count"):1;TextView unread=text(this,String.valueOf(count),11,BLUE);unread.setTypeface(null,Typeface.BOLD);unread.setTag("message-unread-"+id);unread.setContentDescription("안 읽은 사람 "+count+"명");meta.addView(unread);}
         TextView time=text(this,date(message.optString("created_at"),true),10,MUTED);time.setSingleLine(true);time.setTag("message-time-"+id);meta.addView(time);
+        if(message.has("pending")&&!"sent".equals(message.optString("pending"))&&!message.optString("attachment_type").startsWith("video/"))addSimpleSendState(meta,message);
         meta.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
         LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-2,-2);mp.gravity=Gravity.BOTTOM;if(mine)mp.rightMargin=dp(this,6);else mp.leftMargin=dp(this,6);
         if(mine)messageLine.addView(meta,mp);
@@ -286,8 +287,15 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         }
         String raw=NativeStaffChatState.CONTRACT.matcher(message.optString("body")).replaceAll("").trim();if(!raw.isEmpty()){TextView body=text(this,"",15,INK);body.setText(NativeShibaStickers.render(this,raw,Math.min(dp(this,120),maxWidth)));body.setContentDescription(NativeShibaStickers.preview(raw));body.setMaxWidth(maxWidth);body.setTextIsSelectable(true);content.addView(body);}
         String contract=NativeStaffChatState.contract(message.optString("body"));if(contract!=null){TextView link=button(this,"근로계약서 확인·서명 ›","근로계약서 확인 및 서명");link.setTextSize(13);content.addView(link);link.setOnClickListener(v->startActivity(new Intent(this,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/contracts.html?id="+Uri.encode(contract)+"&from=notification")).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP)));}
-        if(message.has("pending")&&!"sent".equals(message.optString("pending")))addTransferFooter(content,message,maxWidth);
+        if(message.has("pending")&&!"sent".equals(message.optString("pending"))){if(type.startsWith("video/"))addTransferFooter(content,message,maxWidth);}
         if(!mine)messageLine.addView(meta,mp);return outer;
+    }
+    private void addSimpleSendState(LinearLayout meta,JSONObject message){
+        String status=message.optString("pending"),client=message.optString("client_id");
+        LinearLayout controls=row(this);controls.setTag("simple-send-"+client);
+        TextView state=text(this,"failed".equals(status)?"전송 실패":"paused".equals(status)?"일시정지":"전송 중…",10,"failed".equals(status)?0xffbd354b:MUTED);state.setTag("send-state-"+client);controls.addView(state);
+        if("failed".equals(status)||"paused".equals(status)){TextView retry=text(this,"재시도",11,BLUE);retry.setPadding(dp(this,6),0,dp(this,6),0);retry.setMinHeight(dp(this,40));retry.setContentDescription("재시도");retry.setOnClickListener(v->outbox.retry(client));controls.addView(retry);}
+        TextView cancel=text(this,"×",18,MUTED);cancel.setGravity(Gravity.CENTER);cancel.setContentDescription("전송 취소");cancel.setOnClickListener(v->outbox.cancel(client));controls.addView(cancel,new LinearLayout.LayoutParams(dp(this,40),dp(this,40)));meta.addView(controls);
     }
     private void addTransferFooter(LinearLayout content,JSONObject message,int maxWidth){
         String status=message.optString("pending"),client=message.optString("client_id");boolean failed="failed".equals(status),paused="paused".equals(status);

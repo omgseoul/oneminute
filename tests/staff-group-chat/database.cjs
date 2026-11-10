@@ -57,7 +57,7 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok(!await rpc('verify_notification_worker',['wrong'],'service_role'),'wrong worker secret rejected');
  await assert.rejects(()=>rpc('verify_notification_worker',['test-worker']),/permission denied/);checks++;
  await db.exec('create schema cron;create function cron.schedule(text,text,text) returns int language sql as $$select 1$$;');
- for(const migration of ['20261110012924_chat_attachment_decode_once.sql','20261110013317_staff_chat_chunked_upload.sql','20261110025205_staff_chat_upload_authorization.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
+ for(const migration of ['20261110012924_chat_attachment_decode_once.sql','20261110013317_staff_chat_chunked_upload.sql','20261110025205_staff_chat_upload_authorization.sql','20261110161330_staff_chat_download_progress.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  for(const token of [id(201),id(301),id(302)]){
   const legacy=(await rpc('list_property_messages',[token])).recipients;
   const fast=(await q('select omg_private.staff_chat_recipients($1) recipients',[token]))[0].recipients;
@@ -144,6 +144,23 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok((await call(o,'send',{peer:peer1,body:'video',client_id:uploadId,uploaded:true})).message_id===video.message_id,'final retry creates no duplicate');
  const received=await call(s1,'attachment',{peer:'owner:'+id(21),message_id:video.message_id});
  ok(Buffer.from(received.attachment.split(',')[1],'base64').equals(buffer),'employee receives all administrator video bytes');
+ const info=await call(s1,'download_info',{peer:'owner:'+id(21),message_id:video.message_id});
+ ok(info.byte_length===buffer.length&&info.part_size===1048576,'exact byte count before download');
+ const parts=[];for(let i=0;i<20;i++){const part=await call(s1,'download_part',{peer:'owner:'+id(21),message_id:video.message_id,part_index:i});parts.push(Buffer.from(part.chunk,'base64'));ok(part.part_index===i&&part.byte_length===buffer.length,'bounded download metadata');}
+ ok(Buffer.concat(parts).equals(buffer),'downloaded chunks exactly match original 20MiB');
+ for(const action of ['download_info','download_part']){
+  await assert.rejects(()=>call(id(999),action,{peer:peer1,message_id:video.message_id,part_index:0}),/로그인/);checks++;
+  await assert.rejects(()=>call(s2,action,{peer:'owner:'+id(21),message_id:video.message_id,part_index:0}),/접근/);checks++;
+  await assert.rejects(()=>call(s1,action,{peer:peer2,message_id:video.message_id,part_index:0}),/접근/);checks++;
+ }
+ for(const part_index of [-1,20,null]){await assert.rejects(()=>call(s1,'download_part',{peer:'owner:'+id(21),message_id:video.message_id,part_index}),/범위/);checks++;}
+ // Group metadata obeys current membership on EVERY part, including after leaving.
+ const groupDownload=(await call(o,'create_group',{peers:[peer1,peer2],client_id:id(899)})).peer;
+ const groupMedia=await call(o,'send',{peer:groupDownload,body:'photo',client_id:id(898),photo:'data:image/jpeg;base64,/9j/AA=='});
+ ok((await call(s1,'download_info',{peer:groupDownload,message_id:groupMedia.message_id})).byte_length===4,'group member sees exact metadata');
+ ok(Buffer.from((await call(s1,'download_part',{peer:groupDownload,message_id:groupMedia.message_id,part_index:0})).chunk,'base64').length===4,'last partial part returned');
+ await call(s1,'leave',{peer:groupDownload});
+ await assert.rejects(()=>call(s1,'download_part',{peer:groupDownload,message_id:groupMedia.message_id,part_index:0}),/접근/);checks++;
  const staffUpload=id(803),staffPeer='owner:'+id(21);
  for(let i=0;i<20;i++)await rpc('staff_chat_upload_chunk',[s1,staffUpload,staffPeer,'video/mp4',i,20,buffer.subarray(i*1048576,(i+1)*1048576).toString('base64')]);
  const staffVideo=await call(s1,'send',{peer:staffPeer,body:'staff video',client_id:staffUpload,uploaded:true});

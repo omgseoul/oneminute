@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>메세지</title>
   <link rel="stylesheet" href="guest-support.css?v=20261001-compact">
-  <link rel="stylesheet" href="staff-chat.css?v=20261110-transfer-controls">
+  <link rel="stylesheet" href="staff-chat.css?v=20261111-media-fix">
   <link rel="stylesheet" href="home-link.css?v=20261001">
   <link rel="stylesheet" href="top-layout.css?v=20261005b">
 <style>.chat-video{position:relative;width:min(220px,62vw);height:132px;margin:3px 0 6px;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#243d5c,#7793b1)}.chat-video .video-poster,.chat-video video{position:absolute;inset:0;display:block;width:100%;height:100%;border-radius:0;background:#111}.chat-video .video-poster{object-fit:cover}.chat-video video{object-fit:contain}.chat-video img[hidden],.chat-video video[hidden],.chat-video button[hidden]{display:none!important}.chat-video button{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;padding:0;border:0;border-radius:0;background:linear-gradient(180deg,#0001,#0005);color:#fff;cursor:pointer}.chat-video .video-play{display:grid;place-items:center;width:46px;height:46px;padding-left:3px;border-radius:50%;background:#f4f9ff;color:#2467bd;font-size:22px;box-shadow:0 2px 12px #0003}.chat-video .video-label{font-size:12px;font-weight:850;text-shadow:0 1px 4px #0008}.staff-contract-link{display:block;margin-top:12px;padding:10px 12px;border:1px solid #c5d8f0;border-radius:10px;background:#fff;color:#2467bd;text-decoration:none;font-weight:750}</style><link rel="stylesheet" href="photo-viewer-zoom.css?v=20261018-media"><link rel="stylesheet" href="message-profiles.css?v=20261109-person-profile"></head>
@@ -52,11 +52,11 @@
       <button id="photoGalleryOpen" class="viewer-icon grid-icon" type="button" aria-label="사진·동영상 모아보기"><i></i><i></i><i></i><i></i></button>
     </header>
     <div id="photoStage" class="photo-stage">
-      <button id="photoPrevious" class="photo-arrow previous" type="button" aria-label="이전 사진 또는 동영상">‹</button>
-      <img id="photoViewerImage" alt="대화 첨부 사진"><video id="photoViewerVideo" controls playsinline preload="metadata" hidden></video><p id="videoViewerStatus" class="video-viewer-status" role="status" hidden></p><button id="videoViewerRetry" class="video-viewer-retry" type="button" hidden>다시 불러오기</button><button id="videoFullscreen" class="video-fullscreen" type="button" aria-label="동영상 화면 확대" aria-pressed="false" hidden>⛶</button>
-      <button id="photoNext" class="photo-arrow next" type="button" aria-label="다음 사진 또는 동영상">›</button>
+
+      <div id="mediaLoading" class="media-loading indeterminate" role="progressbar" aria-label="동영상 불러오기" aria-valuemin="0" aria-valuemax="100" hidden><div class="media-ring"><svg viewBox="0 0 104 104" aria-hidden="true"><circle class="ring-track" cx="52" cy="52" r="45"/><circle id="mediaProgress" cx="52" cy="52" r="45"/></svg><strong id="mediaPercent"></strong></div><strong id="mediaLoadingLabel">동영상 불러오는 중</strong><span id="mediaLoadingBytes"></span><button type="button" id="mediaLoadingCancel">취소</button></div><img id="photoViewerImage" alt="대화 첨부 사진"><video id="photoViewerVideo" controls playsinline preload="metadata" hidden></video><p id="videoViewerStatus" class="video-viewer-status" role="status" hidden></p><button id="videoViewerRetry" class="video-viewer-retry" type="button" hidden>다시 불러오기</button><button id="videoFullscreen" class="video-fullscreen" type="button" aria-label="동영상 화면 확대" aria-pressed="false" hidden>⛶</button>
+
     </div>
-    <footer class="photo-viewer-foot"><div id="photoThumbs" class="photo-thumbs"></div><strong id="photoCount"></strong></footer>
+    <footer class="photo-viewer-foot"><div id="photoThumbs" class="photo-thumbs"></div><nav class="media-navigation"><button id="photoPrevious" class="photo-arrow previous" type="button" aria-label="이전 사진 또는 동영상">‹</button><strong id="photoCount"></strong><button id="photoNext" class="photo-arrow next" type="button" aria-label="다음 사진 또는 동영상">›</button></nav></footer>
   </section>
 
   <section id="photoGallery" class="photo-gallery" hidden aria-modal="true" role="dialog" aria-label="사진·동영상 모아보기">
@@ -69,7 +69,7 @@
   <script src="supabase-config.js"></script><script src="supabase-client.js"></script>
   <script src="notification-config.js"></script><script src="notification-client.js"></script>
   <script src="photo-codec.js?v=20261014-100mb"></script><script src="guest-support-client.js?v=20261001-ui"></script>
-  <script src="shiba-stickers.js?v=20261019"></script><script src="chat-live.js?v=20261020"></script><script src="chat-outbox.js?v=20261110-transfer-controls"></script><script src="staff-chat-client.js?v=20261110-transfer-controls"></script><script src="photo-viewer-zoom.js?v=20261018-media"></script><script src="chat-video-preview.js?v=20261018"></script><script src="message-profiles.js?v=20261109-person-profile"></script><script src="staff-chat.js?v=20261110-transfer-controls"></script>
+  <script src="shiba-stickers.js?v=20261019"></script><script src="chat-live.js?v=20261020"></script><script src="chat-outbox.js?v=20261111-media-fix"></script><script src="staff-chat-client.js?v=20261111-media-fix"></script><script src="photo-viewer-zoom.js?v=20261018-media"></script><script src="chat-video-preview.js?v=20261018"></script><script src="message-profiles.js?v=20261109-person-profile"></script><script src="staff-chat.js?v=20261111-media-fix"></script>
 <script src="staff-chat-emoji.js?v=20261019"></script>
 </body>
 </html>

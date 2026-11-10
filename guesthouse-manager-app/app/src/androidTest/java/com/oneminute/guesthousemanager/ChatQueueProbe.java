@@ -50,7 +50,7 @@ final class ChatQueueProbe {
    box.cancel(id);check(box.rows("room-a").stream().noneMatch(row->id.equals(row.optString("client_id"))),"cancel removes failed row");
    box.enqueue("room-a","stalled text","normal",null,"");check(textEntered.await(5,TimeUnit.SECONDS),"text starts");
    box.enqueue("room-b","other text","normal",null,"");check(otherTextSent.await(5,TimeUnit.SECONDS),"other room text bypasses stalled text");releaseText.countDown();
-   NativeStaffChatApi.clearLocal(context);TransferControlsProbe.verify(context);result.putString("oms_chat_queue","ok");instrument.finish(-1,result);
+   NativeStaffChatApi.clearLocal(context);TransferControlsProbe.verify(context);MediaDownloadProbe.verify(context);result.putString("oms_chat_queue","ok");instrument.finish(-1,result);
   }catch(Throwable error){result.putString("oms_chat_queue","failed: "+error);instrument.finish(0,result);}
   finally{release.countDown();releaseText.countDown();NativeChatOutbox.clearInstances();}
  }

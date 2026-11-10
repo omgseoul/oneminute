@@ -6,6 +6,7 @@
   function transaction(mode,fn){return new Promise((resolve,reject)=>{const tx=db.transaction('messages',mode);fn(tx.objectStore('messages'));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
   const all=await new Promise((resolve,reject)=>{const q=db.transaction('messages').objectStore('messages').getAll();q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
   entries=all.filter(e=>e.scope===scope).sort((a,b)=>a.created_at.localeCompare(b.created_at));
+  let lastCreatedAt=entries.reduce((latest,e)=>Math.max(latest,Date.parse(e.created_at)||0),0);
   async function save(item){await transaction('readwrite',s=>s.put(item));}
   for(const item of entries)if(['sending','saving'].includes(item.status)){item.status='failed';item.error='전송이 중단되었습니다. 재시도를 눌러주세요.';await save(item);}
   const lane=item=>(item.photo?'media:':'text:')+item.peer;
@@ -28,7 +29,7 @@
   }
   const api={
    items(peer){return entries.filter(e=>e.peer===peer&&e.status!=='cancelled');},
-   async enqueue(item){const value={...item,scope,status:'queued',created_at:new Date().toISOString(),client_id:crypto.randomUUID()};await save(value);entries.push(value);changed();pump();return value;},
+   async enqueue(item){lastCreatedAt=Math.max(Date.now(),lastCreatedAt+1);const value={...item,scope,status:'queued',created_at:new Date(lastCreatedAt).toISOString(),client_id:crypto.randomUUID()};await save(value);entries.push(value);changed();pump();return value;},
    async acknowledge(messages){const ids=new Set(messages.map(m=>m.client_id).filter(Boolean)),server=new Set(messages.map(m=>m.id));const done=entries.filter(e=>!transfers.has(e.client_id)&&(ids.has(e.client_id)||server.has(e.message_id)));if(!done.length)return;await transaction('readwrite',s=>done.forEach(e=>s.delete(e.client_id)));entries=entries.filter(e=>!done.includes(e));changed();},
    async retry(id){const item=entries.find(e=>e.client_id===id&&['failed','paused'].includes(e.status));if(!item)return;item.status='queued';delete item.upload_percent;try{await save(item);}catch(error){item.status='failed';throw error;}changed();pump();},
    async pause(id){const item=entries.find(e=>e.client_id===id&&['queued','sending','saving'].includes(e.status));if(!item)return;item.status='paused';transfers.get(id)?.abort();await save(item);changed();pump();},

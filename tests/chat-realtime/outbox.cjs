@@ -4,6 +4,7 @@ function windowFor(){const w=new JSDOM('',{url:'https://omgworks24.com',runScrip
 (async()=>{
  const a=windowFor();Object.defineProperty(a.navigator,'onLine',{value:false,configurable:true});let calls=[];
  const first=await a.OMSChatOutbox.open('account-a',async()=>{throw Error('offline')},()=>{});
+ a.Date.now=()=>1794326400000; // Same clock tick must preserve enqueue order after IndexedDB reload.
  await first.enqueue({peer:'peer-a',body:'one'});await first.enqueue({peer:'peer-a',body:'two'});const ids=first.items('peer-a').map(x=>x.client_id);first.close();a.close();
  const b=windowFor(),reopened=await b.OMSChatOutbox.open('account-a',async item=>{calls.push(item.body);return {message_id:item.client_id,message:{id:item.client_id,client_id:item.client_id}}},()=>{});
  await wait(()=>calls.length===2);assert.deepEqual(calls,['one','two']);assert.deepEqual(Array.from(reopened.items('peer-a'),x=>x.client_id),Array.from(ids));

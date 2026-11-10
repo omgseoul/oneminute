@@ -49,7 +49,7 @@ public final class LargeVideoProbe {
       }catch(AssertionError e){error.set(e);throw new IOException(e);}
      }
      @Override JSONObject chat(String action,JSONObject args)throws Exception{
-      try{check(args.optBoolean("uploaded")&&!args.has("photo"),"small final request");check(Arrays.equals(expected,hash(received)),"received bytes match");sent.countDown();return new JSONObject().put("ok",true).put("message_id",UUID.randomUUID().toString());}
+      try{check(args.optBoolean("uploaded")&&!args.has("photo"),"small final request");check(Arrays.equals(expected,LargeVideoProbe.hash(received)),"received bytes match");sent.countDown();return new JSONObject().put("ok",true).put("message_id",UUID.randomUUID().toString());}
       catch(AssertionError e){error.set(e);sent.countDown();throw new IOException(e);}
      }
     };

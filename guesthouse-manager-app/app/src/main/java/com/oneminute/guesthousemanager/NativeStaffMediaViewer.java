@@ -69,7 +69,7 @@ final class NativeStaffMediaViewer {
                     @Override public void onPlayerError(androidx.media3.common.PlaybackException error){if(!closed&&request==version){loading.failed("동영상을 재생하지 못했습니다.",()->render());if(loading.getParent()==null)addLoading(loading);}}
                 });
                 final float[] down=new float[2];view.setOnTouchListener((v,event)->{if(event.getPointerCount()!=1)return false;if(event.getActionMasked()==MotionEvent.ACTION_DOWN){down[0]=event.getX();down[1]=event.getY();}else if(event.getActionMasked()==MotionEvent.ACTION_UP&&down[1]<view.getHeight()-dp(context,80)){float dx=event.getX()-down[0],dy=event.getY()-down[1];if(Math.abs(dx)>dp(context,55)&&Math.abs(dx)>Math.abs(dy)*1.5){move(dx<0?1:-1);return true;}}return false;});
-                player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)));player.prepare();if(!galleryOpen)player.play();
+                player.setPlayWhenReady(false);player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)));player.prepare();view.showController();
             }else{
                 StaffChatZoomImage image=new StaffChatZoomImage(context,NativeStaffMediaViewer.this::move);image.setContentDescription("대화 첨부 사진");stage.addView(image,new FrameLayout.LayoutParams(-1,-1));addLoading(loading);
                 media.worker.execute(()->{android.graphics.Bitmap bitmap=NativeStaffChatMedia.fullImage(file);image.post(()->{if(!closed&&request==version){if(bitmap!=null){image.setImageBitmap(bitmap);stage.removeView(loading);}else loading.failed("사진을 열지 못했습니다.",()->render());}});});

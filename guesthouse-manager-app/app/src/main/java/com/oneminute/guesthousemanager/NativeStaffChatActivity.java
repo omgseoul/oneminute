@@ -292,6 +292,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     }
     private void addSimpleSendState(LinearLayout meta,JSONObject message){
         String status=message.optString("pending"),client=message.optString("client_id");
+        if(!"failed".equals(status)&&!"paused".equals(status))return;
         LinearLayout controls=row(this);controls.setTag("simple-send-"+client);
         TextView state=text(this,"failed".equals(status)?"전송 실패":"paused".equals(status)?"일시정지":"전송 중…",10,"failed".equals(status)?0xffbd354b:MUTED);state.setTag("send-state-"+client);controls.addView(state);
         if("failed".equals(status)||"paused".equals(status)){TextView retry=text(this,"재시도",11,BLUE);retry.setPadding(dp(this,6),0,dp(this,6),0);retry.setMinHeight(dp(this,40));retry.setContentDescription("재시도");retry.setOnClickListener(v->outbox.retry(client));controls.addView(retry);}

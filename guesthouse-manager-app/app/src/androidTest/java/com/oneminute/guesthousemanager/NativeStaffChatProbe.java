@@ -65,12 +65,12 @@ public final class NativeStaffChatProbe {
             check(fake.readThrough!=null&&fake.historyUnread==0,"room cursor reads older incoming history above our outgoing stickers");
             fake.downloadGate=new java.util.concurrent.CountDownLatch(1);
             ui(()->{Method open=activity.getClass().getDeclaredMethod("openMedia",String.class);open.setAccessible(true);open.invoke(activity,VIDEO);return null;});
-            waitFor(()->{FrameLayout stage=(FrameLayout)field(field(activity,"viewer"),"stage");return stage.findViewWithTag("media-loading")!=null;});
-            capture("native-media-loading.png");fake.downloadGate.countDown();
+            waitFor(()->{FrameLayout stage=(FrameLayout)field(field(activity,"viewer"),"stage");View loading=stage.findViewWithTag("media-loading");return loading!=null&&String.valueOf(loading.getContentDescription()).contains("0%");});
+            instrumentation.waitForIdleSync();Thread.sleep(350);capture("native-media-loading.png");fake.downloadGate.countDown();
             waitFor(()->{Object viewer=field(activity,"viewer");ExoPlayer player=(ExoPlayer)field(viewer,"player");return player!=null&&player.getPlaybackState()==Player.STATE_READY&&player.getVideoSize().width>0&&player.getCurrentPosition()>100;});
             ui(()->{Object viewer=field(activity,"viewer");((NativeStaffMediaViewer)viewer).pause();ExoPlayer player=(ExoPlayer)field(viewer,"player");check(!player.getPlayWhenReady(),"background pause");Method move=viewer.getClass().getDeclaredMethod("move",int.class);move.setAccessible(true);move.invoke(viewer,-1);check(field(viewer,"player")==null,"switching to a photo releases the video player");return null;});
-            waitFor(()->{FrameLayout stage=(FrameLayout)field(field(activity,"viewer"),"stage");return stage.getChildAt(0) instanceof StaffChatZoomImage&&((ImageView)stage.getChildAt(0)).getDrawable()!=null;});
-            capture("native-media-photo.png");
+            waitFor(()->{FrameLayout stage=(FrameLayout)field(field(activity,"viewer"),"stage");return stage.findViewWithTag("media-loading")==null&&stage.getChildAt(0) instanceof StaffChatZoomImage&&((ImageView)stage.getChildAt(0)).getDrawable()!=null;});
+            instrumentation.waitForIdleSync();Thread.sleep(350);capture("native-media-photo.png");
             ui(()->{((NativeStaffMediaViewer)field(activity,"viewer")).dismiss();((EditText)field(activity,"input")).setText("이모지를 선택해보세요");if(((GridView)field(activity,"emojis")).getVisibility()!=View.VISIBLE)((ImageButton)field(activity,"emoji")).performClick();return null;});
             Thread.sleep(400);Bitmap screenshot=instrumentation.getUiAutomation().takeScreenshot();try(FileOutputStream out=new FileOutputStream(new File(c.getFilesDir(),"native-chat-probe.png"))){screenshot.compress(Bitmap.CompressFormat.PNG,100,out);}screenshot.recycle();
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitFor(()->((GridView)field(activity,"emojis")).getVisibility()==View.GONE);

@@ -15,6 +15,7 @@ import java.util.concurrent.*;
 final class NativeStaffChatMedia {
     interface Result {void done(File file);void failed(String message);}
     final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final ExecutorService avatars=Executors.newSingleThreadExecutor();
     private final NativeStaffChatApi api;
     private final Handler main=new Handler(Looper.getMainLooper());
     private final LruCache<String,Bitmap> thumbs=new LruCache<String,Bitmap>(8*1024*1024){@Override protected int sizeOf(String k,Bitmap b){return b.getAllocationByteCount();}};
@@ -44,6 +45,7 @@ final class NativeStaffChatMedia {
     void bind(ImageView image,String peer,String id,boolean video){
         String key=id+(video?":video":":image");image.setTag(key);image.setImageDrawable(null);image.setBackgroundColor(0xffdce8f7);
         Bitmap hit=thumbs.get(key);if(hit!=null){image.setImageBitmap(hit);return;}
+        if(video&&!new File(api.cacheDirectory(),id+".media").exists())return;
         image.post(()->{if(closed)return;worker.execute(()->{
             if(closed||!image.isAttachedToWindow()||!key.equals(image.getTag()))return;
             try{Bitmap bitmap=thumbnail(file(peer,id),video);if(bitmap==null)return;thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}catch(Exception ignored){/* The row remains a tappable retry placeholder. */}
@@ -52,7 +54,7 @@ final class NativeStaffChatMedia {
     void avatar(ImageView image,String data){
         image.setImageDrawable(null);if(data==null||!data.startsWith("data:image/")||data.length()>2200000)return;
         final String key="avatar:"+NativeStaffChatApi.hash(data);image.setTag(key);Bitmap hit=thumbs.get(key);if(hit!=null){image.setImageBitmap(hit);return;}
-        image.post(()->{if(closed)return;worker.execute(()->{if(closed||!key.equals(image.getTag()))return;try{int comma=data.indexOf(',');if(comma<0)return;byte[] bytes=Base64.decode(data.substring(comma+1),Base64.DEFAULT);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/128);Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);if(bitmap!=null){thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}}catch(Exception ignored){}});});
+        image.post(()->{if(closed)return;avatars.execute(()->{if(closed||!key.equals(image.getTag()))return;try{int comma=data.indexOf(',');if(comma<0)return;byte[] bytes=Base64.decode(data.substring(comma+1),Base64.DEFAULT);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/128);Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);if(bitmap!=null){thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}}catch(Exception ignored){}});});
     }
     static Bitmap thumbnail(File file,boolean video)throws Exception {
         if(!video){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/480);return BitmapFactory.decodeFile(file.getPath(),options);}
@@ -69,5 +71,5 @@ final class NativeStaffChatMedia {
     private static boolean black(Bitmap bitmap){for(int y=1;y<=4;y++)for(int x=1;x<=4;x++){int pixel=bitmap.getPixel(Math.min(bitmap.getWidth()-1,bitmap.getWidth()*x/5),Math.min(bitmap.getHeight()-1,bitmap.getHeight()*y/5));if(Math.max(Color.red(pixel),Math.max(Color.green(pixel),Color.blue(pixel)))>20)return false;}return true;}
     static Bitmap fullImage(File file){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/2048);return BitmapFactory.decodeFile(file.getPath(),o);}
     private void prune(){File[] list=api.cacheDirectory().listFiles();if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
-    void close(){closed=true;worker.shutdownNow();thumbs.evictAll();}
+    void close(){closed=true;worker.shutdownNow();avatars.shutdownNow();thumbs.evictAll();}
 }

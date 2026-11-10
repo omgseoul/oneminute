@@ -72,6 +72,10 @@ public class MessageAlertActivity extends AppCompatActivity {
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         if (message == null || message.trim().isEmpty()) message = "메세지 메뉴에서 확인해주세요.";
 
+        // Notices require one authoritative web response form, not an extra arrival card.
+        if ("announcement".equals(messageType) || "attendance_warning".equals(messageType)) {
+            openMessages(); return;
+        }
         ReminderPopup reminder=ReminderPopup.parse(message,sender);
         if(reminder!=null){buildReminderScreen(reminder);return;}
         FrameLayout shade = new FrameLayout(this);
@@ -234,6 +238,7 @@ public class MessageAlertActivity extends AppCompatActivity {
                 + (alertId == null || alertId.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(alertId));
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse(messageUrl))
+                .putExtra("centralNotice", "announcement".equals(getIntent().getStringExtra("messageType")) || "attendance_warning".equals(getIntent().getStringExtra("messageType")))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
                         | Intent.FLAG_ACTIVITY_SINGLE_TOP);

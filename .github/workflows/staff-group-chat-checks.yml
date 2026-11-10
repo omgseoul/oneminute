@@ -1,7 +1,7 @@
 name: Verify staff group conversations
 on:
   pull_request:
-    paths: ['supabase/functions/dispatch-notification/**', 'supabase/tests/push-handler.test.mjs', 'supabase/migrations/*notification_worker_auth.sql', 'home-message-queue.js', 'report.html', 'oms-dog-*-plain.webp', 'app.html', 'apk-download.js', 'message-profiles.js', 'tests/home-version/**', 'tests/attendance-nfc/home-bootstrap.cjs', 'staff-chat*', 'message-hub.js', 'assets/staff-group-avatar.svg', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'supabase/migrations/*group_member_profiles.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
+    paths: ['central-notices.css', 'attendance-warning-response.js', 'attendance.html', 'attendance-export.js', 'dialog-cards.js', 'supabase/migrations/*central_attendance_responses.sql', 'supabase/migrations/*chat_attachment_decode_once.sql', 'supabase/migrations/*staff_chat_chunked_upload.sql', 'tests/central-notices/**', 'supabase/functions/dispatch-notification/**', 'supabase/tests/push-handler.test.mjs', 'supabase/migrations/*notification_worker_auth.sql', 'home-message-queue.js', 'report.html', 'oms-dog-*-plain.webp', 'app.html', 'apk-download.js', 'message-profiles.js', 'tests/home-version/**', 'tests/attendance-nfc/home-bootstrap.cjs', 'staff-chat*', 'message-hub.js', 'assets/staff-group-avatar.svg', 'messages.html', 'reminder-settings.js', 'login.html', 'supabase/migrations/*staff_group_conversations.sql', 'supabase/migrations/*group_member_profiles.sql', 'tests/staff-group-chat/**', '.github/workflows/staff-group-chat-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +24,11 @@ jobs:
           node tests/staff-chat-receipts.cjs
           node tests/staff-chat-send-state.cjs
           node tests/staff-chat-native-navigation.cjs
+          node tests/notification-checkout/database.cjs
+          node tests/notice-responses-owner-completion.cjs
+          node tests/central-notices/browser.cjs
+          node tests/central-notices/video-client.cjs
+          node tests/attendance-ui.cjs
           node tests/notification-checkout/web.cjs
           node tests/notification-checkout/browser.cjs
           node tests/notification-checkout/report-flow.cjs

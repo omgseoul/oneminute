@@ -76,5 +76,38 @@ await rpc('save_attendance_warning_rules',[ownerToken,[{...base,comparison:'earl
 ok((await one("select omg_private.pending_checkout_warnings($1,'2026-11-06T20:50:00Z') w",[session.id])).w.length===1,'overnight early threshold included');ok((await one("select omg_private.pending_checkout_warnings($1,'2026-11-06T20:51:00Z') w",[session.id])).w.length===0,'inside overnight threshold omitted');
 const text=(await one("select omg_private.reminder_popup_text('todo','냉장고 정리','2026-11-05T15:30Z','Asia/Seoul','2026-11-06T15:01Z') t")).t;
 ok(text.includes('1일 지연: 냉장고 정리')&&text.includes('마감: 2026-11-06 00:30'),'reminder dates use property timezone');
+
+// New responses and remarks: same session/day, server validation and private storage.
+await db.exec(`alter table property_message_recipients add id uuid default gen_random_uuid(),add acknowledged_at timestamptz,add acknowledged_name text,add acknowledged_understood boolean;
+alter table property_messages add require_signature boolean default true,add require_understanding boolean default true;
+alter table attendance_adjustment_requests add requested_at timestamptz default now();`);
+await db.exec(fs.readFileSync('supabase/migrations/20261110012818_central_attendance_responses.sql','utf8'));
+const warningId=randomUUID();
+await db.query("insert into property_messages(id,message_type,message) values($1,'attendance_warning','경고')",[warningId]);
+await db.query("insert into property_message_recipients(message_id,employee_id) values($1,$2)",[warningId,e.id]);
+await db.query("insert into attendance_warning_deliveries(work_session_id,message_id,event_type) values($1,$2,'clock_in')",[session.id,warningId]);
+ok(!(await rpc('respond_attendance_warning',[other,warningId,true,''])).ok,'invalid token denied');
+ok(!(await rpc('respond_attendance_warning',[token,warningId,null,'사유입니다'])).ok,'selection required by server');
+ok(!(await rpc('respond_attendance_warning',[token,warningId,false,'두자'])).ok,'two characters rejected');
+ok(!(await rpc('respond_attendance_warning',[token,warningId,false,'   '])).ok,'spaces rejected');
+ok(!(await rpc('respond_attendance_warning',[token,warningId,false,'가'.repeat(501)])).ok,'overlong reason rejected');
+ok(!(await rpc('acknowledge_announcement',[token,warningId,e.display_name,true])).ok,'old acknowledgement cannot bypass reason');
+ok((await rpc('respond_attendance_warning',[token,warningId,false,'교통 지연으로 늦었습니다'])).ok,'reason accepted');
+ok((await rpc('respond_attendance_warning',[token,warningId,true,''])).ok,'response retry succeeds');
+let remark=(await one('select omg_private.attendance_warning_remark($1) value',[session.id])).value;
+ok(remark==='출근: 교통 지연으로 늦었습니다','first response preserved on retry');
+let stats=await rpc('list_attendance_statistics',[token,'2026-11-06','2026-11-06']);
+ok(stats.sessions[0].attendance_remark===remark,'original work day carries reason');
+await db.exec('set role anon');await assert.rejects(()=>db.query('select * from omg_private.attendance_warning_responses'),/permission denied/);checks++;await db.exec('reset role');
+await db.query("update work_sessions set work_date=(clock_timestamp() at time zone 'Asia/Seoul')::date where id=$1",[session.id]);
+await db.query("update employees set scheduled_clock_in='00:01',scheduled_clock_out='00:02'");
+await rpc('save_attendance_warning_rules',[ownerToken,[{...base,before_checkout:true}]]);w=(await rpc('preview_checkout_warnings',[token])).warnings[0];
+ok(!(await rpc('respond_checkout_warning',[token,w.rule_id,w.rule_updated_at,false,'두자'])).ok,'checkout short reason rejected');
+ok((await rpc('respond_checkout_warning',[token,w.rule_id,w.rule_updated_at,true,'ignored'])).ok,'checkout agreement accepted');
+remark=(await one('select omg_private.attendance_warning_remark($1) value',[session.id])).value;
+ok(remark.includes('퇴근: 관리자와 기존협의 완료'),'checkout agreement in remarks');
+ok((await rpc('preview_checkout_warnings',[token])).warnings.length===0,'valid response clears warning');
+const noticeId=randomUUID();await db.query("insert into property_messages(id,message_type,message) values($1,'announcement','공지')",[noticeId]);await db.query('insert into property_message_recipients(message_id,employee_id) values($1,$2)',[noticeId,e.id]);
+ok(!(await rpc('acknowledge_announcement',[token,noticeId,e.display_name,false])).ok,'notice checkbox preserved');ok((await rpc('acknowledge_announcement',[token,noticeId,e.display_name,true])).ok,'notice signature preserved');
 console.log('PASS '+checks+' checkout database assertions');await db.close();
 })().catch(async e=>{console.error(e.message,e.code,e.position,e.where);if(e.query&&e.position)console.error(e.query.slice(Number(e.position)-150,Number(e.position)+150));await db.close();process.exitCode=1});

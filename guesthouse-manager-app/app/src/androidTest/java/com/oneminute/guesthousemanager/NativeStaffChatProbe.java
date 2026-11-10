@@ -41,7 +41,7 @@ public final class NativeStaffChatProbe {
     private static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
     private void verify()throws Exception{
         Context c=instrumentation.getTargetContext();c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
-        verifyUploads(c);
+        verifyUploads(c);verifyChunkedUpload(c);
         NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);fake.onlyOutgoing=true;NativeMessageBadge.loader=ignored->fake.historyUnread;NativeMessageBadge.fromWeb(context,TOKEN,12);return fake;};
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
@@ -383,6 +383,32 @@ public final class NativeStaffChatProbe {
         ui(()->{Field f=activity.getClass().getDeclaredField("outbox");f.setAccessible(true);f.set(activity,recovered);recovered.observe((Runnable)field(activity,"outboxChanged"));fake.blockSend=false;recovered.retry(client);return null;});
         stage="recovered queue delivered";waitFor(()->fake.saved.contains(client));
         check(fake.saved.size()==2,"disk recovery delivers exactly one additional message");
+    }
+    private void verifyChunkedUpload(Context c)throws Exception {
+        final java.util.concurrent.CountDownLatch done=new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicInteger bytes=new java.util.concurrent.atomic.AtomicInteger();
+        final Set<Integer> parts=java.util.Collections.synchronizedSet(new HashSet<>());
+        final java.util.concurrent.atomic.AtomicBoolean loseReply=new java.util.concurrent.atomic.AtomicBoolean(true);
+        NativeStaffChatApi chunkApi=new NativeStaffChatApi(c){
+            @Override JSONObject rpc(String name,JSONObject args)throws Exception {
+                check("staff_chat_upload_chunk".equals(name),"video uses chunk endpoint");
+                byte[] data=Base64.decode(args.getString("p_chunk"),Base64.DEFAULT);
+                check(data.length<=1048576,"request bounded to 1MiB");
+                int part=args.getInt("p_part_index");if(parts.add(part))bytes.addAndGet(data.length);
+                if(part==5&&loseReply.getAndSet(false))throw new IOException("Simulated lost chunk response");
+                return new JSONObject().put("ok",true);
+            }
+            @Override JSONObject chat(String action,JSONObject args)throws Exception {
+                check(args.optBoolean("uploaded")&&!args.has("photo"),"final request contains no large base64");
+                check(bytes.get()==20971520&&parts.size()==20,"all 20MiB received");done.countDown();
+                return new JSONObject().put("ok",true).put("message_id",args.getString("client_id"));
+            }
+        };
+        File video=new File(c.getCacheDir(),"chunk-test.mp4");try(RandomAccessFile f=new RandomAccessFile(video,"rw")){f.setLength(20971520);f.seek(4);f.writeBytes("ftyp");}
+        NativeChatOutbox.clearInstances();NativeStaffChatApi.clearLocal(c);
+        NativeChatOutbox box=NativeChatOutbox.get(c,chunkApi);box.enqueue(PEER,"동영상","normal",video,"video/mp4");
+        check(done.await(25,java.util.concurrent.TimeUnit.SECONDS),"chunked upload completes");
+        NativeChatOutbox.clearInstances();NativeStaffChatApi.clearLocal(c);video.delete();
     }
     private static final class FakeApi extends NativeStaffChatApi {
         String lastProfilePeer="";

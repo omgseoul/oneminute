@@ -4,10 +4,10 @@ window.ReportInbox=(()=>{
  const $=id=>document.getElementById(id),e=value=>GuestSupport.esc(value),label=type=>type==='clock_in'?'출근보고':'퇴근보고';
  async function call(args={}){const {data,error}=await window.omgSupabase.rpc('work_report_inbox',{p_access_token:session.accessToken,...args});if(error||!data?.ok)throw new Error(data?.message||'보고를 불러오지 못했습니다.');return data;}
  function setCount(data){if(session?.sessionKind==='owner'&&$('reportCount'))$('reportCount').textContent=(!propertyIds?Number(data.unread_count||0):propertyIds.reduce((sum,id)=>sum+Number(data.unread_by_property?.[id]||0),0))||'';}
- async function refreshCount(force=false){if(session?.sessionKind!=='owner'||countBusy||document.hidden||!force&&Date.now()-lastCountFetch<8000)return;countBusy=true;lastCountFetch=Date.now();try{setCount(await call());}catch(err){console.warn('Report count load',err);}finally{countBusy=false;}}
+ async function refreshCount(force=false){if(session?.sessionKind!=='owner'||countBusy||window.omsNativeChatOpen||document.hidden||!force&&Date.now()-lastCountFetch<8000)return;countBusy=true;lastCountFetch=Date.now();try{setCount(await call());}catch(err){console.warn('Report count load',err);}finally{countBusy=false;}}
  function render(){const items=rows.filter(r=>!propertyIds||propertyIds.includes(String(r.property_id))).filter(r=>`${label(r.report_type)} ${r.employee_name} ${r.property_name} ${r.preview}`.toLowerCase().includes(query));$('reportRows').innerHTML=items.map(r=>`<button class="hub-room report-row ${r.unread?'is-unread':''}" data-report="${e(r.report_id)}" type="button">${StaffChat.avatar(r.employee_name,r.profile_image)}<span class="hub-room-copy"><strong>${e(label(r.report_type)+' '+r.employee_name)}</strong><span class="hub-room-preview">${e(r.property_name)}${r.edited?' · 수정됨':''}</span></span><span class="hub-room-meta"><time>${e(new Date(r.submitted_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))}</time><span aria-hidden="true">›</span></span></button>`).join('')||'<div class="empty">'+(query?'검색 결과가 없습니다.':'제출한 보고가 없습니다.')+'</div>';$('reportRows').querySelectorAll('[data-report]').forEach(button=>button.onclick=()=>open(button.dataset.report));}
  async function load(older=false){
-  if(!session||busy||!visible||document.hidden)return;
+  if(!session||busy||!visible||window.omsNativeChatOpen||document.hidden)return;
   busy=true;clearTimeout(timer);const version=selectionVersion,selected=propertyIds;let nextCursor=older?cursor:null,batch=[],data,hasMore=false;
   try{
    do{

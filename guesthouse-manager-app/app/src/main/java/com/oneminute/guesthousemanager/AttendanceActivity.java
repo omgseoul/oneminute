@@ -161,7 +161,7 @@ public class AttendanceActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, Bitmap icon) { if(loginInput!=null)loginInput.started();if(attendanceNfc!=null)attendanceNfc.clear();if(workerProfiles!=null)workerProfiles.clear();recovery.started(url); }
-            @Override public void onPageFinished(WebView view, String url) { recovery.finished(url);if(loginInput!=null)loginInput.finished(); }
+            @Override public void onPageFinished(WebView view, String url) { recovery.finished(url);view.evaluateJavascript("window.omsNativeChatOpen="+staffChatOpen,null);if(loginInput!=null)loginInput.finished(); }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) recovery.fail(request.getUrl().toString());
             }
@@ -244,9 +244,9 @@ public class AttendanceActivity extends AppCompatActivity {
         if(staffChatOpen)return true;
         try { new NativeStaffChatApi(this); } catch(Exception error) { return false; }
         staffChatOpen=true;
-        webView.evaluateJavascript("window.dispatchEvent(new Event('omg:native-navigation'))",null);
+        webView.evaluateJavascript("window.omsNativeChatOpen=true;window.dispatchEvent(new Event('omg:native-navigation'))",null);
         try { startActivityForResult(new Intent(this,NativeStaffChatActivity.class).putExtra("peer",peer).putExtra("property_ids",propertyIds),STAFF_CHAT_REQUEST); }
-        catch(Exception error){staffChatOpen=false;return false;}
+        catch(Exception error){staffChatOpen=false;webView.evaluateJavascript("window.omsNativeChatOpen=false",null);return false;}
         return true;
     }
 
@@ -488,7 +488,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume();if(attendanceNfc!=null)attendanceNfc.resume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume();if(attendanceNfc!=null)attendanceNfc.resume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.omsNativeChatOpen=false;window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
     protected void onPause() { if(attendanceNfc!=null)attendanceNfc.pause(); if (recovery != null) recovery.pause(); super.onPause(); }

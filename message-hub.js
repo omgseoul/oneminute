@@ -7,7 +7,7 @@ window.MessageHub=(()=>{
  $('guestCount').textContent=rows.reduce((n,r)=>n+Number(r.unread||0),0)||'';
  }
  async function load(older=false){
-  if(!state||busy||document.hidden)return;
+  if(!state||busy||window.omsNativeChatOpen||document.hidden)return;
   busy=true;clearTimeout(timer);const version=selectionVersion;
   try{
    const selected=propertyIds&&propertyIds.length<properties.length?propertyIds:[''];

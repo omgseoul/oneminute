@@ -33,7 +33,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private NativeChatUpload upload;
     private NativeChatOutbox outbox;
     private NativeChatLive live;
-    private boolean refreshAgain;private int outboxSentRevision;
+    private boolean fetchedRoom;private boolean refreshAgain;private int outboxSentRevision;
     private final Runnable liveRefresh=()->{refreshNow();if(outbox!=null)outbox.pump();NativeMessageBadge.refresh(this);};
     private final Runnable outboxChanged=this::onOutboxChanged;
     private void onOutboxChanged(){if(destroyed||outbox==null)return;refreshList(true);enableComposer();int revision=outbox.sentRevision();if(revision!=outboxSentRevision){outboxSentRevision=revision;if(active)refreshNow();}}
@@ -82,7 +82,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         build();
     }
     private void build(){
-        generation++;receiptCursor=0;busy=false;searching=false;readThroughId="";readingRoom=false;state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
+        generation++;receiptCursor=0;fetchedRoom=false;busy=false;searching=false;readThroughId="";readingRoom=false;state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         root=column(this);root.setBackgroundColor(BG);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
@@ -168,6 +168,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
             if(last!=null&&getLastVisiblePosition()==getCount()-1&&last.getBottom()<=getHeight()-getPaddingBottom()+1)readerBrowsing=false;
         }
         void showLatest(){
+            if(getHeight()<=getPaddingTop()+getPaddingBottom()||getWidth()==0){alignAfterLayout=true;return;}
             int position=getCount()-1;
             View last=getChildCount()>0?getChildAt(getChildCount()-1):null;
             if(last!=null&&getLastVisiblePosition()==position){
@@ -234,7 +235,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
                 main.post(()->{
                     if(destroyed||request!=generation)return;
                     if(room.isEmpty()){rooms=result.optJSONArray("rooms");if(rooms==null)rooms=new JSONArray();refreshList(false);}
-                    else{JSONArray incoming=result.optJSONArray("messages");if(incoming==null)incoming=new JSONArray();boolean initial=state.messages.isEmpty();outbox.acknowledge(incoming);boolean changed=state.merge(incoming)|state.mergeReceipts(result.optJSONArray("receipts"));if(previous||initial)complete=incoming.length()<50;else if(incoming.length()==50)refreshAgain=true;canSend=result.optBoolean("can_send",false);JSONObject person=result.optJSONObject("peer");if(person!=null&&(profile==null||isGroup())){title.setText(profileTitle(person));if(isGroup()){profile=person;if(headerAvatar!=null)((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(person.optString("display_name","단")));}}older.setVisibility(complete?View.GONE:View.VISIBLE);enableComposer();if(changed){saveSnapshot();if(previous)((MessageList)list).browseHistory();refreshList(initial||atBottom&&!previous);if(previous&&!anchor.isEmpty())restoreAnchor(anchor,anchorTop);}if(!canSend)notice("현재 이 계정에 메세지를 보낼 수 없습니다.",true);if(profile==null&&!profileLoading)loadProfile(false);scheduleRead();}
+                    else{JSONArray incoming=result.optJSONArray("messages");if(incoming==null)incoming=new JSONArray();boolean initial=state.messages.isEmpty(),firstFetch=!fetchedRoom;fetchedRoom=true;outbox.acknowledge(incoming);boolean changed=state.merge(incoming)|state.mergeReceipts(result.optJSONArray("receipts"));if(previous||initial)complete=incoming.length()<50;else if(incoming.length()==50)refreshAgain=true;canSend=result.optBoolean("can_send",false);JSONObject person=result.optJSONObject("peer");if(person!=null&&(profile==null||isGroup())){title.setText(profileTitle(person));if(isGroup()){profile=person;if(headerAvatar!=null)((TextView)((FrameLayout)headerAvatar.getParent()).getChildAt(0)).setText(initial(person.optString("display_name","단")));}}older.setVisibility(complete?View.GONE:View.VISIBLE);enableComposer();if(changed||firstFetch){saveSnapshot();if(previous)((MessageList)list).browseHistory();refreshList(firstFetch||initial||atBottom&&!previous);if(previous&&!anchor.isEmpty())restoreAnchor(anchor,anchorTop);}if(!canSend)notice("현재 이 계정에 메세지를 보낼 수 없습니다.",true);if(profile==null&&!profileLoading)loadProfile(false);scheduleRead();}
                     if(canSend||room.isEmpty())notice("",false);finishLoad(request,ready);
                 });
             }catch(Exception e){main.post(()->{if(!destroyed&&request==generation){notice(e.getMessage()==null?"연결을 확인하고 여기를 눌러 다시 시도해주세요.":e.getMessage(),true);finishLoad(request,ready);}});}

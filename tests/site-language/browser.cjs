@@ -12,6 +12,7 @@ const files=['index.html','feature-staff.html','feature-tasks.html','feature-cle
     const b=el.getBoundingClientRect();if(!b.width||!b.height)continue;
     if(b.left< -1||b.right>width+1||el.scrollWidth>el.clientWidth+2)bad.push(el.className+' '+el.textContent.trim()+': overflow');
    }
+   for(const el of document.querySelectorAll("body *")){if(!el.getBoundingClientRect().width)continue;for(const pseudo of ["::before","::after"]){if(/[가-힣]/.test(getComputedStyle(el,pseudo).content))bad.push("Untranslated generated copy: "+el.className);}}
    return bad;
   });assert.deepEqual(problems,[],width+' '+file);
   if(width===390||width===1440)await page.screenshot({path:'/tmp/oms-site-'+file.replace('.html','')+'-'+width+'.png',fullPage:true});

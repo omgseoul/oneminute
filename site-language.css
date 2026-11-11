@@ -44,3 +44,5 @@ html[lang=en] .metrics small{min-height:2.4em;line-height:1.2}
  html[lang=en] .urgent-compose{flex-wrap:wrap}
  html[lang=en] .reminder-targets{flex-wrap:wrap;gap:6px}
 }
+
+@media(max-width:760px){html[lang=en] .try-hint:before{content:"Explore the previews below ↓"}}

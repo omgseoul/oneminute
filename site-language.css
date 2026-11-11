@@ -1,9 +1,12 @@
 /* Shared language control on the public homepage and feature previews. */
 .site-language-bar{display:flex;justify-content:flex-end;padding-top:18px}
-.site-language-control{position:relative;display:inline-flex;align-items:center;flex:none;color:#17304e}
-.site-language-control:after{content:"";position:absolute;right:14px;top:17px;width:6px;height:6px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:rotate(45deg);pointer-events:none}
-.site-language-control select{appearance:none;-webkit-appearance:none;min-width:112px;height:40px;padding:0 32px 0 15px;border:1px solid #dfe6ef;border-radius:10px;background:#fff;color:inherit;font:600 13px/1.2 Inter,"Pretendard","Noto Sans KR",sans-serif;cursor:pointer}
-.site-language-control select:focus-visible{outline:3px solid #599cfa;outline-offset:3px}
+.site-language-control{position:relative;display:inline-flex;align-items:center;gap:5px;flex:none;height:28px;padding:0 14px 0 3px;border-radius:4px;color:#718096;font:500 10px/1 Inter,"Pretendard","Noto Sans KR",sans-serif;letter-spacing:.04em}
+.site-language-control:after{content:"";position:absolute;right:3px;top:10px;width:4px;height:4px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(45deg);pointer-events:none}
+.site-language-flag{display:block;width:17px;height:12px;object-fit:cover;border:1px solid #dce2e9;border-radius:2px;opacity:.85}
+.site-language-code{min-width:22px}
+.site-language-control select{position:absolute;inset:0;width:100%;min-width:0;height:100%;padding:0;border:0;opacity:0;cursor:pointer;font:13px sans-serif}
+.site-language-control:hover{color:#17304e;background:#f6f8fa}
+.site-language-control:focus-within{outline:2px solid #599cfa;outline-offset:2px}
 .site-head{gap:16px}.site-head .back{margin-left:auto;white-space:nowrap}
 .site-language-bar+.hero,.site-language-bar~main .hero{padding-top:34px}
 html[lang=en] body{word-break:normal;overflow-wrap:break-word}
@@ -34,7 +37,6 @@ html[lang=en] .metrics small{min-height:2.4em;line-height:1.2}
 }
 @media(max-width:540px){
  .site-head{flex-wrap:wrap;gap:10px}.site-head .brand{margin-right:auto}.site-head .back{order:3;flex-basis:100%;margin-left:0}
- .site-language-control select{min-width:104px}
  html[lang=en] .feature-card{grid-template-columns:minmax(0,1.35fr) minmax(100px,.65fr)}
  html[lang=en] .feature-card h3{font-size:17px}
  html[lang=en] .feature-card p{font-size:12px}

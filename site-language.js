@@ -361,7 +361,7 @@
       try{localStorage.setItem(KEY,language);}catch(_){}
       try{const url=new URL(location.href);if(language==='en')url.searchParams.set('lang','en');else url.searchParams.delete('lang');history.replaceState(history.state,'',url);}catch(_){}
     }
-    document.querySelectorAll('[data-site-language]').forEach(node=>{node.value=language;node.setAttribute('aria-label',language==='en'?'Select language':'언어 선택');});
+    document.querySelectorAll('[data-site-language]').forEach(node=>{node.value=language;node.setAttribute('aria-label',language==='en'?'Select language':'언어 선택');const control=node.closest('.site-language-control');if(control){control.querySelector('.site-language-code').textContent=language==='en'?'ENG':'KOR';control.querySelector('.site-language-flag').src=language==='en'?'assets/flag-us.svg':'assets/flag-kr.svg';}});
     translate(document);
   }
   // Translate text changes from the interactive demos without rebuilding controls or losing their state.

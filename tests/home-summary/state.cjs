@@ -1,0 +1,28 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),assert=require('node:assert/strict');
+const code=fs.readFileSync('home-summary-state.js','utf8');
+const session={sessionId:'session-a',sessionKind:'owner',ownerId:'owner-a',propertyId:'p-a',timezone:'Asia/Seoul'};
+const dom=new JSDOM('',{url:'https://oms.test',runScripts:'outside-only'}),w=dom.window;
+let current=session,clock=Date.parse('2026-11-11T14:59:59Z');const RealDate=w.Date;
+w.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}};
+w.omgSession={get:()=>current};w.eval(code);
+const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+(async()=>{
+ let state=w.OMSHomeState.open(session);state.write('messageCount',4);state.write('missionCount',2);state.write('today',{label:'11/11',items:[]});
+ state=w.OMSHomeState.open(session);assert.equal(state.read('messageCount'),4);assert.equal(state.read('missionCount',true),2);
+ clock+=2000;assert.equal(state.read('missionCount',true),null,'Seoul midnight expires daily widgets');assert.equal(state.read('messageCount'),4);
+ state.write('messageCount',0);assert.equal(w.OMSHomeState.open(session).read('messageCount'),0,'zero is a valid successful count');
+ current={...session,propertyId:'p-b'};assert.equal(w.OMSHomeState.open(current).read('messageCount'),null);
+ current=session;state=w.OMSHomeState.open(session);state.write('messageCount',9);
+ current={...session,sessionId:'session-b'};assert.equal(w.OMSHomeState.open(current).read('messageCount'),null,'new login cannot reuse old snapshot');
+ current=session;state=w.OMSHomeState.open(session);state.write('messageCount',9);current=null;w.dispatchEvent(new w.Event('omg:session-changed'));assert.equal(w.sessionStorage.length,0);state.write('messageCount',99);assert.equal(w.sessionStorage.length,0,'late writes after logout are ignored');
+ current=session;state=w.OMSHomeState.open(session);state.write('messageCount',5);clock+=7*3600000;assert.equal(state.read('messageCount'),null);
+ w.sessionStorage.setItem('oms.home.summary.v1','broken');assert.doesNotThrow(()=>w.OMSHomeState.open(session));
+ Object.defineProperty(w,'sessionStorage',{configurable:true,get(){throw Error('blocked')}});state=w.OMSHomeState.open(session);state.write('messageCount',3);assert.equal(state.read('messageCount'),3);
+ let calls=0,releases=[],paint=[];
+ const channel=w.OMSHomeState.channel(async(_,valid)=>{const n=++calls;await new Promise(r=>releases.push(r));if(valid())paint.push(n);});
+ channel.refresh();channel.refresh();channel.refresh();await tick();assert.equal(calls,1,'overlapping focus events coalesce');
+ channel.refresh({force:true});releases.shift()();await tick();assert.equal(calls,2,'real change during a request gets one trailing refresh');releases.shift()();await tick();assert.deepEqual(paint,[1,2]);
+ clock+=2000;channel.refresh();await tick();clock+=26000;channel.refresh();await tick();assert.equal(calls,4);releases.shift()();await tick();assert.deepEqual(paint,[1,2],'superseded slow response cannot paint');releases.shift()();await tick();assert.deepEqual(paint,[1,2,4]);
+ clock+=2000;channel.refresh();await tick();channel.cancel();releases.shift()();await tick();assert.deepEqual(paint,[1,2,4],'pagehide cancels late painting');
+ w.close();console.log('PASS snapshot reload, zero, account/property/login isolation, logout, Seoul midnight, expiry, blocked storage, request coalescing and stale response protection');
+})().catch(e=>{console.error(e);w.close();process.exitCode=1});

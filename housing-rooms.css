@@ -8,4 +8,4 @@
 @supports(font-size:1cqi){.entire-house-name{font-size:min(.75rem,18cqi)}}
 .room input:focus-visible+label{outline:2px solid #2467bd;outline-offset:2px}
 .housing-result{min-width:0;text-align:left;display:grid;gap:6px}.housing-unit-result{white-space:normal}
-.report-value-row:has(.housing-result){grid-template-columns:minmax(68px,max-content) minmax(0,1fr);column-gap:8px;align-items:start}.report-value-row:has(.housing-result)>strong{padding-top:8px;font-size:12px}.report-value-row .housing-result{white-space:normal;text-align:left}
+.report-value-row:has(.housing-result){grid-template-columns:minmax(68px,max-content) minmax(0,1fr);column-gap:8px;align-items:start}.report-value-row:has(.housing-result)>strong{padding-top:0;font-size:inherit;line-height:inherit}.report-value-row .housing-result{white-space:normal;text-align:left}

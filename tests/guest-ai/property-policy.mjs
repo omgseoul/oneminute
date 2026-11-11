@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {buildRequest,validateAnswer} from '../../supabase/functions/guest-ai/handler.mjs';
+import {fallbackReply} from '../../supabase/functions/guest-ai/property-policy.mjs';
+const data=['청소·청결 불만','시설 고장·비상 신고','확인되지 않은 문의·직원 지원'].map((title,i)=>({id:String(i+1),title,answer:'Fixture policy'}));
+const job={support_policy:'Fixture property policy',data,prompt:'',history:[{role:'user',content:'방이 더러워요'}]};
+const sample=title=>({reply:'확인해주세요.',disposition:'answer',reason:'',parts:[{question:'문의',sources:[data.find(r=>r.title===title).id],needs_human:false}]});
+assert.equal(validateAnswer(sample('청소·청결 불만'),job).disposition,'handoff');
+assert.equal(validateAnswer(sample('시설 고장·비상 신고'),job).disposition,'urgent');
+assert.equal(validateAnswer(sample('확인되지 않은 문의·직원 지원'),job).disposition,'handoff');
+assert.equal(validateAnswer(sample('청소·청결 불만'),{...job,support_policy:''}).disposition,'answer');
+assert(buildRequest(job).input[0].content.includes('Fixture property policy'));
+assert(!buildRequest({...job,support_policy:''}).input[0].content.includes('Fixture property policy'));
+assert.equal(fallbackReply('이건 어떻게 하나요?'),'문의하신 내용은 직원이 확인해서 다시 말씀드리겠습니다.');
+console.log('PASS property-specific routing, unknown fallback and branch isolation');

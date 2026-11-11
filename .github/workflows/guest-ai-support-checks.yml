@@ -1,0 +1,28 @@
+name: Verify guest AI support handoff
+on:
+  pull_request:
+    paths: ['supabase/functions/guest-ai/**', 'supabase/setup/guest_ai_support_handoff.sql', 'notification-bot.js', 'messages.html', 'tests/guest-ai/**', '.github/workflows/guest-ai-support-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: tests/attendance-nfc/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify owner data, escalation, recipients and bot navigation
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/guest-ai/database.cjs
+          node tests/guest-ai/edge.mjs
+          node tests/guest-ai/property-policy.mjs
+          node tests/guest-ai/support-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: OMS-guest-ai-support-preview
+          path: /tmp/oms-ai-support-mobile.png

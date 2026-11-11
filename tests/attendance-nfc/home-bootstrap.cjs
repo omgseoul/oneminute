@@ -27,7 +27,7 @@ const read=file=>fs.readFileSync(file,'utf8');
      throw Error('Unexpected RPC '+name);
     }};
    },scenario);
-   const scripts=new Set(['page-transition.js','attendance-nfc.js','attendance-flow.js','worker-tasks.js','home-guest-count.js']);
+   const scripts=new Set(['page-transition.js','attendance-nfc.js','attendance-flow.js','worker-tasks.js','home-guest-count.js','home-summary-state.js']);
    const html=read(process.env.HOME_TEST_HTML||'app.html').replace(/<script src="([^"]+)"[^>]*><\/script>/g,(_,url)=>scripts.has(url.split('?')[0])?'<script>'+read(url.split('?')[0])+'</script>':'');
    await page.route('**/*',route=>{
     const url=new URL(route.request().url()),file=url.pathname.slice(1);

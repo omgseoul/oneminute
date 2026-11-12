@@ -13,6 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: npm ci --prefix tests/attendance-nfc
+      - run: cd tests/attendance-nfc && npx playwright install --with-deps chromium
       - name: Verify tenancy, credential storage, approvals and delivery
         env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
         run: |
@@ -20,3 +21,4 @@ jobs:
           node tests/online/database.cjs
           node tests/online/edge.mjs
           node tests/online/ui.cjs
+          node tests/online/layout.cjs

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import {createBedsHandler,dateRange,selectBooking,selectMessage} from '../../supabase/functions/beds24/handler.mjs';
 const p='00000000-0000-0000-0000-000000000001',token='00000000-0000-0000-0000-000000000002',id='00000000-0000-0000-0000-000000000003';
-let calls=[],outboxStatus=null,responseMode='ok',notify=false;
+let calls=[],outboxStatus=null,responseMode='ok',notify=false,hydrate=false;
 const res=v=>new Response(JSON.stringify(v),{headers:{'Content-Type':'application/json'}});
 const fetcher=async(url,options={})=>{const b=options.body?JSON.parse(options.body):{},a=b.p_action;calls.push({url,a,body:b});
- if(url.includes('/rpc/online_owner')){if(a==='auth'){if(b.p_token!==token)return new Response(JSON.stringify({code:'P0001',message:'관리자'}),{status:400});return res({property_id:p,actor:'owner:test'});}if(a==='prepare_send'){if(outboxStatus)return res({ok:true,skip:true,status:outboxStatus});outboxStatus='sending';return res({ok:true});}return res({ok:true});}
+ if(url.includes('/rpc/online_owner')){if(a==='auth'){if(b.p_token!==token)return new Response(JSON.stringify({code:'P0001',message:'관리자'}),{status:400});return res({property_id:b.p_data.property_id||p,actor:'owner:test'});}if(a==='prepare_send'){if(outboxStatus)return res({ok:true,skip:true,status:outboxStatus});outboxStatus='sending';return res({ok:true});}return res({ok:true});}
  if(url.includes('/rpc/online_internal')){if(a==='credentials')return res({beds_property_id:100,secret:{token:'secret-access',refreshToken:'secret-refresh',expiresAt:Date.now()+9999999}});if(a==='finish_send')outboxStatus=b.p_data.status;if(a==='push_pending')return res([]);if(a==='webhook'){if(b.p_data.key!=='a'.repeat(64))return new Response(JSON.stringify({code:'P0001',message:'invalid_webhook'}),{status:400});notify=true;}return res({ok:true});}
  if(url.includes('/bookings/messages')&&options.method==='POST'){if(responseMode==='timeout')throw Error('timeout');if(responseMode==='reject')return res([{success:false}]);return res([{success:true,new:{id:500}}]);}
- if(url.includes('/bookings/messages'))return res({data:[],pages:{nextPageExists:false}});
- if(url.includes('/bookings?'))return res({data:[{id:10,propertyId:100,firstName:'G'}],pages:{nextPageExists:false}});
+ if(url.includes('/bookings/messages'))return res({data:hydrate?[{id:20,bookingId:10,propertyId:100,source:'guest',message:'hello'},{id:21,bookingId:11,propertyId:100,source:'guest',message:'cancel'}]:[],pages:{nextPageExists:false}});
+ if(url.includes('/bookings?'))return res({data:hydrate?(url.includes('status=cancelled')?[{id:11,propertyId:100,status:'cancelled'}]:[{id:10,propertyId:100,status:'confirmed'}]):[{id:10,propertyId:100,firstName:'G'}],pages:{nextPageExists:false}});
  throw Error('Unexpected '+url);
 };
 const env=n=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'service'})[n];
@@ -22,4 +22,5 @@ outboxStatus=null;responseMode='timeout';r=await request('send',{booking_id:10,i
 outboxStatus=null;responseMode='reject';r=await request('send',{booking_id:10,id,body:'Hi'});assert.equal((await r.json()).status,'failed');
 r=await handler(new Request(`https://test.supabase.co/functions/v1/beds24/webhook?property=${p}&key=${'b'.repeat(64)}`,{method:'POST',body:JSON.stringify({booking:{id:10}})}));assert.equal(r.status,400);assert(!notify);
 r=await handler(new Request('https://test.supabase.co/functions/v1/beds24',{method:'POST',headers:{Origin:'https://evil.test'},body:'{}'}));assert.equal(r.status,403);
+calls=[];hydrate=true;r=await request('sync_messages',{property_id:id,statuses:['confirmed']});assert.equal(r.status,200);assert(calls.filter(c=>c.a==='auth').every(c=>c.body.p_data.property_id===id));assert(calls.filter(c=>c.a==='credentials'||c.a==='bookings'||c.a==='messages').every(c=>c.body.p_property===id),'all internal requests use authorized selected branch');assert(calls.some(c=>c.url.includes('/bookings?')&&new URL(c.url).searchParams.getAll('id').length===2),'hydrate booking status in batches');assert(calls.some(c=>c.url.includes('status=cancelled')));assert.deepEqual(calls.find(c=>c.a==='inbox').body.p_data.statuses,['confirmed']);
 console.log('online edge: auth first, range validation, minimal data storage, duplicate prevention and ambiguous send handling passed');

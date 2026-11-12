@@ -52,26 +52,38 @@ create function omg_private.online_owner(p_token uuid,p_action text,p_data jsonb
 declare a jsonb;home uuid;c omg_private.online_connections%rowtype;bid bigint;v_from date;v_to date;tz text;v_id uuid;d omg_private.online_outbox%rowtype;latest bigint;begin
  a:=omg_private.guest_actor(p_token);
  if a is null or a->>'kind'<>'owner' then raise exception '관리자 로그인이 필요합니다.';end if;
- home:=(a->>'property_id')::uuid;
+ home:=coalesce(nullif(p_data->>'property_id','')::uuid,(a->>'property_id')::uuid);
+ if home<>(a->>'property_id')::uuid and (not coalesce(omg_private.can_manage_shared_property(p_token,home,'property_settings'),false) or not coalesce(omg_private.can_manage_shared_property(p_token,home,'messages'),false)) then raise exception '이 지점의 온라인 관리 권한이 없습니다.';end if;
+ if p_data ? 'statuses' and (jsonb_typeof(p_data->'statuses')<>'array' or exists(select 1 from jsonb_array_elements_text(p_data->'statuses') x where x not in('new','confirmed','request','inquiry','cancelled','black','unknown'))) then raise exception '예약상태를 확인해주세요.';end if;
  insert into omg_private.online_connections(property_id) values(home) on conflict do nothing;
  select * into c from omg_private.online_connections where property_id=home;
  select timezone into tz from public.properties where id=home;
  if p_action='auth' then return jsonb_build_object('property_id',home,'actor',a->>'key','timezone',tz);end if;
+ if p_action='reuse_connection' then
+  if c.vault_id is not null then raise exception '이미 연결된 지점입니다.';end if;
+  if not coalesce(omg_private.can_manage_shared_property(p_token,(p_data->>'source_property_id')::uuid,'property_settings'),false) or not coalesce(omg_private.can_manage_shared_property(p_token,(p_data->>'source_property_id')::uuid,'messages'),false) then raise exception '기존 연결을 사용할 권한이 없습니다.';end if;
+  update omg_private.online_connections target set vault_id=source.vault_id,properties=source.properties,connected_at=now() from omg_private.online_connections source where target.property_id=home and source.property_id=(p_data->>'source_property_id')::uuid and source.vault_id is not null;
+  if not found then raise exception '사용 가능한 기존 연결이 없습니다.';end if;
+  insert into omg_private.online_audit(property_id,action,actor,detail)values(home,'reuse_connection',a->>'key',jsonb_build_object('source_property_id',p_data->>'source_property_id'));
+  return omg_private.online_owner(p_token,'settings',p_data);
+ end if;
  if p_action='settings' then
-  return jsonb_build_object('ok',true,'property_name',(select name from public.properties where id=home),'timezone',tz,'connected',c.vault_id is not null,'beds_property_id',c.beds_property_id,'beds_name',c.beds_name,'properties',c.properties,'property_id',home,'webhook_key',c.webhook_key,'ai_mode',c.ai_mode,'synced_at',c.synced_at,'webhook_at',c.webhook_at,'last_error',c.last_error,'data_count',(select jsonb_array_length(data) from omg_private.ai_settings where property_id=home));
+  return jsonb_build_object('ok',true,'branches',(select coalesce(jsonb_agg(jsonb_build_object('id',p.id,'name',p.name) order by p.management_number),'[]') from public.properties p where omg_private.can_manage_shared_property(p_token,p.id,'property_settings') and omg_private.can_manage_shared_property(p_token,p.id,'messages')),'connection_sources',(select coalesce(jsonb_agg(jsonb_build_object('id',p.id,'name',p.name) order by p.management_number),'[]') from public.properties p join omg_private.online_connections co on co.property_id=p.id where p.id<>home and co.vault_id is not null and omg_private.can_manage_shared_property(p_token,p.id,'property_settings') and omg_private.can_manage_shared_property(p_token,p.id,'messages')),'property_name',(select name from public.properties where id=home),'timezone',tz,'connected',c.vault_id is not null,'beds_property_id',c.beds_property_id,'beds_name',c.beds_name,'properties',c.properties,'property_id',home,'webhook_key',c.webhook_key,'ai_mode',c.ai_mode,'synced_at',c.synced_at,'webhook_at',c.webhook_at,'last_error',c.last_error,'data_count',(select jsonb_array_length(data) from omg_private.ai_settings where property_id=home));
  elsif p_action='save_settings' then
   if coalesce(p_data->>'ai_mode','off') not in('off','approval') then raise exception '현재는 승인 후 발송 모드만 지원합니다.';end if;
   bid:=nullif(p_data->>'beds_property_id','')::bigint;
+  if c.vault_id is null then raise exception 'Beds24를 먼저 연결해주세요.';end if;
   if bid is null or not exists(select 1 from jsonb_array_elements(c.properties)x where (x->>'id')::bigint=bid) then raise exception '연결된 Beds24 숙소를 선택해주세요.';end if;
-  if c.beds_property_id is not null and c.beds_property_id<>bid then raise exception '다른 숙소로 변경하려면 연결 해제 후 다시 연결해주세요.';end if;
+  if c.beds_property_id is not null and c.beds_property_id<>bid then raise exception '다른 지점은 화면 상단의 지점 선택에서 변경해주세요. 현재 지점의 기존 숙소 연결은 유지됩니다.';end if;
+  if exists(select 1 from omg_private.online_connections where beds_property_id=bid and property_id<>home) then raise exception '이미 다른 OMS 지점에 연결된 숙소입니다. 상단에서 해당 지점을 선택해주세요.';end if;
   update omg_private.online_connections set beds_property_id=bid,beds_name=(select x->>'name' from jsonb_array_elements(c.properties)x where (x->>'id')::bigint=bid),ai_mode=p_data->>'ai_mode' where property_id=home;
   insert into omg_private.online_audit(property_id,action,actor,detail)values(home,'settings',a->>'key',jsonb_build_object('beds_property_id',bid,'ai_mode',p_data->>'ai_mode'));
  elsif p_action='bookings' then
   v_from:=(p_data->>'from')::date;v_to:=(p_data->>'to')::date;
   if v_from is null or v_to is null or v_to<v_from or v_to-v_from>92 then raise exception '조회 기간은 최대 93일입니다.';end if;
-  return jsonb_build_object('ok',true,'synced_at',c.synced_at,'bookings',(select coalesce(jsonb_agg(to_jsonb(x) order by x.arrival,x.guest_name),'[]') from (select b.* from omg_private.online_bookings b where b.property_id=home and (not coalesce((p_data->>'active_only')::boolean,false) or coalesce(b.status,'') not in('cancelled','black','inquiry')) and case p_data->>'basis' when 'booked' then (b.booked_at at time zone tz)::date between v_from and v_to when 'staying' then b.arrival<=v_from and b.departure>v_from and coalesce(b.status,'') not in('cancelled','black','inquiry') else b.arrival between v_from and v_to end order by b.arrival,b.id limit 2000)x));
+  return jsonb_build_object('ok',true,'synced_at',c.synced_at,'bookings',(select coalesce(jsonb_agg(to_jsonb(x) order by x.arrival,x.guest_name),'[]') from (select b.* from omg_private.online_bookings b where b.property_id=home and (not (p_data ? 'statuses') or coalesce(nullif(b.status,''),'unknown') in(select jsonb_array_elements_text(p_data->'statuses'))) and (not coalesce((p_data->>'active_only')::boolean,false) or coalesce(b.status,'') not in('cancelled','black','inquiry')) and case p_data->>'basis' when 'booked' then (b.booked_at at time zone tz)::date between v_from and v_to when 'staying' then b.arrival<=v_from and b.departure>v_from and coalesce(b.status,'') not in('cancelled','black','inquiry') else b.arrival between v_from and v_to end order by b.arrival,b.id limit 2000)x));
  elsif p_action='inbox' then
-  return jsonb_build_object('ok',true,'threads',(select coalesce(jsonb_agg(to_jsonb(x) order by x.sent_at desc),'[]') from(select m.booking_id,max(m.sent_at) sent_at,count(*) filter(where m.source='guest' and m.read_at is null) unread,(array_agg(m.body order by m.sent_at desc,m.id desc))[1] preview,coalesce(b.guest_name,'예약 #'||m.booking_id) guest_name,b.room_name,b.arrival,b.departure,(select count(*) from omg_private.online_outbox o where o.property_id=home and o.booking_id=m.booking_id and o.status='draft') drafts from omg_private.online_messages m left join omg_private.online_bookings b on b.property_id=m.property_id and b.id=m.booking_id where m.property_id=home group by m.booking_id,b.guest_name,b.room_name,b.arrival,b.departure order by max(m.sent_at) desc limit 300)x));
+  return jsonb_build_object('ok',true,'threads',(select coalesce(jsonb_agg(to_jsonb(x) order by x.sent_at desc),'[]') from(select m.booking_id,max(m.sent_at) sent_at,count(*) filter(where m.source='guest' and m.read_at is null) unread,(array_agg(m.body order by m.sent_at desc,m.id desc))[1] preview,coalesce(b.guest_name,'예약 #'||m.booking_id) guest_name,b.room_name,b.arrival,b.departure,b.status,(select count(*) from omg_private.online_outbox o where o.property_id=home and o.booking_id=m.booking_id and o.status='draft') drafts from omg_private.online_messages m left join omg_private.online_bookings b on b.property_id=m.property_id and b.id=m.booking_id where m.property_id=home and (not (p_data ? 'statuses') or coalesce(nullif(b.status,''),'unknown') in(select jsonb_array_elements_text(p_data->'statuses'))) group by m.booking_id,b.guest_name,b.room_name,b.arrival,b.departure,b.status order by max(m.sent_at) desc limit 300)x));
  elsif p_action='thread' then
   bid:=(p_data->>'booking_id')::bigint;
   update omg_private.online_messages set read_at=now() where property_id=home and booking_id=bid and read_at is null;
@@ -124,7 +136,8 @@ declare c omg_private.online_connections%rowtype;sid uuid;x jsonb;bid bigint;mid
   return jsonb_build_object('beds_property_id',c.beds_property_id,'ai_mode',c.ai_mode,'secret',(select decrypted_secret::jsonb from vault.decrypted_secrets where id=c.vault_id),'timezone',(select timezone from public.properties where id=p_property));
  elsif p_action='connect' then
   select vault_id into sid from omg_private.online_connections where property_id=p_property for update;
-  if sid is null then sid:=vault.create_secret((p_data->'secret')::text,'oms_beds24_'||p_property,'Beds24 credential');else perform vault.update_secret(sid,(p_data->'secret')::text);end if;
+  if sid is not null and exists(select 1 from omg_private.online_connections where vault_id=sid and property_id<>p_property) then sid:=null;end if;
+  if sid is null then sid:=vault.create_secret((p_data->'secret')::text,'oms_beds24_'||p_property||'_'||gen_random_uuid(),'Beds24 credential');else perform vault.update_secret(sid,(p_data->'secret')::text);end if;
   update omg_private.online_connections set vault_id=sid,properties=coalesce(p_data->'properties',properties),connected_at=now(),last_error=null where property_id=p_property;
   insert into omg_private.online_audit(property_id,action,actor)values(p_property,'connected',p_data->>'actor');
  elsif p_action='token' then

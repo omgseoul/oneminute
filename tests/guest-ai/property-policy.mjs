@@ -12,4 +12,5 @@ assert.equal(validateAnswer(sample('청소·청결 불만'),{...job,support_poli
 assert(buildRequest(job).input[0].content.includes('Fixture property policy'));
 assert(!buildRequest({...job,support_policy:''}).input[0].content.includes('Fixture property policy'));
 assert.equal(fallbackReply('이건 어떻게 하나요?'),'문의하신 내용은 직원이 확인해서 다시 말씀드리겠습니다.');
+assert.equal(validateAnswer({...sample('시설 고장·비상 신고'),alert_kind:'none'},{...job,alert_rules:{}}).disposition,'answer','editable criteria replace legacy title routing');
 console.log('PASS property-specific routing, unknown fallback and branch isolation');

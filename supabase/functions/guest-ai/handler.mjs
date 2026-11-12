@@ -1,3 +1,4 @@
+import {combinedInstructions,deliveryEnabled,unavailableReply} from './alert-rules.mjs';
 import {propertyRules,enforcePropertyRouting,fallbackReply} from './property-policy.mjs';
 // No credentials or guest text are logged. Workers use server credentials only.
 export const MODEL='gpt-6-luna';
@@ -14,7 +15,7 @@ SERVICE_DATA: ${JSON.stringify(SERVICE_DATA)}
 Identify EACH question in the latest guest message, including paraphrases and follow-ups; match all relevant DATA rows semantically, not by exact title. Return one natural, concise reply in the guest's language, combining supported answers. Include a part for EACH question, with the IDs of DATA or SERVICE_DATA rows supporting it. Each answered part needs at least one valid source ID; unknown parts use no sources and needs_human=true. For unknown inquiries say staff will check the inquiry and get back to the guest, in the guest's language. When the guest requests an actual service or reports an unresolved problem requiring staff action, use handoff even if its policy exists in DATA. A factual policy question alone is not a service request. If some parts are unknown, answer the known parts and say the remaining parts need the property's staff; disposition must then be handoff. Conflicting DATA also requires handoff. Do not guess missing facts.
 If the guest requests a human, use handoff. If there is plausible immediate danger (fire, gas leak, serious injury, violence, entrapment), use urgent and a short concrete reason. Do not confuse routine inconvenience with immediate danger. Give brief safe action guidance, including contacting local emergency services when appropriate; do not invent emergency phone numbers. Do not claim that a person has received or read an alert. Server will perform escalation separately.
 Return structured JSON. parts describes question coverage and source IDs; reply is the guest-facing combined answer. reason is a short Korean staff explanation. No raw DATA IDs in reply.`;
-export const FORMAT={type:'json_schema',name:'guest_reply',strict:true,schema:{type:'object',additionalProperties:false,properties:{reply:{type:'string'},disposition:{type:'string',enum:['answer','handoff','urgent']},reason:{type:'string'},parts:{type:'array',items:{type:'object',additionalProperties:false,properties:{question:{type:'string'},sources:{type:'array',items:{type:'string'}},needs_human:{type:'boolean'}},required:['question','sources','needs_human']}}},required:['reply','disposition','reason','parts']}};
+export const FORMAT={type:'json_schema',name:'guest_reply',strict:true,schema:{type:'object',additionalProperties:false,properties:{alert_kind:{type:'string',enum:['none','handoff','emergency']},reply:{type:'string'},disposition:{type:'string',enum:['answer','handoff','urgent']},reason:{type:'string'},parts:{type:'array',items:{type:'object',additionalProperties:false,properties:{question:{type:'string'},sources:{type:'array',items:{type:'string'}},needs_human:{type:'boolean'}},required:['question','sources','needs_human']}}},required:['reply','disposition','reason','parts','alert_kind']}};
 const FALLBACK='정확한 안내를 위해 직원 확인이 필요합니다. 숙소 관리자의 답변을 기다려주세요. / A staff member needs to check this. Please wait for their reply.';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function emergencyHint(text){return /불이\s*났|화재가|가스\s*(냄새|누출)|의식이\s*없|숨을?\s*(못\s*쉬|안\s*쉬)|폭행당|갇혔|\bon fire\b|\bgas (leak|smell)\b|\b(can.?t|cannot) breathe\b|\bunconscious\b|\bbeing attacked\b/i.test(text);}
@@ -25,8 +26,8 @@ export function buildRequest(job){
  const data=job.data.map(row=>({id:String(row.id),title:row.title,answer:row.answer}));
  return {model:MODEL,store:false,service_tier:'default',reasoning:{effort:'low'},max_output_tokens:2048,
   prompt_cache_options:{mode:'explicit',ttl:'30m'},
-  input:[{role:'developer',content:RULES+'\n'+propertyRules(job)},{role:'user',content:[
-   {type:'input_text',text:JSON.stringify({property_preferences:job.prompt,DATA:data}),prompt_cache_breakpoint:{mode:'explicit'}},
+  input:[{role:'developer',content:combinedInstructions(job,RULES,propertyRules(job))},{role:'user',content:[
+   {type:'input_text',text:JSON.stringify({DATA:data}),prompt_cache_breakpoint:{mode:'explicit'}},
    {type:'input_text',text:JSON.stringify({conversation:job.history,attachment_requires_staff:!!job.has_attachment})}
   ]}],text:{format:FORMAT}};
 }
@@ -36,8 +37,10 @@ export function validateAnswer(value,job){
  for(const part of value.parts){if(typeof part.question!=='string'||!part.question.trim()||typeof part.needs_human!=='boolean'||!Array.isArray(part.sources)||part.sources.some(id=>!ids.has(id)))throw Error('invalid_source');if(part.needs_human)unknown=true;if(value.disposition==='answer'&&!part.sources.length)throw Error('ungrounded_answer');}
  if(value.disposition==='answer'&&unknown)throw Error('unsupported_answer');
  if(job.has_attachment&&value.disposition==='answer')throw Error('unread_attachment');
+ if(job.alert_rules&&!['none','handoff','emergency'].includes(value.alert_kind))throw Error('invalid_alert_kind');
  const routed=enforcePropertyRouting(value,job);
- return {reply:routed.reply.trim(),disposition:routed.disposition,reason:String(routed.reason||'').slice(0,500)};
+ if(job.alert_rules){if(value.alert_kind==='emergency')routed.disposition='urgent';else if(value.alert_kind==='handoff')routed.disposition='handoff';}
+ return {reply:routed.reply.trim(),disposition:routed.disposition,reason:String(routed.reason||'').slice(0,500),...(job.alert_rules?{alert_kind:value.alert_kind}:{})};
 }
 export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})}){
  const base=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
@@ -47,7 +50,8 @@ export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
  async function process(job){
   let result={reply:fallbackReply(job.history.at(-1)?.content),disposition:'handoff',reason:'AI 응답 확인 실패',estimated:false},usage={},responseId;
   const latest=job.history.at(-1)?.content||'';
-  if(emergencyHint(latest)){result={...result,disposition:'urgent',reason:'메시지에 즉각적인 위험 징후가 있습니다.',reply:'안전한 장소로 이동하고 즉시 위험한 경우 현지 긴급기관에 연락해주세요. 숙소 직원의 확인이 필요합니다. / Move to safety and contact local emergency services if in immediate danger. Staff assistance is needed.'};}
+  if(job.alert_rules){result.alert_kind=emergencyHint(latest)?'emergency':'handoff';if(!deliveryEnabled(job,result.alert_kind))result.reply=unavailableReply(latest);}
+  if(!job.alert_rules&&emergencyHint(latest)){result={...result,disposition:'urgent',reason:'메시지에 즉각적인 위험 징후가 있습니다.',reply:'안전한 장소로 이동하고 즉시 위험한 경우 현지 긴급기관에 연락해주세요. 숙소 직원의 확인이 필요합니다. / Move to safety and contact local emergency services if in immediate danger. Staff assistance is needed.'};}
   else if(job.has_attachment){result.reason='첨부 사진은 직원 확인이 필요합니다.';}
   else {
    let attempted=false,received=false;

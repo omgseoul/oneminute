@@ -8,7 +8,7 @@ export function fallbackReply(text=''){
 }
 export function propertyRules(job){return typeof job.support_policy==='string'?job.support_policy:'';}
 export function enforcePropertyRouting(value,job){
- if(!job.support_policy)return value;
+ if(job.alert_rules||!job.support_policy)return {...value};
  const titles=new Map(job.data.map(r=>[String(r.id),r.title]));
  const sources=new Set(value.parts.flatMap(p=>p.sources).map(id=>titles.get(id)));
  // Hard floor for acknowledged incident categories, even if a model labels them "answer".

@@ -18,14 +18,14 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  }
  async function pages(path,headers,onPage){
   let page=1;while(page<=100){const v=await api(path+(path.includes('?')?'&':'?')+'page='+page,headers);if(!Array.isArray(v.data))throw Error('Beds24 목록 형식을 확인하지 못했습니다.');await onPage(v.data);
-   if(!v.pages?.nextPageExists&&!v.pages?.nextPageLink) return;page++;
+   if(v.pages?.nextPageExists!==true) return;page++;
   }throw Error('조회량이 많습니다. 기간을 줄여주세요.');
  }
  async function credentials(property){
   const c=await internal('credentials',property);if(!c.secret?.refreshToken)throw Error('기본정보에서 Beds24를 먼저 연결해주세요.');
   if(!c.secret.token||c.secret.expiresAt<Date.now()+60000){const t=await api('/authentication/token',{refreshToken:c.secret.refreshToken});if(!t.token)throw Error('Beds24 연결을 다시 확인해주세요.');c.secret={...c.secret,token:t.token,expiresAt:Date.now()+Math.max(60,Number(t.expiresIn)||3600)*1000};await internal('token',property,{secret:c.secret});}return c;
  }
- async function booking(property,c,id){let found=false;await pages('/bookings?id='+positive(id)+'&propertyId='+positive(c.beds_property_id),{token:c.secret.token},async rows=>{if(rows.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)||Number(b.id)!==Number(id)))throw Error('숙소가 일치하지 않습니다.');if(rows.length){found=true;await internal('bookings',property,{items:rows.map(selectBooking)});}});if(!found)throw Error('해당 숙소에서 예약을 찾지 못했습니다.');}
+ async function booking(property,c,id){let found=false;const path='/bookings?id='+positive(id)+'&propertyId='+positive(c.beds_property_id);const save=async rows=>{if(rows.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)||Number(b.id)!==Number(id)))throw Error('숙소가 일치하지 않습니다.');if(rows.length){found=true;await internal('bookings',property,{items:rows.map(selectBooking)});}};await pages(path,{token:c.secret.token},save);if(!found)await pages(path+'&status=cancelled',{token:c.secret.token},save);if(!found)throw Error('해당 숙소에서 예약을 찾지 못했습니다.');}
  async function messages(property,c,id,notify=false){
   await pages('/bookings/messages?propertyId='+positive(c.beds_property_id)+(id?'&bookingId='+positive(id):'&maxAge=30'),{token:c.secret.token},async rows=>{
    if(rows.some(m=>Number(m.propertyId)!==Number(c.beds_property_id)||(id&&Number(m.bookingId)!==Number(id))))throw Error('메시지 숙소가 일치하지 않습니다.');
@@ -88,7 +88,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';
     else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;
     else q+='&arrivalFrom='+before+'&arrivalTo='+after;
-    await pages('/bookings?'+q,{token:c.secret.token},rows=>internal('bookings',p,{items:rows.map(selectBooking)}));await internal('synced',p);return reply(await owner(b.access_token,'bookings',d));
+    for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix,{token:c.secret.token},rows=>internal('bookings',p,{items:rows.map(selectBooking)}));await internal('synced',p);return reply(await owner(b.access_token,'bookings',d));
    }
    if(b.action==='sync_messages'){const id=d.booking_id?positive(d.booking_id):null;if(id)await booking(p,c,id);await messages(p,c,id,true);await push(p);await internal('synced',p);return reply(await owner(b.access_token,id?'thread':'inbox',d));}
    if(b.action==='draft'){const id=positive(d.booking_id);await booking(p,c,id);await messages(p,c,id,true);return reply(await draft(p,id,a.actor));}

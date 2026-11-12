@@ -9,6 +9,7 @@ const select=w.document.getElementById('employeeSelect'),control=w.omgSelectPick
  assert.equal(select.value,'worker-2');assert.equal(changed,1);assert.equal(w.document.querySelector('#employeeSelectPickerButton').textContent,'변지훈');
  select.value='worker-1';control.refresh();assert.equal(w.document.querySelector('#employeeSelectPickerButton').textContent,'문정국');
  const all=w.document.querySelector('#employeeSelectPickerHost input[value=""]');all.checked=true;all.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(select.value,'');assert.equal(w.document.querySelector('#employeeSelectPickerButton').textContent,'전체');
+ select.disabled=true;await Promise.resolve();assert(w.document.querySelector('#employeeSelectPickerButton').disabled);assert([...w.document.querySelectorAll('#employeeSelectPickerHost input')].every(x=>x.disabled));select.disabled=false;await Promise.resolve();assert(!w.document.querySelector('#employeeSelectPickerButton').disabled);
  assert.equal(w.document.querySelector('label').htmlFor,'employeeSelectPickerButton');
  w.close();console.log('PASS modern selection keeps dynamic options, native change handlers and empty filter');
 })().catch(error=>{console.error(error);w.close();process.exitCode=1});

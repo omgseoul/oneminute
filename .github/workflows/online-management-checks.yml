@@ -1,0 +1,22 @@
+name: Verify online reservation management
+on:
+  pull_request:
+    paths: ['online.*', 'app.html', 'supabase/functions/beds24/**', 'supabase/setup/beds24_online.sql', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - name: Verify tenancy, credential storage, approvals and delivery
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node --check online.js
+          node tests/online/database.cjs
+          node tests/online/edge.mjs
+          node tests/online/ui.cjs

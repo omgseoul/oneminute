@@ -10,7 +10,8 @@ window.NotificationBot=(()=>{
  function items(){return(alertsLoaded?alertMessages:data.messages||[]).filter(i=>isAlert(i)&&(!properties||properties.includes(String(i.property_id||session.propertyId))));}
  function guestRoom(i){return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(i.guest_chat_room_id||'')?i.guest_chat_room_id:null;}
  function title(i){if(guestRoom(i))return 'AI 메시지 지원요청';if(i.is_platform_system_notice)return '* 시스템 알림 *';if(StaffChat.contractId(i.message))return '근로계약서';if(i.message_type==='announcement')return '공지';if(i.message_type==='attendance_warning')return '근태관리';if(i.message_type==='holiday_approval'||i.message_type==='holiday_notice')return '휴일 신청';if(i.message_type==='attendance_approval')return '출퇴근 수정';if(i.message_type==='property_share_approval')return '지점 공유';return i.sender_label==='근태관리'?'알림':i.sender_label||'알림';}
- function body(i){const message=String(i.message||'').replace(/^\[OMS-GUEST-CHAT:[0-9a-f-]{36}\]\s*/i,'').replace(/\\n/g,'\n').replace(/\n시간대: [^\n]+/g,'');const text=StaffChat.cleanText(i.is_platform_system_notice?message.startsWith('[시스템]')?message.slice(5).trimStart():message:message);return /^(To do 알림|일정 알림)$/.test(i.sender_label||'')?text.replace(/^(?:To do 알림|일정 알림)(?:\s*\n|\\n)/, ''):text;}
+ function onlineBooking(i){return i?.sender_type==='system'?String(i.message||'').match(/^\[OMS-ONLINE:([0-9]+)\]/)?.[1]:null;}
+ function body(i){const message=String(i.message||'').replace(/^\[OMS-ONLINE:[0-9]+\]\s*/,'').replace(/^\[OMS-GUEST-CHAT:[0-9a-f-]{36}\]\s*/i,'').replace(/\\n/g,'\n').replace(/\n시간대: [^\n]+/g,'');const text=StaffChat.cleanText(i.is_platform_system_notice?message.startsWith('[시스템]')?message.slice(5).trimStart():message:message);return /^(To do 알림|일정 알림)$/.test(i.sender_label||'')?text.replace(/^(?:To do 알림|일정 알림)(?:\s*\n|\\n)/, ''):text;}
  function reminder(i){return i.sender_type==='system'&&(!i.message_type||i.message_type==='general')?window.OMSReminderPopup?.parse(i.message,i.sender_label,new Date(),{at:i.reminder_at,timezone:i.reminder_timezone}):null;}
  function state(i){if(i.is_sender&&needsAck(i)){const a=i.announcement_acknowledgements||[];return `확인 ${a.filter(x=>x.acknowledged_at).length}/${a.length}`;}if(i.approval_status)return ({approved:'승인 완료',rejected:'반려',pending:'승인 대기'})[i.approval_status]||'처리 내역';if(i.acknowledged_at)return '확인 완료';if(needsAck(i))return '확인 필요';if(StaffChat.contractId(i.message))return '계약서 보기';return i.read_at?'읽음':'새 알림';}
  function homeProfile(){return profiles.find(p=>String(p.property_id)===String(session.propertyId))||{property_id:session.propertyId,display_name:'OMS 알림',property_name:''};}
@@ -23,6 +24,7 @@ window.NotificationBot=(()=>{
  // Parse only known server-generated envelopes; unknown formats retain their full text.
  function cardContent(i){
   const text=body(i),lines=text.split('\n');
+  if(onlineBooking(i))return {heading:'온라인 게스트 문의',meta:lines[0],text:lines.slice(1).join('\n')};
   if(guestRoom(i)){
    const urgent=/^긴급 AI 지원요청$/.test(lines[0]?.trim());
    const known=/^(긴급 AI 지원요청|AI 메시지 지원요청)$/.test(lines[0]?.trim())&&lines[2]?.trim()==='게스트 문의가 왔습니다. 직원 확인이 필요합니다.';
@@ -65,7 +67,7 @@ window.NotificationBot=(()=>{
   return `<div class="bot-notice-footer">${meta?`<div class="bot-notice-context">${e(meta)}</div>`:''}<button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}"${aria?` aria-label="${e(aria)}"`:''}>${e(action)} ›</button></div>`;
  }
  function ordinary(i){
-  const c=cardContent(i),action=guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
+  const c=cardContent(i),action=onlineBooking(i)?'대화 열기':guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
   const heading=c.urgent?`<span class="bot-notice-badge">긴급</span><span>${e(c.heading.replace(/^긴급 · /,''))}</span>`:`<span class="bot-notice-badge">${e(c.heading)}</span>`;
   return row(i,`<div class="bot-chat-bubble bot-notice ${c.urgent?'is-urgent':''}"><div class="bot-chat-category bot-notice-heading">${heading}</div><div class="bot-notice-body">${contentHTML(c)}</div>${footer(i,action,c.meta,guestRoom(i)?'게스트 대화 열기':'')}</div>`);
  }
@@ -74,7 +76,7 @@ window.NotificationBot=(()=>{
   return row(i,`<div class="bot-chat-bubble bot-notice bot-reminder-panel ${r.overdue?'is-overdue':''}"><div class="bot-chat-category bot-notice-heading bot-reminder-heading"><span class="bot-notice-badge">${e(label)}</span>${r.overdue&&r.days!==null?`<span class="bot-overdue-days">+${Math.abs(r.days)}일</span>`:''}</div><div class="bot-notice-body bot-reminder-line"><div class="bot-notice-quote"><p>${e(r.title)}</p></div></div>${footer(i,'상세보기',r.dateLine,r.title+' 상세보기')}</div>`,'bot-reminder-card');
  }
  $('botTimeline').innerHTML=(hasOlder?'<button type="button" id="botOlder" class="bot-older">이전 대화 더 보기</button>':'')+(list.map(i=>{const date=new Date(i.created_at),key=date.toLocaleDateString('ko-KR'),divider=key!==day?`<div class="bot-date"><span>${e(date.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'}))}</span></div>`:'';day=key;return divider+(reminder(i)?reminderCard(i):ordinary(i));}).join('')||'<div class="bot-empty">'+(q?'검색 결과가 없습니다.':announcementMode?'발송한 공지가 없습니다.':'아직 받은 알림이 없습니다.')+'</div>');$('botOlder')?.addEventListener('click',()=>loadAlerts(true));
- $('botTimeline').querySelectorAll('[data-bot-message]').forEach(b=>b.onclick=()=>{const item=list.find(i=>i.message_id===b.dataset.botMessage);if(guestRoom(item)){location.href='guest-chat.html?room='+encodeURIComponent(guestRoom(item));return;}callbacks.openDetail(item);});
+ $('botTimeline').querySelectorAll('[data-bot-message]').forEach(b=>b.onclick=()=>{const item=list.find(i=>i.message_id===b.dataset.botMessage);if(onlineBooking(item)){location.href='online.html#thread/'+encodeURIComponent(onlineBooking(item));return;}if(guestRoom(item)){location.href='guest-chat.html?room='+encodeURIComponent(guestRoom(item));return;}callbacks.openDetail(item);});
  scroller.scrollTop=near?scroller.scrollHeight:oldTop;scheduleRead();
  }
  function scheduleRead(){clearTimeout(readTimer);readTimer=setTimeout(markVisibleRead,300);}

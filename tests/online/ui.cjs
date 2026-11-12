@@ -1,0 +1,16 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+(async()=>{
+ const dom=new JSDOM(fs.readFileSync('online.html','utf8').replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/online.html',runScripts:'outside-only'}),w=dom.window;let calls=[],outbox=[],thread=[];
+ w.omgSession={require:async()=>({sessionKind:'owner',accessToken:'fixture',propertyId:'home'})};w.OMG_SUPABASE={url:'https://fixture.supabase.co',publishableKey:'public'};w.AbortSignal=AbortSignal;w.crypto.randomUUID=()=> '00000000-0000-0000-0000-000000000001';w.setInterval=()=>1;
+ const settings={ok:true,property_id:'home',property_name:'One Minute',timezone:'Asia/Seoul',connected:true,beds_property_id:100,beds_name:'One Minute',properties:[{id:100,name:'One Minute'}],webhook_key:'secret',ai_mode:'approval',data_count:57};
+ w.fetch=async(u,o)=>{const b=JSON.parse(o.body);calls.push(b);let v={ok:true};if(['settings','connect','properties'].includes(b.action))v=settings;if(['bookings','sync_bookings'].includes(b.action))v={ok:true,bookings:[]};if(['inbox','sync_messages'].includes(b.action)&&!b.data.booking_id)v={ok:true,threads:[]};if(b.action==='thread'||b.action==='sync_messages'&&b.data.booking_id)v={ok:true,booking:{guest_name:'<img src=x onerror=alert(1)>',arrival:'2026-11-12',departure:'2026-11-13'},messages:thread,outbox};if(b.action==='logs')v={ok:true,logs:outbox};if(b.action==='send')v={ok:true,status:'sent'};return {ok:true,json:async()=>v};};
+ w.eval(fs.readFileSync('online.js','utf8'));const tick=()=>new Promise(r=>setTimeout(r,30));await tick();assert(w.document.querySelector('a[href="#settings"]'));
+ w.location.hash='settings';await tick();assert.equal(w.document.querySelector('#webhookUrl').value,'https://fixture.supabase.co/functions/v1/beds24/webhook?property=home&key=secret');
+ assert.equal(w.document.querySelector('#inviteCode').type,'password');assert.equal(w.document.querySelectorAll('#aiMode option').length,2,'no unattended-send toggle in trial');
+ outbox=[{id:'draft1',kind:'ai',status:'draft',body:'AI draft',booking_id:10,updated_at:'2026-11-12T00:00:00Z',result:{reason:'data'}}];thread=[{id:1,source:'guest',body:'<script>bad()</script>',sent_at:'2026-11-12T00:00:00Z'}];
+ w.location.hash='thread/10';await tick();assert.equal(w.document.querySelector('#guestName img'),null);assert.equal(w.document.querySelector('#threadMessages script'),null);assert.equal(calls.filter(x=>x.action==='send').length,0,'rendering AI draft never sends');
+ w.document.querySelector('[data-approve]').click();await tick();assert.equal(calls.filter(x=>x.action==='send').length,1);assert.equal(calls.find(x=>x.action==='send').data.id,'draft1');
+ assert.equal(w.document.querySelector('#status').textContent,'Beds24에 메시지를 발송했습니다.');
+ const home=fs.readFileSync('app.html','utf8');assert(home.indexOf('id="onlineManagement"')<home.indexOf('id="workingPropertyPicker"'));assert(home.includes('onlineManagement").hidden=!isOwner'));
+ dom.window.close();console.log('online UI: settings, secret input, owner menu placement, XSS escaping, approval-only sending passed');
+})().catch(e=>{console.error(e);process.exit(1)});

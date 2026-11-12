@@ -4,11 +4,11 @@ const read=file=>fs.readFileSync(file,'utf8');
 (async()=>{
  const browser=await chromium.launch({headless:true});
  try{
-  for(const scenario of ['nfc','tagged','reported','first_login','owner']){
+  for(const scenario of ['nfc','tagged','reported','first_login','owner','owner_permission_denied','owner_permission_rejected','owner_permission_stalled','owner_platform']){
    const page=await browser.newPage({viewport:{width:360,height:850}}),errors=[];
    page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error'&&message.text().includes('Home initialization failed'))errors.push(message.text());});
    await page.addInitScript(scenario=>{
-    const owner=scenario==='owner';
+    const owner=scenario.startsWith('owner');
     const session={sessionKind:owner?'owner':'staff',employeeName:'테스트 근무자',employeeId:'worker-a',ownerId:owner?'owner-a':null,propertyId:'property-a',accessToken:'fixture',status:'working',timezone:'Asia/Seoul'};
     window.omgSession={require:async()=>session,get:()=>session,logout:async()=>{}};
     window.omgWorkConfig={load:async()=>({can_manage:owner,property:{name:'테스트 지점',property_id:'property-a',management_number:1}})};
@@ -17,7 +17,12 @@ const read=file=>fs.readFileSync(file,'utf8');
     window.omgSupabase={rpc:async(name,args)=>{
      rpcCalls.push(name);
      if(name==='attendance_nfc_entry')return {data:{ok:true,basis:scenario==='first_login'?'first_login':'nfc',status:'working',entry_at:['tagged','reported'].includes(scenario)?'2026-10-24T00:00:00Z':null,checkin_report_at:scenario==='reported'?'2026-10-24T00:01:00Z':null}};
-     if(name==='is_platform_administrator')return {data:false};
+     if(name==='is_platform_administrator'){
+      if(scenario==='owner_permission_denied')return {data:null,error:{code:'42501',message:'permission denied for function is_platform_administrator'}};
+      if(scenario==='owner_permission_rejected')throw Error('Network unavailable');
+      if(scenario==='owner_permission_stalled')return new Promise(()=>{});
+      return {data:scenario==='owner_platform'};
+     }
      if(name==='list_working_employees')return {data:{ok:true,own_property_id:'property-a',own_property_name:'테스트 지점',employees:[{employee_id:'worker-b',display_name:'동료',property_id:'property-a',property_name:'테스트 지점'}]}};
      if(name==='list_property_messages')return {data:{ok:true,can_manage:owner,messages:[],unread_count:2}};
      if(name==='work_report_inbox')return {data:{ok:true,unread_count:0,reports:[]}};
@@ -41,7 +46,14 @@ const read=file=>fs.readFileSync(file,'utf8');
    assert.deepEqual(errors,[],scenario+' must finish actual Home initialization');
    await page.waitForFunction(()=>document.querySelector('#todayOverviewItems').textContent.includes('오늘 일정이 없습니다.')&&document.querySelector('#workingGrid').textContent.includes('동료')&&document.querySelector('#messageCounter').textContent==='2');
    assert.equal(await page.locator('#mainMenu').evaluate(el=>el.inert),false);
-   if(scenario!=='owner'){
+   if(scenario.startsWith('owner')){
+    assert.equal(await page.locator('#onlineManagement').isVisible(),true);
+    assert.equal(await page.locator('#todayMissionCount').textContent(),'0');
+    assert.equal(await page.locator('#platformAdminQuick').isVisible(),scenario==='owner_platform');
+    assert.equal(await page.locator('#workingHeading').textContent(),'근무중');
+    if(scenario==='owner_permission_denied')await page.screenshot({path:'/tmp/oms-home-permission-recovery.png'});
+   }
+   if(!scenario.startsWith('owner')){
     assert.equal(await page.locator('.attendance-progress-label').count(),0);
     assert.equal(await page.locator('#myInfoQuick').isVisible(),true);assert.equal(await page.locator('#staffWorkStatus').isVisible(),true);
     assert((await page.locator('#workingHeading').textContent()).endsWith(scenario==='reported'?' 근무중':' 로그인'));

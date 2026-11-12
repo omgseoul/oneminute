@@ -173,21 +173,22 @@
 /* Bot portraits open the same profile card as staff identities. */
 .bot-conversation-head .bot-profile-trigger,.bot-profile-trigger{display:inline-flex;flex-shrink:0;align-self:flex-start;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.bot-profile-trigger:focus-visible{outline:2px solid #286bbc;outline-offset:3px}
 
-/* Shared information-separated cards for all manager bot notifications. */
+/* Option 2: compact bot bubbles, small category badges and right-aligned text actions. */
 #botTimeline{padding:12px 12px 20px}.bot-date{margin:2px 0 12px}
-.bot-chat-bubble.bot-notice{width:360px;max-width:100%;padding:0;border-radius:18px;background:#fff;border:1px solid #dfe7f1;box-sizing:border-box;overflow:hidden}
-.bot-notice .bot-notice-heading{display:flex;align-items:center;gap:8px;margin:0;padding:10px 12px;background:#e9f2ff;color:#285f9d;font-size:13px;font-weight:700;line-height:1.4;white-space:normal}
-.bot-notice.is-urgent .bot-notice-heading,.bot-notice.is-overdue .bot-notice-heading{background:#fff0f1;color:#b93646}
-.bot-notice-warning{display:grid;place-items:center;flex:0 0 18px;width:18px;height:18px;border:1.5px solid currentColor;border-radius:50%;font-size:12px;line-height:1}
-.bot-notice .bot-notice-body{display:block;padding:12px 12px 0;margin:0}
-.bot-notice-context{margin:0 0 9px;color:#788797;font-size:12px;font-weight:400;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
-.bot-notice-quote{padding:10px 12px;border-radius:12px;background:#f2f6fc}
+.bot-chat-bubble.bot-notice{width:360px;max-width:100%;padding:11px 12px 7px;border-radius:18px;background:#fff;border:1px solid #e1e8f1;box-sizing:border-box;overflow:hidden}
+.bot-notice .bot-notice-heading{display:flex;align-items:center;gap:7px;margin:0 0 7px;padding:0;background:transparent;color:#285f9d;font-size:13px;font-weight:700;line-height:1.4;white-space:normal}
+.bot-notice-badge{display:inline-block;padding:3px 8px;border-radius:8px;background:#eaf2ff;color:#285f9d;max-width:100%}
+.bot-notice.is-urgent .bot-notice-heading{color:#bd3042}.bot-notice.is-urgent .bot-notice-badge{background:#c83c4b;color:#fff;flex-shrink:0}
+.bot-notice.is-overdue .bot-notice-badge{background:#fff0f1;color:#b93646}.bot-notice.is-overdue .bot-overdue-days{color:#b93646}
+.bot-notice .bot-notice-body{display:block;padding:0;margin:0}
+.bot-notice-quote{padding:0;border-radius:0;background:transparent}
 .bot-notice .bot-notice-quote p{margin:0;color:#19334f;font-size:15px;font-weight:400;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
-.bot-notice .bot-chat-action{display:block;width:calc(100% - 24px);min-height:38px;margin:10px 12px 12px;padding:7px 10px;border:0;border-radius:10px;background:#286bbc;color:#fff;font-family:inherit;font-size:13px;font-weight:600;line-height:1.5;text-align:center}
-.bot-notice .bot-chat-action:focus-visible{outline:2px solid #19334f;outline-offset:2px}
-.bot-notice-fields{display:grid;gap:0;margin:0;padding:0;font-size:15px;font-weight:400;line-height:1.6}
-.bot-notice-fields>div{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;padding:8px 0;border-bottom:1px solid #edf1f6}
-.bot-notice-fields>div:first-child{padding-top:0}.bot-notice-fields>div:last-child{border-bottom:0;padding-bottom:0}
+.bot-notice-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:5px;min-width:0}
+.bot-notice-context{flex:1;min-width:0;margin:0;color:#788797;font-size:11px;font-weight:400;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot-notice .bot-chat-action{display:block;flex:none;width:auto;max-width:100%;min-height:36px;margin:0 0 0 auto;padding:5px 0 5px 6px;border:0;border-radius:6px;background:transparent;color:#286bbc;font-family:inherit;font-size:13px;font-weight:600;line-height:1.5;text-align:right;white-space:nowrap}
+.bot-notice .bot-chat-action:focus-visible{outline:2px solid #286bbc;outline-offset:1px}
+.bot-notice-fields{display:grid;gap:3px;margin:0;padding:0;font-size:15px;font-weight:400;line-height:1.6}
+.bot-notice-fields>div{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;padding:0;border:0}
 .bot-notice-fields dt{margin:0;color:#788797;font-size:12px;font-weight:400;align-self:start;padding-top:2px;word-break:keep-all}
 .bot-notice-fields dd{margin:0;color:#19334f;font-size:15px;font-weight:400;white-space:pre-wrap;overflow-wrap:anywhere}
 .bot-reminder-heading{justify-content:space-between}.bot-overdue-days{flex:none;white-space:nowrap;font-size:12px}

@@ -17,7 +17,7 @@ window.OMSDialogs=(()=>{
    if(!field('날짜')||reason===undefined)return;
    host.innerHTML=`<div class="dc-summary-card">${row('신청일',field('날짜'))}${row('신청자',field('신청자'))}${row('대상',field('대상'))}</div><div class="dc-reason-card"><span class="dc-section-label">휴일 신청 사유</span><p>${escape(reason)}</p></div>`;
   }else{
-   const labels={attendance_records:'근무기록',work_status:'근무상태',missions:'To do'};
+   const labels={account_settings:'계정 설정',attendance:'근태',messages:'메시지',property_settings:'숙소 설정',attendance_records:'근무기록',work_status:'근무상태',missions:'To do'};
    host.innerHTML=`<div class="dc-summary-card">${row('요청 지점',item.share_source_name)}${row('대상 지점',item.share_target_name)}</div><div class="dc-reason-card"><span class="dc-section-label">공유 요청 항목</span><p>${escape((item.share_permissions||[]).map(x=>labels[x]||x).join(' · ')||'-')}</p></div>`;
   }
   host.hidden=false;body.hidden=true;

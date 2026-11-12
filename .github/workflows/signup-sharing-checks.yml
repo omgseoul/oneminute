@@ -1,0 +1,30 @@
+name: Verify signup and sharing approvals
+on:
+  pull_request:
+    paths: ['login.html', 'native-login-input.js', 'messages.html', 'message-hub.js', 'dialog-cards.js', 'supabase/setup/property_share_rejection.sql', 'tests/signup-sharing/**', 'tests/dialog-cards.cjs', '.github/workflows/signup-sharing-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: cd tests/attendance-nfc && npx playwright install --with-deps chromium
+      - name: Verify native overlay, pending counters, rejection permissions and mobile welcome
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node --check native-login-input.js
+          node --check message-hub.js
+          node tests/signup-sharing/database.cjs
+          node tests/signup-sharing/ui.cjs
+          node tests/dialog-cards.cjs
+          node tests/signup-sharing/browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: OMS-signup-welcome-preview
+          path: /tmp/oms-signup-*.png

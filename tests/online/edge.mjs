@@ -34,3 +34,17 @@ limited=false;rateLimit=false;metadataCached=true;calls=[];r=await request('sync
 console.log('online edge cache: duplicate sync suppression, 429 cache fallback, shared cooldown and metadata reuse passed');
 
 lastSync=new Date().toISOString();calls=[];await request('sync_messages');assert(calls.some(c=>c.url.includes('maxAge=2')),'warm sync only fetches overlapping recent days');
+// Translation is owner-authorized, cached and completely separate from AI billing.
+let translationCalls=[],translationCached=false,translationFinished=false;
+const th=createBedsHandler({env,waitUntil:()=>{},fetcher:async(url,options={})=>{
+ const b=options.body?JSON.parse(options.body):{};translationCalls.push({url,b,headers:options.headers});
+ if(url.endsWith('/rpc/online_owner')){if(b.p_action==='auth'&&b.p_token!==token)return new Response(JSON.stringify({code:'P0001',message:'관리자'}),{status:400});return res({ok:true,property_id:p});}
+ if(url.endsWith('/rpc/online_translation')){if(b.p_action==='claim')return res(translationCached?{cached:true,text:'안녕하세요'}:{body:'hello',key:'translation-secret',lease:id});translationFinished=true;return res({ok:true});}
+ if(url==='https://translation.googleapis.com/language/translate/v2')return res({data:{translations:[{translatedText:'안녕하세요'}]}});
+ throw Error('Unexpected translation request');
+}});
+const trRequest=t=>th(new Request('https://test.supabase.co/functions/v1/beds24',{method:'POST',body:JSON.stringify({action:'translate',access_token:t,data:{message_id:20,property_id:p}})}));
+await trRequest(p);assert(!translationCalls.some(c=>c.url.includes('googleapis')),'denied owner never reaches translator');translationCalls=[];
+let trResult=await (await trRequest(token)).json();assert.equal(trResult.text,'안녕하세요');assert(translationFinished);assert(!JSON.stringify(trResult).includes('translation-secret'));assert.equal(translationCalls.find(c=>c.url.includes('googleapis')).b.q,'hello','only server-loaded message body sent for translation');assert(!translationCalls.some(c=>c.url.includes('openai')||c.url.includes('guest_ai')));
+translationCached=true;translationCalls=[];trResult=await (await trRequest(token)).json();assert(trResult.cached);assert(!translationCalls.some(c=>c.url.includes('googleapis')),'repeat translation has no provider call');
+console.log('Translation: tenant authorization, minimal text, no AI credits, cached reuse passed');

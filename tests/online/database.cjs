@@ -20,6 +20,7 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 
  const shared=fs.readFileSync('supabase/migrations/20261005090000_shared_settings_reminders.sql','utf8');await db.exec(shared.slice(shared.indexOf('CREATE OR REPLACE FUNCTION omg_private.can_manage_shared_property('),shared.indexOf('CREATE OR REPLACE FUNCTION public.shared_get_work_app_config')));
  await db.exec(fs.readFileSync('supabase/setup/beds24_online.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/beds24_sync_cache.sql','utf8'));
  const p1=id(1),p2=id(2),o1=id(3),o2=id(4),t1=id(5),t2=id(6),st=id(7);
  await db.query("insert into properties(id,name,management_number)values($1,'A',1),($2,'B',2)",[p1,p2]);
  await db.query("insert into owners(id,property_id,display_name)values($1,$2,'A'),($3,$4,'B')",[o1,p1,o2,p2]);
@@ -77,5 +78,18 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.query("update property_share_requests set status='revoked'");
  await assert.rejects(()=>owner('inbox',{property_id:p2}),/권한/);
  await db.exec('set role anon');await assert.rejects(()=>db.query('select public.online_owner($1,$2,$3)',[t1,'settings','{}']),/permission denied/);await assert.rejects(()=>db.query('select * from omg_private.online_connections'),/permission denied/);await db.exec('reset role');
+
+ const control=async(action,property,data={})=>(await db.query('select public.online_sync_control($1,$2,$3::jsonb) v',[action,property,JSON.stringify(data)])).rows[0].v;
+ const lease=await control('begin',p1,{scope:'inbox'});assert(lease.lease);
+ assert((await control('begin',p1,{scope:'inbox'})).skip,'concurrent sync shares durable lease');
+ await control('finish',p1,{scope:'inbox',lease:lease.lease,success:true});assert((await control('begin',p1,{scope:'inbox'})).skip,'repeat sync is throttled');
+ await db.query('update omg_private.online_connections set vault_id=(select vault_id from omg_private.online_connections where property_id=$1) where property_id=$2',[p1,p2]);
+ await control('cooldown',p1,{seconds:125});assert((await control('check',p2)).skip,'shared credential branches honor cooldown');
+ assert((await control('begin',p2,{scope:'inbox'})).limited);
+ assert.equal((await db.query("select has_function_privilege('anon','public.online_sync_control(text,uuid,jsonb)','EXECUTE') ok")).rows[0].ok,false);
+ const existing=await owner('inbox',{});assert(existing.threads.length);
+ const latest=existing.threads[0],day=new Date(latest.sent_at).toISOString().slice(0,10);
+ assert((await owner('inbox',{message_from:'2000-01-01',message_to:'2000-01-02'})).threads.length===0,'date filter applied before pagination');
+ assert((await owner('inbox',{offset:300})).threads.length===0);
  console.log('online database: tenant isolation, Vault secrecy, webhook dedupe, approval freshness, idempotent sends/billing passed');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

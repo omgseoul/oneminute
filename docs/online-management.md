@@ -1,0 +1,17 @@
+# Online management (Beds24)
+
+The owner home footer opens `online.html`. Owner sessions are validated server-side against their current property; shared attendance filters do not grant access to guest reservations. Each OMS property maps to one Beds24 property. The same Beds24 property cannot be registered twice.
+
+Setup: paste a new V2 invite code in Basic information, connect, select the matching property, save, then copy the generated URL into Beds24's Version 2 Booking webhook setting. Preserve Make's existing URLs. Tokens are exchanged server-side, encrypted in Supabase Vault, and never returned to browser storage. Refresh occurs before expiry, including idle connections through the worker. Secrets are not committed or logged.
+
+Cached lists support arrival date, reservation creation date in the property's timezone, and guests staying overnight (arrival <= date < departure). API pagination is consumed, and queries cover at most 93 days. Lists display up to 2,000 rows; narrow larger searches. Room/unit names come from the connected property. Card/payment fields are deliberately not stored.
+
+Messages are fetched from Beds24 with the selected property filter. Webhook data is a change notification only: the server reads the authoritative booking/message via the API before storing it. A durable queue retries failed fetches, deduplicates message IDs, and preserves events arriving while a worker runs. Incoming guest messages create owner bot notifications that open the online conversation. The message screen reads cached updates every 12 seconds while visible. Attachments are indicated by name; open the original in Beds24. API/channel limitations are surfaced as errors.
+
+All sends require an explicit owner action. A persistent outbox ID prevents double clicks and repeated HTTP requests from resending. Ambiguous network failures become `uncertain`; they are never automatically retried. Check the OTA conversation before starting another send. Manual sends and approved AI replies are recorded with actor, status and timestamps.
+
+AI is off by default. Approval mode generates a draft on new webhook-driven conversations, using the property's existing DATA, prompt, escalation classification and provider. It never sends without approval. Freshness is checked against the latest imported message, including other host replies; obsolete approvals are blocked. The shared wallet reserves credit before inference, settles once, and records tokens, sources and disposition. Interrupted jobs settle as estimated and remain visible. AI with attachments requires human review. Existing Make auto replies are independent: operators must avoid approving a second answer to an already answered inquiry.
+
+Deploy `supabase/setup/beds24_online.sql`, deploy `beds24` with its guest-ai module dependencies, and deploy the extended `dispatch-notification` function. Functions authenticate requests internally (owner session / webhook capability / worker secret). All online RPCs and private tables are inaccessible to anon/authenticated roles. Production confirmation still requires an owner-entered valid invite code and a real inbound webhook; tests use isolated fixtures and do not send to actual guests.
+
+Future autonomous mode must be a separate server-side policy with opt-in, takeover suppression, escalation recipients, duplicate prevention across Make, and auditability. This release intentionally exposes only off/approval modes.

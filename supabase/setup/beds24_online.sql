@@ -184,7 +184,7 @@ declare c omg_private.online_connections%rowtype;sid uuid;x jsonb;bid bigint;mid
   insert into omg_private.online_outbox(id,property_id,booking_id,body,kind,status,based_on,actor,period,reserved_micro)values(gen_random_uuid(),p_property,bid,'','ai','generating',mid,p_data->>'actor',v_period,v_res)returning * into d;
   update omg_private.ai_wallets set balance_micro=balance_micro-v_res where property_id=p_property;
   update omg_private.ai_usage_month set reserved_micro=reserved_micro+v_res where property_id=p_property and month=v_period;
-  return jsonb_build_object('id',d.id,'data',dataset,'history',history,'prompt',s.prompt,'support_policy',s.support_policy,'has_attachment',x->>'attachment_name' is not null,'alert_rules',jsonb_build_object('handoff',s.handoff_config,'emergency',s.emergency_config));
+  return jsonb_build_object('id',d.id,'data_revision',s.revision,'data',dataset,'history',history,'prompt',s.prompt,'support_policy',s.support_policy,'has_attachment',x->>'attachment_name' is not null,'alert_rules',jsonb_build_object('handoff',s.handoff_config,'emergency',s.emergency_config));
  elsif p_action='draft_finish' then
   select * into d from omg_private.online_outbox where property_id=p_property and id=(p_data->>'id')::uuid for update;
   if not found or d.status<>'generating' then return jsonb_build_object('skip',true);end if;

@@ -44,7 +44,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    result={...result,input_tokens:u?.input_tokens||0,output_tokens:u?.output_tokens||0,cached_tokens:u?.input_tokens_details?.cached_tokens||0,cache_write_tokens:u?.input_tokens_details?.cache_write_tokens||0,response_id:output.id,estimated:![u?.input_tokens,u?.output_tokens].every(n=>Number.isSafeInteger(n)&&n>=0)};
    if(output.status!=='completed')throw Error('AI 답변 생성이 완료되지 않았습니다.');
    const t=output.output?.filter(i=>i.type==='message').flatMap(i=>i.content||[]).filter(i=>i.type==='output_text').map(i=>i.text).join('');
-   result={...result,...validateAnswer(JSON.parse(t),job),sources:job.data.map(x=>({id:x.id,title:x.title})),model:'gpt-6-luna'};
+   const parsed=JSON.parse(t);result={...result,...validateAnswer(parsed,job),parts:parsed.parts,data_revision:job.data_revision,sources:job.data.map(x=>({id:x.id,title:x.title})),model:'gpt-6-luna'};
   }catch(e){result.error=attempted?'AI 초안 생성 또는 검증 실패 · 직접 답변해주세요.':e.message;if(attempted&&!received)result.estimated=true;}
   await internal('draft_finish',property,result);return {ok:true};
  }

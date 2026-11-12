@@ -16,6 +16,7 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.exec(fs.readFileSync('supabase/migrations/20261025094411_guest_ai_continue_after_handoff.sql','utf8'));
  await db.exec(`create function public.list_notification_bot_messages(uuid,timestamptz,uuid)returns jsonb language sql as $$select jsonb_build_object('ok',true)$$;`);
  await db.exec(fs.readFileSync('supabase/setup/guest_ai_support_handoff.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/guest_ai_alert_settings.sql','utf8'));
  const p1=id(1),p2=id(2),owner=id(3),token=id(4),staff=id(5),stafftoken=id(6),operator=id(7),guest=id(8),room=id(9),room2=id(10);
  await db.query("insert into properties(id,name,management_number)values($1,'Own',1),($2,'Other',2)",[p1,p2]);
  await db.query("insert into owners(id,property_id,display_name)values($1,$2,'Owner')",[owner,p1]);
@@ -64,7 +65,7 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.query('select omg_private.ai_record_notice($1)',[needsStaff.event_id]);assert.equal((await db.query("select count(*)::int n from property_messages where source='guest_ai'")).rows[0].n,1);
 
  await db.query("insert into guest_chat_alert_preferences(actor_key,home_property_id,schedules)values($1,$2,$3)",['owner:'+owner,p1,JSON.stringify([{enabled:true,property_ids:[p1],days:[0,1,2,3,4,5,6],alert_mode:'strong'}])]);
- const supportDispatch=await rpc('get_guest_chat_dispatch',[needsStaff.event_id]);assert.equal(supportDispatch.recipient_modes['property_1_owner_'+owner],'strong','AI support inherits onsite guest mode');
+ const supportDispatch=await rpc('get_guest_chat_dispatch',[needsStaff.event_id]);assert.equal(supportDispatch.recipient_modes['property_1_owner_'+owner],'normal','AI support uses its own configured mode');
  assert.equal(supportDispatch.room_id,room);
  await db.query("delete from guest_chat_alert_preferences where actor_key=$1",['owner:'+owner]);
  let state=(await chat('messages')).room;assert(state.ai_handoff);assert(!state.ai_paused);assert(state.ai_active);assert(state.unanswered_since);
@@ -89,5 +90,34 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.exec(fs.readFileSync('supabase/migrations/20261025092316_guest_ai_basic_conversation.sql','utf8'));
  assert((await ownerCall('get')).settings.prompt.includes('자기소개'));
  assert.equal((await db.query('select prompt from omg_private.ai_settings where property_id=$1',[p2])).rows[0].prompt,'관리자가 직접 수정한 프롬프트');
+ // Config validation, legacy-client preservation, exact recipient selection and all four strengths.
+ const saved=(await ownerCall('get')).settings;
+ for(const bad of [{...saved.handoff_config,enabled:'true'},{...saved.handoff_config,script:''},{...saved.handoff_config,staff_mode:'loud'},null])await assert.rejects(()=>ownerCall('save',{...saved,handoff_config:bad}),/전달|스크립트|강도/);
+ const custom={...saved.handoff_config,script:'예약 확인이 필요한 경우에만 전달',notify_staff:false,owner_mode:'weak'};
+ await ownerCall('save',{...saved,handoff_config:custom});
+ const legacy={...saved};delete legacy.handoff_config;delete legacy.emergency_config;
+ await ownerCall('save',legacy);assert.deepEqual((await ownerCall('get')).settings.handoff_config,custom,'legacy saves preserve new settings');
+ let eventNumber=200;
+ async function alert(urgent=false){const mid=id(eventNumber++);await db.query("insert into guest_chat_messages(id,room_id,client_id,sender_key,sender_name,sender_kind,body)values($1,$2,$1,'guest:fixture','Guest','guest','Fixture inquiry')",[mid,room]);return(await db.query('select omg_private.ai_alert($1,$2,$3,$4) v',[room,mid,urgent,'Fixture alert'])).rows[0].v;}
+ for(const mode of ['weak','normal','strong','urgent']){
+  await ownerCall('save',{...saved,handoff_config:{...custom,owner_mode:mode}});
+  const ev=await alert();const d=await rpc('get_guest_chat_dispatch',[ev]);assert.deepEqual(d.recipient_topics,['property_1_owner_'+owner]);assert.equal(d.recipient_modes['property_1_owner_'+owner],mode);
+  const recipients=(await db.query('select recipient_key from property_message_recipients where message_id=(select id from property_messages where external_message_id=$1)',[ev])).rows;assert.deepEqual(recipients,[{recipient_key:'owner:'+owner}]);
+ }
+ await ownerCall('save',{...saved,handoff_config:{...custom,notify_owner:false,notify_staff:true,staff_mode:'strong'}});
+ let ev=await alert();let d=await rpc('get_guest_chat_dispatch',[ev]);assert.deepEqual(d.recipient_topics,['property_1_employee_'+staff]);assert.equal(d.recipient_modes['property_1_employee_'+staff],'strong');
+ await db.query('update work_sessions set checkout_report_at=now() where employee_id=$1',[staff]);
+ ev=await alert();assert.equal((await rpc('get_guest_chat_dispatch',[ev])).recipient_topics.length,0);assert.equal((await db.query('select count(*)::int n from property_messages where external_message_id=$1',[ev])).rows[0].n,0,'no bot notice to unchecked or off-duty recipients');
+ await db.query('update work_sessions set checkout_report_at=null where employee_id=$1',[staff]);
+ const before=(await db.query('select count(*)::int n from omg_private.ai_alerts')).rows[0].n;
+ await ownerCall('save',{...saved,handoff_config:{...custom,enabled:false},emergency_config:{...saved.emergency_config,enabled:false}});
+ assert.equal(await alert(),null);assert.equal(await alert(true),null);assert.equal((await db.query('select count(*)::int n from omg_private.ai_alerts')).rows[0].n,before,'off creates no alerts or bot notices');
+ await ownerCall('save',{...saved,handoff_config:{...custom,notify_owner:false,notify_staff:false}});assert.equal(await alert(),null);
+ await ownerCall('save',{...saved,emergency_config:{...saved.emergency_config,notify_staff:false,owner_mode:'weak'}});
+ ev=await alert(true);d=await rpc('get_guest_chat_dispatch',[ev]);assert.deepEqual(d.recipient_topics,['property_1_owner_'+owner]);assert.equal(d.recipient_modes['property_1_owner_'+owner],'weak','emergency strength remains user-selected');
+ await ownerCall('save',{...saved,emergency_config:{...saved.emergency_config,enabled:false}});assert.equal((await rpc('get_guest_chat_dispatch',[ev])).recipient_topics.length,0,'switching off blocks pending delivery');
+ await ownerCall('save',saved);await chat('ai_resume',{},token,null);
+ await chat('send',{client_id:id(299),body:'A custom script excludes this question'});job=await rpc('guest_ai_claim');assert.deepEqual(job.alert_rules.handoff,saved.handoff_config);assert.deepEqual(job.alert_rules.emergency,saved.emergency_config);
+ const noDelivery=await rpc('guest_ai_finish',[job.id,job.lease_id,JSON.stringify({...finish,disposition:'handoff',alert_kind:'none'})]);assert.equal(noDelivery.event_id,null,'ungrounded answer can need human confirmation without matching notification script');
  console.log('PASS database: tenant auth, schedule overnight/boundaries, working staff, idempotent credits/replies, reservations, takeover, urgent recipients, guest isolation, quota handoff, expired lease, default prompt upgrade preserves custom text');await db.close();
 })().catch(e=>{console.error(e.message,e.detail,e.where);process.exitCode=1;});

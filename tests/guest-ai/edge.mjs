@@ -9,7 +9,7 @@ assert(!request.input[1].content[1].prompt_cache_breakpoint,'changing conversati
 const followup=buildRequest({...job,history:[...job.history,{role:'assistant',content:answer.reply},{role:'user',content:'체크아웃은요?'}]});
 assert.equal(followup.input[1].content[0].text,request.input[1].content[0].text,'follow-up preserves shared prefix exactly');
 assert.notEqual(followup.input[1].content[1].text,request.input[1].content[1].text);
-const changedPrompt=buildRequest({...job,prompt:'답변은 두 문장 이내로 작성하세요.'});assert.notEqual(changedPrompt.input[1].content[0].text,request.input[1].content[0].text);
+const changedPrompt=buildRequest({...job,prompt:'답변은 두 문장 이내로 작성하세요.'});assert.notEqual(changedPrompt.input[0].content,request.input[0].content);
 const changedData=buildRequest({...job,data:job.data.map(r=>r.id==='2'?{...r,answer:'16시'}:r)});assert.notEqual(changedData.input[1].content[0].text,request.input[1].content[0].text);assert(changedData.input[1].content[0].text.includes('16시'));
 assert.equal(buildRequest({...job,data:job.data.map(r=>({answer:r.answer,id:r.id,title:r.title}))}).input[1].content[0].text,request.input[1].content[0].text,'object key order cannot invalidate cache');
 const removed=buildRequest({...job,data:[job.data[0]]});assert(!removed.input[1].content[0].text.includes('15시'),'deleted DATA does not linger');
@@ -47,3 +47,17 @@ const connect=()=>new Request('https://fixture.supabase.co/functions/v1/guest-ai
 t=setup({operator:false});assert.equal((await t.handler(connect())).status,400);assert(!t.calls.some(c=>c.url.includes('api.openai.com')),'nonoperator must not trigger provider verification');
 t=setup();assert.equal((await t.handler(connect())).status,200);assert(t.calls.some(c=>c.url.includes('/v1/models/')));assert(!t.calls.some(c=>c.url.endsWith('/v1/responses')),'connecting key is not a billable generation');
 console.log('PASS edge: multi-question and partial grounding, source validation, emergency, one paid call, token accounting, timeout handling, worker auth, operator-only API connection');
+
+const rules={handoff:{enabled:true,script:'Fixture unknown inquiry rule',notify_staff:true,notify_owner:true},emergency:{enabled:true,script:'Fixture door or water emergency rule',notify_staff:true,notify_owner:true}};
+const configured={...job,alert_rules:rules,support_policy:'Previous property policy'};
+const merged=buildRequest(configured);
+assert(merged.input[0].content.includes(job.prompt));for(const c of Object.values(rules))assert.equal(merged.input[0].content.split(c.script).length,2,'each script included once');
+assert.equal(merged.input.filter(x=>x.role==='developer').length,1);
+assert.notEqual(buildRequest({...configured,alert_rules:{...rules,handoff:{...rules.handoff,script:'Updated rule'}}}).input[0].content,merged.input[0].content,'edits invalidate stable prefix');
+assert.throws(()=>validateAnswer(answer,configured),/invalid_alert_kind/);
+assert.equal(validateAnswer({...partial,alert_kind:'none'},configured).alert_kind,'none');
+assert.equal(validateAnswer({...partial,alert_kind:'emergency'},configured).disposition,'urgent');
+const oneCall=setup({jobOverride:{alert_rules:rules,history:[{role:'user',content:'문이 안 열려요'}]},output:{...partial,alert_kind:'emergency'}});
+await oneCall.run();
+assert.equal(oneCall.calls.filter(c=>c.url.includes('/v1/responses')).length,1,'one call handles reply and both scripts');assert.equal(oneCall.settled.alert_kind,'emergency');
+console.log('PASS combined editable prompt, precedence, cache invalidation, single-call emergency classification');

@@ -1,7 +1,7 @@
 name: Verify guest AI support handoff
 on:
   pull_request:
-    paths: ['supabase/functions/guest-ai/**', 'supabase/setup/guest_ai_support_handoff.sql', 'notification-bot.js', 'messages.html', 'tests/guest-ai/**', '.github/workflows/guest-ai-support-checks.yml']
+    paths: ['supabase/functions/guest-ai/**', 'supabase/setup/guest_ai*.sql', 'guest-ai-settings.*', 'guest-ai.css', 'notification-bot.js', 'messages.html', 'tests/guest-ai/**', '.github/workflows/guest-ai-support-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,8 +21,9 @@ jobs:
           node tests/guest-ai/edge.mjs
           node tests/guest-ai/property-policy.mjs
           node tests/guest-ai/support-browser.cjs
+          node tests/guest-ai/settings-mobile.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: OMS-guest-ai-support-preview
-          path: /tmp/oms-ai-support-mobile.png
+          path: /tmp/oms-ai-*.png

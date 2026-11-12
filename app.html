@@ -122,14 +122,20 @@ async function loadTodayOverview(session,missionData,isCurrent=()=>true){
   document.getElementById("emergencyQuick").style.display = isOwner ? "none" : "grid";
   document.getElementById("myInfoQuick").style.display = isOwner ? "none" : "inline-flex";
   document.getElementById("missionCopy").textContent = isOwner ? "To do 등록·진행 확인" : "오늘의 할 일과 전달사항 확인";
-  // Resolve all menu visibility before revealing the home screen.
-  let permissionTimeout;
-  const platformResult = await Promise.race([
-    isOwner ? window.omgSupabase.rpc("is_platform_administrator") : Promise.resolve({data:false}),
-    new Promise((_,reject)=>{permissionTimeout=setTimeout(()=>reject(new Error("관리 메뉴 권한을 확인하지 못했습니다. 앱을 다시 열어주세요.")),10000);})
-  ]).finally(()=>clearTimeout(permissionTimeout));
-  if(platformResult.error)throw new Error("관리 메뉴 권한을 확인하지 못했습니다. 앱을 다시 열어주세요.");
-  document.getElementById("platformAdminQuick").style.display=isOwner&&platformResult.data===true?"grid":"none";
+  // Platform access is optional. A denied/slow check must not stop normal owner widgets.
+  const platformButton=document.getElementById("platformAdminQuick");
+  platformButton.style.display="none";
+  if(isOwner){
+    let permissionTimeout;
+    Promise.race([
+      Promise.resolve().then(()=>window.omgSupabase.rpc("is_platform_administrator")),
+      new Promise((_,reject)=>{permissionTimeout=setTimeout(()=>reject(new Error("운영자센터 권한 확인 시간 초과")),10000);})
+    ]).then(result=>{
+      // Only a positive server decision may reveal this link; the destination also checks access.
+      if(!result.error&&result.data===true&&(!window.omgSession.get||window.omgSession.get()?.accessToken===session.accessToken))platformButton.style.display="grid";
+    }).catch(error=>console.warn("Optional platform access check unavailable",error))
+      .finally(()=>clearTimeout(permissionTimeout));
+  }
   // Navigation must not depend on optional summaries, native push, or shared-property lookups.
   document.getElementById("mainMenu").inert=false;
   document.getElementById("mainMenu").removeAttribute("inert");

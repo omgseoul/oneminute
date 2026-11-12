@@ -20,14 +20,54 @@ window.NotificationBot=(()=>{
  host.querySelector('.empty')?.remove();host.insertAdjacentHTML('beforeend',`<a href="#bot" class="hub-room staff-room bot-room ${unread?'is-unread':''}" data-room-time="${e(last?.created_at||'')}" data-bot-property="${e(p.property_id)}">${avatar(p)}<span class="hub-room-copy"><strong>${e(p.display_name)} <small class="bot-label">BOT</small></strong><span class="hub-room-preview">${e(last?(last.is_platform_system_notice?'* 시스템 알림 *':(branchName(last)?'['+branchName(last)+'] ':'')+body(last)):'공지와 업무 알림을 전해드립니다.')}</span></span><span class="hub-room-meta"><time>${last?e(new Date(last.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):''}</time><span>${e(p.property_name)}</span>${unread?`<b class="hub-count">${unread}</b>`:''}</span></a>`);host.querySelector('.bot-room').onclick=ev=>{ev.preventDefault();open(p.property_id);};}
  [...host.querySelectorAll('.staff-room')].sort((a,b)=>(Date.parse(b.dataset.roomTime)||0)-(Date.parse(a.dataset.roomTime)||0)).forEach(el=>host.append(el));
  }
+ // Parse only known server-generated envelopes; unknown formats retain their full text.
+ function cardContent(i){
+  const text=body(i),lines=text.split('\n');
+  if(guestRoom(i)){
+   const urgent=/^긴급 AI 지원요청$/.test(lines[0]?.trim());
+   const known=/^(긴급 AI 지원요청|AI 메시지 지원요청)$/.test(lines[0]?.trim())&&lines[2]?.trim()==='게스트 문의가 왔습니다. 직원 확인이 필요합니다.';
+   return {heading:urgent?'긴급 · AI 지원요청':'AI 문의 · 직원 확인',urgent,meta:known?lines[1]:'',text:known?(lines.slice(4).join('\n').trim()||lines[3]):/^(긴급 AI 지원요청|AI 메시지 지원요청)$/.test(lines[0]?.trim())?lines.slice(1).join('\n'):text};
+  }
+  const formats={
+   holiday_approval:{header:/^(미결재|결재완료|반려) - 휴일신청$/,labels:['날짜','신청자','대상','휴일 신청 사유']},
+   holiday_notice:{header:/^(미결재|결재완료|반려) - 휴일신청$/,labels:['날짜','신청자','대상','휴일 신청 사유']},
+   attendance_approval:{header:/^출퇴근 시간 수정 요청$/,labels:['근무일','기존','요청']},
+   property_share_approval:{header:/^Property 공유 요청$/,labels:['요청 지점','요청 항목']}
+  };
+  const f=formats[i.message_type];
+  if(f&&f.header.test(lines[0]?.trim())){
+   const fields=[];let valid=true;
+   // Consume the fixed envelope in order. The last value can contain arbitrary guest/staff text.
+   let offset=1;
+   for(let n=0;n<f.labels.length;n++){
+    const label=f.labels[n],prefix=label+':';
+    if(!lines[offset]?.startsWith(prefix)){valid=false;break;}
+    fields.push({label:label==='휴일 신청 사유'?'사유':label,value:(n===f.labels.length-1?lines.slice(offset).join('\n'):lines[offset]).slice(prefix.length).trim()});offset++;
+   }
+   if(valid){
+    const requester=fields.find(x=>x.label==='신청자'),target=fields.find(x=>x.label==='대상');
+    if(requester&&target&&requester.value===target.value){requester.label='신청자·대상';fields.splice(fields.indexOf(target),1);}
+    return {heading:title(i),fields,meta:!i.approval_status&&/^holiday_/.test(i.message_type)?lines[0].replace(/ - 휴일신청$/,''):''};
+   }
+  }
+  return {heading:title(i),text,urgent:i.priority==='urgent'};
+ }
+ function contentHTML(c){return `${c.meta?`<div class="bot-notice-context">${e(c.meta)}</div>`:''}${c.fields?`<dl class="bot-notice-fields">${c.fields.map(f=>`<div><dt>${e(f.label)}</dt><dd>${e(f.value)}</dd></div>`).join('')}</dl>`:`<div class="bot-notice-quote"><p>${e(c.text)}</p></div>`}`;}
  function renderConversation(){if(!$('botConversation')||$('botConversation').hidden)return;const profile=homeProfile(),q=$('botSearch').value.trim().toLowerCase();$('botTitle').textContent=announcementMode?'공지':profile?.display_name||'OMS 알림';$('botProperty').textContent=announcementMode?'발송 내역':profile?.property_name||'';$('botNewAnnouncement').hidden=!announcementMode;$('botHeaderAvatar').innerHTML=avatar(profile);$('botHeaderAvatar').setAttribute('aria-label',(profile.display_name||'OMS 알림')+' 프로필 보기');
  const list=items().filter(i=>announcementMode?i.message_type==='announcement'&&i.is_sender:true).filter(i=>!q||`${branchName(i)} ${title(i)} ${body(i)}`.toLowerCase().includes(q)).slice().sort((a,b)=>a.created_at.localeCompare(b.created_at));
  const scroller=$('botTimeline'),near=scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<90,oldTop=scroller.scrollTop;
  let day='';
- function ordinary(i){const date=new Date(i.created_at);return `<article class="bot-chat-row" data-bot-row="${e(i.message_id)}"><button class="bot-chat-avatar bot-profile-trigger" type="button" data-bot-profile aria-label="${e(profile.display_name||'OMS 알림')} 프로필 보기">${avatar(profile)}</button><div class="bot-chat-content"><div class="bot-chat-name">${e(profile.display_name)}${branchName(i)?` <span>· ${e(branchName(i))}</span>`:''}</div><div class="bot-chat-bubble"><div class="bot-chat-category">${e(title(i))}</div><p>${e(body(i))}</p><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}">${guestRoom(i)?'게스트 대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기'} ›</button></div><div class="bot-chat-meta"><time>${e(date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time><span class="bot-state ${i.acknowledged_at||i.approval_status==='approved'?'done':''}">${e(state(i))}</span></div>${i.acknowledged_at?`<small class="bot-ack-time">${e(i.acknowledged_name||'')} · ${e(new Date(i.acknowledged_at).toLocaleString('ko-KR'))} 확인</small>`:''}</div></article>`;}
+ function row(i,card,extra=''){
+  const date=new Date(i.created_at);
+  return `<article class="bot-chat-row ${extra}" data-bot-row="${e(i.message_id)}"><button class="bot-chat-avatar bot-profile-trigger" type="button" data-bot-profile aria-label="${e(profile.display_name||'OMS 알림')} 프로필 보기">${avatar(profile)}</button><div class="bot-chat-content"><div class="bot-chat-name">${e(profile.display_name)}${branchName(i)?` <span>· ${e(branchName(i))}</span>`:''}</div>${card}<div class="bot-chat-meta"><time>${e(date.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time><span class="bot-state ${i.acknowledged_at||i.approval_status==='approved'?'done':''}">${e(state(i))}</span></div>${i.acknowledged_at?`<small class="bot-ack-time">${e(i.acknowledged_name||'')} · ${e(new Date(i.acknowledged_at).toLocaleString('ko-KR'))} 확인</small>`:''}</div></article>`;
+ }
+ function ordinary(i){
+  const c=cardContent(i),action=guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
+  return row(i,`<div class="bot-chat-bubble bot-notice ${c.urgent?'is-urgent':''}"><div class="bot-chat-category bot-notice-heading">${c.urgent?'<span class="bot-notice-warning" aria-hidden="true">!</span>':''}<span>${e(c.heading)}</span></div><div class="bot-notice-body">${contentHTML(c)}</div><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}"${guestRoom(i)?' aria-label="게스트 대화 열기"':''}>${action} ›</button></div>`);
+ }
  function reminderCard(i){
-  const r=reminder(i),label=r.calendar?'일정 알림'+(r.timing?' '+r.timing:''):'To do';
-  return `<article class="bot-chat-row bot-reminder-card" data-bot-row="${e(i.message_id)}"><button class="bot-chat-avatar bot-profile-trigger" type="button" data-bot-profile aria-label="${e(profile.display_name||'OMS 알림')} 프로필 보기">${avatar(profile)}</button><div class="bot-chat-content"><div class="bot-chat-name">${e(profile.display_name)}${branchName(i)?` <span>· ${e(branchName(i))}</span>`:''}</div><div class="bot-chat-bubble bot-reminder-panel"><div class="bot-reminder-heading"><span>${r.overdue?'<b class="bot-overdue">[지연]</b> ':''}${e(label)}</span>${r.overdue&&r.days!==null?`<span class="bot-overdue-days">+${Math.abs(r.days)}일</span>`:''}</div><div class="bot-reminder-line"><p>${e(r.title)}</p><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}" aria-label="${e(r.title)} 상세보기">상세보기 ›</button></div></div><div class="bot-chat-meta"><time>${e(new Date(i.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}))}</time><span class="bot-state">${e(state(i))}</span></div></div></article>`;
+  const r=reminder(i),label=r.overdue?'지연 · To do':r.calendar?'일정 알림'+(r.timing?' '+r.timing:''):'To do'+(r.timing?' '+r.timing:'');
+  return row(i,`<div class="bot-chat-bubble bot-notice bot-reminder-panel ${r.overdue?'is-overdue':''}"><div class="bot-chat-category bot-notice-heading bot-reminder-heading"><span>${e(label)}</span>${r.overdue&&r.days!==null?`<span class="bot-overdue-days">+${Math.abs(r.days)}일</span>`:''}</div><div class="bot-notice-body bot-reminder-line">${r.dateLine?`<div class="bot-notice-context">${e(r.dateLine)}</div>`:''}<div class="bot-notice-quote"><p>${e(r.title)}</p></div></div><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}" aria-label="${e(r.title)} 상세보기">상세보기 ›</button></div>`,'bot-reminder-card');
  }
  $('botTimeline').innerHTML=(hasOlder?'<button type="button" id="botOlder" class="bot-older">이전 대화 더 보기</button>':'')+(list.map(i=>{const date=new Date(i.created_at),key=date.toLocaleDateString('ko-KR'),divider=key!==day?`<div class="bot-date"><span>${e(date.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'}))}</span></div>`:'';day=key;return divider+(reminder(i)?reminderCard(i):ordinary(i));}).join('')||'<div class="bot-empty">'+(q?'검색 결과가 없습니다.':announcementMode?'발송한 공지가 없습니다.':'아직 받은 알림이 없습니다.')+'</div>');$('botOlder')?.addEventListener('click',()=>loadAlerts(true));
  $('botTimeline').querySelectorAll('[data-bot-message]').forEach(b=>b.onclick=()=>{const item=list.find(i=>i.message_id===b.dataset.botMessage);if(guestRoom(item)){location.href='guest-chat.html?room='+encodeURIComponent(guestRoom(item));return;}callbacks.openDetail(item);});

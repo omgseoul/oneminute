@@ -173,13 +173,23 @@
 /* Bot portraits open the same profile card as staff identities. */
 .bot-conversation-head .bot-profile-trigger,.bot-profile-trigger{display:inline-flex;flex-shrink:0;align-self:flex-start;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.bot-profile-trigger:focus-visible{outline:2px solid #286bbc;outline-offset:3px}
 
-/* Option 1: individual compact bubbles with the detail action beside the body. */
+/* Shared information-separated cards for all manager bot notifications. */
 #botTimeline{padding:12px 12px 20px}.bot-date{margin:2px 0 12px}
-.bot-reminder-card{margin-bottom:10px}.bot-reminder-panel{width:360px;max-width:100%;padding:8px 11px;border-radius:17px;box-sizing:border-box}
-.bot-reminder-heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:#2467bd;font-size:13px;font-weight:750;line-height:1.4}
-.bot-overdue,.bot-overdue-days{color:#cf3943}.bot-overdue-days{flex:none;white-space:nowrap;font-size:12px}
-.bot-reminder-line{display:flex;align-items:center;gap:8px;margin-top:3px}.bot-reminder-line p{flex:1;min-width:0;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
-.bot-reminder-line .bot-chat-action{flex:none;width:auto;min-height:28px;margin:0;padding:3px 8px;border-radius:9px;font-size:12px;line-height:20px;white-space:nowrap}
-.bot-reminder-line .bot-chat-action:focus-visible{outline:2px solid #2467bd;outline-offset:2px}
+.bot-chat-bubble.bot-notice{width:360px;max-width:100%;padding:0;border-radius:18px;background:#fff;border:1px solid #dfe7f1;box-sizing:border-box;overflow:hidden}
+.bot-notice .bot-notice-heading{display:flex;align-items:center;gap:8px;margin:0;padding:10px 12px;background:#e9f2ff;color:#285f9d;font-size:13px;font-weight:700;line-height:1.4;white-space:normal}
+.bot-notice.is-urgent .bot-notice-heading,.bot-notice.is-overdue .bot-notice-heading{background:#fff0f1;color:#b93646}
+.bot-notice-warning{display:grid;place-items:center;flex:0 0 18px;width:18px;height:18px;border:1.5px solid currentColor;border-radius:50%;font-size:12px;line-height:1}
+.bot-notice .bot-notice-body{display:block;padding:12px 12px 0;margin:0}
+.bot-notice-context{margin:0 0 9px;color:#788797;font-size:12px;font-weight:400;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot-notice-quote{padding:10px 12px;border-radius:12px;background:#f2f6fc}
+.bot-notice .bot-notice-quote p{margin:0;color:#19334f;font-size:15px;font-weight:400;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot-notice .bot-chat-action{display:block;width:calc(100% - 24px);min-height:38px;margin:10px 12px 12px;padding:7px 10px;border:0;border-radius:10px;background:#286bbc;color:#fff;font-family:inherit;font-size:13px;font-weight:600;line-height:1.5;text-align:center}
+.bot-notice .bot-chat-action:focus-visible{outline:2px solid #19334f;outline-offset:2px}
+.bot-notice-fields{display:grid;gap:0;margin:0;padding:0;font-size:15px;font-weight:400;line-height:1.6}
+.bot-notice-fields>div{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;padding:8px 0;border-bottom:1px solid #edf1f6}
+.bot-notice-fields>div:first-child{padding-top:0}.bot-notice-fields>div:last-child{border-bottom:0;padding-bottom:0}
+.bot-notice-fields dt{margin:0;color:#788797;font-size:12px;font-weight:400;align-self:start;padding-top:2px;word-break:keep-all}
+.bot-notice-fields dd{margin:0;color:#19334f;font-size:15px;font-weight:400;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot-reminder-heading{justify-content:space-between}.bot-overdue-days{flex:none;white-space:nowrap;font-size:12px}
 #botConversation .bot-chat-footer{padding:9px 12px calc(9px + env(safe-area-inset-bottom));font-size:11px}
-@media(max-width:360px){.bot-reminder-panel{padding:8px 9px}.bot-reminder-line{gap:5px}.bot-reminder-line .bot-chat-action{padding:3px 6px}.bot-reminder-heading{font-size:12px}}
+@media(max-width:360px){.bot-notice-fields>div{grid-template-columns:66px minmax(0,1fr);gap:6px}}

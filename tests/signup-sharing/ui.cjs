@@ -1,0 +1,23 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('assert/strict');
+const delay=()=>new Promise(r=>setTimeout(r,35));
+(async()=>{
+ const w=new JSDOM(fs.readFileSync('login.html','utf8').replace(/<script[\s\S]*?<\/script>/g,''),{runScripts:'outside-only',pretendToBeVisual:true}).window;
+ const input=w.document.getElementById('employeeLoginId'),modal=w.document.getElementById('welcomeModal'),layouts=[];
+ w.document.getElementById('loginShell').classList.add('ready');
+ input.getBoundingClientRect=()=>({left:30,top:150,width:280,height:52,bottom:202});w.visualViewport=null;w.ResizeObserver=class{observe(){}};
+ w.OMSLoginInput={layout:s=>layouts.push(JSON.parse(s)),hide(){},focus(){},value:()=>''};
+ w.eval(fs.readFileSync('native-login-input.js','utf8'));await delay();assert.equal(layouts.at(-1).visible,true);
+ w.OMSNativeLoginInput.attach(layouts.at(-1).documentId);await delay();
+ modal.hidden=false;await delay();assert.equal(layouts.at(-1).visible,false,'native field must hide above welcome');
+ modal.hidden=true;await delay();assert.equal(layouts.at(-1).visible,true,'native field restores after welcome');
+ w.close();
+ const h=new JSDOM('<div class="mail-tabs"></div><nav class="hub-tabs"><button data-hub="approvals"><small id="approvalsCount"></small></button><small id="staffCount"></small></nav><button id="announcementButton"></button><button id="composeToggle"></button>',{runScripts:'outside-only'}).window;
+ Object.assign(h,{NotificationBot:{update(){}},StaffConversations:{update(){}},ReportInbox:{refreshCount(){}}});
+ h.eval(fs.readFileSync('message-hub.js','utf8'));
+ const pending={message_id:'m1',property_share_request_id:'r1',message_type:'property_share_approval',approval_status:'pending',read_at:null};
+ const update=messages=>h.MessageHub.updateCounts({can_manage:true,messages});
+ update([pending]);assert.equal(h.document.getElementById('approvalsCount').textContent,'1');
+ update([{...pending,read_at:'2026-11-12'}, {...pending,message_id:'m2'}]);assert.equal(h.document.getElementById('approvalsCount').textContent,'1','reading and duplicate recipients do not clear or inflate pending count');
+ update([{...pending,approval_status:'rejected'},{...pending,message_id:'m3',approval_status:'approved'},{...pending,is_sender:true}]);assert.equal(h.document.getElementById('approvalsCount').textContent,'');
+ h.close();console.log('Android overlay visibility/restoration and unread-independent pending approval counts passed.');
+})().catch(e=>{console.error(e);process.exit(1)});

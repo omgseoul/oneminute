@@ -7,7 +7,8 @@
  function refresh(){
   cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{
    const r=input.getBoundingClientRect(),v=window.visualViewport;
-   const visible=!input.disabled&&r.width>0&&r.height>0&&getComputedStyle(input).visibility!=='hidden'&&r.bottom>0&&r.top<(v?.height||innerHeight);
+   const modalOpen=!!document.querySelector('[aria-modal="true"]:not([hidden])');
+   const visible=!modalOpen&&!input.closest('[inert]')&&!input.disabled&&r.width>0&&r.height>0&&getComputedStyle(input).visibility!=='hidden'&&r.bottom>0&&r.top<(v?.height||innerHeight);
    bridge.layout(JSON.stringify({documentId,visible,x:r.left-(v?.offsetLeft||0),y:r.top-(v?.offsetTop||0),width:r.width,height:r.height,viewportWidth:v?.width||innerWidth,value:input.value,fontSize:parseFloat(getComputedStyle(input).fontSize)}));
   });
  }
@@ -15,6 +16,8 @@
  document.getElementById('loginForm').addEventListener('submit',()=>{if(attached&&!input.disabled)input.value=bridge.value();},true);
  input.addEventListener('focus',()=>{if(attached)bridge.focus();});
  new MutationObserver(refresh).observe(document.getElementById('loginShell'),{subtree:true,attributes:true,attributeFilter:['class','style','hidden','disabled']});
+ const welcome=document.getElementById('welcomeModal');
+ if(welcome)new MutationObserver(refresh).observe(welcome,{attributes:true,attributeFilter:['hidden']});
  new ResizeObserver(refresh).observe(input);
  addEventListener('resize',refresh);addEventListener('scroll',refresh,true);visualViewport?.addEventListener('resize',refresh);visualViewport?.addEventListener('scroll',refresh);
  addEventListener('pagehide',()=>{cancelAnimationFrame(frame);bridge.hide();});refresh();

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {createBedsHandler,dateRange,selectBooking,selectMessage} from '../../supabase/functions/beds24/handler.mjs';
 const p='00000000-0000-0000-0000-000000000001',token='00000000-0000-0000-0000-000000000002',id='00000000-0000-0000-0000-000000000003';
-let calls=[],outboxStatus=null,responseMode='ok',notify=false,hydrate=false,skipSync=false,limited=false,rateLimit=false,metadataCached=false;
+let calls=[],outboxStatus=null,responseMode='ok',notify=false,hydrate=false,skipSync=false,limited=false,rateLimit=false,metadataCached=false,lastSync=null;
 const res=v=>new Response(JSON.stringify(v),{headers:{'Content-Type':'application/json'}});
 const fetcher=async(url,options={})=>{const b=options.body?JSON.parse(options.body):{},a=b.p_action;calls.push({url,a,body:b});
- if(url.includes('/rpc/online_sync_control')){if(a==='begin')return res(skipSync?{skip:true}:{lease:id});if(a==='check')return res({skip:limited});if(a==='cooldown'){limited=true;return res({skip:true});}if(a==='metadata_needed')return res(metadataCached?[]:b.p_data.ids);return res({ok:true});}
+ if(url.includes('/rpc/online_sync_control')){if(a==='begin')return res(skipSync?{skip:true}:{lease:id,last_success:lastSync});if(a==='check')return res({skip:limited});if(a==='cooldown'){limited=true;return res({skip:true});}if(a==='metadata_needed')return res(metadataCached?[]:b.p_data.ids);return res({ok:true});}
  if(url.includes('/rpc/online_owner')){if(a==='auth'){if(b.p_token!==token)return new Response(JSON.stringify({code:'P0001',message:'관리자'}),{status:400});return res({property_id:b.p_data.property_id||p,actor:'owner:test'});}if(a==='prepare_send'){if(outboxStatus)return res({ok:true,skip:true,status:outboxStatus});outboxStatus='sending';return res({ok:true});}return res({ok:true});}
  if(url.includes('/rpc/online_internal')){if(a==='credentials')return res({beds_property_id:100,secret:{token:'secret-access',refreshToken:'secret-refresh',expiresAt:Date.now()+9999999}});if(a==='finish_send')outboxStatus=b.p_data.status;if(a==='push_pending')return res([]);if(a==='webhook'){if(b.p_data.key!=='a'.repeat(64))return new Response(JSON.stringify({code:'P0001',message:'invalid_webhook'}),{status:400});notify=true;}return res({ok:true});}
  if(url.includes('/bookings/messages')&&options.method==='POST'){if(responseMode==='timeout')throw Error('timeout');if(responseMode==='reject')return res([{success:false}]);return res([{success:true,new:{id:500}}]);}
@@ -32,3 +32,5 @@ skipSync=false;rateLimit=true;calls=[];r=await request('sync_messages');let valu
 calls=[];r=await request('sync_messages');assert.equal(r.status,200);assert(!calls.some(c=>c.url.startsWith('https://beds24.com')),'other edge invocation obeys persisted cooldown');
 limited=false;rateLimit=false;metadataCached=true;calls=[];r=await request('sync_messages');assert.equal(r.status,200);assert(!calls.some(c=>c.url.includes('/bookings?')),'recent booking metadata is not reloaded for the entire inbox');
 console.log('online edge cache: duplicate sync suppression, 429 cache fallback, shared cooldown and metadata reuse passed');
+
+lastSync=new Date().toISOString();calls=[];await request('sync_messages');assert(calls.some(c=>c.url.includes('maxAge=2')),'warm sync only fetches overlapping recent days');

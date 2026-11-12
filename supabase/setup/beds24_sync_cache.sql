@@ -99,7 +99,7 @@ declare c omg_private.online_connections%rowtype;s omg_private.online_sync_state
   if s.leased_until>now() or s.next_at>now() then return jsonb_build_object('skip',true,'retry_at',greatest(s.leased_until,s.next_at));end if;
   if exists(select 1 from omg_private.online_sync_state where scope=account_key and next_at>now()) then return jsonb_build_object('skip',true,'limited',true,'retry_at',(select next_at from omg_private.online_sync_state where scope=account_key));end if;
   update omg_private.online_sync_state set lease=gen_random_uuid(),leased_until=now()+interval '5 minutes',updated_at=now() where scope=k returning * into s;
-  return jsonb_build_object('lease',s.lease);
+  return jsonb_build_object('lease',s.lease,'last_success',s.last_success);
  elsif p_action='finish' then
   update omg_private.online_sync_state set leased_until=null,next_at=now()+make_interval(secs=>case when coalesce((p_data->>'success')::boolean,false) then case when p_data->>'scope' like 'thread:%' then 60 else 300 end else 60 end),last_success=case when coalesce((p_data->>'success')::boolean,false) then now() else last_success end,updated_at=now() where scope=k and lease=(p_data->>'lease')::uuid;
  else raise exception '지원하지 않는 요청입니다.';end if;

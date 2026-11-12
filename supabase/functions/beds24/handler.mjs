@@ -32,9 +32,9 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
   if(!c.secret.token||c.secret.expiresAt<Date.now()+60000){const t=await api('/authentication/token',{refreshToken:c.secret.refreshToken});if(!t.token)throw Error('Beds24 연결을 다시 확인해주세요.');c.secret={...c.secret,token:t.token,expiresAt:Date.now()+Math.max(60,Number(t.expiresIn)||3600)*1000};await internal('token',property,{secret:c.secret});}tokenProperties.set(c.secret.token,property);return c;
  }
  async function booking(property,c,id){let found=false;const path='/bookings?id='+positive(id)+'&propertyId='+positive(c.beds_property_id);const save=async rows=>{if(rows.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)||Number(b.id)!==Number(id)))throw Error('숙소가 일치하지 않습니다.');if(rows.length){found=true;await internal('bookings',property,{items:rows.map(selectBooking)});}};await pages(path,{token:c.secret.token},save);if(!found)await pages(path+'&status=cancelled',{token:c.secret.token},save);if(!found)throw Error('해당 숙소에서 예약을 찾지 못했습니다.');}
- async function messages(property,c,id,notify=false){
+ async function messages(property,c,id,notify=false,maxAge=30){
   const bookingIds=new Set();
-  await pages('/bookings/messages?propertyId='+positive(c.beds_property_id)+(id?'&bookingId='+positive(id):'&maxAge=30'),{token:c.secret.token},async rows=>{
+  await pages('/bookings/messages?propertyId='+positive(c.beds_property_id)+(id?'&bookingId='+positive(id):'&maxAge='+maxAge),{token:c.secret.token},async rows=>{
    if(rows.some(m=>Number(m.propertyId)!==Number(c.beds_property_id)||(id&&Number(m.bookingId)!==Number(id))))throw Error('메시지 숙소가 일치하지 않습니다.');
    rows.forEach(m=>bookingIds.add(positive(m.bookingId)));
    await internal('messages',property,{items:rows.map(selectMessage),notify});
@@ -110,7 +110,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
       let q='propertyId='+c.beds_property_id;const before=new Date(Date.parse(d.from)-86400000).toISOString().slice(0,10),after=new Date(Date.parse(d.to)+86400000).toISOString().slice(0,10);
       if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;else q+='&arrivalFrom='+before+'&arrivalTo='+after;
       for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix,{token:c.secret.token},rows=>internal('bookings',p,{items:rows.map(selectBooking)}));
-     }else{if(id)await booking(p,c,id);await messages(p,c,id,true);await push(p);}
+     }else{if(id)await booking(p,c,id);const age=claim.last_success?Math.min(30,Math.max(2,Math.ceil((Date.now()-Date.parse(claim.last_success))/86400000)+1)):30;await messages(p,c,id,true,age);await push(p);}
      await internal('synced',p);success=true;
     }catch(e){warning=e.message+' · 저장된 내역을 표시합니다.';}
     finally{await control('finish',p,{scope,lease:claim.lease,success});}

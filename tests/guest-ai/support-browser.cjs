@@ -30,6 +30,8 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  await page.evaluate(()=>NotificationBot.init({propertyId:'p',accessToken:'fixture'},{refresh:async()=>{},openDetail:i=>__details.push(i.message_id),compose:()=>{}}));
  await page.locator('.bot-room').click();await page.locator('[data-bot-row="ai"] .bot-notice').waitFor();
  assert.equal(await page.locator('.bot-notice').count(),9,'all categories share the same card');
+ assert.equal(await page.locator('.bot-notice-footer .bot-chat-action').count(),9,'all actions use compact footer');
+ assert((await page.locator('.bot-chat-action').evaluateAll(xs=>xs.map(x=>({bg:getComputedStyle(x).backgroundColor,width:x.getBoundingClientRect().width,card:x.closest('.bot-notice').getBoundingClientRect().width})))).every(x=>x.bg==='rgba(0, 0, 0, 0)'&&x.width<x.card*.6),'text actions are transparent and compact');
  const ai=page.locator('[data-bot-row="ai"]');assert(await ai.locator('.is-urgent').count());assert.equal(await ai.locator('.bot-notice-quote p').innerText(),'객실에 불이 난 것 같습니다');assert.equal(await ai.locator('.bot-notice-context').innerText(),'게스트명 · 객실 미정');
  assert(!(await ai.innerText()).includes('시설 고장 비상 확인 필요'));assert(!(await page.locator('#botTimeline').innerText()).includes('OMS-GUEST-CHAT:'));
  const holiday=page.locator('[data-bot-row="holiday"]');assert.equal(await holiday.locator('dt').allTextContents().then(x=>x.join('|')),'날짜|신청자·대상|사유');assert((await holiday.innerText()).includes('두 번째 줄도 유지'));assert(!(await holiday.innerText()).includes('결재완료 - 휴일신청'));assert((await holiday.innerText()).includes('승인 완료'));

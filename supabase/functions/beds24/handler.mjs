@@ -81,7 +81,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     if(req.method!=='POST')return reply({ok:false},405);
     const p=u.searchParams.get('property'),secret=u.searchParams.get('key');if(!UUID.test(p||'')||!/^[a-f0-9]{64}$/.test(secret||''))return reply({ok:false},401);
     const raw=await req.text();if(raw.length>1000000)return reply({ok:false},413);const payload=JSON.parse(raw);
-    await internal('webhook',p,{key:secret,booking_id:positive(payload.booking?.id)});waitUntil(drain());return reply({ok:true});
+    await internal('webhook',p,{key:secret,booking_id:positive(payload.booking?.id),event_kind:payload.message||payload.messages?'message':'booking'});waitUntil(drain());return reply({ok:true});
    }
    if(req.method!=='POST')return reply({ok:false},405);
    if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(drain());return reply({ok:true},202);}
@@ -89,7 +89,24 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
    const a=await owner(b.access_token,'auth',{property_id:d.property_id}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
-   if(['settings','save_settings','reuse_connection','bookings','inbox','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
+   if(['settings','save_settings','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
+   if(b.action==='save_translation'){
+    if(typeof d.key!=='string'||d.key.length<20||d.key.length>300)throw Error('Google Cloud Translation API 키를 확인해주세요.');
+    const check=await fetcher('https://translation.googleapis.com/language/translate/v2/languages',{method:'GET',headers:{'X-Goog-Api-Key':d.key},signal:AbortSignal.timeout(15000)});
+    if(!check.ok)throw Error('Google 번역 키를 확인하지 못했습니다. Cloud Translation API 활성화와 키 권한을 확인해주세요.');
+    return reply(await scoped('save_translation'));
+   }
+   if(b.action==='translate'){
+    const message_id=positive(d.message_id),args={p_property:p,p_data:{message_id}},job=await rpc('online_translation',{...args,p_action:'claim'});
+    if(job.cached)return reply({ok:true,text:job.text,cached:true});
+    if(job.unconfigured||job.busy)return reply({ok:true,unconfigured:job.unconfigured,busy:job.busy});
+    try{
+     const r=await fetcher('https://translation.googleapis.com/language/translate/v2',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':job.key},body:JSON.stringify({q:job.body,target:'ko',format:'text',model:'nmt'}),signal:AbortSignal.timeout(20000)});
+     if(!r.ok)throw Error('번역 서비스 연결·사용 한도를 확인해주세요.');
+     const v=await r.json(),text=v.data?.translations?.[0]?.translatedText;if(typeof text!=='string'||!text)throw Error('번역 결과를 받지 못했습니다.');
+     await rpc('online_translation',{...args,p_action:'finish',p_data:{message_id,lease:job.lease,text}});return reply({ok:true,text});
+    }catch(e){await rpc('online_translation',{...args,p_action:'finish',p_data:{message_id,lease:job.lease,error:'translation_failed'}});throw Error('번역하지 못했습니다. 잠시 후 다시 시도하거나 기본정보의 번역 연결을 확인해주세요.');}
+   }
    if(b.action==='connect'){
     if(typeof d.code!=='string'||d.code.trim().length<8||d.code.length>2048)throw Error('Beds24 Invite code를 입력해주세요.');
     const t=await api('/authentication/setup',{code:d.code.trim(),deviceName:'OMS Online'});if(!t.token||!t.refreshToken)throw Error('초대코드가 만료되었거나 이미 사용되었습니다. 새 코드를 발급해주세요.');

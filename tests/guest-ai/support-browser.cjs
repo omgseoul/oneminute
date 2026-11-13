@@ -1,7 +1,7 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs'),assert=require('node:assert/strict');
 (async()=>{
- const browser=await chromium.launch({headless:true});
+ const browser=await chromium.launch({...(process.env.OMS_CHROMIUM_PATH?{executablePath:process.env.OMS_CHROMIUM_PATH}:{}),headless:true});
  const room='11111111-1111-4111-8111-111111111111';
  try{for(const width of [320,390,760]){
  const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -22,15 +22,17 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
    {message_id:'notice',message_type:'announcement',message:'청소 후 비품 재고를 확인해주세요.'},
    {message_id:'contract',message:'[CONTRACT] 근로계약서를 확인해주세요.'},
    {message_id:'fallback',message_type:'holiday_notice',message:'기존 형식이 아닌 알림도 내용 전체를 유지합니다. '+('긴문장'.repeat(45))},
+   {message_id:'booking',message:'[OMS-BOOKING:8123]\n당일 예약 접수\n예약 게스트 · 401호\n2026-11-12 → 2026-11-14 · Booking.com'},
    {message_id:'ai-regular',guest_chat_room_id:room,message:'[OMS-GUEST-CHAT:'+room+']\nAI 메시지 지원요청\n게스트명 · 401호\n게스트 문의가 왔습니다. 직원 확인이 필요합니다.\n직원 확인 필요\n숙박을 하루 더 연장할 수 있나요?'}
   ].map((item,n)=>({...base,...item,created_at:'2026-11-12T02:24:'+String(n).padStart(2,'0')+'Z'}));
   window.omgSupabase={rpc:async(name)=>({data:name==='notification_bot_settings'?{ok:true,bots:[{property_id:'p',display_name:'매니저',property_name:'One Minute'}]}:{ok:true,unread_by_property:{},messages:__items}})};
  },{room,portrait:'data:image/webp;base64,'+fs.readFileSync('bot-avatar-helper.webp').toString('base64')});
  await page.addScriptTag({content:fs.readFileSync('notification-bot.js','utf8')});
- await page.evaluate(()=>NotificationBot.init({propertyId:'p',accessToken:'fixture'},{refresh:async()=>{},openDetail:i=>__details.push(i.message_id),compose:()=>{}}));
+ await page.evaluate(()=>NotificationBot.init({propertyId:'p',accessToken:'fixture',sessionKind:'staff'},{refresh:async()=>{},openDetail:i=>__details.push(i.message_id),compose:()=>{}}));
  await page.locator('.bot-room').click();await page.locator('[data-bot-row="ai"] .bot-notice').waitFor();
- assert.equal(await page.locator('.bot-notice').count(),9,'all categories share the same card');
- assert.equal(await page.locator('.bot-notice-footer .bot-chat-action').count(),9,'all actions use compact footer');
+ const expectedCards=await page.evaluate(()=>__items.length);
+ assert.equal(await page.locator('.bot-notice').count(),expectedCards,'all categories share the same card');
+ assert.equal(await page.locator('.bot-notice-footer .bot-chat-action').count(),expectedCards,'all actions use compact footer');
  assert((await page.locator('.bot-chat-action').evaluateAll(xs=>xs.map(x=>({bg:getComputedStyle(x).backgroundColor,width:x.getBoundingClientRect().width,card:x.closest('.bot-notice').getBoundingClientRect().width})))).every(x=>x.bg==='rgba(0, 0, 0, 0)'&&x.width<x.card*.6),'text actions are transparent and compact');
  const ai=page.locator('[data-bot-row="ai"]');assert(await ai.locator('.is-urgent').count());assert.equal(await ai.locator('.bot-notice-quote p').innerText(),'객실에 불이 난 것 같습니다');assert.equal(await ai.locator('.bot-notice-context').innerText(),'게스트명 · 객실 미정');
  assert(!(await ai.innerText()).includes('시설 고장 비상 확인 필요'));assert(!(await page.locator('#botTimeline').innerText()).includes('OMS-GUEST-CHAT:'));
@@ -41,6 +43,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  assert((await page.locator('.bot-notice-body p,.bot-notice-fields dd').evaluateAll(xs=>xs.map(x=>getComputedStyle(x).fontWeight))).every(w=>w==='400'));
  assert(await page.locator('#botTimeline').evaluate(el=>el.scrollWidth<=el.clientWidth),'no horizontal clipping');
  for(const id of ['holiday','system','attendance','share','notice','contract'])await page.locator('[data-bot-message="'+id+'"]').click();assert.deepEqual(await page.evaluate(()=>__details),['holiday','system','attendance','share','notice','contract']);
+ const booking=page.locator('[data-bot-row="booking"]');assert.equal(await booking.locator('.is-urgent').count(),0);assert.equal(await booking.locator('.bot-notice-badge').innerText(),'당일 예약 접수');assert(!(await booking.innerText()).includes('OMS-BOOKING'));await booking.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'booking');
  // Opening cards retains their existing action and does not acknowledge approval/notice content.
  assert.equal(await page.locator('[data-bot-row="notice"] .bot-state').innerText(),'확인 필요');
  await page.locator('#botTimeline').evaluate(el=>el.scrollTop=0);await page.screenshot({path:'/tmp/oms-ai-support-mobile-'+width+'.png'});

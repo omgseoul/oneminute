@@ -1,6 +1,6 @@
 const {chromium}=require('playwright'),fs=require('fs'),assert=require('assert/strict');
 (async()=>{
- const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:360,height:780}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const browser=await chromium.launch({...(process.env.OMS_CHROMIUM_PATH?{executablePath:process.env.OMS_CHROMIUM_PATH}:{}),headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:360,height:780}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',r=>{const f=new URL(r.request().url()).pathname.slice(1);if(['online.html','online.css','online.js','top-layout.css','property-selector.js','select-picker.js'].includes(f))return r.fulfill({body:fs.readFileSync(f),contentType:f.endsWith('.css')?'text/css':f.endsWith('.js')?'text/javascript':'text/html'});return r.fulfill({body:'',contentType:'text/javascript'});});
  await page.addInitScript(()=>{
   window.omgSession={require:async()=>({sessionKind:'owner',accessToken:'fixture',propertyId:'home'})};window.OMG_SUPABASE={url:'https://fixture.test',publishableKey:'test'};

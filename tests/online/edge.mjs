@@ -48,3 +48,15 @@ await trRequest(p);assert(!translationCalls.some(c=>c.url.includes('googleapis')
 let trResult=await (await trRequest(token)).json();assert.equal(trResult.text,'안녕하세요');assert(translationFinished);assert(!JSON.stringify(trResult).includes('translation-secret'));assert.equal(translationCalls.find(c=>c.url.includes('googleapis')).b.q,'hello','only server-loaded message body sent for translation');assert(!translationCalls.some(c=>c.url.includes('openai')||c.url.includes('guest_ai')));
 translationCached=true;translationCalls=[];trResult=await (await trRequest(token)).json();assert(trResult.cached);assert(!translationCalls.some(c=>c.url.includes('googleapis')),'repeat translation has no provider call');
 console.log('Translation: tenant authorization, minimal text, no AI credits, cached reuse passed');
+
+// Booking occurrence data shares the booking-time lease and never trusts a client date basis.
+limited=false;rateLimit=false;skipSync=false;calls=[];
+r=await request('sync_booking_data',{property_id:id,from:'2026-11-01',to:'2026-11-13',basis:'arrival'});assert.equal(r.status,200);
+assert.equal(calls.find(c=>c.a==='begin').body.p_data.scope,'bookings:booked:2026-11-01:2026-11-13');
+assert(calls.some(c=>c.url.includes('/bookings?')&&new URL(c.url).searchParams.has('bookingTimeFrom')));
+assert(!calls.some(c=>c.url.includes('/bookings?')&&new URL(c.url).searchParams.has('arrivalFrom')));
+assert.equal(calls.find(c=>c.a==='booking_data').body.p_data.property_id,id);assert(calls.some(c=>c.a==='push_pending'),'booking sync drains newly created same-day alerts');
+skipSync=true;calls=[];r=await request('sync_booking_data',{from:'2026-11-01',to:'2026-11-13'});assert((await r.json()).cached);assert(!calls.some(c=>c.url.startsWith('https://beds24.com')));assert(calls.some(c=>c.a==='booking_data'));
+for(const action of ['booking_data','booking_data_count','save_booking_alert']){calls=[];r=await request(action,{property_id:id});assert.equal(r.status,200);assert.equal(calls.at(-1).body.p_data.property_id,id);assert(!calls.some(c=>c.url.startsWith('https://beds24.com')));}
+calls=[];r=await request('booking_data_count',{property_id:id},p);assert.equal(r.status,400);assert(!calls.some(c=>c.a==='booking_data_count'),'unauthorized caller cannot read booking counts');
+console.log('Booking Data edge: authorized branch, booking-time query, shared sync lease, stored reads and notification draining passed');

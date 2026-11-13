@@ -131,7 +131,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if(!dispatch.ok)return reply({ok:false,code:'not_found'},404);
         if(env('PUSH_DELIVERY_ENABLED')!=='true')return reply({ok:false,code:'not_enabled'},503);
         deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
-        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:'message',priority:'normal',messageType:'general',senderLabel:'온라인 게스트',route:dispatch.route};
+        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route};
       } else if (path.endsWith('/reminder')) {
         if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);

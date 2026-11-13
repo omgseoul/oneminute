@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 import org.json.JSONObject;
 
 final class NativeMessagePopupQueue {
-    private static final String[] FIELDS={"alertId","senderLabel","message","messageType"};
+    private static final String[] FIELDS={"alertId","senderLabel","message","messageType","guestContext"};
     private static SharedPreferences prefs(Context c){return c.getSharedPreferences("omg_message_popup_queue",0);}
     static String scope(Context c){SharedPreferences p=c.getSharedPreferences("omg_push",0);String role=p.getString("role",""),member=p.getString("member_id","");return (role.equals("owner")||role.equals("staff"))&&!member.isEmpty()?role+":"+member:"";}
     private static MessagePopupQueue load(Context c){SharedPreferences p=prefs(c);String scope=scope(c);if(!scope.equals(p.getString("scope","")))p.edit().clear().putString("scope",scope).commit();return new MessagePopupQueue(p.getString("data","{}"));}

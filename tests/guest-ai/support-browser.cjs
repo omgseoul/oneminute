@@ -22,6 +22,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
    {message_id:'notice',message_type:'announcement',message:'청소 후 비품 재고를 확인해주세요.'},
    {message_id:'contract',message:'[CONTRACT] 근로계약서를 확인해주세요.'},
    {message_id:'fallback',message_type:'holiday_notice',message:'기존 형식이 아닌 알림도 내용 전체를 유지합니다. '+('긴문장'.repeat(45))},
+   {message_id:'online',message:'[OMS-ONLINE:8123]\n온라인 게스트\nWhat time is check-in?'},
    {message_id:'booking',message:'[OMS-BOOKING:8123]\n당일 예약 접수\n예약 게스트 · 401호\n2026-11-12 → 2026-11-14 · Booking.com'},
    {message_id:'ai-regular',guest_chat_room_id:room,message:'[OMS-GUEST-CHAT:'+room+']\nAI 메시지 지원요청\n게스트명 · 401호\n게스트 문의가 왔습니다. 직원 확인이 필요합니다.\n직원 확인 필요\n숙박을 하루 더 연장할 수 있나요?'}
   ].map((item,n)=>({...base,...item,created_at:'2026-11-12T02:24:'+String(n).padStart(2,'0')+'Z'}));
@@ -44,6 +45,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  assert(await page.locator('#botTimeline').evaluate(el=>el.scrollWidth<=el.clientWidth),'no horizontal clipping');
  for(const id of ['holiday','system','attendance','share','notice','contract'])await page.locator('[data-bot-message="'+id+'"]').click();assert.deepEqual(await page.evaluate(()=>__details),['holiday','system','attendance','share','notice','contract']);
  const booking=page.locator('[data-bot-row="booking"]');assert.equal(await booking.locator('.is-urgent').count(),0);assert.equal(await booking.locator('.bot-notice-badge').innerText(),'당일 예약 접수');assert(!(await booking.innerText()).includes('OMS-BOOKING'));await booking.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'booking');
+ const online=page.locator('[data-bot-row="online"]');await online.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'online','staff opens an authorized notice detail rather than an owner-only online page');
  // Opening cards retains their existing action and does not acknowledge approval/notice content.
  assert.equal(await page.locator('[data-bot-row="notice"] .bot-state').innerText(),'확인 필요');
  await page.locator('#botTimeline').evaluate(el=>el.scrollTop=0);await page.screenshot({path:'/tmp/oms-ai-support-mobile-'+width+'.png'});

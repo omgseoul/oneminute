@@ -222,6 +222,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         const results = await Promise.allSettled(targets.slice(i, i + 8).map(t => {
           const cap = recipientModes[t.topic] || 'urgent';
           const mode = payload.messageType === 'work_report' || cap === 'weak' ? 'weak' : cap === 'normal' ? 'normal' : cap === 'strong' ? 'strong'
+            : path.endsWith('/online') && recipientModes[t.topic] === 'urgent' ? 'urgent'
             : payload.messageType === 'guest_chat' ? 'urgent'
             : payload.priority === 'urgent' ? 'urgent' : 'message';
           const data = {

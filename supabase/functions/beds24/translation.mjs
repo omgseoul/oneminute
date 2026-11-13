@@ -1,5 +1,6 @@
 // Independent translation budget: no guest-AI credits or prompt access.
 const decodeText=value=>value.replace(/&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos);/gi,(match,entity)=>{const named={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"},key=entity.toLowerCase();if(key[0]!=='#')return named[key]||match;const n=parseInt(key.slice(key[1]==='x'?2:1),key[1]==='x'?16:10);return n>0&&n<=0x10ffff&&!(n>=0xd800&&n<=0xdfff)?String.fromCodePoint(n):match;});
+export function sameLanguage(a,b){const norm=v=>{const k=String(v||'').toLowerCase().replace(/_/g,'-');return ['zh','zh-cn','zh-hans'].includes(k)?'zh-cn':['zh-tw','zh-hant'].includes(k)?'zh-tw':k.split('-')[0];};return !!a&&!!b&&norm(a)===norm(b);}
 export function createTranslation({rpc,fetcher}) {
  const ctl=(action,property=null,data={},user=null)=>rpc('translation_control',{p_action:action,p_property:property,p_user:user,p_data:data});
  async function validate(key){
@@ -17,7 +18,7 @@ export function createTranslation({rpc,fetcher}) {
  }
  async function translate(property,data){
   const job=await ctl('claim',property,data);
-  if(job.cached)return {ok:true,...job};
+  if(job.cached)return {ok:true,...job,same_language:!!job.same_language||(data.direction!=='outgoing'&&sameLanguage(job.source_language,job.target))};
   if(job.busy)throw Error('번역 처리 중입니다. 잠시 후 다시 확인해주세요.');
   if(job.limit_reached)throw Error('이번 달 남은 제공량으로 번역할 수 없습니다. 기본정보에 개인 번역 API 키를 등록해주세요.');
   if(job.unconfigured)throw Error('번역 API 연결이 필요합니다. 운영자 공용 연결 또는 기본정보의 개인 키를 확인해주세요.');
@@ -29,7 +30,7 @@ export function createTranslation({rpc,fetcher}) {
    const text=typeof translation.translatedText==='string'?decodeText(translation.translatedText):null,source_language=translation.detectedSourceLanguage||data.source_language||null;
    if(typeof text!=='string'||!text||text.length>20000)throw Error('invalid_translation');
    const result=await ctl('finish',property,{id:job.id,lease:job.lease,text,source_language,charged:true});
-   return {ok:true,id:job.id,text,source_language,target:job.target,usage:result.usage};
+   return {ok:true,id:job.id,text,source_language,target:job.target,same_language:data.direction!=='outgoing'&&(sameLanguage(source_language,job.target)||text===job.body),usage:result.usage};
   }catch{
    await ctl('finish',property,{id:job.id,lease:job.lease,charged:!received||charged});
    throw Error('번역하지 못했습니다. API 연결·사용 한도를 확인하고 잠시 후 다시 시도해주세요.');

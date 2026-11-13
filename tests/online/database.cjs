@@ -116,5 +116,6 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  assert.equal((await db.query("select has_function_privilege('anon','public.online_translation(text,uuid,jsonb)','EXECUTE') ok")).rows[0].ok,false);
  await require('./translation-database.cjs')({db,owner,internal,p1,p2,t1,t2,id});
  await require('./followup-database.cjs')({db,owner,p1,p2,id});
+ await require('./translation-language-database.cjs')({db,owner,p1,p2,t2});
  console.log('online database: tenant isolation, Vault secrecy, webhook dedupe, approval freshness, idempotent sends/billing passed');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -1,7 +1,7 @@
 const {chromium}=require('playwright'),fs=require('fs'),assert=require('assert/strict');
 (async()=>{
  const browser=await chromium.launch({...(process.env.OMS_CHROMIUM_PATH?{executablePath:process.env.OMS_CHROMIUM_PATH}:{}),headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:360,height:780}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.route('**/*',r=>{const f=new URL(r.request().url()).pathname.slice(1);if(['online.html','online.css','online.js','top-layout.css','property-selector.js','select-picker.js'].includes(f))return r.fulfill({body:fs.readFileSync(f),contentType:f.endsWith('.css')?'text/css':f.endsWith('.js')?'text/javascript':'text/html'});return r.fulfill({body:'',contentType:'text/javascript'});});
+ await page.route('**/*',r=>{const f=new URL(r.request().url()).pathname.slice(1);if(f.startsWith('assets/booking-channels/'))return r.fulfill({body:fs.readFileSync(f),contentType:'image/svg+xml'});if(['online.html','online.css','online.js','top-layout.css','property-selector.js','select-picker.js'].includes(f))return r.fulfill({body:fs.readFileSync(f),contentType:f.endsWith('.css')?'text/css':f.endsWith('.js')?'text/javascript':'text/html'});return r.fulfill({body:'',contentType:'text/javascript'});});
  await page.addInitScript(()=>{
   window.omgSession={require:async()=>({sessionKind:'owner',accessToken:'fixture',propertyId:'home'})};window.OMG_SUPABASE={url:'https://fixture.test',publishableKey:'test'};
   window.fetch=async(u,o)=>{const {action,data}=JSON.parse(o.body),p=data.property_id||'home',names={home:'One Minute',other:'OMG House'};let v={ok:true};
@@ -14,7 +14,7 @@ const {chromium}=require('playwright'),fs=require('fs'),assert=require('assert/s
  await page.locator('.menu-card[href="#checkin"]').click();await page.locator('.booking-item').first().waitFor();
  for(const width of [320,360,412]){
   await page.setViewportSize({width,height:780});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  const box=await page.locator('.booking-item summary').first().evaluate(e=>({h:e.getBoundingClientRect().height,tops:[...e.children].map(c=>Math.round(c.getBoundingClientRect().top)),scroll:e.scrollWidth,width:e.clientWidth}));assert(box.h<=52,'one-row booking summary');assert(box.scroll<=box.width);assert(Math.max(...box.tops)-Math.min(...box.tops)<7,'fields align on one line');
+  const box=await page.locator('.booking-item summary').first().evaluate(e=>({h:e.getBoundingClientRect().height,tops:[...e.children].map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2)),scroll:e.scrollWidth,width:e.clientWidth}));assert(box.h<=52,'one-row booking summary');assert(box.scroll<=box.width);assert(Math.max(...box.tops)-Math.min(...box.tops)<7,'fields align on one line');
  }
  await page.setViewportSize({width:360,height:780});await page.screenshot({path:'/tmp/online-reservations-compact.png'});
  await page.locator('.booking-item summary').first().click();await page.locator('.booking-item[open] .text-link').click();await page.waitForFunction(()=>document.body.dataset.view==='thread');

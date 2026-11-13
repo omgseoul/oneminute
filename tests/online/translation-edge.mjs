@@ -14,13 +14,13 @@ const h=createBedsHandler({env:n=>({SUPABASE_URL:'https://test.supabase.co',SUPA
   if(b.p_action==='personal_key')return res({key:'old-secret-key-for-test',fingerprint:'hash'});
   return res({ok:true,usage:{limit:50000,used:10}});
  }
- if(url==='https://translation.googleapis.com/language/translate/v2')return valid?res({data:{translations:[{translatedText:'Translated',detectedSourceLanguage:'fr'}]}}):res({},403);
+ if(url==='https://translation.googleapis.com/language/translate/v2')return valid?res({data:{translations:[{translatedText:'You&#39;re welcome &amp; safe',detectedSourceLanguage:'fr'}]}}):res({},403);
  throw Error('Unexpected request '+url);
 }});
 const request=(action,data={},platform=false)=>h(new Request('https://test.supabase.co/functions/v1/beds24',{method:'POST',body:JSON.stringify({action,data,...(platform?{platform_token:'jwt'}:{access_token:token})})}));
 operator=false;await request('translation_save',{key:'new-secret-key-for-test'},true);assert(!calls.some(x=>x.url.includes('googleapis')),'platform authority checked before secret validation');
 operator=true;calls=[];valid=false;await request('save_translation',{key:'new-secret-key-for-test'});assert(!calls.some(x=>x.b.p_action==='save_key'),'invalid candidate never replaces valid stored key');
-valid=true;calls=[];let result=await(await request('translate_reply',{booking_id:20,body:'안녕하세요',target:'auto'})).json();assert.equal(result.target,'fr');assert.equal(calls.filter(x=>x.url.includes('googleapis')).length,2,'detect guest language by incoming translation then translate outgoing');assert(!calls.some(x=>x.url.includes('beds24.com')),'preview never sends a guest message');assert(!JSON.stringify(result).includes('private-key'));
+valid=true;calls=[];let result=await(await request('translate_reply',{booking_id:20,body:'안녕하세요',target:'auto'})).json();assert.equal(result.target,'fr');assert.equal(result.text,"You're welcome & safe");assert.equal(calls.filter(x=>x.url.includes('googleapis')).length,2,'detect guest language by incoming translation then translate outgoing');assert(!calls.some(x=>x.url.includes('beds24.com')),'preview never sends a guest message');assert(!JSON.stringify(result).includes('private-key'));
 blocked=true;calls=[];result=await(await request('translate',{message_id:10})).json();assert.equal(result.ok,false);assert(!calls.some(x=>x.url.includes('googleapis')),'quota denial never calls billed provider');
 valid=false;calls=[];await request('check_translation');assert(calls.some(x=>x.b.p_action==='personal_check_result'&&x.b.p_data.status==='invalid'));
 console.log('Translation Edge: operator auth, actual key validation, allowance denial, detected target and preview-only flow passed');

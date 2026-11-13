@@ -1,4 +1,5 @@
 // Independent translation budget: no guest-AI credits or prompt access.
+const decodeText=value=>value.replace(/&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos);/gi,(match,entity)=>{const named={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"},key=entity.toLowerCase();if(key[0]!=='#')return named[key]||match;const n=parseInt(key.slice(key[1]==='x'?2:1),key[1]==='x'?16:10);return n>0&&n<=0x10ffff&&!(n>=0xd800&&n<=0xdfff)?String.fromCodePoint(n):match;});
 export function createTranslation({rpc,fetcher}) {
  const ctl=(action,property=null,data={},user=null)=>rpc('translation_control',{p_action:action,p_property:property,p_user:user,p_data:data});
  async function validate(key){
@@ -25,8 +26,8 @@ export function createTranslation({rpc,fetcher}) {
    const r=await fetcher('https://translation.googleapis.com/language/translate/v2',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':job.key},body:JSON.stringify({q:job.body,target:job.target,format:'text',model:'nmt'}),signal:AbortSignal.timeout(20000)});received=true;charged=r.ok||r.status>=500;
    if(!r.ok)throw Error('provider_failed');
    const v=await r.json(),translation=v.data?.translations?.[0];if(!translation?.translatedText)throw Error('empty_translation');
-   const text=translation.translatedText,source_language=translation.detectedSourceLanguage||data.source_language||null;
-   if(typeof text!=='string'||text.length>20000)throw Error('invalid_translation');
+   const text=typeof translation.translatedText==='string'?decodeText(translation.translatedText):null,source_language=translation.detectedSourceLanguage||data.source_language||null;
+   if(typeof text!=='string'||!text||text.length>20000)throw Error('invalid_translation');
    const result=await ctl('finish',property,{id:job.id,lease:job.lease,text,source_language,charged:true});
    return {ok:true,id:job.id,text,source_language,target:job.target,usage:result.usage};
   }catch{

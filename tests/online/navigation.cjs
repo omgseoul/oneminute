@@ -11,21 +11,21 @@ const {chromium}=require('playwright'),fs=require('fs'),assert=require('assert/s
   };
  });
  await page.goto('https://omgworks24.com/online.html');await page.locator('#propertyName button').waitFor();
- await page.locator('.menu-card[href="#search"]').click();await page.locator('.booking-item').first().waitFor();
+ await page.locator('.menu-card[href="#checkin"]').click();await page.locator('.booking-item').first().waitFor();
  for(const width of [320,360,412]){
   await page.setViewportSize({width,height:780});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   const box=await page.locator('.booking-item summary').first().evaluate(e=>({h:e.getBoundingClientRect().height,tops:[...e.children].map(c=>Math.round(c.getBoundingClientRect().top)),scroll:e.scrollWidth,width:e.clientWidth}));assert(box.h<=52,'one-row booking summary');assert(box.scroll<=box.width);assert(Math.max(...box.tops)-Math.min(...box.tops)<7,'fields align on one line');
  }
  await page.setViewportSize({width:360,height:780});await page.screenshot({path:'/tmp/online-reservations-compact.png'});
  await page.locator('.booking-item summary').first().click();await page.locator('.booking-item[open] .text-link').click();await page.waitForFunction(()=>document.body.dataset.view==='thread');
- await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='search');
+ await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='checkin');
  await page.locator('#onlineBack').click();await page.waitForFunction(()=>document.body.dataset.view==='menu');
- await page.locator('.menu-card[href="#today"]').click();await page.waitForFunction(()=>document.body.dataset.view==='today');await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='menu');
+ await page.locator('.menu-card[href="#checkin"]').click();await page.waitForFunction(()=>document.body.dataset.view==='checkin');await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='menu');
  await page.locator('#propertyName button').click();await page.locator('#propertyName input[data-value="other"]').check();await page.locator('#propertyName button').click();assert.equal(await page.locator('#propertyName button').innerText(),'All');
  await page.locator('.menu-card[href="#settings"]').click();await page.waitForFunction(()=>document.body.dataset.view==='settings');assert.equal(await page.locator('#propertyName input[type=radio]').count(),2);assert.equal(await page.locator('#propertyName input[type=checkbox]').count(),0);
  await page.locator('#propertyName button').click();await page.screenshot({path:'/tmp/online-property-single.png'});await page.locator('#propertyName input[value="other"]').check();await page.waitForFunction(()=>document.querySelector('#webhookProperty').textContent==='OMG House');assert(await page.locator('#bedsPropertyPickerButton').isDisabled());assert(!(await page.locator('#bedsProperty').isVisible()));
  await page.locator('#onlineBack').click();await page.waitForFunction(()=>document.body.dataset.view==='menu');assert.equal(await page.locator('#propertyName button').innerText(),'All');await page.locator('#propertyName button').click();await page.screenshot({path:'/tmp/online-property-multi.png'});
  await page.goto('https://omgworks24.com/app.html');
- await page.goto('https://omgworks24.com/online.html#thread/123?property=other&from=search');await page.waitForFunction(()=>document.body.dataset.view==='thread');await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='search');await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='menu');assert.deepEqual(errors,[]);
+ await page.goto('https://omgworks24.com/online.html#thread/123?property=other&from=search');await page.waitForFunction(()=>document.body.dataset.view==='thread');await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='checkin');await page.goBack();await page.waitForFunction(()=>document.body.dataset.view==='menu');assert.deepEqual(errors,[]);
  await browser.close();console.log('Chromium: one-line reservations at 320/360/412px, expansion, native/browser and header back, custom single/multi controls and direct-link parent history passed.');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -1,0 +1,20 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+module.exports=async({db,owner,p1,p2,t2})=>{
+ const sql=fs.readFileSync('supabase/setup/beds24_translation_language.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const ctl=async data=>(await db.query("select public.translation_control('claim',$1,null,$2::jsonb) v",[p1,JSON.stringify(data)])).rows[0].v;
+ assert.equal((await owner('settings')).incoming_translation_language,'ko');
+ await owner('save_translation_language',{target:'en'});assert.equal((await owner('settings')).incoming_translation_language,'en');assert.equal((await owner('settings',{},t2)).incoming_translation_language,'ko');
+ await assert.rejects(()=>owner('save_translation_language',{property_id:p2,target:'ja'}),/권한/);await assert.rejects(()=>owner('save_translation_language',{target:'auto'}),/언어/);
+ await db.query('update properties set translation_limit_override=100000 where id=$1',[p1]);
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,80001,10,'guest','안녕하세요. 감사합니다.',now()),($1,80002,10,'guest','Good evening, thank you.',now())",[p1]);
+ let tr=await ctl({message_id:80001,direction:'incoming'});assert.equal(tr.target,'en','incoming defaults to saved language');assert(tr.lease);await db.query("select public.translation_control('finish',$1,null,$2::jsonb)",[p1,JSON.stringify({id:tr.id,lease:tr.lease,text:'Hello. Thank you.',source_language:'ko',charged:true})]);
+ await owner('save_translation_language',{target:'ko'});const before=(await db.query('select coalesce(sum(used+reserved+personal),0)::int n from omg_private.translation_usage where property_id=$1',[p1])).rows[0].n;
+ tr=await ctl({message_id:80001,direction:'incoming'});assert(tr.same_language&&tr.cached&&!tr.lease,'known Korean same-language input is a no-op');
+ assert.equal((await db.query('select coalesce(sum(used+reserved+personal),0)::int n from omg_private.translation_usage where property_id=$1',[p1])).rows[0].n,before,'no-op does not reserve or charge translation characters');
+ const english=await ctl({message_id:80002,direction:'incoming'});assert.equal(english.target,'ko');await db.query("select public.translation_control('finish',$1,null,$2::jsonb)",[p1,JSON.stringify({id:english.id,lease:english.lease,text:'좋은 저녁입니다. 감사합니다.',source_language:'en',charged:true})]);
+ await owner('save_translation_language',{target:'en'});tr=await ctl({message_id:80002,direction:'incoming'});assert(tr.same_language&&tr.source_language==='en','known English bypasses translation after switching default');
+ tr=await ctl({message_id:80001,direction:'incoming',target:'ja'});assert.equal(tr.target,'ja');assert(tr.id!==english.id,'target languages have separate cache identities');
+ await owner('save_translation_language',{target:'ko'});await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,80003,10,'guest','짐은 보관할게요!',now())",[p1]);assert((await ctl({message_id:80003,direction:'incoming'})).same_language,'plain Korean needs no provider request');
+ assert((await owner('inbox')).threads.some(t=>typeof t.needs_reply==='boolean'),'existing follow-up helper survives language patch');
+ console.log('Translation language DB: property persistence, allowed languages, auth boundaries, per-target cache and same-language no-charge bypass passed');
+};

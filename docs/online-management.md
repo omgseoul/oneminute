@@ -38,3 +38,10 @@ The stay picker uses each property's local calendar day: check-in is arrival tod
 Reply state compares the latest incoming message against later host messages across the stored conversation, including messages outside the chosen period. Confirmed `sent` outbox rows also count while sync is pending; drafts, failures, uncertain deliveries and internal notes do not. A newer incoming message makes the conversation unanswered again. Host-only conversations are neither replied questions nor unanswered questions.
 
 Expanding an incoming message marks incoming messages through its `(sent_at,id)` position as read within the same property/booking. Newer arrivals remain unread. When an open card stops matching the unread/unanswered filter after reading or sending, it stays visible until collapsed; changing filters clears that temporary retention. Reading and filtering query the stored inbox and do not request extra Beds24 syncs.
+
+
+## Incoming translation language
+
+After the existing inbox and translation setup, apply `supabase/setup/beds24_translation_language.sql`, deploy Beds24 with its existing dependency set, then publish `online.*`. The default incoming translation language is stored per property (Korean initially) and saved via the same authorized owner action. Incoming cache identity includes target language; outgoing `auto` continues to use the guest's detected source language.
+
+Known same-language incoming text returns silently before reserving translation allowance; plain Hangul-only text also bypasses the provider for Korean. Unknown language uses the provider's detection, stores the result once, and hides a duplicate translation when source and target match. A first detection may still incur the provider's normal character usage. Outgoing translation remains an explicit preview and separate send action in both inbox and full conversation forms.

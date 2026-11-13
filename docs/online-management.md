@@ -70,6 +70,8 @@ Language-code source: https://cloud.google.com/translate/docs/languages (NMT tab
 
 ## Basic information card accordions and active online-message alerts
 
+Inbox direction, unread/unreplied toggles, reservation statuses, stay scopes and selected branches persist on the device under the current owner's key and are restored before the first inbox query. Restored branch IDs are intersected with current access; entirely removed selections fall back to the home property. The latest valid local message period takes precedence over an older server value. Storage failures preserve live filtering, and malformed preferences fall back to defaults. These display preferences do not change delivery settings.
+
 Basic Information uses six native details/summary cards with one-line descriptions. All start closed and open independently. Webhook and translation help buttons appear only in expanded headings; opening help does not collapse the card. Existing connection and translation controls remain available inside their cards.
 
 Apply `supabase/setup/beds24_message_alert_draft.sql` after the earlier migrations, then `supabase/setup/beds24_message_alert_routing.sql`, deploy Beds24 and dispatch-notification, and publish the frontend and notification bot script. Previously saved preferences are copied into the active per-property `online_message_alert` field without resetting them. The owner-authorized `save_message_alert` action validates and immediately saves active preferences; the older draft-named action remains a compatible alias for clients loading older scripts. The UI shows unsaved changes distinctly and prevents edits while a save is pending.

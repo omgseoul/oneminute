@@ -25,6 +25,7 @@ jobs:
           node tests/online/ui.cjs
           node tests/online/booking-data-ui.cjs
           node tests/online/followup-ui.cjs
+          node tests/online/filter-memory-ui.cjs
           node tests/online/translation-ui.cjs
           node tests/online/translation-edge.mjs
           node tests/online/auto-translation-edge.mjs

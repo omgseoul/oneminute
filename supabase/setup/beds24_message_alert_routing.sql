@@ -54,6 +54,17 @@ declare f text;n text;begin
  end if;execute f;
 end $patch$;
 
+-- Home polling keeps notice history/unread counts but must respect popup eligibility.
+do $patch$
+declare f text;n text;begin
+ f:=pg_get_functiondef('public.list_property_messages(uuid)'::regprocedure);
+ if strpos(f,'''online_popup_allowed''')=0 then
+  n:='jsonb_build_object(''message_id'',m.id,''property_id'',m.property_id';
+  if strpos(f,n)=0 then raise exception '홈 메시지 조회 위치를 확인해주세요.';end if;
+  f:=replace(f,n,n||',''online_popup_allowed'',case when m.source=''beds24'' then exists(select 1 from omg_private.online_messages om cross join lateral omg_private.online_message_alert_recipients(m.property_id,om.booking_id) target where om.property_id=m.property_id and om.notice_id=m.id and target.mode<>''weak'' and ((v_is_owner and target.owner_id=v_owner_id) or (not v_is_owner and target.employee_id=v_employee_id))) else true end');
+ end if;execute f;
+end $patch$;
+
 -- Delivery rechecks current schedule, duty and scope without backfilling new recipients.
 create or replace function public.get_online_push_dispatch(p_message_id uuid)returns jsonb language plpgsql security definer set search_path='' as $$
 declare m record;topics jsonb;modes jsonb;cfg jsonb;bid bigint;begin

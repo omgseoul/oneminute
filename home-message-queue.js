@@ -47,7 +47,7 @@
   active=null;render();setTimeout(()=>confirming=false,200);
  }
  function add(items,accessToken){
-  bind(accessToken);const ordinary=items.filter(i=>!i.report);
+  bind(accessToken);items=items.filter(i=>i.online_popup_allowed!==false);const ordinary=items.filter(i=>!i.report);
   if(typeof window.OMGNative?.showMessageAlerts==='function'&&ordinary.length){window.OMGNative.showMessageAlerts(JSON.stringify(ordinary));items=items.filter(i=>i.report);}
   for(const item of items)if(item.message_id&&!seen.has(item.message_id)&&active?.message_id!==item.message_id&&!queue.some(q=>q.message_id===item.message_id))queue.push(item);
   if(!active&&queue.length)render();else if(active)popup().querySelector('.message-arrival-count').textContent=`${queue.length+1}건 대기`;

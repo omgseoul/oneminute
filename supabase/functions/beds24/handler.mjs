@@ -102,12 +102,12 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    const a=await owner(b.access_token,'auth',{property_id:d.property_id}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
    if(b.action==='settings'){const v=await scoped('settings'),t=await translation.ctl('status',p);return reply({...v,translation:t.usage,translation_connected:!!(t.usage?.platform_ready||t.usage?.personal_connected)});}
-   if(['booking_data','booking_data_count','save_booking_alert','save_settings','save_translation_language','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
+   if(['save_auto_translation','booking_data','booking_data_count','save_booking_alert','save_settings','save_translation_language','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
    if(b.action==='save_translation')return reply(await translation.save(p,d.key));
    if(b.action==='check_translation')return reply(await translation.check(p));
    if(b.action==='remove_translation')return reply(await translation.ctl('remove_key',p));
    if(b.action==='translation_status')return reply(await translation.ctl('status',p));
-   if(b.action==='translate')return reply(await translation.translate(p,{message_id:positive(d.message_id),direction:'incoming',...(d.target?{target:d.target}:{})}));
+   if(b.action==='translate')return reply(await translation.translate(p,{message_id:positive(d.message_id),direction:'incoming',automatic:d.automatic===true,...(d.target?{target:d.target}:{})}));
    if(b.action==='translate_reply')return reply(await translation.outgoing(p,{...d,booking_id:positive(d.booking_id)}));
    if(b.action==='connect'){
     if(typeof d.code!=='string'||d.code.trim().length<8||d.code.length>2048)throw Error('Beds24 Invite code를 입력해주세요.');

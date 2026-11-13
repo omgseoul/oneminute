@@ -3,7 +3,7 @@ import {buildRequest,validateAnswer} from '../guest-ai/handler.mjs';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BASE='https://beds24.com/api/v2';
 export function positive(v){const n=Number(v);if(!Number.isSafeInteger(n)||n<=0)throw Error('예약번호를 확인해주세요.');return n;}
-export function dateRange(d){const valid=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;if(!valid(d.from)||!valid(d.to)||d.to<d.from||(Date.parse(d.to)-Date.parse(d.from))/86400000>92)throw Error('조회 기간은 최대 93일입니다.');if(!['arrival','booked','staying'].includes(d.basis))throw Error('조회 기준을 확인해주세요.');return d;}
+export function dateRange(d){const valid=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;if(!valid(d.from)||!valid(d.to)||d.to<d.from||(Date.parse(d.to)-Date.parse(d.from))/86400000>92)throw Error('조회 기간은 최대 93일입니다.');if(!['arrival','departure','booked','staying'].includes(d.basis))throw Error('조회 기준을 확인해주세요.');return d;}
 export function selectBooking(b){return Object.fromEntries(['id','propertyId','roomId','roomName','unitId','firstName','lastName','arrival','departure','bookingTime','status','apiSource','referer','apiReference','numAdult','numChild','arrivalTime'].map(k=>[k,b[k]??null]));}
 export function selectMessage(m){return Object.fromEntries(['id','bookingId','propertyId','source','message','time','attachmentName'].map(k=>[k,m[k]??null]));}
 export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})}){
@@ -128,7 +128,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     try{const c=await credentials(p);if(!c.beds_property_id)throw Error('기본정보에서 연동할 숙소를 선택하고 저장해주세요.');
      if(bookingsSync){
       let q='propertyId='+c.beds_property_id;const before=new Date(Date.parse(d.from)-86400000).toISOString().slice(0,10),after=new Date(Date.parse(d.to)+86400000).toISOString().slice(0,10);
-      if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;else q+='&arrivalFrom='+before+'&arrivalTo='+after;
+      if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;else if(d.basis==='departure')q+='&departureFrom='+before+'&departureTo='+after;else q+='&arrivalFrom='+before+'&arrivalTo='+after;
       for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix,{token:c.secret.token},rows=>internal('bookings',p,{items:rows.map(selectBooking)}));
      }else{if(id)await booking(p,c,id);const age=claim.last_success?Math.min(30,Math.max(2,Math.ceil((Date.now()-Date.parse(claim.last_success))/86400000)+1)):30;await messages(p,c,id,true,age);}
      await push(p);await internal('synced',p);success=true;

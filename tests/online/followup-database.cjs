@@ -37,7 +37,8 @@ module.exports=async({db,owner,p1,p2,id})=>{
  assert((await db.query('select read_at is null unseen from omg_private.online_messages where property_id=$1 and id=50000',[p2])).rows[0].unseen,'read-through is property-scoped');
  // A reply outside the selected message period still resolves the conversation.
  await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,50004,5000,'host','Later reply',now())",[p1]);
- assert((await query({message_from:day,message_to:day,direction:'guest'})).find(x=>x.booking_id===5000).replied);
+ const receivedDay=(await db.query("select to_char(sent_at at time zone 'Asia/Seoul','YYYY-MM-DD') d from omg_private.online_messages where property_id=$1 and id=50000",[p1])).rows[0].d;
+ assert((await query({message_from:receivedDay,message_to:receivedDay,direction:'guest'})).find(x=>x.booking_id===5000).replied);
  await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,60000,6000,'host','Proactive message',now())",[p1]);
  row=(await query({})).find(x=>x.booking_id===6000);assert(!row.replied&&!row.needs_reply,'host-only conversations are not unanswered questions');
  for(const signature of ['omg_private.online_inbox_followup(uuid,text,jsonb,text)','omg_private.online_read_through(uuid,bigint)'])assert.equal((await db.query("select has_function_privilege('anon',$1,'EXECUTE') ok",[signature])).rows[0].ok,false);

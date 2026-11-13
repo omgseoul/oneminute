@@ -10,7 +10,7 @@ const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('assert/strict');
   if(['inbox','sync_messages'].includes(action))result={ok:true,threads:[]};if(action==='logs')result={ok:true,logs:[]};return {ok:true,json:async()=>result};
  };
  for(const file of ['property-selector.js','select-picker.js','online.js'])w.eval(fs.readFileSync(file,'utf8'));
- await tick();w.document.querySelector('a[href="#search"]').click();await tick();
+ await tick();w.document.querySelector('a[href="#checkin"]').click();await tick();
  const check=(id,value)=>{const el=w.document.querySelector('#propertyName input[data-value="'+id+'"]');el.checked=value;el.dispatchEvent(new w.Event('change'));};
  assert.equal(w.document.querySelectorAll('.booking-item').length,1);let row=w.document.querySelector('.booking-item');assert(!row.open);assert.equal(row.querySelector('.booking-name').textContent,'19 Myung Paik');assert.equal(row.querySelector('.booking-channel').textContent,'Booking');assert.equal(row.querySelector('.booking-dates').textContent,'11.12–11.18');assert.equal(row.querySelector('.booking-property').textContent,'One Minute');assert(row.querySelector('.inbox-chevron'));row.open=true;
  w.document.querySelector('#searchButton').click();await tick();assert(w.document.querySelector('.booking-item').open,'refresh preserves expanded booking');

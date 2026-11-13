@@ -27,6 +27,7 @@ jobs:
           node tests/online/translation-edge.mjs
           node tests/online/auto-translation-edge.mjs
           node tests/online/auto-translation-ui.cjs
+          node tests/online/settings-accordion-ui.cjs
           node tests/operations-center-ui.cjs
           node tests/online/layout.cjs
           node tests/online/branches.cjs

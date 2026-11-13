@@ -57,6 +57,6 @@ assert(calls.some(c=>c.url.includes('/bookings?')&&new URL(c.url).searchParams.h
 assert(!calls.some(c=>c.url.includes('/bookings?')&&new URL(c.url).searchParams.has('arrivalFrom')));
 assert.equal(calls.find(c=>c.a==='booking_data').body.p_data.property_id,id);assert(calls.some(c=>c.a==='push_pending'),'booking sync drains newly created same-day alerts');
 skipSync=true;calls=[];r=await request('sync_booking_data',{from:'2026-11-01',to:'2026-11-13'});assert((await r.json()).cached);assert(!calls.some(c=>c.url.startsWith('https://beds24.com')));assert(calls.some(c=>c.a==='booking_data'));
-for(const action of ['booking_data','booking_data_count','save_booking_alert','save_auto_translation']){calls=[];r=await request(action,{property_id:id});assert.equal(r.status,200);assert.equal(calls.at(-1).body.p_data.property_id,id);assert(!calls.some(c=>c.url.startsWith('https://beds24.com')));}
+for(const action of ['booking_data','booking_data_count','save_booking_alert','save_auto_translation','save_message_alert_draft']){calls=[];r=await request(action,{property_id:id});assert.equal(r.status,200);assert.equal(calls.at(-1).body.p_data.property_id,id);assert(!calls.some(c=>c.url.startsWith('https://beds24.com')));}
 calls=[];r=await request('booking_data_count',{property_id:id},p);assert.equal(r.status,400);assert(!calls.some(c=>c.a==='booking_data_count'),'unauthorized caller cannot read booking counts');
 console.log('Booking Data edge: authorized branch, booking-time query, shared sync lease, stored reads and notification draining passed');

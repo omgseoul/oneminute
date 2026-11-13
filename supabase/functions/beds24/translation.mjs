@@ -16,17 +16,20 @@ export function createTranslation({rpc,fetcher}) {
   const stored=await ctl(user?'platform_key':'personal_key',property,{},user);if(!stored.key)throw Error('등록된 번역 API 키가 없습니다.');
   const status=await validate(stored.key);return ctl(user?'platform_check_result':'personal_check_result',property,{status,fingerprint:stored.fingerprint},user);
  }
- async function translate(property,data){
+ async function translateJob(property,data){
   const job=await ctl('claim',property,data);
+  if(job.skipped)return {ok:true,...job};
   if(job.cached)return {ok:true,...job,same_language:!!job.same_language||(data.direction!=='outgoing'&&sameLanguage(job.source_language,job.target))};
   if(job.busy)throw Error('번역 처리 중입니다. 잠시 후 다시 확인해주세요.');
   if(job.limit_reached)throw Error('이번 달 남은 제공량으로 번역할 수 없습니다. 기본정보에 개인 번역 API 키를 등록해주세요.');
   if(job.unconfigured)throw Error('번역 API 연결이 필요합니다. 운영자 공용 연결 또는 기본정보의 개인 키를 확인해주세요.');
   let received=false,charged=true;
   try{
-   const r=await fetcher('https://translation.googleapis.com/language/translate/v2',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':job.key},body:JSON.stringify({q:job.body,target:job.target,format:'text',model:'nmt'}),signal:AbortSignal.timeout(20000)});received=true;charged=r.ok||r.status>=500;
+   const r=await fetcher('https://translation.googleapis.com/language/translate/v2'+(data.detect?'/detect':''),{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':job.key},body:JSON.stringify(data.detect?{q:job.body}:{q:job.body,target:job.target,format:'text',model:'nmt'}),signal:AbortSignal.timeout(20000)});received=true;charged=r.ok||r.status>=500;
    if(!r.ok)throw Error('provider_failed');
-   const v=await r.json(),translation=v.data?.translations?.[0];if(!translation?.translatedText)throw Error('empty_translation');
+   const v=await r.json();
+   if(data.detect){const language=v.data?.detections?.[0]?.[0]?.language;if(typeof language!=='string'||!/^([a-z]{2,3})(-[A-Za-z]{2,4})?$/.test(language)||language==='und')throw Error('unknown_language');await ctl('finish',property,{id:job.id,lease:job.lease,text:language,source_language:language,charged:true});return {ok:true,source_language:language};}
+   const translation=v.data?.translations?.[0];if(!translation?.translatedText)throw Error('empty_translation');
    const text=typeof translation.translatedText==='string'?decodeText(translation.translatedText):null,source_language=translation.detectedSourceLanguage||data.source_language||null;
    if(typeof text!=='string'||!text||text.length>20000)throw Error('invalid_translation');
    const result=await ctl('finish',property,{id:job.id,lease:job.lease,text,source_language,charged:true});
@@ -35,6 +38,22 @@ export function createTranslation({rpc,fetcher}) {
    await ctl('finish',property,{id:job.id,lease:job.lease,charged:!received||charged});
    throw Error('번역하지 못했습니다. API 연결·사용 한도를 확인하고 잠시 후 다시 시도해주세요.');
   }
+ }
+ async function translate(property,data){
+  if(data.automatic&&data.direction!=='outgoing'){
+   let cfg=await ctl('auto_prepare',property,{message_id:data.message_id});
+   if(cfg.skipped)return {ok:true,...cfg};
+   if(cfg.needs_detection){
+    // Standalone detection is cached and uses the same character allowance as translation.
+    const detected=await translateJob(property,{message_id:data.message_id,direction:'incoming',target:'und',automatic:true,detect:true});
+    if(detected.skipped)return detected;
+    cfg=await ctl('auto_prepare',property,{message_id:data.message_id});
+    if(cfg.skipped)return {ok:true,...cfg};
+    if(cfg.needs_detection)throw Error('메시지 언어를 확인하지 못했습니다. 번역 버튼을 눌러주세요.');
+   }
+   return translateJob(property,{message_id:data.message_id,direction:'incoming',target:cfg.target,automatic:true});
+  }
+  return translateJob(property,data);
  }
  async function outgoing(property,data){
   if(typeof data.body!=='string'||!data.body.trim()||[...data.body.trim()].length>4000)throw Error('보낼 원문을 1~4,000자로 입력해주세요.');

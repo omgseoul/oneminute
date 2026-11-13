@@ -39,7 +39,7 @@ let translationCalls=[],translationCached=false,translationFinished=false;
 const th=createBedsHandler({env,waitUntil:()=>{},fetcher:async(url,options={})=>{
  const b=options.body?JSON.parse(options.body):{};translationCalls.push({url,b,headers:options.headers});
  if(url.endsWith('/rpc/online_owner')){if(b.p_action==='auth'&&b.p_token!==token)return new Response(JSON.stringify({code:'P0001',message:'관리자'}),{status:400});return res({ok:true,property_id:p});}
- if(url.endsWith('/rpc/online_translation')){if(b.p_action==='claim')return res(translationCached?{cached:true,text:'안녕하세요'}:{body:'hello',key:'translation-secret',lease:id});translationFinished=true;return res({ok:true});}
+ if(url.endsWith('/rpc/translation_control')){if(b.p_action==='claim')return res(translationCached?{cached:true,text:'안녕하세요'}:{id,body:'hello',target:'ko',key:'translation-secret',lease:id});translationFinished=true;return res({ok:true});}
  if(url==='https://translation.googleapis.com/language/translate/v2')return res({data:{translations:[{translatedText:'안녕하세요'}]}});
  throw Error('Unexpected translation request');
 }});

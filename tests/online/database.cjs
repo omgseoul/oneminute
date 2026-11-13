@@ -114,5 +114,6 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  const tr=await translate('claim',{message_id:102});assert(tr.lease);assert((await translate('claim',{message_id:102})).busy);await translate('finish',{message_id:102,lease:tr.lease,text:'최근 문의'});assert.equal((await translate('claim',{message_id:102})).text,'최근 문의');
  await assert.rejects(()=>translate('claim',{message_id:102},p2),/수신 메시지/);
  assert.equal((await db.query("select has_function_privilege('anon','public.online_translation(text,uuid,jsonb)','EXECUTE') ok")).rows[0].ok,false);
+ await require('./translation-database.cjs')({db,owner,internal,p1,p2,t1,t2,id});
  console.log('online database: tenant isolation, Vault secrecy, webhook dedupe, approval freshness, idempotent sends/billing passed');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

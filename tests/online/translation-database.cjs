@@ -1,0 +1,45 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+module.exports=async({db,owner,internal,p1,p2,t1,t2,id})=>{
+ await db.exec(fs.readFileSync('tests/online/translation-fixture.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/translation_allowance.sql','utf8'));
+ const ctl=async(a,d={},p=p1,u=null)=>(await db.query('select public.translation_control($1,$2,$3,$4::jsonb) v',[a,p,u,JSON.stringify(d)])).rows[0].v;
+ await assert.rejects(()=>ctl('platform_status'),/권한/);
+ const admin=id(900);await db.query('insert into public.platform_administrators values($1)',[admin]);
+ await ctl('platform_save',{key:'shared-google-secret-never-return'},null,admin);
+ await ctl('remove_key');assert.equal((await ctl('status')).usage.limit,50000);
+ const body='Hello guest',claim=()=>ctl('claim',{direction:'outgoing',booking_id:10,body,target:'en'});
+ await db.query('update public.properties set translation_limit_override=20 where id=$1',[p1]);
+ const j=await claim();assert.equal(j.provider,'platform');assert.equal((await claim()).busy,true);
+ assert.equal((await ctl('status')).usage.reserved,11);
+ const full=await ctl('claim',{direction:'outgoing',booking_id:10,body:'Another message',target:'ja'});assert(full.limit_reached,'concurrent reservation cannot exceed monthly limit');
+ await ctl('finish',{id:j.id,lease:j.lease,text:'Hello guest!',source_language:'ko',charged:true});
+ await ctl('finish',{id:j.id,lease:j.lease,text:'Hello guest!',charged:true});assert.equal((await ctl('status')).usage.used,11,'idempotent charge');
+ assert((await claim()).cached,'cached preview free');assert.equal((await ctl('status')).usage.reserved,0);
+ await ctl('save_key',{key:'personal-google-secret-never-return'});
+ const personal=await ctl('claim',{direction:'outgoing',booking_id:10,body:'Another message',target:'ja'});assert.equal(personal.provider,'personal');
+ await ctl('finish',{id:personal.id,lease:personal.lease,text:'こんにちは',charged:true});const u=(await ctl('status')).usage;assert.equal(u.used,11);assert.equal(u.personal_used,15);assert(!JSON.stringify(u).includes('secret'));
+ await assert.rejects(()=>owner('prepare_send',{id:id(901),booking_id:10,body:'modified',translation_id:j.id}),/미리보기/);
+ await owner('prepare_send',{id:id(901),booking_id:10,body:'Hello guest!',translation_id:j.id});await internal('finish_send',{id:id(901),status:'sent',result:{remote:{id:909}}});
+ await internal('messages',{items:[{id:909,bookingId:10,propertyId:100,source:'host',message:'Hello guest!',time:new Date().toISOString()}]});
+ const thread=await owner('peek_thread',{booking_id:10});assert.equal(thread.messages.find(m=>m.id===909).original_body,body);assert.equal(thread.outbox.find(o=>o.id===id(901)).target_language,'en');
+ assert.equal((await owner('inbox',{direction:'host'})).threads.find(t=>t.booking_id===10).original_body,body);
+ await assert.rejects(()=>ctl('claim',{message_id:102},p2),/수신/);
+ await assert.rejects(()=>ctl('claim',{direction:'outgoing',booking_id:10,body:'private',target:'en'},p2),/예약/);
+ // Threshold warning and exhaustion reuse actual system notice delivery with monthly deduplication.
+ await db.query('update public.properties set translation_limit_override=15 where id=$1',[p1]);
+ const warn=await ctl('claim',{direction:'outgoing',booking_id:10,body:'1234',target:'en'});await ctl('finish',{id:warn.id,lease:warn.lease,text:'1234',charged:true});
+ assert.equal((await ctl('status')).usage.full,true);
+ let notices=(await db.query("select count(*)::int n from omg_private.system_notice_deliveries where event_key='translation_full'")).rows[0].n;assert.equal(notices,1);
+ await db.query('select omg_private.refresh_service_notices()');assert.equal((await db.query("select count(*)::int n from omg_private.system_notice_deliveries where event_key='translation_full'")).rows[0].n,1,'monthly full alert deduplicates scheduled refresh');
+ await db.query("select set_config('test.uid',$1,false)",[admin]);
+ const policy={trial_days:30,reminder_days:7,grace_days:3,storage_limit_bytes:2147483648,storage_warning_bytes:1073741824,end_action:'notice',storage_action:'warn',support_contact:'',plans:[{code:'basic',name:'기본',monthly_price:'',storage_limit_bytes:2147483648,translation_limit:75000},{code:'pro',name:'프로',monthly_price:'',storage_limit_bytes:5368709120,translation_limit:100000}]};
+ await db.query('select public.platform_operations($1,$2::jsonb)',['policy',JSON.stringify(policy)]);assert.equal((await ctl('status',{},p2)).usage.limit,75000,'plan allowance inherited');assert.equal((await ctl('status')).usage.limit,15,'property override preserved');
+ await db.query('select public.platform_system_notices($1,$2::jsonb)',['save',JSON.stringify({event_key:'translation_warning',title:'번역',body:'{번역사용량} / {번역제공량}',enabled:true})]);
+ // Month rollover does not inherit prior usage; ambiguous provider outcomes consume reservations once.
+ await db.query("update omg_private.translation_usage set month=month-interval '1 month' where property_id=$1",[p1]);assert.equal((await ctl('status')).usage.used,0);
+ const late=await ctl('claim',{direction:'outgoing',booking_id:10,body:'late',target:'en'});await db.query("update omg_private.translation_jobs set leased_until=now()-interval '1 second' where id=$1",[late.id]);
+ await ctl('claim',{direction:'outgoing',booking_id:10,body:'next',target:'en'});assert.equal((await ctl('status')).usage.used,4,'lost worker reservation settled conservatively');
+ await ctl('finish',{id:late.id,lease:late.lease,charged:true});assert.equal((await ctl('status')).usage.used,4,'late finish never double charges');
+ await db.exec('set role anon');await assert.rejects(()=>ctl('status'),/permission denied/);await db.exec('reset role');
+ console.log('Translation DB: allowance reservations, cached reuse, personal overflow, original provenance, tenant auth, month reset and notices passed');
+};

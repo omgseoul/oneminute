@@ -1,0 +1,45 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+module.exports=async({db,owner,p1,p2,id})=>{
+ const sql=fs.readFileSync('supabase/setup/beds24_inbox_followup.sql','utf8');await db.exec(sql);await db.exec(sql);
+ await db.query("update properties set timezone='Asia/Seoul' where id=$1",[p1]);
+ const day=(await db.query("select to_char(now() at time zone 'Asia/Seoul','YYYY-MM-DD') d")).rows[0].d;
+ const shift=n=>new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+ const bookings=[[5000,day,shift(2)],[5001,shift(-2),shift(2)],[5002,shift(-2),day],[5003,shift(2),shift(4)],[5004,shift(-4),shift(-2)],[5005,null,null]];
+ for(const [bid,arrival,departure] of bookings){await db.query("insert into omg_private.online_bookings(property_id,id,guest_name,arrival,departure,status,data) values($1,$2,'Fixture',$3,$4,'confirmed','{}')",[p1,bid,arrival,departure]);await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,$2,$3,'guest','Question',now()-interval '2 hours')",[p1,bid*10,bid]);}
+ const query=async d=>(await owner('inbox',d)).threads;
+ const fixtureIds=rows=>rows.map(x=>x.booking_id).filter(x=>x>=5000&&x<=5005).sort();
+ assert.deepEqual(fixtureIds(await query({stay_types:['checkin']})),[5000]);
+ assert.deepEqual(fixtureIds(await query({stay_types:['staying']})),[5001]);
+ assert.deepEqual(fixtureIds(await query({stay_types:['checkout']})),[5002]);
+ assert.deepEqual(fixtureIds(await query({stay_types:['other']})),[5003,5004,5005]);
+ assert.deepEqual(fixtureIds(await query({stay_types:['checkin','checkout']})),[5000,5002]);
+ assert.equal((await query({stay_types:[]})).length,0);
+ await assert.rejects(()=>query({stay_types:['invalid']}),/숙박/);
+ await assert.rejects(()=>query({stay_types:{}}),/숙박/);
+ let row=(await query({})).find(x=>x.booking_id===5000);assert.equal(row.needs_reply,true);assert.equal(row.replied,false);
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)select $1,50001,5000,'host','Reply',sent_at from omg_private.online_messages where property_id=$1 and id=50000",[p1]);
+ row=(await query({direction:'guest'})).find(x=>x.booking_id===5000);assert(row.replied,'external host replies count even in received-only view');assert(row.unread>0,'reply does not imply read');assert(!(await query({unreplied_only:true})).some(x=>x.booking_id===5000));
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)select $1,50002,5000,'guest','New question',sent_at from omg_private.online_messages where property_id=$1 and id=50000",[p1]);
+ row=(await query({})).find(x=>x.booking_id===5000);assert(!row.replied&&row.needs_reply,'a new incoming message clears the reply marker, including equal timestamps');
+ for(const [i,status] of ['draft','failed','uncertain','sending'].entries())await db.query("insert into omg_private.online_outbox(id,property_id,booking_id,kind,status,body,updated_at)values($1,$2,5000,'manual',$3,'Unsent',now())",[id(950+i),p1,status]);
+ assert(!(await query({})).find(x=>x.booking_id===5000).replied,'unsent attempts never count');
+ await db.query("insert into omg_private.online_outbox(id,property_id,booking_id,kind,status,body,updated_at)values($1,$2,5000,'manual','sent','Delivered',now())",[id(955),p1]);
+ assert((await query({})).find(x=>x.booking_id===5000).replied,'confirmed OMS send counts while Beds24 re-sync is pending');
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,50000,5001,'host','Other branch reply',now())",[p2]);
+ assert(!(await query({})).find(x=>x.booking_id===5001).replied,'other branch reply cannot leak across equal booking IDs');
+ assert((await query({unread_only:true,unreplied_only:true})).every(x=>x.unread>0&&x.needs_reply));
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)select $1,50003,5000,'guest','Later arrival',sent_at from omg_private.online_messages where property_id=$1 and id=50000",[p1]);
+ await owner('read_message',{message_id:50002});
+ const reads=(await db.query('select id,read_at is not null seen from omg_private.online_messages where property_id=$1 and booking_id=5000 order by id',[p1])).rows;
+ assert(reads.find(x=>x.id===50000).seen&&reads.find(x=>x.id===50002).seen,'reading latest message clears preceding incoming messages');assert(!reads.find(x=>x.id===50003).seen,'newer message remains unread');
+ assert.equal((await query({})).find(x=>x.booking_id===5000).unread,1);
+ await owner('read_message',{message_id:50003});assert(!(await query({unread_only:true})).some(x=>x.booking_id===5000));
+ assert((await db.query('select read_at is null unseen from omg_private.online_messages where property_id=$1 and id=50000',[p2])).rows[0].unseen,'read-through is property-scoped');
+ // A reply outside the selected message period still resolves the conversation.
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,50004,5000,'host','Later reply',now())",[p1]);
+ assert((await query({message_from:day,message_to:day,direction:'guest'})).find(x=>x.booking_id===5000).replied);
+ await db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at)values($1,60000,6000,'host','Proactive message',now())",[p1]);
+ row=(await query({})).find(x=>x.booking_id===6000);assert(!row.replied&&!row.needs_reply,'host-only conversations are not unanswered questions');
+ for(const signature of ['omg_private.online_inbox_followup(uuid,text,jsonb,text)','omg_private.online_read_through(uuid,bigint)'])assert.equal((await db.query("select has_function_privilege('anon',$1,'EXECUTE') ok",[signature])).rows[0].ok,false);
+ console.log('Inbox follow-up: stay unions, local dates, reply ordering, delivery confirmation, read-through races and tenant isolation passed');
+};

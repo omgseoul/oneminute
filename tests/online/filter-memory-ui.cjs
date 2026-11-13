@@ -1,0 +1,22 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+const html=fs.readFileSync('online.html','utf8').replace(/<script[\s\S]*?<\/script>/g,''),tick=()=>new Promise(r=>setTimeout(r,45));
+async function boot(storage={},owner='owner-a',allowed=['home','other'],blocked=false){
+ const w=new JSDOM(html,{url:'https://omgworks24.com/online.html#inbox',runScripts:'outside-only',pretendToBeVisual:true}).window,calls=[];
+ for(const [key,value]of Object.entries(storage))w.localStorage.setItem(key,value);
+ if(blocked){w.Storage.prototype.getItem=()=>{throw Error('storage unavailable');};w.Storage.prototype.setItem=()=>{throw Error('storage unavailable');};}
+ w.omgSession={require:async()=>({sessionKind:'owner',ownerId:owner,propertyId:'home',accessToken:'fixture'})};w.OMG_SUPABASE={url:'https://fixture.supabase.co',publishableKey:'public'};w.AbortSignal=AbortSignal;w.setInterval=()=>{};
+ w.fetch=async(u,o)=>{const {action,data}=JSON.parse(o.body);calls.push({action,data});let v={ok:true};if(action==='settings')v={ok:true,property_id:data.property_id||'home',property_name:'One Minute',timezone:'Asia/Seoul',branches:allowed.map(id=>({id,name:id})),properties:[],synced_at:new Date().toISOString(),message_period:{days:7,from:'',to:''}};if(action==='inbox')v={ok:true,threads:[]};if(action==='unread')v={ok:true,unread:0};return {ok:true,json:async()=>v};};
+ for(const p of ['property-selector.js','select-picker.js','online.js'])w.eval(fs.readFileSync(p,'utf8'));await tick();await tick();
+ return {w,calls,$:s=>w.document.querySelector(s),query:()=>calls.filter(x=>x.action==='inbox').at(-1)?.data,snapshot:()=>Object.fromEntries(Object.keys(w.localStorage).map(k=>[k,w.localStorage.getItem(k)]))};
+}
+(async()=>{
+ let b=await boot();assert.equal(b.query().direction,'all');b.$('[data-direction=guest]').click();b.$('#unreadOnlyButton').click();b.$('#unrepliedOnlyButton').click();b.$('#inboxStatusFilters [data-reservation-status=cancelled]').click();b.$('[data-stay=all]').click();b.$('[data-stay=checkin]').click();b.$('[data-stay=checkout]').click();b.$('[data-days="3"]').click();await tick();b.$('#propertyName input[data-value=other]').click();await tick();b.$('#propertyName input[data-value=home]').click();await tick();
+ const saved=b.snapshot();assert.equal(JSON.parse(saved['oms-online-inbox-filters:owner-a']).direction,'guest');b.w.close();
+ b=await boot(saved);assert.equal(b.query().direction,'guest','fresh page restores last received tab');assert.equal(b.$('[data-direction=guest]').getAttribute('aria-pressed'),'true');assert.equal(b.$('[data-direction=all]').getAttribute('aria-pressed'),'false');assert(b.query().unread_only&&b.query().unreplied_only);assert.equal(b.$('#unreadOnlyButton').getAttribute('aria-pressed'),'true');assert.equal(b.$('#unrepliedOnlyButton').getAttribute('aria-pressed'),'true');assert.deepEqual([...b.query().stay_types],['checkin','checkout']);assert(b.query().statuses.includes('cancelled'));assert(b.$('#inboxStatusFilters [data-reservation-status=cancelled]').checked);assert.equal(b.query().property_id,'other');assert.equal((Date.parse(b.query().message_to)-Date.parse(b.query().message_from))/86400000,2,'older server period cannot overwrite the most recent local choice');assert.equal(b.$('#periodButton .period-label').textContent,'3일');
+ b.$('[data-direction=host]').click();await tick();const latest=b.snapshot();b.w.close();b=await boot(latest);assert.equal(b.query().direction,'host','each change replaces the previous saved tab');b.w.close();
+ b=await boot(latest,'owner-b');assert.equal(b.query().direction,'all');assert(!b.query().unread_only&&!b.query().unreplied_only);assert.equal(b.query().property_id,'home','different account does not inherit branch selection');b.w.close();
+ b=await boot(latest,'owner-a',['home']);assert.equal(b.query().property_id,'home','removed branch access is discarded before any inbox request');assert(!b.calls.some(x=>x.data.property_id==='other'));b.w.close();
+ b=await boot({'oms-online-inbox-filters:owner-a':'{broken'});assert.equal(b.query().direction,'all');b.w.close();
+ b=await boot({},'owner-a',['home'],true);b.$('[data-direction=guest]').click();await tick();assert.equal(b.query().direction,'guest','blocked storage does not prevent live filtering');b.w.close();
+ console.log('Inbox filter memory: fresh page restores tab, toggles, statuses, stay scopes, branch and latest period; account isolation, access changes and unavailable/corrupt storage passed');
+})().catch(e=>{console.error(e);process.exit(1);});

@@ -48,7 +48,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         Intent next=NativeMessagePopupQueue.peek(this);
         if(next==null){cancelNotification();finish();return;}
         if(!next.getStringExtra("alertId").equals(alertId)) {setIntent(next);buildMessageScreen(next);}
-        if(queueCount!=null)queueCount.setText(NativeMessagePopupQueue.size(this)+"건 대기");
+        if(queueCount!=null){int count=NativeMessagePopupQueue.size(this);queueCount.setText(count>=2?count+"건 대기":"");queueCount.setVisibility(count>=2?android.view.View.VISIBLE:android.view.View.GONE);}
     }
 
     private void showOverLockScreen() {
@@ -106,7 +106,8 @@ public class MessageAlertActivity extends AppCompatActivity {
 
         queueCount=label("",12,BLUE,false,Gravity.CENTER);
         card.addView(queueCount,new LinearLayout.LayoutParams(-1,-2));
-        TextView title = label(approval ? "결재 요청" : "새 메세지 도착", 28, NAVY, true, Gravity.CENTER);
+        GuestMessageCard guest=GuestMessageCard.parse(intent.getStringExtra("guestContext"),message);
+        TextView title = label(guest!=null?guest.title():approval ? "결재 요청" : "새 메세지 도착", guest!=null?23:28, NAVY, true, Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.setMargins(0, dp(5), 0, dp(7));
         card.addView(title, titleParams);
@@ -115,14 +116,14 @@ public class MessageAlertActivity extends AppCompatActivity {
                 Color.rgb(112, 128, 149), false, Gravity.CENTER);
         LinearLayout.LayoutParams fromParams = new LinearLayout.LayoutParams(-1, -2);
         fromParams.setMargins(0, 0, 0, dp(16));
-        card.addView(from, fromParams);
+        if(guest==null)card.addView(from, fromParams);
 
         TextView messageBox = label(message, 18, Color.rgb(38, 58, 86),
                 true, Gravity.CENTER);
         messageBox.setMinHeight(dp(105));
         messageBox.setPadding(dp(18), dp(18), dp(18), dp(18));
         messageBox.setBackground(rounded(Color.rgb(244, 247, 252), 18));
-        card.addView(messageBox, new LinearLayout.LayoutParams(-1, -2));
+        card.addView(guest!=null?guest.view(this):messageBox, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);

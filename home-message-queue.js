@@ -27,9 +27,12 @@
   root.querySelector('strong').textContent=reminder?'OMS':active.report?'새 보고 도착':/^(To do 알림|일정 알림)$/.test(active.sender_label)?active.sender_label:'새 메세지 도착';
   document.getElementById('messageArrivalSender').textContent=reminder?'':active.report?active.sender_label:/^(To do 알림|일정 알림)$/.test(active.sender_label)?'업무 알림':(active.sender_label||'새 메세지');
   document.getElementById('messageArrivalBody').textContent=reminder?reminder.title:String(active.message||'메세지 메뉴에서 확인해주세요.').replace(/\\n/g,'\n').replace(/^(?:To do 알림|일정 알림)\s*\n/,'');
-  root.querySelector('.message-arrival-count').textContent=`${queue.length+1}건 대기`;
+  updateCount();
+  root.querySelector('.guest-popup-card')?.remove();const guest=window.OMSGuestMessageCard?.read(active),original=document.getElementById('messageArrivalBody');original.hidden=!!guest;document.getElementById('messageArrivalSender').hidden=!!guest;
+  if(guest){root.querySelector('strong').textContent=window.OMSGuestMessageCard.title(guest);original.after(window.OMSGuestMessageCard.render(active));}
   root.hidden=false;root.querySelector('button').focus({preventScroll:true});
  }
+ function updateCount(){const count=popup()?.querySelector('.message-arrival-count');if(count){count.textContent=queue.length+1>=2?`${queue.length+1}건 대기`:'';count.hidden=queue.length+1<2;}}
  function saveReads(){try{sessionStorage.setItem('oms-popup-pending:'+token,JSON.stringify([...pendingReads]));}catch{}}
  function flushReads(){
   const accessToken=token,pending=pendingReads,inFlight=reading;
@@ -50,7 +53,7 @@
   bind(accessToken);items=items.filter(i=>i.online_popup_allowed!==false);const ordinary=items.filter(i=>!i.report);
   if(typeof window.OMGNative?.showMessageAlerts==='function'&&ordinary.length){window.OMGNative.showMessageAlerts(JSON.stringify(ordinary));items=items.filter(i=>i.report);}
   for(const item of items)if(item.message_id&&!seen.has(item.message_id)&&active?.message_id!==item.message_id&&!queue.some(q=>q.message_id===item.message_id))queue.push(item);
-  if(!active&&queue.length)render();else if(active)popup().querySelector('.message-arrival-count').textContent=`${queue.length+1}건 대기`;
+  if(!active&&queue.length)render();else if(active)updateCount();
  }
  function update(items,accessToken,announce){
   bind(accessToken);flushReads();

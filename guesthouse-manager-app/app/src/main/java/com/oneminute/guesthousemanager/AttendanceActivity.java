@@ -280,7 +280,7 @@ public class AttendanceActivity extends AppCompatActivity {
                         org.json.JSONObject item=items.getJSONObject(n);
                         NativeMessagePopupQueue.offer(AttendanceActivity.this,new Intent(AttendanceActivity.this,MessageAlertActivity.class)
                           .putExtra("alertId",item.getString("message_id")).putExtra("senderLabel",item.optString("sender_label"))
-                          .putExtra("message",item.optString("message")).putExtra("messageType",item.optString("message_type")));
+                          .putExtra("message",item.optString("message")).putExtra("messageType",item.optString("message_type")).putExtra("guestContext",item.optJSONObject("guest_context")==null?"":item.optJSONObject("guest_context").toString()));
                     }
                     if(hasWindowFocus())NativeMessagePopupQueue.launch(AttendanceActivity.this);
                 }catch(Exception ignored){}

@@ -11,6 +11,14 @@ function preview(text) {
   return [...(value.startsWith(normalMessagePrefix) ? value.slice(normalMessagePrefix.length) : value)].slice(0, 650).join('');
 }
 
+function guestPresentation(value){
+ if(!value||!['online','onsite'].includes(value.kind))return {};
+ const limits={kind:8,guest:120,room:60,arrival:10,departure:10,property:3,channel:80,sent:14},safe={};
+ for(const [key,max]of Object.entries(limits))safe[key]=[...String(value[key]??'')].slice(0,max).join('');
+ if(safe.kind==='onsite')safe.channel='';
+ return {guestContext:JSON.stringify(safe)};
+}
+
 export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = crypto, now = () => Date.now() }) {
   let cachedToken, tokenUntil = 0;
   function credentials() {
@@ -131,7 +139,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if(!dispatch.ok)return reply({ok:false,code:'not_found'},404);
         if(env('PUSH_DELIVERY_ENABLED')!=='true')return reply({ok:false,code:'not_enabled'},503);
         deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
-        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route};
+        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route,...guestPresentation(dispatch.guest_context)};
       } else if (path.endsWith('/reminder')) {
         if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);
@@ -167,7 +175,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         recipientModes = dispatch.recipient_modes || {};
         payload = {alertId:String(deliveryId),roomId:String(dispatch.room_id),message:preview(dispatch.message),
           mode:'message',priority:'normal',
-          messageType:'guest_chat',senderLabel:dispatch.sender_label && dispatch.sender_label !== '현장 게스트' ? '현장게스트 '+String(dispatch.sender_label) : '현장게스트',validUntil:String(dispatch.valid_until || now()+300000)};
+          messageType:'guest_chat',senderLabel:dispatch.sender_label && dispatch.sender_label !== '현장 게스트' ? '현장게스트 '+String(dispatch.sender_label) : '현장게스트',validUntil:String(dispatch.valid_until || now()+300000),...guestPresentation(dispatch.guest_context)};
       } else if (path.endsWith('/telegram')) {
         const secret = env('TELEGRAM_URGENT_SECRET');
         if (!secret || req.headers.get('x-webhook-secret') !== secret) return reply({ ok: false, code: 'unauthorized' }, 401);
@@ -207,6 +215,8 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if (!Array.isArray(topics) || topics.some(t => typeof t !== 'string' || !topicPattern.test(t))) throw new Error('invalid_routing');
       }
       if (!Array.isArray(topics) || topics.some(t=>typeof t!=='string'||!topicPattern.test(t))) throw new Error('invalid_routing');
+      // Leave room for recipient binding and transport fields within FCM's data limit.
+      if(payload.guestContext){let chars=[...payload.message];while(encoder.encode(JSON.stringify(payload)).length>3300&&chars.length){chars=chars.slice(0,-30);payload.message=chars.join('')+'…';}}
       const uniqueTopics = [...new Set(topics)];
       const devices = uniqueTopics.length ? await rpc('resolve_native_push_targets',{p_topics:uniqueTopics}) : [];
       if (!Array.isArray(devices)) throw new Error('invalid_routing');

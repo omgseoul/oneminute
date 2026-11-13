@@ -79,6 +79,10 @@ jobs:
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-0.png > "$RUNNER_TEMP/oms-native-reminder-0.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-1.png > "$RUNNER_TEMP/oms-native-reminder-1.png"
             adb exec-out run-as com.oneminute.guesthousemanager cat files/native-reminder-2.png > "$RUNNER_TEMP/oms-native-reminder-2.png"
+            adb shell am instrument -w -e phase guest-design com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-guest-design.txt"
+            grep -q 'oms_guest_design=ok' "$RUNNER_TEMP/oms-guest-design.txt"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-guest-online.png > "$RUNNER_TEMP/oms-native-guest-online.png"
+            adb exec-out run-as com.oneminute.guesthousemanager cat files/native-guest-onsite.png > "$RUNNER_TEMP/oms-native-guest-onsite.png"
             bash guesthouse-manager-app/scripts/run-launcher-badge-probe.sh
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton

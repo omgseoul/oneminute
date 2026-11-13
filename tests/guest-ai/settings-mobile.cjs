@@ -2,7 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const root=process.cwd();
 (async()=>{
  const server=http.createServer((req,res)=>{const name=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(name==='/before.html'){res.end('<a href="guest-ai-settings.html">AI 설정</a>');return;}const file=path.join(root,name);if(!file.startsWith(root+path.sep)){res.writeHead(403).end();return;}try{let body=fs.readFileSync(file);if(name==='/owner-settings.html')body=body.toString().replace(/<script[\s\S]*?<\/script>/g,'').replace('omg-booting property-settings-page','property-settings-page');res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(body);}catch{res.writeHead(404).end();}});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({headless:true});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({...(process.env.OMS_CHROMIUM_PATH?{executablePath:process.env.OMS_CHROMIUM_PATH}:{}),headless:true});
  try{
   const errors=[],nativeDialogs=[],saves=[];
   const state={ok:true,settings:{enabled:true,mode:'always',prompt:'숙소 안내 DATA를 참고해 정중하게 답변하세요. '.repeat(80),data:[{title:'위치',answer:'테스트 숙소'}]},default_prompt:'기본 안내',usage:{balance:991.612,used:8.388,monthly_limit:1000,available:991.612,enabled:true},history:[],provider_ready:true,qr_enabled:true};

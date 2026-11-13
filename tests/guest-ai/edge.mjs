@@ -61,3 +61,7 @@ const oneCall=setup({jobOverride:{alert_rules:rules,history:[{role:'user',conten
 await oneCall.run();
 assert.equal(oneCall.calls.filter(c=>c.url.includes('/v1/responses')).length,1,'one call handles reply and both scripts');assert.equal(oneCall.settled.alert_kind,'emergency');
 console.log('PASS combined editable prompt, precedence, cache invalidation, single-call emergency classification');
+
+for(const text of ['뭐하냐','안녕하세요','thanks','빨리 답장해']){const fixture=setup({jobOverride:{alert_rules:rules,history:[{role:'user',content:text}]},output:{...partial,disposition:'urgent',alert_kind:'emergency'}});await fixture.run();assert.notEqual(fixture.settled.alert_kind,'emergency','ordinary chat must not become an emergency: '+text);assert.notEqual(fixture.settled.disposition,'urgent');}
+const contextUrgent=setup({jobOverride:{alert_rules:rules,history:[{role:'user',content:'방에 불이 났어요'},{role:'assistant',content:'안전한 곳으로 이동해주세요.'},{role:'user',content:'뭐하냐'}]},output:{...partial,disposition:'urgent',alert_kind:'emergency'}});await contextUrgent.run();assert.equal(contextUrgent.settled.disposition,'urgent','actual incident context is preserved');
+console.log('PASS ordinary conversation cannot trigger emergency escalation; actual incident context is preserved');

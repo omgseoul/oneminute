@@ -70,7 +70,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
   await internal('draft_finish',property,result);return {ok:true};
  }
  async function handleJob(job){const p=job.property_id;try{const c=await credentials(p);await booking(p,c,job.booking_id);await messages(p,c,job.booking_id,true);await push(p);if(c.ai_mode==='approval')await draft(p,job.booking_id,'webhook');await internal('synced',p);await internal('ack',p,job);}catch(e){await internal('ack',p,{...job,error:e.message});}}
- async function drain(){for(const p of await internal('maintenance',null)){try{await credentials(p);await push(p);}catch{}}for(let i=0;i<4;i++){const job=await internal('claim',null);if(job.empty)break;await handleJob(job);}}
+ async function drain(){let bookingProperties=[];try{const v=await internal('booking_push_properties',null);if(Array.isArray(v))bookingProperties=v;}catch{}for(const p of new Set([...await internal('maintenance',null),...bookingProperties])){try{await credentials(p);await push(p);}catch{}}for(let i=0;i<4;i++){const job=await internal('claim',null);if(job.empty)break;await handleJob(job);}}
  return async req=>{
   const origin=req.headers.get('origin'),allowed=['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io'];
   const cors={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'};if(allowed.includes(origin))cors['Access-Control-Allow-Origin']=origin;
@@ -102,7 +102,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    const a=await owner(b.access_token,'auth',{property_id:d.property_id}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
    if(b.action==='settings'){const v=await scoped('settings'),t=await translation.ctl('status',p);return reply({...v,translation:t.usage,translation_connected:!!(t.usage?.platform_ready||t.usage?.personal_connected)});}
-   if(['save_settings','save_translation_language','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
+   if(['booking_data','booking_data_count','save_booking_alert','save_settings','save_translation_language','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
    if(b.action==='save_translation')return reply(await translation.save(p,d.key));
    if(b.action==='check_translation')return reply(await translation.check(p));
    if(b.action==='remove_translation')return reply(await translation.ctl('remove_key',p));
@@ -117,20 +117,21 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     await internal('connect',p,{secret,actor:a.actor});
     const props=[];await pages('/properties?includeAllRooms=true',{token:t.token},async items=>props.push(...items.map(x=>({id:x.id,name:x.name,roomTypes:(x.roomTypes||[]).map(r=>({id:r.id,name:r.name,units:(r.units||[]).map(u=>({id:u.id,name:u.name}))}))}))));await internal('connect',p,{secret,properties:props,actor:a.actor});return reply(await scoped('settings'));
    }
-   if(['sync_messages','sync_bookings'].includes(b.action)){
+   if(['sync_messages','sync_bookings','sync_booking_data'].includes(b.action)){
+    const bookingData=b.action==='sync_booking_data',bookingsSync=b.action==='sync_bookings'||bookingData;if(bookingData)d.basis='booked';
     const id=b.action==='sync_messages'&&d.booking_id?positive(d.booking_id):null;
-    if(b.action==='sync_bookings')dateRange(d);
-    const scope=b.action==='sync_bookings'?'bookings:'+d.basis+':'+d.from+':'+d.to:id?'thread:'+id:'inbox',read=b.action==='sync_bookings'?'bookings':id?'thread':'inbox';
+    if(bookingsSync)dateRange(d);
+    const scope=bookingsSync?'bookings:'+d.basis+':'+d.from+':'+d.to:id?'thread:'+id:'inbox',read=bookingData?'booking_data':bookingsSync?'bookings':id?'thread':'inbox';
     const claim=await control('begin',p,{scope});
     if(claim.skip)return reply({...await scoped(read),cached:true,retry_at:claim.retry_at,warning:claim.limited?'Beds24 요청 제한 · 저장된 내역을 표시합니다.':'최근 동기화 내역을 표시합니다.'});
     let success=false,warning;
     try{const c=await credentials(p);if(!c.beds_property_id)throw Error('기본정보에서 연동할 숙소를 선택하고 저장해주세요.');
-     if(b.action==='sync_bookings'){
+     if(bookingsSync){
       let q='propertyId='+c.beds_property_id;const before=new Date(Date.parse(d.from)-86400000).toISOString().slice(0,10),after=new Date(Date.parse(d.to)+86400000).toISOString().slice(0,10);
       if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;else q+='&arrivalFrom='+before+'&arrivalTo='+after;
       for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix,{token:c.secret.token},rows=>internal('bookings',p,{items:rows.map(selectBooking)}));
-     }else{if(id)await booking(p,c,id);const age=claim.last_success?Math.min(30,Math.max(2,Math.ceil((Date.now()-Date.parse(claim.last_success))/86400000)+1)):30;await messages(p,c,id,true,age);await push(p);}
-     await internal('synced',p);success=true;
+     }else{if(id)await booking(p,c,id);const age=claim.last_success?Math.min(30,Math.max(2,Math.ceil((Date.now()-Date.parse(claim.last_success))/86400000)+1)):30;await messages(p,c,id,true,age);}
+     await push(p);await internal('synced',p);success=true;
     }catch(e){warning=e.message+' · 저장된 내역을 표시합니다.';}
     finally{await control('finish',p,{scope,lease:claim.lease,success});}
     return reply({...await scoped(read),cached:!success,...(warning?{warning}:{})});

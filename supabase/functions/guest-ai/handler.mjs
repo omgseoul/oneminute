@@ -14,11 +14,22 @@ The following server-owned SERVICE_DATA references cover identity, chat help and
 SERVICE_DATA: ${JSON.stringify(SERVICE_DATA)}
 Identify EACH question in the latest guest message, including paraphrases and follow-ups; match all relevant DATA rows semantically, not by exact title. Return one natural, concise reply in the guest's language, combining supported answers. Include a part for EACH question, with the IDs of DATA or SERVICE_DATA rows supporting it. Each answered part needs at least one valid source ID; unknown parts use no sources and needs_human=true. For unknown inquiries say staff will check the inquiry and get back to the guest, in the guest's language. When the guest requests an actual service or reports an unresolved problem requiring staff action, use handoff even if its policy exists in DATA. A factual policy question alone is not a service request. If some parts are unknown, answer the known parts and say the remaining parts need the property's staff; disposition must then be handoff. Conflicting DATA also requires handoff. Do not guess missing facts.
 If the guest requests a human, use handoff. If there is plausible immediate danger (fire, gas leak, serious injury, violence, entrapment), use urgent and a short concrete reason. Do not confuse routine inconvenience with immediate danger. Give brief safe action guidance, including contacting local emergency services when appropriate; do not invent emergency phone numbers. Do not claim that a person has received or read an alert. Server will perform escalation separately.
+Greetings, thanks, questions about what the assistant is doing (including "뭐하냐"), impatience, rude tone and requests for a faster reply are not evidence of an emergency. Never infer danger from tone alone. Use handoff for an explicit human request unless the conversation actually reports an incident.
 Return structured JSON. parts describes question coverage and source IDs; reply is the guest-facing combined answer. reason is a short Korean staff explanation. No raw DATA IDs in reply.`;
 export const FORMAT={type:'json_schema',name:'guest_reply',strict:true,schema:{type:'object',additionalProperties:false,properties:{alert_kind:{type:'string',enum:['none','handoff','emergency']},reply:{type:'string'},disposition:{type:'string',enum:['answer','handoff','urgent']},reason:{type:'string'},parts:{type:'array',items:{type:'object',additionalProperties:false,properties:{question:{type:'string'},sources:{type:'array',items:{type:'string'}},needs_human:{type:'boolean'}},required:['question','sources','needs_human']}}},required:['reply','disposition','reason','parts','alert_kind']}};
 const FALLBACK='정확한 안내를 위해 직원 확인이 필요합니다. 숙소 관리자의 답변을 기다려주세요. / A staff member needs to check this. Please wait for their reply.';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function emergencyHint(text){return /불이\s*났|화재가|가스\s*(냄새|누출)|의식이\s*없|숨을?\s*(못\s*쉬|안\s*쉬)|폭행당|갇혔|\bon fire\b|\bgas (leak|smell)\b|\b(can.?t|cannot) breathe\b|\bunconscious\b|\bbeing attacked\b/i.test(text);}
+export function ordinaryEscalation(value,job){
+ const latest=String((job.history||[]).at(-1)?.content||'').trim().replace(/[.!?~。！？\s]+$/g,'');
+ const basic=/^(뭐\s*(하냐|해|해요|하세요|하는데)|넌?\s*누구(야|냐|세요)?|안녕(하세요)?|고마워(요)?|감사합니다|thanks|thank you|hello|hi|what are you doing|who are you)$/i.test(latest);
+ const impatient=/^(답장\s*(해|해주세요|좀)|빨리\s*(답장|답변)(해|해주세요)?|왜\s*(답장|답변)(이|을)?\s*(없어|안해)|anyone there|please (reply|respond)|reply (please|faster))$/i.test(latest);
+ if(!basic&&!impatient)return value;
+ const context=(job.history||[]).slice(-8).some(m=>emergencyHint(m.content||'')||/문.{0,12}(안\s*열|갇|고장)|물.{0,6}안\s*나|화재|침입|폭력|火事|火灾|停水|incendio|fuego|feuer|incendie|locked (in|out)|no (running )?water|door.{0,12}(stuck|not open)/i.test(m.content||''));
+ if(context||value.disposition!=='urgent'&&value.alert_kind!=='emergency')return value;
+ const ko=/[가-힣]/.test(latest);
+ return {...value,disposition:basic?'answer':'handoff',alert_kind:basic?'none':'handoff',reason:basic?'일반 대화 · 긴급 상황 아님':'답변 재촉 · 일반 직원 확인',reply:basic?(ko?'저는 이 숙소의 AI 안내 도우미입니다. 숙소 이용에 관해 궁금한 점을 말씀해주세요.':'I am the accommodation’s AI information assistant. What can I help you with?'):fallbackReply(latest)};
+}
 // Explicitly cache only stable reference material. Guest history stays outside the
 // write boundary, so each new question does not rewrite the whole cached prompt.
 // Content matching invalidates changed prompts/DATA automatically; never key by room.
@@ -38,9 +49,10 @@ export function validateAnswer(value,job){
  if(value.disposition==='answer'&&unknown)throw Error('unsupported_answer');
  if(job.has_attachment&&value.disposition==='answer')throw Error('unread_attachment');
  if(job.alert_rules&&!['none','handoff','emergency'].includes(value.alert_kind))throw Error('invalid_alert_kind');
- const routed=enforcePropertyRouting(value,job);
+ let routed=enforcePropertyRouting(value,job);
  if(job.alert_rules){if(value.alert_kind==='emergency')routed.disposition='urgent';else if(value.alert_kind==='handoff')routed.disposition='handoff';}
- return {reply:routed.reply.trim(),disposition:routed.disposition,reason:String(routed.reason||'').slice(0,500),...(job.alert_rules?{alert_kind:value.alert_kind}:{})};
+ routed=ordinaryEscalation(routed,job);
+ return {reply:routed.reply.trim(),disposition:routed.disposition,reason:String(routed.reason||'').slice(0,500),...(job.alert_rules?{alert_kind:routed.alert_kind}:{})};
 }
 export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})}){
  const base=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');

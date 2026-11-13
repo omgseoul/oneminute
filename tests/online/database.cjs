@@ -119,5 +119,6 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await require('./translation-language-database.cjs')({db,owner,p1,p2,t2});
  await require('./booking-data-database.cjs')({db,owner,internal,p1,p2,t2,id});
  await require('./auto-translation-database.cjs')({db,owner,p1,p2,t2});
+ await require('./message-alert-draft-database.cjs')({db,owner,internal,p1,p2,t2});
  console.log('online database: tenant isolation, Vault secrecy, webhook dedupe, approval freshness, idempotent sends/billing passed');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

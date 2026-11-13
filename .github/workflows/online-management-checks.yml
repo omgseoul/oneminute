@@ -1,7 +1,7 @@
 name: Verify online reservation management
 on:
   pull_request:
-    paths: ['property-selector.js', 'select-picker.js', 'online.*', 'app.html', 'supabase/functions/beds24/**', 'supabase/setup/beds24*.sql', 'supabase/setup/translation*.sql', 'platform-translation.js', 'platform-admin.html', 'operations-center.js', 'subscription.html', 'service-access.js', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
+    paths: ['assets/booking-channels/**', 'property-selector.js', 'select-picker.js', 'online.*', 'app.html', 'supabase/functions/beds24/**', 'supabase/setup/beds24*.sql', 'supabase/setup/translation*.sql', 'platform-translation.js', 'platform-admin.html', 'operations-center.js', 'subscription.html', 'service-access.js', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read

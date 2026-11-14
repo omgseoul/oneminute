@@ -32,7 +32,8 @@ public class EmergencyAlarmService extends Service {
     public static final String ACTION_SCREEN_CLOSE = "com.oneminute.guesthousemanager.URGENT_SCREEN_CLOSE";
 
     private static final String CHANNEL_ID = "urgent_alerts_countdown_v7_badge";
-    private static final int NOTIFICATION_ID = NativeMessageBadge.ID;
+    private int notificationId = NativeMessageBadge.ID;
+    private boolean guestNotification,botNotification;
     private static final long COUNTDOWN_MS = 60_000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -88,6 +89,9 @@ public class EmergencyAlarmService extends Service {
         stopOutputs();
         if (startPersistentAlarm != null) handler.removeCallbacks(startPersistentAlarm);
 
+        guestNotification=intent.getBooleanExtra("guestNotification",false);
+        botNotification=intent.getBooleanExtra("botNotification",false);
+        notificationId=NativeMessageBadge.id(guestNotification);
         alertId = intent.getStringExtra("alertId");
         message = intent.getStringExtra("message");
         mode = intent.getStringExtra("mode");
@@ -103,7 +107,7 @@ public class EmergencyAlarmService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent acknowledge = buildAcknowledgePendingIntent();
 
-        startForeground(NOTIFICATION_ID, buildNotification(fullScreen, acknowledge, false));
+        startForeground(notificationId, buildNotification(fullScreen, acknowledge, false));
         acquireWakeLock();
         if ("urgent".equals(mode)) maximizeAlarmVolume();
         playFirstStage();
@@ -133,7 +137,7 @@ public class EmergencyAlarmService extends Service {
             startPersistentAlarm = () -> {
                 playPersistentAlarm();
                 NotificationManager manager = getSystemService(NotificationManager.class);
-                if (manager != null) manager.notify(NOTIFICATION_ID,
+                if (manager != null) manager.notify(notificationId,
                         buildNotification(fullScreen, acknowledge, true));
             };
             handler.postDelayed(startPersistentAlarm, COUNTDOWN_MS);
@@ -178,8 +182,8 @@ public class EmergencyAlarmService extends Service {
         String title = test ? "긴급알림 테스트" :
                 (ringing ? "미확인 긴급 메세지" : senderIntro());
         String content = ringing ? "확인할 때까지 긴급 알람이 계속 울립니다." : message;
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
+        Notification notification=new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this,guestNotification))
                 .setColor(Color.rgb(217, 54, 62))
                 .setContentTitle(title)
                 .setContentText(content)
@@ -194,6 +198,7 @@ public class EmergencyAlarmService extends Service {
                 .setContentIntent(fullScreen)
                 .addAction(0, "확인했습니다", acknowledge)
                 .build();
+        return NativeMessageBadge.decorate(this,notification,guestNotification,botNotification);
     }
 
     private void acquireWakeLock() {

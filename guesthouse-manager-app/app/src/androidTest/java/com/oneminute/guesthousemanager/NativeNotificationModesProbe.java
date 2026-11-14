@@ -54,6 +54,19 @@ final class NativeNotificationModesProbe {
             check(audio.getRingerMode()==AudioManager.RINGER_MODE_VIBRATE,"Weak respects the phone vibration mode");
             NativeMessageBadge.fromWeb(c,token,2);Thread.sleep(100);
             check(active(manager,NativeMessageBadge.CHANNEL,2).number==2,"Actual count change stays quiet");
+            NativeMessageBadge.fromWeb(c,token,5,6);
+            new TestService(c).onMessageReceived(new RemoteMessage.Builder("synthetic")
+                .addData("mode","weak").addData("alertId","guest-"+UUID.randomUUID()).addData("messageType","general")
+                .addData("route","guest-messages.html#thread/123").addData("message","합성 게스트 메시지").build());
+            Thread.sleep(100);check(manager.getActiveNotifications().length==2,"Guest FCM keeps staff notification");
+            Notification guest=null;for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()==NativeMessageBadge.GUEST_ID)guest=item.getNotification();
+            check(guest!=null&&guest.number==5&&weak.equals(guest.getChannelId()),"Online FCM uses guest slot with exact count and strength");
+            new TestService(c).onMessageReceived(new RemoteMessage.Builder("synthetic")
+                .addData("mode","weak").addData("alertId","booking-"+UUID.randomUUID()).addData("messageType","general")
+                .addData("route","messages.html#bot").addData("message","당일 예약 접수 · 합성 예약").build());
+            Notification booking=active(manager,weak,6);
+            check(booking.extras.getBoolean("oms_bot_notice")&&"staff".equals(booking.extras.getString("oms_message_bucket")),"Booking FCM stays in staff slot and targets BOT");
+            check(manager.getActiveNotifications().length==2,"Booking FCM creates no third combined notice");
             NativeMessageBadge.fromWeb(c,token,0);Thread.sleep(100);check(manager.getActiveNotifications().length==0,"Read clears notification");
             android.util.Log.i("OMSProbe","weak vibration pattern, phone mode, migration, silent-refresh race and single alert: PASS");
         }finally{

@@ -51,7 +51,7 @@ async function loadMessageSummary(accessToken,announce=false,isCurrent=()=>true,
  const guestCount=Number(guestSummary.unread)||0;
  const reportCount=Number(reportData?.unread_count)||0;
  const ordinary=(data.messages||[]).filter(i=>!i.is_sender&&!i.read_at&&i.source!=="beds24"&&i.message_type!=="guest_chat"),unread=Number.isInteger(guestSummary.messenger_unread)?guestSummary.messenger_unread:ordinary.length,count=unread+reportCount,counter=document.getElementById("messageCounter");
- try{window.OMGNative?.setMessageBadge?.(accessToken,count+guestCount);}catch(_){}
+ try{if(window.OMGNative?.setMessageCounts)window.OMGNative.setMessageCounts(accessToken,guestCount,count);else window.OMGNative?.setMessageBadge?.(accessToken,count+guestCount);}catch(_){}
  counter.textContent=count>99?"99+":String(count);counter.style.display=count?"grid":"none";
  window.OMSHomeSnapshot?.write("messageCount",count);
  const gc=document.getElementById("guestMessageCounter");gc.textContent=guestCount>99?"99+":String(guestCount);gc.style.display=guestCount?"grid":"none";window.OMSHomeSnapshot?.write("guestMessageCountV2",{count:guestCount,query:window.HomeGuestCount.query(session)});

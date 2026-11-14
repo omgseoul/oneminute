@@ -32,7 +32,7 @@ public final class NativeStaffChatProbe {
     private String roomProfileMetrics;
     static void runHandoff(Instrumentation i){Bundle result=new Bundle();try{new NativeStaffChatProbe(i).verifyHandoff();result.putString("oms_handoff","ok");i.finish(-1,result);}catch(Throwable error){error.printStackTrace();result.putString("oms_handoff","failed: "+error);i.finish(0,result);}}
     private String stage="start",layout="";
-    NativeStaffChatProbe(Instrumentation i){instrumentation=i;NativeMessageBadge.loader=context->0;}
+    NativeStaffChatProbe(Instrumentation i){instrumentation=i;NativeMessageBadge.loader=context->new NativeMessageBadge.Counts(0,0);}
     static void run(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verify();result.putString("oms_chat","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-probe.png");error.printStackTrace();result.putString("oms_chat","failed: "+error);i.finish(0,result);}}
     static void runLayout(Instrumentation i){NativeStaffChatProbe probe=new NativeStaffChatProbe(i);Bundle result=new Bundle();try{probe.verifyLayoutOnly();result.putString("oms_layout","ok");i.finish(-1,result);}catch(Throwable error){probe.capture("native-chat-layout.png");error.printStackTrace();result.putString("oms_layout","failed: "+error);i.finish(0,result);}}
     private <T>T ui(Callable<T> action)throws Exception{AtomicReference<T> value=new AtomicReference<>();AtomicReference<Throwable> error=new AtomicReference<>();instrumentation.runOnMainSync(()->{try{value.set(action.call());}catch(Throwable e){error.set(e);}});if(error.get() instanceof Error)throw (Error)error.get();if(error.get()!=null)throw (Exception)error.get();return value.get();}
@@ -42,7 +42,7 @@ public final class NativeStaffChatProbe {
     private void verify()throws Exception{
         Context c=instrumentation.getTargetContext();c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
         verifyUploads(c);verifyChunkedUpload(c);
-        NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);fake.onlyOutgoing=true;NativeMessageBadge.loader=ignored->fake.historyUnread;NativeMessageBadge.fromWeb(context,TOKEN,12);return fake;};
+        NativeStaffChatActivity.apiFactory=context->{fake=new FakeApi(context);fake.onlyOutgoing=true;NativeMessageBadge.loader=ignored->new NativeMessageBadge.Counts(0,fake.historyUnread);NativeMessageBadge.fromWeb(context,TOKEN,12);return fake;};
         try{
             Intent launch=new Intent(c,NativeStaffChatActivity.class).putExtra("peer",PEER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(NativeStaffChatActivity)instrumentation.startActivitySync(launch);
             waitFor(()->((EditText)field(activity,"input")).isEnabled());

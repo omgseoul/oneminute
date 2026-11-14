@@ -356,7 +356,13 @@ public class AttendanceActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void setMessageBadge(String token,int count) {
-            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,count);});
+            // Cached older pages provide only a sum; reload its authoritative components.
+            if(token==null||!token.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))return;
+            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.changed(AttendanceActivity.this);});
+        }
+        @JavascriptInterface
+        public void setMessageCounts(String token,int guest,int staff) {
+            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,guest,staff);});
         }
         @JavascriptInterface
         public void setMessageBadgeQuery(String token,String query) {

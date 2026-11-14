@@ -42,6 +42,46 @@ final class NativeMessageBadgeProbe {
         check(android.graphics.Color.alpha(small.getPixel(120,65))>240,"Status ring has thicker stroke");
         check(android.graphics.Color.alpha(small.getPixel(120,120))==0,"Status ring hole remains clear");
     }
+    private static Notification guest(Context c){
+        for(StatusBarNotification n:c.getSystemService(NotificationManager.class).getActiveNotifications())
+            if(n.getId()==NativeMessageBadge.GUEST_ID)return n.getNotification();
+        return null;
+    }
+    private static void verifySplit(Instrumentation instrumentation,Context c)throws Exception{
+        NativeMessageBadge.fromWeb(c,TOKEN,5,6);Thread.sleep(150);expect(c,6);
+        check(guest(c)!=null&&guest(c).number==5,"Guest has its own exact count");
+        check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==2,"Exactly two notifications, no combined third notification");
+        check("게스트 메시지 5건 알림".contentEquals(guest(c).extras.getCharSequence(Notification.EXTRA_TITLE)),"Guest count title");
+        check("직원 메시지 6건 알림".contentEquals(summary(c).extras.getCharSequence(Notification.EXTRA_TITLE)),"Staff count title");
+        java.util.Map<String,String> data=new java.util.HashMap<>();data.put("messageType","general");data.put("route","guest-messages.html#thread/123");
+        check(NativeMessageBadge.guest(data),"Online messages are guests even though messageType is general");
+        data.put("route","messages.html#bot");check(!NativeMessageBadge.guest(data)&&NativeMessageBadge.bot(data.get("route")),"Same-day booking belongs to staff BOT");
+        check(NativeMessageBadge.guest("guest_chat",null,null),"QR guest classification");
+        check(NativeMessageBadge.guest("general","{\"kind\":\"online\"}",null),"Online context fallback");
+        check(!NativeMessageBadge.guest("general",null,null),"Staff classification");
+        check(NativeMessageBadge.messageUrl("general",null,"online.html#thread/123","id").equals("https://omgworks24.com/guest-messages.html#thread/123"),"Legacy online popup routes to guest screen");
+        check(NativeMessageBadge.messageUrl("general",null,"messages.html#bot","id").endsWith("messages.html#bot"),"Booking popup routes to BOT");
+        check(!NativeMessageBadge.messageUrl("general",null,"https://evil.invalid","id").contains("evil"),"Untrusted route rejected");
+        // Resolve the actual PendingIntent by intercepting AttendanceActivity before it launches.
+        assertDestination(instrumentation,guest(c),NativeMessageBadge.url(true,false));
+        assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,false));
+        Notification alert=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentText("Guest latest message").build();
+        NativeMessageBadge.postAlert(c,alert,true,false);Thread.sleep(100);expect(c,6);check(guest(c).number==5,"Guest push does not overwrite staff or increment count");
+        Notification booking=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentText("당일 예약 접수 · Synthetic guest").build();
+        NativeMessageBadge.postAlert(c,booking,false,true);Thread.sleep(100);assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,true));
+        NativeMessageBadge.fromWeb(c,TOKEN,4,5);Thread.sleep(100);expect(c,5);check(guest(c).number==4,"Both counts refresh independently");
+        assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,true));
+        NativeMessageBadge.fromWeb(c,TOKEN,0,5);Thread.sleep(100);check(guest(c)==null,"Reading guests clears only guest notification");expect(c,5);
+        NativeMessageBadge.fromWeb(c,TOKEN,4,0);Thread.sleep(100);expect(c,0);check(guest(c).number==4,"Reading staff preserves guest count");
+        NativeMessageBadge.fromWeb(c,TOKEN,0,0);Thread.sleep(100);check(guest(c)==null,"All read clears both");
+    }
+    private static void assertDestination(Instrumentation instrumentation,Notification n,String expected)throws Exception{
+        Context c=instrumentation.getTargetContext();boolean isGuest=expected.contains("guest-messages.html");
+        Intent intent=new Intent(c,AttendanceActivity.class).setData(android.net.Uri.parse(expected))
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent target=PendingIntent.getActivity(c,NativeMessageBadge.id(isGuest),intent,PendingIntent.FLAG_NO_CREATE|PendingIntent.FLAG_IMMUTABLE);
+        check(target!=null&&target.equals(n.contentIntent),"Actual pending destination matches "+expected);
+    }
     static void run(Instrumentation instrumentation){
         Bundle result=new Bundle();Context c=instrumentation.getTargetContext();
         NativeMessageBadge.Loader original=NativeMessageBadge.loader;
@@ -50,9 +90,9 @@ final class NativeMessageBadgeProbe {
             NativeMessageBadge.clear(c);
             org.json.JSONObject query=new org.json.JSONObject("{\"filters\":{\"version\":1,\"qrVersion\":1,\"statuses\":[\"qr\"],\"properties\":[\"home\"]},\"period\":{\"days\":3}}");
             CountApi owner=new CountApi(c,true);
-            check(NativeMessageBadge.count(owner,query)==47,"31 guests + (12 staff + 4 reports), not 846 historical items");
+            check(NativeMessageBadge.counts(owner,query).total()==47,"31 guests + (12 staff + 4 reports), not 846 historical items");
             check(owner.receivedQuery.toString().equals(query.toString()),"Home filters and rolling period reach summary RPC unchanged");
-            check(NativeMessageBadge.count(new CountApi(c,false),new org.json.JSONObject())==43,"Staff menu sum excludes owner-only reports");
+            check(NativeMessageBadge.counts(new CountApi(c,false),new org.json.JSONObject()).total()==43,"Staff menu sum excludes owner-only reports");
             NativeMessageBadge.loader=ctx->{throw new java.io.IOException("synthetic offline");};
             NativeMessageBadge.setQuery(c,TOKEN,query.toString());
             check(c.getSharedPreferences("omg_message_badge",0).getString("query","").equals(query.toString()),"Background query persisted");
@@ -61,11 +101,11 @@ final class NativeMessageBadgeProbe {
             Thread.sleep(200);
             NativeMessageBadge.fromWeb(c,TOKEN,846);expect(c,846);
             NativeMessageBadge.fromWeb(c,TOKEN,47);expect(c,47);
-            check(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("47개"),"Summary text replaces stale 846 when count falls");
+            check(summary(c).extras.getCharSequence(Notification.EXTRA_TITLE).toString().equals("직원 메시지 47건 알림"),"Summary text replaces stale 846 when count falls");
             Notification legacy=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("미확인 메세지 846개 · 메세지 메뉴에서 확인해주세요.").setNumber(846).build();
             c.getSystemService(NotificationManager.class).notify(NativeMessageBadge.ID,legacy);expect(c,846);
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
-            check(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("7개"),"Legacy summary text is migrated");
+            check(summary(c).extras.getCharSequence(Notification.EXTRA_TITLE).toString().equals("직원 메시지 7건 알림"),"Legacy summary text is migrated");
             Notification n=summary(c);
             verifyLogo(c,n);
             check(n.getSmallIcon().getResId()==R.drawable.ic_oms_notification,"OMS status icon");
@@ -73,6 +113,7 @@ final class NativeMessageBadgeProbe {
             check(n.getGroup()==null,"Badge remains independent of alert groups");
             check(c.getSystemService(NotificationManager.class).getNotificationChannel(NativeMessageBadge.CHANNEL).canShowBadge(),"Badge channel enabled");
             NativeNotificationModesProbe.verify(c,TOKEN);
+            verifySplit(instrumentation,c);
             Notification actual=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setLargeIcon(android.graphics.Bitmap.createBitmap(24,24,android.graphics.Bitmap.Config.ARGB_8888)).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("보낸 사람 · 안녕하세요").build();
             NativeMessageBadge.postAlert(c,actual);NativeMessageBadge.postAlert(c,actual);
             check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==1,"One real message notification, no extra unread bulletin");
@@ -88,11 +129,11 @@ final class NativeMessageBadgeProbe {
             NativeMessageBadge.fromWeb(c,TOKEN,0);expect(c,0);
             Thread.sleep(200);
             CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
-            NativeMessageBadge.loader=ctx->{entered.countDown();release.await(5,TimeUnit.SECONDS);return 99;};
+            NativeMessageBadge.loader=ctx->{entered.countDown();release.await(5,TimeUnit.SECONDS);return new NativeMessageBadge.Counts(80,19);};
             NativeMessageBadge.refresh(c);check(entered.await(4,TimeUnit.SECONDS),"Snapshot started");
             NativeMessageBadge.fromWeb(c,TOKEN,2);release.countDown();Thread.sleep(300);expect(c,2);
             Thread.sleep(200);CountDownLatch staleEntered=new CountDownLatch(1),staleRelease=new CountDownLatch(1);java.util.concurrent.atomic.AtomicInteger loads=new java.util.concurrent.atomic.AtomicInteger();
-            NativeMessageBadge.loader=ctx->{if(loads.incrementAndGet()==1){staleEntered.countDown();staleRelease.await(5,TimeUnit.SECONDS);return 99;}return 0;};
+            NativeMessageBadge.loader=ctx->{if(loads.incrementAndGet()==1){staleEntered.countDown();staleRelease.await(5,TimeUnit.SECONDS);return new NativeMessageBadge.Counts(80,19);}return new NativeMessageBadge.Counts(0,0);};
             NativeMessageBadge.refresh(c);check(staleEntered.await(4,TimeUnit.SECONDS),"Pre-read snapshot started");
             NativeMessageBadge.changed(c);staleRelease.countDown();expect(c,0);
             check(loads.get()>=2,"Reading invalidates stale snapshot and reloads count");

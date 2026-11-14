@@ -235,8 +235,7 @@ public class MessageAlertActivity extends AppCompatActivity {
     private void openMessages() {
         confirmCurrent();
         if (GuestChatAlerts.open(this, alertId)) { finish(); return; }
-        String messageUrl = "https://omgworks24.com/messages.html"
-                + (alertId == null || alertId.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(alertId));
+        String messageUrl = NativeMessageBadge.messageUrl(getIntent().getStringExtra("messageType"),getIntent().getStringExtra("guestContext"),getIntent().getStringExtra("messageRoute"),alertId);
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse(messageUrl))
                 .putExtra("centralNotice", "announcement".equals(getIntent().getStringExtra("messageType")) || "attendance_warning".equals(getIntent().getStringExtra("messageType")))

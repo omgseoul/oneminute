@@ -5,5 +5,8 @@
 #mainMenu .quick-visual svg{width:27px;height:27px}#mainMenu .quick-card .copy b,#mainMenu #messageMenu .copy b{font-size:16px;line-height:1.13;white-space:normal;word-break:keep-all;letter-spacing:-.3px}
 #mainMenu .mission-counter{flex:0 0 39px;width:39px;height:39px;margin-left:auto}#mainMenu .mission-counter strong{font-size:20px}#mainMenu .mission-counter small{font-size:7px}
 #missionMenu{order:1}#calendarMenu{order:2}#attendanceManagement,#staffWorkStatus{order:3}#onlineManagement{order:4}#guestMessageMenu{order:5}#messageMenu{order:6}
-#reportMenu{gap:7px}#reportMenu .report-card{height:67px;min-height:67px;padding:9px}#reportMenu .copy b{font-size:17px}#reportMenu .copy span{display:none}#reportMenu .report-icon{max-width:40px;max-height:40px}
+/* Attendance uses the same card and circle metrics as every other menu item.
+   Keep the approved door/person art at about 73% of the circle diameter. */
+#reportMenu{gap:7px}#reportMenu .copy span{display:none}
+#reportMenu .report-icon{display:block;flex:0 0 auto;width:87%;height:87%;max-width:none;max-height:none;margin:0;border-radius:0;object-fit:contain}
 @media(max-width:350px){#mainMenu .quick-card{gap:6px;padding:8px}#mainMenu .quick-card .copy b,#mainMenu #messageMenu .copy b{font-size:14px}#mainMenu .quick-card .quick-visual{width:32px;height:32px;flex-basis:32px}#mainMenu .mission-counter{width:32px;height:32px;flex-basis:32px}}

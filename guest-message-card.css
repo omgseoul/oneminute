@@ -33,3 +33,14 @@
 .bot-online-notice .guest-popup-message{font-size:15px;line-height:1.6;font-weight:400}
 
 .guest-popup-original{margin-top:8px;font-size:12px;line-height:1.5;color:#758397;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
+
+/* Compact reservation metadata; popup frame, mascot and actions stay unchanged. */
+#messageArrival .guest-popup-strip,.bot-online-notice .guest-popup-strip{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:3px 6px}
+#messageArrival .guest-popup-strip .guest-popup-room,.bot-online-notice .guest-popup-strip .guest-popup-room{grid-column:1;grid-row:1;min-width:0;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#messageArrival .guest-popup-strip .guest-popup-dates,.bot-online-notice .guest-popup-strip .guest-popup-dates{grid-column:2;grid-row:1;min-width:0;white-space:nowrap;font-size:10px!important}
+#messageArrival .guest-popup-strip .guest-popup-property,.bot-online-notice .guest-popup-strip .guest-popup-property{grid-column:3;grid-row:1;margin-left:0}
+#messageArrival .guest-popup-strip .guest-popup-channel,.bot-online-notice .guest-popup-strip .guest-popup-channel{grid-column:4;grid-row:1}
+#messageArrival .guest-popup-strip .guest-popup-name,.bot-online-notice .guest-popup-strip .guest-popup-name{grid-column:1/-1;grid-row:2;display:block;margin:6px 0 0;min-width:0;overflow-wrap:anywhere;font-size:18px}
+.bot-online-notice .guest-popup-strip .guest-popup-name{font-size:15px}
+#messageArrival .guest-popup-strip .guest-popup-source,.bot-online-notice .guest-popup-strip .guest-popup-source{grid-column:1/-1;grid-row:3}
+#messageArrival .guest-popup-message,.bot-online-notice .guest-popup-message{margin-top:10px}

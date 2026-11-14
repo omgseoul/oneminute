@@ -28,13 +28,15 @@ final class GuestMessageCard {
   int navy=Color.rgb(28,51,78),muted=Color.rgb(112,128,149);LinearLayout box=new LinearLayout(c);box.setOrientation(1);box.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));box.setBackground(round(Color.rgb(244,247,252),18,c));
   LinearLayout strip=new LinearLayout(c);strip.setOrientation(1);strip.setPadding(dp(c,8),dp(c,7),dp(c,8),dp(c,7));strip.setBackground(round(Color.rgb(226,237,252),9,c));
   LinearLayout top=new LinearLayout(c);top.setGravity(Gravity.CENTER_VERTICAL);String room=data.optString("room","객실 미정");if(room.matches("[0-9]+"))room+="호";
-  boolean wide=c.getResources().getDisplayMetrics().widthPixels/c.getResources().getDisplayMetrics().density/c.getResources().getConfiguration().fontScale>=380;
-  String stay="체크인 "+date(data.optString("arrival"))+" → 체크아웃 "+date(data.optString("departure"));
-  top.addView(text(c,room,12,true,navy),new LinearLayout.LayoutParams(wide?-2:0,-2,wide?0:1));if(wide){TextView dates=text(c,stay,10,false,muted);dates.setPadding(dp(c,5),0,dp(c,3),0);top.addView(dates,new LinearLayout.LayoutParams(0,-2,1));}top.addView(text(c,data.optString("property"),12,true,navy),new LinearLayout.LayoutParams(-2,-2));
+  String stay=date(data.optString("arrival"))+" → "+date(data.optString("departure"));
+  TextView roomLabel=text(c,room,12,true,navy);roomLabel.setSingleLine(true);roomLabel.setMaxWidth(dp(c,60));roomLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);roomLabel.setContentDescription(room);top.addView(roomLabel,new LinearLayout.LayoutParams(-2,-2));
+  TextView dates=text(c,stay,11,false,muted);dates.setSingleLine(true);dates.setAutoSizeTextTypeUniformWithConfiguration(9,11,1,android.util.TypedValue.COMPLEX_UNIT_SP);dates.setPadding(dp(c,5),0,dp(c,5),0);top.addView(dates,new LinearLayout.LayoutParams(0,-2,1));
+  TextView property=text(c,data.optString("property"),12,true,navy);property.setSingleLine(true);property.setMaxWidth(dp(c,42));property.setEllipsize(android.text.TextUtils.TruncateAt.END);top.addView(property,new LinearLayout.LayoutParams(-2,-2));
   String channel=data.optString("kind").equals("online")?data.optString("channel"):"";
   if(!channel.isEmpty()){ChannelIcon icon=new ChannelIcon(c,channel);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(c,24),dp(c,24));ip.setMargins(dp(c,5),0,0,0);top.addView(icon,ip);}
-  strip.addView(top,new LinearLayout.LayoutParams(-1,-2));if(!wide){TextView dates=text(c,stay,11,false,muted);dates.setPadding(0,dp(c,3),0,0);strip.addView(dates,new LinearLayout.LayoutParams(-1,-2));}box.addView(strip,new LinearLayout.LayoutParams(-1,-2));
-  TextView guest=text(c,data.optString("guest","게스트"),18,true,navy);guest.setPadding(0,dp(c,10),0,dp(c,5));box.addView(guest,new LinearLayout.LayoutParams(-1,-2));
+  strip.addView(top,new LinearLayout.LayoutParams(-1,-2));
+  TextView guest=text(c,data.optString("guest","게스트"),18,true,navy);guest.setPadding(0,dp(c,6),0,0);strip.addView(guest,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout.LayoutParams stripParams=new LinearLayout.LayoutParams(-1,-2);stripParams.bottomMargin=dp(c,10);box.addView(strip,stripParams);
   TextView message=text(c,body.isEmpty()?"메세지 메뉴에서 확인해주세요.":body,16,false,navy);message.setLineSpacing(dp(c,3),1);box.addView(message,new LinearLayout.LayoutParams(-1,-2));
   String time=data.optString("sent");if(!time.isEmpty()){TextView received=text(c,time,10,false,muted);received.setGravity(Gravity.RIGHT);received.setPadding(0,dp(c,9),0,0);box.addView(received,new LinearLayout.LayoutParams(-1,-2));}
   return box;

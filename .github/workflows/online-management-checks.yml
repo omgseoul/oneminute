@@ -28,6 +28,7 @@ jobs:
           node tests/online/followup-ui.cjs
           node tests/online/filter-memory-ui.cjs
           node tests/online/checkin-list-ui.cjs
+          node tests/online/cleaning-ui.cjs
           node tests/online/translation-ui.cjs
           node tests/online/translation-edge.mjs
           node tests/online/auto-translation-edge.mjs

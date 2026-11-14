@@ -5,6 +5,8 @@ const BASE='https://beds24.com/api/v2';
 export function positive(v){const n=Number(v);if(!Number.isSafeInteger(n)||n<=0)throw Error('예약번호를 확인해주세요.');return n;}
 export function dateRange(d){const valid=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;if(!valid(d.from)||!valid(d.to)||d.to<d.from||(Date.parse(d.to)-Date.parse(d.from))/86400000>92)throw Error('조회 기간은 최대 93일입니다.');if(!['arrival','departure','booked','staying'].includes(d.basis))throw Error('조회 기준을 확인해주세요.');return d;}
 export function selectBooking(b){return Object.fromEntries(['id','propertyId','roomId','roomName','unitId','firstName','lastName','arrival','departure','bookingTime','status','apiSource','referer','apiReference','numAdult','numChild','arrivalTime'].map(k=>[k,b[k]??null]));}
+// Retain only inventory identifiers and display fields, never provider notes or credentials.
+export function selectProperty(p){return {id:positive(p.id),name:String(p.name||''),roomTypes:(p.roomTypes||[]).map(r=>({id:positive(r.id),name:String(r.name||''),roomType:String(r.roomType||''),qty:Number.isInteger(r.qty)&&r.qty>=0?r.qty:null,units:(r.units||[]).map(u=>({id:positive(u.id),name:String(u.name||''),name2:String(u.name2||'')}))}))};}
 export function selectMessage(m){return Object.fromEntries(['id','bookingId','propertyId','source','message','time','attachmentName'].map(k=>[k,m[k]??null]));}
 export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})}){
  const url=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
@@ -115,7 +117,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     const secret={token:t.token,refreshToken:t.refreshToken,expiresAt:Date.now()+(Number(t.expiresIn)||3600)*1000};
     // Persist exchanged credentials before a later property request can fail.
     await internal('connect',p,{secret,actor:a.actor});
-    const props=[];await pages('/properties?includeAllRooms=true',{token:t.token},async items=>props.push(...items.map(x=>({id:x.id,name:x.name,roomTypes:(x.roomTypes||[]).map(r=>({id:r.id,name:r.name,units:(r.units||[]).map(u=>({id:u.id,name:u.name}))}))}))));await internal('connect',p,{secret,properties:props,actor:a.actor});return reply(await scoped('settings'));
+    const props=[];await pages('/properties?includeAllRooms=true&includeUnitDetails=true',{token:t.token},async items=>props.push(...items.map(selectProperty)));await internal('connect',p,{secret,properties:props,actor:a.actor});return reply(await scoped('settings'));
    }
    if(['sync_messages','sync_bookings','sync_booking_data'].includes(b.action)){
     const bookingData=b.action==='sync_booking_data',bookingsSync=b.action==='sync_bookings'||bookingData;if(bookingData)d.basis='booked';
@@ -137,7 +139,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     return reply({...await scoped(read),cached:!success,...(warning?{warning}:{})});
    }
    const c=await credentials(p);
-   if(b.action==='properties'){const props=[];await pages('/properties?includeAllRooms=true',{token:c.secret.token},async items=>props.push(...items.map(x=>({id:x.id,name:x.name,roomTypes:(x.roomTypes||[]).map(r=>({id:r.id,name:r.name,units:(r.units||[]).map(u=>({id:u.id,name:u.name}))}))}))));await internal('connect',p,{secret:c.secret,properties:props,actor:a.actor});return reply(await scoped('settings'));}
+   if(b.action==='properties'){const props=[];await pages('/properties?includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token},async items=>props.push(...items.map(selectProperty)));await internal('connect',p,{secret:c.secret,properties:props,actor:a.actor});return reply(await scoped('settings'));}
    if(!c.beds_property_id)throw Error('기본정보에서 연동할 숙소를 선택하고 저장해주세요.');
    if(b.action==='draft'){const id=positive(d.booking_id);await booking(p,c,id);await messages(p,c,id,true);return reply(await draft(p,id,a.actor));}
    if(b.action==='send'){

@@ -16,7 +16,7 @@ const read=f=>fs.readFileSync(f,'utf8');
    if(name==='list_property_shares')return{ok:true,properties:[{property_id:'property-a',is_own:true}]};
    if(name==='list_shared_missions')return{ok:true,missions:updated?[]:[{id:'task-a',title:'오늘 업무 <img src=x>',timing:'today',active:true,target_count:1,completed_count:0}]};
    if(name==='calendar_event_action')return{ok:true,events:[]};
-   if(name==='guest_message_unread')return{ok:true,unread:updated?0:1,messenger_unread:2};
+   if(name==='guest_message_summary')return{ok:true,unread:updated?0:1,messenger_unread:2};
    throw Error('Unexpected RPC '+name);
   };
   const request=name=>{rpcCalls.push(name);if(name==='is_platform_administrator')return Promise.resolve({data:false});const finish=()=>name==='guest'?value(name):{data:value(name)};if(sessionStorage.getItem('fixture-hold')==='yes')return new Promise((resolve,reject)=>pending.push({name,resolve:()=>resolve(finish()),reject}));return Promise.resolve(finish());};

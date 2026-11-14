@@ -170,7 +170,7 @@
   const key=rowKey(t);if(reading.has(key)||Number(t.unread||0)===0||t.source!=='guest')return;reading.add(key);
   try{await call('read_message',{message_id:t.message_id},t.property_id);t.unread=0;pinOpen(t,el);el.querySelector('.inbox-preview-row .badge')?.remove();
    for(const [cacheKey,value] of resultCache){const [property,action]=JSON.parse(cacheKey);if(action==='inbox'&&property===t.property_id)for(const row of value.threads||[])if(row.booking_id===t.booking_id&&row.message_id===t.message_id)row.unread=0;}
-   delete $('inboxList').dataset.signature;if(view==='inbox')await loadInbox();
+   delete $('inboxList').dataset.signature;window.dispatchEvent(new Event('omg:messages-changed'));if(view==='inbox')await loadInbox();
   }catch(e){status('읽음 상태를 저장하지 못했습니다. '+e.message,true);}finally{reading.delete(key);}
  }
  async function task(button,fn){if(button?.disabled)return;const locksBranch=!['searchButton','refreshBookings','refreshInbox','refreshThread','refreshLogs','refreshBookingData','refreshCleaning','searchBookingData','webhookLogsButton'].includes(button?.id);if(locksBranch){taskCount++;lockPicker(true);}const taskVersion=version,text=button?.textContent;if(button){button.disabled=true;button.setAttribute('aria-busy','true');if(!button.classList.contains('icon-refresh'))button.textContent='처리 중…';}try{await fn();}catch(e){if(taskVersion===version)status(e.message,true);}finally{if(button){button.disabled=false;button.removeAttribute('aria-busy');if(!button.classList.contains('icon-refresh'))button.textContent=text;}if(locksBranch)taskCount--;lockPicker(switching||taskCount>0);}}
@@ -216,12 +216,13 @@
  function closeChannels(){document.querySelectorAll('[data-channel][aria-expanded=true]').forEach(b=>{b.setAttribute('aria-expanded','false');document.getElementById(b.getAttribute('aria-controls')).hidden=true;});}
  document.addEventListener('click',e=>{if(!e.target.closest('.inbox-channel'))closeChannels();});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeChannels();});
+ function updateInboxUnread(rows=inboxRows?.threads||[]){const el=$('unreadOnlyButton');if(el)el.textContent='읽지않음 '+rows.reduce((sum,t)=>sum+(Number(t.unread)||0),0);}
  function renderInbox(v){
   if(sending||[...composers.values()].some(x=>x.busy))return;
   inboxRows=v;const list=$('inboxList'),filterKey=JSON.stringify([selectedProperties,inboxQuery()]);if(filterKey!==inboxFilterKey){openPins.clear();inboxFilterKey=filterKey;}
   const rows=(v.threads||[]).filter(t=>selectedStatuses.has(t.status||'unknown'));
   for(const [key,t] of openPins){if(rows.some(row=>rowKey(row)===key))openPins.delete(key);else if([...list.querySelectorAll('details[open]')].some(el=>el.dataset.booking===key))rows.push(t);else openPins.delete(key);}
-  rows.sort((a,b)=>Date.parse(b.sent_at)-Date.parse(a.sent_at)||Number(b.booking_id)-Number(a.booking_id));$('inboxCount').textContent=`대화 ${rows.length}건`;
+  rows.sort((a,b)=>Date.parse(b.sent_at)-Date.parse(a.sent_at)||Number(b.booking_id)-Number(a.booking_id));$('inboxCount').textContent=`대화 ${rows.length}건`;if(guestMode)updateInboxUnread(rows);
   const signature=JSON.stringify([settings.property_name,rows,selectedProperties.map(id=>[id,incomingTarget(id),autoConfig(id)])]);if(list.dataset.signature===signature)return;
   const opened=new Set([...list.querySelectorAll('details[open]')].map(x=>x.dataset.booking)),focused=document.activeElement?.closest('.inbox-item')?.dataset.booking,editing=document.activeElement?.tagName==='TEXTAREA',selection=editing?[document.activeElement.selectionStart,document.activeElement.selectionEnd]:null;
   list.dataset.signature=signature;
@@ -320,7 +321,7 @@
  function bindInline(rows){
   for(const el of $('inboxList').querySelectorAll('.inbox-item')){
    bindChannelButtons(el);
-   const qr=rows.find(x=>rowKey(x)===el.dataset.booking);if(qr?.kind==='qr'){OMSGuestInbox.bind(el,qr,{token:session.accessToken,c:composer(qr),refresh:()=>loadInbox().catch(e=>status(e.message,true)),recordReply,pinOpen});continue;}
+   const qr=rows.find(x=>rowKey(x)===el.dataset.booking);if(qr?.kind==='qr'){OMSGuestInbox.bind(el,qr,{token:session.accessToken,c:composer(qr),refresh:()=>loadInbox().catch(e=>status(e.message,true)),recordReply,pinOpen,onRead:()=>updateInboxUnread(rows)});continue;}
    const t=rows.find(x=>rowKey(x)===el.dataset.booking),c=composer(t),form=el.querySelector('.inline-reply'),input=form.querySelector('textarea'),state=form.querySelector('.inline-state');input.value=c.body;state.textContent=c.state;form.querySelector('[type=submit]').disabled=!!c.blocked;input.oninput=()=>{c.body=input.value;if(!c.ai)c.id=null;resetTranslation(form,c);};
    const target=incomingTarget(t.property_id),cacheKey=incomingKey(t.property_id,t.message_id,t.preview,target),output=el.querySelector('.translation-result');showIncoming(output,cachedIncoming(t.property_id,t.message_id,t.preview),target,t.preview);
    const translate=el.querySelector('[data-translate]');if(translate)translate.onclick=()=>task(translate,async()=>{const v=await call('translate',{message_id:t.message_id,target},t.property_id);if(v.unconfigured)throw Error('기본정보에서 번역 API 연결을 등록해주세요.');if(v.busy)throw Error('번역 중입니다. 잠시 후 다시 확인해주세요.');translated.set(cacheKey,v);showIncoming(output,v,target,t.preview);});

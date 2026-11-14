@@ -25,7 +25,7 @@ const read=file=>fs.readFileSync(file,'utf8');
      }
      if(name==='list_working_employees')return {data:{ok:true,own_property_id:'property-a',own_property_name:'테스트 지점',employees:[{employee_id:'worker-b',display_name:'동료',property_id:'property-a',property_name:'테스트 지점'}]}};
      if(name==='list_property_messages')return {data:{ok:true,can_manage:owner,messages:[{message_id:'s1'},{message_id:'s2'}],unread_count:2}};
-     if(name==='guest_message_unread')return {data:{ok:true,unread:0}};
+     if(name==='guest_message_summary')return {data:{ok:true,unread:0}};
      if(name==='work_report_inbox')return {data:{ok:true,unread_count:0,reports:[]}};
      if(name==='list_property_shares')return {data:{ok:true,properties:[{property_id:'property-a',is_own:true}]}};
      if(['list_missions','list_shared_missions'].includes(name))return {data:{ok:true,missions:[]}};

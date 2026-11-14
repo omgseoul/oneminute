@@ -71,6 +71,14 @@ insert into omg_private.online_messages values('${id(1)}',778,777,'${id(71)}','2
 const botBefore=await read(id(201)),botSql=fs.readFileSync('supabase/setup/beds24_bot_message_cards.sql','utf8');await db.exec(botSql);await db.exec(botSql);const botAfter=await read(id(201));
 assert.equal(botAfter.messages.find(m=>m.message_id===id(71)).guest_context.room,'404');assert.equal(botAfter.messages.find(m=>m.message_id===id(71)).guest_context.channel,'Booking.com');assert.equal(botAfter.messages.find(m=>m.message_id===id(71)).guest_context.property,'본점');
 for(const m of botAfter.messages)delete m.guest_context;assert.deepEqual(botAfter,botBefore,'presentation patch preserves all original feed fields and recipient/read behavior');assert.equal((await read(id(102))).messages.length,0);assert.equal((await read(id(999))).ok,false);assert.equal((await db.query('select omg_private.guest_popup_online($1,$2) v',[id(2),id(71)])).rows[0].v,null);
+// The unified inbox removes ordinary arrivals from the bot feed without touching their recipient records.
+const unifiedSql=fs.readFileSync('supabase/setup/beds24_unified_guest_messages.sql','utf8');
+await db.exec(unifiedSql.slice(unifiedSql.indexOf('-- Filter the presentation feed'),unifiedSql.lastIndexOf('commit;')));
+await db.exec(`insert into property_messages(id,property_id,sender_type,message,message_type,source) values('${id(72)}','${id(1)}','system','QR arrival','guest_chat','guest_chat'),('${id(73)}','${id(1)}','system','AI help','general','guest_ai');
+insert into property_message_recipients(message_id,employee_id,recipient_type,recipient_key)values('${id(72)}','${id(21)}','staff','employee:${id(21)}'),('${id(73)}','${id(21)}','staff','employee:${id(21)}');`);
+const unifiedFeed=await read(id(201));assert(!unifiedFeed.messages.some(m=>[id(71),id(72)].includes(m.message_id)));assert(unifiedFeed.messages.some(m=>m.message_id===id(73)));assert.equal(unifiedFeed.unread_count,5);assert.equal(unifiedFeed.unread_by_property[id(1)],5);
+assert.equal((await db.query('select count(*) n from property_message_recipients where message_id in($1,$2)',[id(71),id(72)])).rows[0].n,2);
+console.log('PASS unified bot feed: ordinary QR/online cards and counts excluded; AI help and popup recipients preserved');
 console.log('PASS bot reservation metadata, idempotent patch, unchanged feed, invalid session and property/recipient isolation');
 console.log('PASS legacy reminder date enrichment, calendar dates, deduplication, deleted targets and recipient/property isolation');
 console.log('PASS: invalid session, staff write denial, cross-property isolation, authorized shared editing, profile validation, bot outgoing mode, recipient cap, disabled schedule, ordinary chat preservation, contract duplication prevention, RLS.');await db.close();

@@ -55,7 +55,16 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    }
   }
  }
- async function push(property){for(const id of await internal('push_pending',property)){try{await fetcher(url()+'/functions/v1/dispatch-notification/online',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:id}),signal:AbortSignal.timeout(12000)});}catch{/* push attempts are idempotent */}}}
+ async function push(property){
+  const deadline=Date.now()+4000;
+  for(const id of await internal('push_pending',property)){
+   // Translation may fill the existing cache later, but must not indefinitely delay the alert.
+   const work=(async()=>{try{const notice=await rpc('online_notice_translation',{p_property:property,p_notice:id});if(notice?.message_id)await translation.translate(property,{message_id:notice.message_id,direction:'incoming',automatic:true});}catch{}})();
+   waitUntil(work);let timer;try{await Promise.race([work,new Promise(resolve=>{timer=setTimeout(resolve,Math.max(0,deadline-Date.now()));})]);}finally{clearTimeout(timer);}
+   try{await fetcher(url()+'/functions/v1/dispatch-notification/online',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:id}),signal:AbortSignal.timeout(12000)});}catch{/* push attempts are idempotent */}
+  }
+ }
+
  async function draft(property,id,actor){
   const job=await internal('draft_claim',property,{booking_id:positive(id),actor});if(job.skip)return {ok:true,skip:true};let result={id:job.id},attempted=false,received=false;
   try{
@@ -101,8 +110,9 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     throw Error('지원하지 않는 운영센터 요청입니다.');
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
-   const a=await owner(b.access_token,'auth',{property_id:d.property_id}),p=a.property_id;
+   const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
+   if(b.action==='guest_settings')return reply(await scoped('guest_settings'));
    if(b.action==='settings'){const v=await scoped('settings'),t=await translation.ctl('status',p);return reply({...v,translation:t.usage,translation_connected:!!(t.usage?.platform_ready||t.usage?.personal_connected)});}
    if(['save_message_alert','save_message_alert_draft','save_auto_translation','booking_data','booking_data_count','save_booking_alert','save_settings','save_translation_language','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));
    if(b.action==='save_translation')return reply(await translation.save(p,d.key));

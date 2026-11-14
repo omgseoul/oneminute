@@ -1,0 +1,6 @@
+.qr-source{display:inline-block;flex:0 0 auto;padding:2px 4px;border-radius:4px;background:#c83e53;color:#fff;font-size:10px;line-height:1.3;font-weight:700;white-space:nowrap}
+.qr-inbox-item .inbox-name{display:flex;align-items:center;gap:4px;min-width:0}.qr-inbox-item .inbox-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr-inbox-item .inbox-reservation{grid-template-columns:minmax(0,1fr) auto auto auto 12px}
+.qr-full-chat{display:flex;align-items:center;justify-content:center;padding:9px;border:1px solid #dce5ef;border-radius:12px;color:#396b98;text-decoration:none;font-size:13px;background:#f1f6ff}
+body[data-guest-inbox] #pageDescription{display:none}
+.hub-tabs{grid-template-columns:repeat(2,minmax(0,1fr)) auto}.hub-tabs.owner-hub{grid-template-columns:repeat(3,minmax(0,1fr)) auto}

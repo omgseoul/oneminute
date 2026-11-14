@@ -11,10 +11,11 @@ import java.util.*;
 /** Synthetic FCM receipt: weak mode must survive the immediate unread refresh. */
 final class NativeNotificationModesProbe {
     private static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
-    private static Notification active(NotificationManager manager,String channel,int count)throws Exception{
+    private static Notification active(NotificationManager manager,String channel,int count)throws Exception{return active(manager,NativeMessageBadge.ID,channel,count);}
+    private static Notification active(NotificationManager manager,int id,String channel,int count)throws Exception{
         long end=System.currentTimeMillis()+3000;
-        while(System.currentTimeMillis()<end){for(StatusBarNotification n:manager.getActiveNotifications())if(n.getId()==NativeMessageBadge.ID&&channel.equals(n.getNotification().getChannelId())&&n.getNotification().number==count)return n.getNotification();Thread.sleep(25);}
-        throw new AssertionError("Expected weak notification");
+        while(System.currentTimeMillis()<end){for(StatusBarNotification n:manager.getActiveNotifications())if(n.getId()==id&&channel.equals(n.getNotification().getChannelId())&&n.getNotification().number==count)return n.getNotification();Thread.sleep(25);}
+        throw new AssertionError("Expected notification id="+id+" channel="+channel+" count="+count);
     }
     private static final class TestService extends GuesthouseMessagingService {TestService(Context context){attachBaseContext(context);}}
     static void verify(Context c,String token)throws Exception{
@@ -50,11 +51,25 @@ final class NativeNotificationModesProbe {
             Notification refreshed=active(manager,weak,7);
             check(weak.equals(refreshed.getChannelId()),"Same-count read refresh must not move real alert to silent badge channel");
             check((refreshed.flags&Notification.FLAG_ONLY_ALERT_ONCE)==0,"Same-count refresh preserves active alert behavior");
-            check(manager.getActiveNotifications().length==1,"One message, one notification");
+            check(NativeMessageBadgeProbe.appNotificationCount(c)==1,"One message, one notification");
             check(audio.getRingerMode()==AudioManager.RINGER_MODE_VIBRATE,"Weak respects the phone vibration mode");
             NativeMessageBadge.fromWeb(c,token,2);Thread.sleep(100);
             check(active(manager,NativeMessageBadge.CHANNEL,2).number==2,"Actual count change stays quiet");
-            NativeMessageBadge.fromWeb(c,token,0);Thread.sleep(100);check(manager.getActiveNotifications().length==0,"Read clears notification");
+            NativeMessageBadge.fromWeb(c,token,5,6);active(manager,NativeMessageBadge.CHANNEL,6);
+            new TestService(c).onMessageReceived(new RemoteMessage.Builder("synthetic")
+                .addData("mode","weak").addData("alertId","guest-"+UUID.randomUUID()).addData("messageType","general")
+                .addData("route","guest-messages.html#thread/123").addData("message","합성 게스트 메시지").build());
+            Notification guest=active(manager,NativeMessageBadge.GUEST_ID,weak,5);
+            NativeMessageBadgeProbe.awaitCounts(c,5,6);
+            check(NativeMessageBadgeProbe.appNotificationCount(c)==2,"Guest FCM keeps staff notification");
+            check(guest.number==5&&weak.equals(guest.getChannelId()),"Online FCM uses guest slot with exact count and strength");
+            new TestService(c).onMessageReceived(new RemoteMessage.Builder("synthetic")
+                .addData("mode","weak").addData("alertId","booking-"+UUID.randomUUID()).addData("messageType","general")
+                .addData("route","messages.html#bot").addData("message","당일 예약 접수 · 합성 예약").build());
+            Notification booking=active(manager,weak,6);NativeMessageBadgeProbe.awaitCounts(c,5,6);
+            check(booking.extras.getBoolean("oms_bot_notice")&&"staff".equals(booking.extras.getString("oms_message_bucket")),"Booking FCM stays in staff slot and targets BOT");
+            check(NativeMessageBadgeProbe.appNotificationCount(c)==2,"Booking FCM creates no third combined notice");
+            NativeMessageBadge.fromWeb(c,token,0);NativeMessageBadgeProbe.awaitCounts(c,0,0);check(NativeMessageBadgeProbe.appNotificationCount(c)==0,"Read clears notification");
             android.util.Log.i("OMSProbe","weak vibration pattern, phone mode, migration, silent-refresh race and single alert: PASS");
         }finally{
             audio.setRingerMode(ringer);SharedPreferences.Editor edit=push.edit().clear();

@@ -32,9 +32,12 @@ final class NativeLauncherBadgeProbe {
         shell("input swipe "+x+" "+(h*85/100)+" "+x+" "+(h*20/100)+" 450");
         awaitCount(0);capture("launcher-badge-before.png");
         NativeMessageBadge.fromWeb(c,token,2);awaitCount(2);capture("launcher-badge-after.png");
+        NativeMessageBadge.fromWeb(c,token,5,6);awaitCount(11);capture("launcher-badge-split.png");
+        NativeMessageBadge.fromWeb(c,token,0,6);awaitCount(6);
+        NativeMessageBadge.fromWeb(c,token,5,0);awaitCount(5);
         NativeMessageBadge.fromWeb(c,token,1);awaitCount(1);
         NativeMessageBadge.fromWeb(c,token,0);awaitCount(0);capture("launcher-badge-cleared.png");
-        System.out.println("PASS: launcher excludes old group header, exposes exact counts 2 -> 1 -> 0 for standalone badge");
+        System.out.println("PASS: launcher excludes old group header, sums guest 5 + staff 6 = 11, clears each independently, then clears all");
     }
     private static void shell(String command)throws Exception{
         ParcelFileDescriptor fd=instrumentation.getUiAutomation().executeShellCommand(command);

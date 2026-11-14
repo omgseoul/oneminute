@@ -218,6 +218,10 @@ public class AttendanceActivity extends AppCompatActivity {
         setIntent(intent);
         if (webView != null) {
             String target=appUrlFromIntent(intent),current=webView.getUrl();
+            if (NativeMessageBadge.url(false,true).equals(target)&&current!=null&&"/messages.html".equals(Uri.parse(current).getPath())) {
+                webView.evaluateJavascript("window.dispatchEvent(new Event('omg:open-bot'))",null);
+                return;
+            }
             if (intent.getBooleanExtra("centralNotice",false) && current!=null) {
                 Uri shown=Uri.parse(current),next=Uri.parse(target);
                 // Let report persistence/delivery finish; Home then opens its unread notice.
@@ -278,9 +282,12 @@ public class AttendanceActivity extends AppCompatActivity {
                 try {org.json.JSONArray items=new org.json.JSONArray(json);
                     for(int n=0;n<items.length();n++){
                         org.json.JSONObject item=items.getJSONObject(n);
+                        String context=item.optJSONObject("guest_context")==null?"":item.optJSONObject("guest_context").toString();
+                        String route="system".equals(item.optString("sender_type"))&&item.optString("message").startsWith("[OMS-BOOKING:")?"messages.html#bot":"";
                         NativeMessagePopupQueue.offer(AttendanceActivity.this,new Intent(AttendanceActivity.this,MessageAlertActivity.class)
                           .putExtra("alertId",item.getString("message_id")).putExtra("senderLabel",item.optString("sender_label"))
-                          .putExtra("message",item.optString("message")).putExtra("messageType",item.optString("message_type")).putExtra("guestContext",item.optJSONObject("guest_context")==null?"":item.optJSONObject("guest_context").toString()));
+                          .putExtra("message",item.optString("message")).putExtra("messageType",item.optString("message_type")).putExtra("guestContext",context)
+                          .putExtra("messageRoute",route).putExtra("notificationId",NativeMessageBadge.id(NativeMessageBadge.guest(item.optString("message_type"),context,route))));
                     }
                     if(hasWindowFocus())NativeMessagePopupQueue.launch(AttendanceActivity.this);
                 }catch(Exception ignored){}
@@ -356,7 +363,13 @@ public class AttendanceActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void setMessageBadge(String token,int count) {
-            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,count);});
+            // Cached older pages provide only a sum; reload its authoritative components.
+            if(token==null||!token.equals(NativeStaffChatApi.prefs(AttendanceActivity.this).getString("token","")))return;
+            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.changed(AttendanceActivity.this);});
+        }
+        @JavascriptInterface
+        public void setMessageCounts(String token,int guest,int staff) {
+            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,guest,staff);});
         }
         @JavascriptInterface
         public void setMessageBadgeQuery(String token,String query) {

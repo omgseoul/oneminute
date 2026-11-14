@@ -93,6 +93,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             service.putExtra("message", message.getData().get("message"));
             service.putExtra("mode", mode == null ? "urgent" : mode);
             service.putExtra("senderLabel", message.getData().get("senderLabel"));
+            service.putExtra("guestNotification",NativeMessageBadge.guest(message.getData()));
+            service.putExtra("botNotification",NativeMessageBadge.bot(message.getData().get("route")));
         }
         try { ContextCompat.startForegroundService(this, service); }
         catch (RuntimeException error) { showMessageNotification(message); }
@@ -133,11 +135,8 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         String body = remote.getData().get("message");
         if (body == null || body.trim().isEmpty()) body = "채팅방을 확인해주세요.";
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
-        int notificationId = NativeMessageBadge.ID;
-        String messageUrl = "guest_chat".equals(messageType)
-                ? GuestChatAlerts.url(remote.getData().get("roomId"))
-                : "https://omgworks24.com/messages.html"
-                    + (id == null || id.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(id));
+        int notificationId = NativeMessageBadge.id(NativeMessageBadge.guest(remote.getData()));
+        String messageUrl = NativeMessageBadge.url(NativeMessageBadge.guest(remote.getData()),NativeMessageBadge.bot(remote.getData().get("route")));
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -145,7 +144,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         ReminderPopup reminder=ReminderPopup.parse(body,sender);
         Notification notification = new NotificationCompat.Builder(this, WEAK_MESSAGE_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
+                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this,NativeMessageBadge.guest(remote.getData())))
                 .setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
@@ -157,7 +156,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setAutoCancel(true)
                 .setContentIntent(content)
                 .build();
-        NativeMessageBadge.postAlert(this,notification);
+        notification=NativeMessageBadge.postAlert(this,notification,NativeMessageBadge.guest(remote.getData()),NativeMessageBadge.bot(remote.getData().get("route")));
     }
 
     private void showNormalNotification(RemoteMessage remote) {
@@ -183,33 +182,30 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         if (body == null || body.trim().isEmpty()) body = "채팅방을 확인해주세요.";
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         boolean continuation="work_confirmation".equals(messageType);
-        int notificationId = continuation?WorkConfirmationActivity.NOTIFICATION_ID:NativeMessageBadge.ID;
+        int notificationId = continuation?WorkConfirmationActivity.NOTIFICATION_ID:NativeMessageBadge.id(NativeMessageBadge.guest(remote.getData()));
         Intent screen = new Intent(this, continuation?WorkConfirmationActivity.class:MessageAlertActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra("alertId", id).putExtra("senderLabel", sender).putExtra("message", body)
                 .putExtra("messageType", messageType).putExtra("notificationId", notificationId);
-        screen.putExtra("guestContext",remote.getData().get("guestContext"));
+        screen.putExtra("guestContext",remote.getData().get("guestContext")).putExtra("messageRoute",remote.getData().get("route"));
         NativeMessagePopupQueue.offer(this,screen);
         PendingIntent fullScreen = PendingIntent.getActivity(this, notificationId, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        String messageUrl = "guest_chat".equals(messageType)
-                ? GuestChatAlerts.url(remote.getData().get("roomId"))
-                : "https://omgworks24.com/messages.html"
-                    + (id == null || id.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(id));
+        String messageUrl = NativeMessageBadge.url(NativeMessageBadge.guest(remote.getData()),NativeMessageBadge.bot(remote.getData().get("route")));
         Intent open = new Intent(this, AttendanceActivity.class).setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, notificationId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         ReminderPopup reminder=ReminderPopup.parse(body,sender);
         Notification notification = new NotificationCompat.Builder(this, NORMAL_MESSAGE_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this)).setColor(Color.rgb(36, 103, 189))
+                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(continuation?0:NativeMessageBadge.currentCount(this,NativeMessageBadge.guest(remote.getData()))).setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:continuation?"근무 12시간 초과 알림":isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
                 .setContentText(reminder!=null?reminder.title:sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(continuation?fullScreen:content).build();
-        if(continuation)manager.notify(notificationId,notification);else NativeMessageBadge.postAlert(this,notification);
+        if(continuation)manager.notify(notificationId,notification);else notification=NativeMessageBadge.postAlert(this,notification,NativeMessageBadge.guest(remote.getData()),NativeMessageBadge.bot(remote.getData().get("route")));
         Handler handler = new Handler(Looper.getMainLooper());
         Runnable showScreen = () -> { try { startActivity(screen); } catch (Exception ignored) {} };
         handler.post(showScreen);handler.postDelayed(showScreen, 350L);
@@ -243,7 +239,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
         if (sender == null || sender.trim().isEmpty()) sender = "새 메세지";
         if (body == null || body.trim().isEmpty()) body = "메세지 메뉴에서 확인해주세요.";
 
-        int requestCode = NativeMessageBadge.ID;
+        int requestCode = NativeMessageBadge.id(NativeMessageBadge.guest(remote.getData()));
         Intent screen = new Intent(this, MessageAlertActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -253,13 +249,11 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .putExtra("message", body)
                 .putExtra("messageType", messageType)
                 .putExtra("notificationId", requestCode);
-        screen.putExtra("guestContext",remote.getData().get("guestContext"));
+        screen.putExtra("guestContext",remote.getData().get("guestContext")).putExtra("messageRoute",remote.getData().get("route"));
         NativeMessagePopupQueue.offer(this,screen);
         PendingIntent fullScreen = PendingIntent.getActivity(this, requestCode, screen,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        String messageUrl = "https://omgworks24.com/messages.html"
-                + (alertId == null || alertId.trim().isEmpty() ? "" : "?message_id=" + Uri.encode(alertId));
-        if ("guest_chat".equals(remote.getData().get("messageType"))) messageUrl = GuestChatAlerts.url(remote.getData().get("roomId"));
+        String messageUrl = NativeMessageBadge.url(NativeMessageBadge.guest(remote.getData()),NativeMessageBadge.bot(remote.getData().get("route")));
         Intent open = new Intent(this, AttendanceActivity.class)
                 .setData(Uri.parse(messageUrl))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -267,7 +261,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         ReminderPopup reminder=ReminderPopup.parse(body,sender);
         Notification notification = new NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this))
+                .setSmallIcon(R.drawable.ic_oms_notification).setNumber(NativeMessageBadge.currentCount(this,NativeMessageBadge.guest(remote.getData())))
                 .setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:isApproval(messageType) ? "결재 요청" : "새 메세지 도착")
                 .setContentText(reminder!=null?reminder.title:sender + " · " + body)
@@ -281,7 +275,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setFullScreenIntent(fullScreen, true)
                 .setContentIntent(content)
                 .build();
-        NativeMessageBadge.postAlert(this,notification);
+        notification=NativeMessageBadge.postAlert(this,notification,NativeMessageBadge.guest(remote.getData()),NativeMessageBadge.bot(remote.getData().get("route")));
         if (!getSharedPreferences("omg_urgent_volume", MODE_PRIVATE).contains("original")) {
             try { ContextCompat.startForegroundService(this, new Intent(this, MessageSoundService.class)
                     .putExtra("notificationId", requestCode).putExtra("notification", notification)); }

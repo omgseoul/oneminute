@@ -20,7 +20,7 @@ adb shell am start -W -n "$launcher_component"
 adb shell am instrument -w -e phase badge com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-badge.txt"
 
 # Retain diagnostics even when the launcher assertion fails.
-for state in before after cleared failed; do
+for state in before after split cleared failed; do
     target="$RUNNER_TEMP/oms-native-launcher-$state.png"
     if ! adb exec-out run-as com.oneminute.guesthousemanager cat "files/launcher-badge-$state.png" > "$target"; then
         rm -f "$target"

@@ -47,24 +47,32 @@ final class NativeMessageBadge {
         try{NativeStaffChatApi session=new NativeStaffChatApi(c);revision++;save(c,session.scope,count);}catch(Exception ignored){}
     }
 
-    static synchronized void received(Context c,String id){
-        if(id==null||id.isEmpty()){refresh(c);return;}
+    // Persist the same account-specific filters/relative period used by the home menu.
+    static synchronized void setQuery(Context c,String token,String json){
+        if(token==null||!token.equals(NativeStaffChatApi.prefs(c).getString("token",""))||json==null||json.length()>32768)return;
         try{
-            NativeStaffChatApi session=new NativeStaffChatApi(c);SharedPreferences p=prefs(c);
-            if(!session.scope.equals(p.getString("scope","")))p.edit().clear().commit();
-            String key="push_"+NativeStaffChatApi.hash(id);long now=System.currentTimeMillis();
-            if(!p.contains(key)){
-                SharedPreferences.Editor edit=p.edit();
-                for(String old:p.getAll().keySet())if(old.startsWith("push_")&&now-p.getLong(old,0)>86400000L)edit.remove(old);
-                edit.putLong(key,now).commit();revision++;
-                save(c,session.scope,Math.min(1000000,p.getInt("count",0)+1));
-            }
-            refresh(c);
-        }catch(Exception ignored){clear(c);}
+            NativeStaffChatApi session=new NativeStaffChatApi(c);JSONObject input=new JSONObject(json);
+            JSONObject query=new JSONObject().put("filters",input.getJSONObject("filters")).put("period",input.getJSONObject("period"));
+            SharedPreferences p=prefs(c);String value=query.toString();
+            if(session.scope.equals(p.getString("query_scope",""))&&value.equals(p.getString("query","")))return;
+            p.edit().putString("query_scope",session.scope).putString("query",value).apply();
+            changed(c);
+        }catch(Exception ignored){}
+    }
+    static synchronized void received(Context c,String id){
+        // A push may be a reminder, a duplicate, or outside the guest filters.
+        // Only a complete server snapshot may change the total.
+        changed(c);
     }
 
     static synchronized void clear(Context c){
         revision++;prefs(c).edit().clear().apply();publish(c,0);
+    }
+    private static boolean isSummary(Notification n){
+        String title=String.valueOf(n.extras.getCharSequence(Notification.EXTRA_TITLE));
+        String body=String.valueOf(n.extras.getCharSequence(Notification.EXTRA_TEXT));
+        return n.extras.getBoolean("oms_unread_summary",false)||title.startsWith("OMS · 미확인 소식")
+            ||(("새 메세지 도착".equals(title)||"새 메시지 도착".equals(title))&&(body.startsWith("미확인 메세지 ")||body.startsWith("미확인 메시지 ")));
     }
     private static void save(Context c,String scope,int total){
         int count=Math.max(0,Math.min(1000000,total));
@@ -76,6 +84,7 @@ final class NativeMessageBadge {
         removeLegacy(manager);
         Notification n=Notification.Builder.recoverBuilder(c,alert).setLargeIcon((android.graphics.Bitmap)null).setNumber(Math.max(1,prefs(c).getInt("count",0))).build();
         manager.notify(ID,n);
+        refresh(c); // Reconcile even if the first push refresh finished before the alert was posted.
     }
     private static void removeLegacy(NotificationManager manager){
         for(StatusBarNotification item:manager.getActiveNotifications())if(item.getId()!=ID&&
@@ -96,9 +105,10 @@ final class NativeMessageBadge {
         Intent open=new Intent(c,AttendanceActivity.class).setData(Uri.parse("https://omgworks24.com/messages.html"))
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content=PendingIntent.getActivity(c,ID,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        android.os.Bundle extras=new android.os.Bundle();extras.putBoolean("oms_unread_summary",true);
         Notification notification=new NotificationCompat.Builder(c,CHANNEL)
                 .setSmallIcon(R.drawable.ic_oms_notification).setColor(0xff2467bd)
-                .setContentTitle("새 메세지 도착").setContentText("미확인 메세지 "+count+"개 · 메세지 메뉴에서 확인해주세요.")
+                .addExtras(extras).setContentTitle("새 메세지 도착").setContentText("미확인 메세지 "+count+"개 · 메세지 메뉴에서 확인해주세요.")
                 .setNumber(count).setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 // Launchers filter group headers; the count must be a standalone notification.
@@ -115,9 +125,9 @@ final class NativeMessageBadge {
                 // A receipt refresh often confirms the same count immediately after FCM.
                 // Reposting that alert on the silent badge channel can cancel its vibration.
                 if(!repost&&previous.getLargeIcon()==null&&previous.getGroup()==null&&!CHANNEL.equals(previous.getChannelId())
-                        &&!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))return;
+                        &&!isSummary(previous))return;
                 // Keep the real sender/body and destination; count changes stay quiet.
-                if(!String.valueOf(previous.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("OMS · 미확인 소식"))notification=Notification.Builder.recoverBuilder(c,previous).setLargeIcon((android.graphics.Bitmap)null).setChannelId(CHANNEL)
+                if(!isSummary(previous))notification=Notification.Builder.recoverBuilder(c,previous).setLargeIcon((android.graphics.Bitmap)null).setChannelId(CHANNEL)
                     .setGroup(null).setGroupSummary(false).setNumber(count).setOnlyAlertOnce(true)
                     .setFullScreenIntent(null,false).build();
                 if(repost)manager.cancel(ID);
@@ -127,21 +137,16 @@ final class NativeMessageBadge {
     }
 
     private static int loadCount(Context c)throws Exception{
-        return count(new NativeStaffChatApi(c));
+        NativeStaffChatApi api=new NativeStaffChatApi(c);SharedPreferences p=prefs(c);
+        JSONObject query=api.scope.equals(p.getString("query_scope",""))?new JSONObject(p.getString("query","{}")):new JSONObject();
+        return count(api,query);
     }
-    static int count(NativeStaffChatApi api)throws Exception{
+    static int count(NativeStaffChatApi api,JSONObject query)throws Exception{
         JSONObject messages=api.rpc("list_property_messages",new JSONObject());
-        long total=Math.max(0,messages.optInt("unread_count"));
-        JSONObject cursor=new JSONObject();int pages=0;
-        while(true){
-            JSONArray rooms=api.guestRooms(cursor).getJSONArray("rooms");
-            for(int i=0;i<rooms.length();i++)total+=Math.max(0,rooms.getJSONObject(i).optInt("unread"));
-            if(rooms.length()<50)break;
-            if(++pages>=100)throw new IllegalStateException("Incomplete guest unread snapshot");
-            JSONObject last=rooms.getJSONObject(rooms.length()-1);
-            cursor=new JSONObject().put("before_updated",last.getString("updated_at")).put("before_id",last.getString("id"));
-        }
-        if(messages.optBoolean("can_manage"))total+=Math.max(0,api.rpc("work_report_inbox",new JSONObject()).optInt("unread_count"));
+        JSONObject guests=api.rpc("guest_message_summary",new JSONObject().put("p_data",query));
+        // messenger_unread excludes guest copies already represented by the guest menu.
+        long total=Math.max(0,guests.getLong("messenger_unread"))+Math.max(0,guests.getLong("unread"));
+        if(messages.optBoolean("can_manage"))total+=Math.max(0,api.rpc("work_report_inbox",new JSONObject()).getLong("unread_count"));
         if(!api.valid())throw new IllegalStateException("Session changed");
         return (int)Math.min(1000000,total);
     }

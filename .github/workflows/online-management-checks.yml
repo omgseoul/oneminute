@@ -25,6 +25,7 @@ jobs:
           node tests/online/guest-popup-ui.cjs
           node tests/online/bot-cards-ui.cjs
           node tests/online/unified-ui.cjs
+          node tests/online/menu-badge.cjs
           node tests/online/unified-browser.cjs
           node tests/message-popup-queue/web.cjs
           node tests/online/ui.cjs

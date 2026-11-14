@@ -28,7 +28,7 @@ declare a jsonb:=omg_private.guest_actor(p_access_token);home uuid;prop uuid;lo 
  )x where (not coalesce((p_data->>'unread_only')::boolean,false) or x.unread>0) and (not coalesce((p_data->>'unreplied_only')::boolean,false) or not x.replied) order by x.sent_at desc,x.booking_id limit 300 offset greatest(0,least(coalesce((p_data->>'offset')::int,0),15000)))page;
  return jsonb_build_object('ok',true,'threads',result,'properties',(select coalesce(jsonb_agg(jsonb_build_object('id',p.id,'name',p.name)),'[]') from public.properties p where omg_private.guest_can_access(home,p.id)));
 end$$;
-create or replace function public.guest_message_inbox(p_access_token uuid,p_data jsonb default '{}')returns jsonb language sql security invoker set search_path='' as $$select omg_private.guest_message_inbox(p_access_token,p_data)$$;
+create or replace function public.guest_message_inbox(p_access_token uuid,p_data jsonb default '{}')returns jsonb language sql security definer set search_path='' as $$select omg_private.guest_message_inbox(p_access_token,p_data)$$;
 revoke all on function public.guest_message_inbox(uuid,jsonb),omg_private.guest_message_inbox(uuid,jsonb) from public;
 grant execute on function public.guest_message_inbox(uuid,jsonb),omg_private.guest_message_inbox(uuid,jsonb) to anon,authenticated,service_role;
 
@@ -39,7 +39,7 @@ declare a jsonb:=omg_private.guest_actor(p_access_token);home uuid;n bigint;begi
  select n+count(*) into n from omg_private.online_messages m where m.source='guest' and m.read_at is null and omg_private.guest_can_access(home,m.property_id);
  return jsonb_build_object('ok',true,'unread',n,'messenger_unread',(select count(*) from public.property_message_recipients r join public.property_messages m on m.id=r.message_id where r.recipient_key=a->>'key' and r.read_at is null and coalesce(m.source,'')<>'beds24' and coalesce(m.message_type,'')<>'guest_chat'));
 end$$;
-create or replace function public.guest_message_unread(p_access_token uuid)returns jsonb language sql security invoker set search_path='' as $$select omg_private.guest_message_unread(p_access_token)$$;
+create or replace function public.guest_message_unread(p_access_token uuid)returns jsonb language sql security definer set search_path='' as $$select omg_private.guest_message_unread(p_access_token)$$;
 revoke all on function public.guest_message_unread(uuid),omg_private.guest_message_unread(uuid) from public;
 grant execute on function public.guest_message_unread(uuid),omg_private.guest_message_unread(uuid) to anon,authenticated,service_role;
 

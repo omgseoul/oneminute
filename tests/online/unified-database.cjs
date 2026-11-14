@@ -17,6 +17,7 @@ module.exports=async({db,owner,internal,p1,p2,t1,t2,id})=>{
  await db.query("insert into guest_chat_rooms(id,property_id,guest_name,check_in,check_out,room_number,token_hash,expires_at,ip_hash)values($1,$2,'QR Guest',current_date,current_date+1,'401','synthetic-qr-a','infinity','fixture'),($3,$4,'Other Guest',current_date,current_date+1,'402','synthetic-qr-b','infinity','fixture')",[room,p1,other,p2]);
  await db.query("insert into guest_chat_messages(room_id,client_id,sender_key,sender_name,sender_kind,body,created_at)values($1,$2,'guest:fixture','Guest','guest','Question',now()-interval '1 minute'),($3,$4,'guest:other','Guest','guest','Private',now())",[room,id(98006),other,id(98007)]);
  const inbox=async(data={},t=token)=>(await db.query('select public.guest_message_inbox($1,$2) v',[t,JSON.stringify(data)])).rows[0].v;
+ await db.exec('set role anon');await assert.rejects(()=>inbox({},id(98099)),/로그인/);assert.equal((await inbox()).threads.length,1);assert((await db.query('select public.guest_message_unread($1) v',[token])).rows[0].v.ok);await db.exec('reset role');
  let rows=(await inbox()).threads;assert.equal(rows.length,1);assert.equal(rows[0].status,'qr');assert.equal(rows[0].unread,1);assert(!rows[0].replied);assert.equal(rows[0].room_name,'401');
  await assert.rejects(()=>inbox({property_id:p2}),/권한/);await assert.rejects(()=>inbox({},id(98099)),/로그인/);
  assert.equal((await inbox({message_from:'2000-01-01',message_to:'2000-01-02'})).threads.length,0);

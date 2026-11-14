@@ -42,12 +42,12 @@ final class NativeNotificationModesProbe {
             new TestService(c).onMessageReceived(new RemoteMessage.Builder("synthetic")
                 .addData("mode","weak").addData("alertId",id).addData("senderLabel","검사")
                 .addData("message","합성 약함 알림").build());
-            Notification received=active(manager,weak,8);
+            Notification received=active(manager,weak,7);
             check(weak.equals(received.getChannelId()),"FCM weak mode selects weak channel");
             check(received.fullScreenIntent==null,"Weak never opens popup");
             check((received.flags&Notification.FLAG_ONLY_ALERT_ONCE)==0,"A fresh message may alert");
-            NativeMessageBadge.fromWeb(c,token,8);Thread.sleep(150);
-            Notification refreshed=active(manager,weak,8);
+            NativeMessageBadge.fromWeb(c,token,7);Thread.sleep(150);
+            Notification refreshed=active(manager,weak,7);
             check(weak.equals(refreshed.getChannelId()),"Same-count read refresh must not move real alert to silent badge channel");
             check((refreshed.flags&Notification.FLAG_ONLY_ALERT_ONCE)==0,"Same-count refresh preserves active alert behavior");
             check(manager.getActiveNotifications().length==1,"One message, one notification");

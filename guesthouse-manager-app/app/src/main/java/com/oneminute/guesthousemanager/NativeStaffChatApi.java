@@ -54,7 +54,7 @@ class NativeStaffChatApi {
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));
     }
     JSONObject rpc(String name,JSONObject args)throws Exception {
-        if(!name.matches("chat_live_ticket|staff_chat_upload_chunk|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
+        if(!name.matches("guest_message_summary|chat_live_ticket|staff_chat_upload_chunk|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
         if(workConfirmationOnly&&!"work_shift_confirmation".equals(name))throw new IOException("잘못된 요청입니다.");
         args.put("p_access_token",token);
         JSONObject result=request(BASE+"rest/v1/rpc/"+name,args,true);

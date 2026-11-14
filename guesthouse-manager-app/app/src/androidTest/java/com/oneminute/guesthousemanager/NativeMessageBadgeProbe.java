@@ -21,17 +21,16 @@ final class NativeMessageBadgeProbe {
         throw new AssertionError("Expected notification count "+count);
     }
     private static final class CountApi extends NativeStaffChatApi {
-        final boolean owner;
+        final boolean owner;org.json.JSONObject receivedQuery;
         CountApi(Context c,boolean owner)throws Exception{super(c);this.owner=owner;}
         @Override org.json.JSONObject rpc(String name,org.json.JSONObject args)throws Exception{
-            if("list_property_messages".equals(name))return new org.json.JSONObject().put("unread_count",9).put("can_manage",owner);
+            if("list_property_messages".equals(name))return new org.json.JSONObject().put("unread_count",846).put("can_manage",owner);
+            if("guest_message_summary".equals(name)){receivedQuery=args.getJSONObject("p_data");return new org.json.JSONObject().put("unread",31).put("messenger_unread",12).put("total_unread",830);}
             if("work_report_inbox".equals(name)){check(owner,"Staff must not request reports");return new org.json.JSONObject().put("unread_count",4);}
             throw new AssertionError("Unexpected RPC");
         }
         @Override org.json.JSONObject guestRooms(org.json.JSONObject cursor)throws Exception{
-            org.json.JSONArray rows=new org.json.JSONArray();boolean first=!cursor.has("before_id");
-            for(int i=0;i<(first?50:1);i++)rows.put(new org.json.JSONObject().put("id","room-"+i).put("updated_at","2026-10-19T00:00:00Z").put("unread",first?1:3));
-            return new org.json.JSONObject().put("rooms",rows);
+            throw new AssertionError("Unfiltered guest rooms must not be counted");
         }
     }
     private static void verifyLogo(Context c, Notification notification) {
@@ -49,10 +48,24 @@ final class NativeMessageBadgeProbe {
         try{
             c.getSharedPreferences("omg_receipts",0).edit().putString("token",TOKEN).putString("expires","2099-01-01T00:00:00Z").commit();
             NativeMessageBadge.clear(c);
-            check(NativeMessageBadge.count(new CountApi(c,true))==66,"Messages + paginated guests + owner reports");
-            check(NativeMessageBadge.count(new CountApi(c,false))==62,"Staff total excludes owner reports");
+            org.json.JSONObject query=new org.json.JSONObject("{\"filters\":{\"version\":1,\"qrVersion\":1,\"statuses\":[\"qr\"],\"properties\":[\"home\"]},\"period\":{\"days\":3}}");
+            CountApi owner=new CountApi(c,true);
+            check(NativeMessageBadge.count(owner,query)==47,"31 guests + (12 staff + 4 reports), not 846 historical items");
+            check(owner.receivedQuery.toString().equals(query.toString()),"Home filters and rolling period reach summary RPC unchanged");
+            check(NativeMessageBadge.count(new CountApi(c,false),new org.json.JSONObject())==43,"Staff menu sum excludes owner-only reports");
             NativeMessageBadge.loader=ctx->{throw new java.io.IOException("synthetic offline");};
+            NativeMessageBadge.setQuery(c,TOKEN,query.toString());
+            check(c.getSharedPreferences("omg_message_badge",0).getString("query","").equals(query.toString()),"Background query persisted");
+            NativeMessageBadge.setQuery(c,"wrong-session","{\"filters\":{},\"period\":{}}");
+            check(c.getSharedPreferences("omg_message_badge",0).getString("query","").equals(query.toString()),"Other sessions cannot replace filters");
+            Thread.sleep(200);
+            NativeMessageBadge.fromWeb(c,TOKEN,846);expect(c,846);
+            NativeMessageBadge.fromWeb(c,TOKEN,47);expect(c,47);
+            check(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("47개"),"Summary text replaces stale 846 when count falls");
+            Notification legacy=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("미확인 메세지 846개 · 메세지 메뉴에서 확인해주세요.").setNumber(846).build();
+            c.getSystemService(NotificationManager.class).notify(NativeMessageBadge.ID,legacy);expect(c,846);
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
+            check(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("7개"),"Legacy summary text is migrated");
             Notification n=summary(c);
             verifyLogo(c,n);
             check(n.getSmallIcon().getResId()==R.drawable.ic_oms_notification,"OMS status icon");
@@ -69,8 +82,8 @@ final class NativeMessageBadgeProbe {
             NativeLauncherBadgeProbe.verify(instrumentation,c,TOKEN);
             NativeMessageBadge.fromWeb(c,TOKEN,7);expect(c,7);
             NativeMessageBadge.fromWeb(c,"wrong-session",99);expect(c,7);
-            NativeMessageBadge.received(c,"same-alert");expect(c,8);
-            NativeMessageBadge.received(c,"same-alert");Thread.sleep(150);expect(c,8);
+            NativeMessageBadge.received(c,"same-alert");expect(c,7);
+            NativeMessageBadge.received(c,"same-alert");Thread.sleep(150);expect(c,7);
             NativeMessageBadge.fromWeb(c,TOKEN,3);expect(c,3);
             NativeMessageBadge.fromWeb(c,TOKEN,0);expect(c,0);
             Thread.sleep(200);

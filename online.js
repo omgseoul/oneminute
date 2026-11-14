@@ -1,5 +1,6 @@
 (async()=>{
  const $=id=>document.getElementById(id),session=await omgSession.require({allowCompleted:true});if(!session)return;const guestMode=document.body.hasAttribute('data-guest-inbox'),isStaff=session.sessionKind!=='owner';if(guestMode&&!location.hash)history.replaceState(null,'','#inbox');
+ if(guestMode)window.addEventListener('omg:messages-changed',()=>{try{window.OMGNative?.refreshMessageBadge?.();}catch{}});
  const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let settings={},view='',bookingId=null,version=0,activeBasis='arrival',busy=false,sendId=null,sending=false,selectedProperty=null,switching=false,taskCount=0,bookingRows=null,inboxRows=null,selectedProperties=[],branches=[],propertyPicker=null,pickerMode=null,threadProperty=null;
  const bookingDataChecked=new Map();
@@ -233,7 +234,7 @@
   }).join(''):'<div class="empty">선택한 기간·예약상태에 해당하는 대화가 없습니다.</div>';
   bindInline(rows);if(focused){const el=[...list.querySelectorAll('.inbox-item')].find(x=>x.dataset.booking===focused)?.querySelector(editing?'textarea':'summary');el?.focus({preventScroll:true});if(editing&&el&&selection)el.setSelectionRange(...selection);}
  }
- async function loadInbox(refresh=false){if(view==='menu')return;const n=version,d=inboxQuery();const v=await collect(refresh?'sync_messages':'inbox',d);if(n!==version)return;renderInbox(v);$('inboxFreshness').textContent=v.warnings?.length?v.warnings.join(' · '):v.synced_at?'최근 동기화 '+time(v.synced_at):'';$('inboxFreshness').title=$('inboxFreshness').textContent;if(refresh&&!v.warnings?.length)status();}
+ async function loadInbox(refresh=false){if(view==='menu')return;if(guestMode)window.HomeGuestCount?.syncNative(session);const n=version,d=inboxQuery();const v=await collect(refresh?'sync_messages':'inbox',d);if(n!==version)return;renderInbox(v);$('inboxFreshness').textContent=v.warnings?.length?v.warnings.join(' · '):v.synced_at?'최근 동기화 '+time(v.synced_at):'';$('inboxFreshness').title=$('inboxFreshness').textContent;if(refresh&&!v.warnings?.length)status();}
  function maybeSyncInbox(){
   if(view!=='inbox'||document.hidden||$('refreshInbox').disabled)return;
   const now=Date.now(),due=selectedProperties.filter(id=>{const cfg=settingsCache.get(id);return cfg?.beds_property_id&&now-Math.max(autoChecked.get(id)||0,Date.parse(cfg.synced_at)||0)>=300000;});

@@ -359,6 +359,10 @@ public class AttendanceActivity extends AppCompatActivity {
             runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.fromWeb(AttendanceActivity.this,token,count);});
         }
         @JavascriptInterface
+        public void setMessageBadgeQuery(String token,String query) {
+            runOnUiThread(()->{if(hasWindowFocus()&&trustedBadgePage())NativeMessageBadge.setQuery(AttendanceActivity.this,token,query);});
+        }
+        @JavascriptInterface
         public void refreshMessageBadge() {
             runOnUiThread(()->{if(trustedBadgePage())NativeMessageBadge.changed(AttendanceActivity.this);});
         }

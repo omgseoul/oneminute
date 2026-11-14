@@ -48,7 +48,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require
  w.location.hash='today';await tick();assert(w.document.querySelector('#bookingStatusFilters input[type=checkbox]'));assert(w.document.querySelector('#refreshBookings svg'));w.document.querySelector('#bookingStatusButton').click();assert(!w.document.querySelector('#bookingStatusPanel').hidden);w.document.querySelector('#bookingStatusDone').click();assert(w.document.querySelector('#bookingStatusPanel').hidden);
  w.location.hash='logs';await tick();assert.equal(w.document.querySelectorAll('#logList article').length,2);
  w.location.hash='settings';await tick();assert.equal(w.document.querySelectorAll('#propertyName input[type=checkbox]').length,0);assert.equal(w.document.querySelectorAll('#propertyName input[type=radio]').length,2);assert(w.document.querySelector('#bedsPropertyPickerButton').disabled,'custom picker respects fixed mapping');
- const home=fs.readFileSync('app.html','utf8');assert(home.indexOf('id="onlineManagement"')<home.indexOf('id="workingPropertyPicker"'));assert(home.includes('onlineManagement").hidden=!isOwner'));
+ const home=fs.readFileSync('app.html','utf8');assert(home.indexOf('id="onlineManagement"')<home.indexOf('id="workingPropertyPicker"'));assert(home.includes('id="guestMessageMenu"'));assert(home.includes('onlineManagement").hidden=false'));
 
  // A fresh document/session restores the server-owned period before querying the menu badge.
  const w2=new JSDOM(fs.readFileSync('online.html','utf8').replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/online.html',runScripts:'outside-only'}).window;

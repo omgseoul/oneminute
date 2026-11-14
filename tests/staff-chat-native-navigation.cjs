@@ -16,7 +16,7 @@ async function checkHub(native){
  w.eval(read('staff-chat-client.js'));w.eval(read('notification-bot.js'));w.eval(read('message-hub.js'));
  await w.MessageHub.init({propertyId:'home',accessToken:'fake'},{mailbox(){},clearSearch(){},render(){},compose(){},load(){},openDetail:item=>details.push(item)});
  const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};await flush();
- const tabs=d.querySelector('.hub-tabs'),property=d.getElementById('hubProperty');assert.equal(w.MessageHub.isStaff(),true,'plain message entry defaults to staff');assert.deepEqual([...d.querySelectorAll('[data-hub]')].map(el=>el.dataset.hub),['staff','guest','reports','approvals']);
+ const tabs=d.querySelector('.hub-tabs'),property=d.getElementById('hubProperty');assert.equal(w.MessageHub.isStaff(),true,'plain message entry defaults to staff');assert.deepEqual([...d.querySelectorAll('[data-hub]')].map(el=>el.dataset.hub),['staff','reports','approvals']);
  const click=tab=>d.querySelector('[data-hub='+tab+']').click();
  click('staff');await flush();
  assert.equal(launches.length,0,'staff tab must stay inside the shared hub even in the app');
@@ -25,7 +25,7 @@ async function checkHub(native){
  assert(d.querySelector('.bot-room'),'the real notification bot must remain in the staff list');assert.match(d.querySelector('.staff-room-property').textContent,/타지점/);
  d.querySelector('.bot-room').click();assert.equal(d.getElementById('botConversation').hidden,false);assert.match(d.getElementById('botTimeline').textContent,/공지 내용/);
  d.querySelector('[data-bot-message]').click();assert.equal(details[0].message_id,'notice','bot actions retain the existing detail/acknowledgement flow');
- click('reports');assert.equal(reportVisible,true);click('approvals');assert.equal(d.getElementById('list').hidden,false);click('guest');assert.equal(d.getElementById('guestPane').hidden,false);click('staff');
+ click('reports');assert.equal(reportVisible,true);click('approvals');assert.equal(d.getElementById('list').hidden,false);assert.equal(d.querySelector('[data-hub=guest]'),null);click('staff');
  assert.equal(tabs,d.querySelector('.hub-tabs'),'all tabs retain the same navigation element');
  selected(['home']);await flush();assert.equal(d.querySelector('.staff-room:not(.bot-room)'),null,'branch filtering remains active');assert(d.querySelector('.bot-room'));
  assert.equal(w.StaffChat.nativeOpen(''),false,'empty peer must never open the removed native list');

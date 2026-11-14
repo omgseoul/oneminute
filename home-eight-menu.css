@@ -1,0 +1,9 @@
+/* Four rows retain the former three-row menu footprint. Worker first row remains clock in/out. */
+#mainMenu{gap:7px}#ownerSettingsMenu,#secondaryMenu{gap:7px}
+#mainMenu .quick-card{height:67px;min-height:67px;padding:9px 10px;gap:9px;border-color:#b8c8da;border-radius:12px;box-shadow:none;justify-content:flex-start}
+#mainMenu .quick-card .quick-visual{order:-1;flex:0 0 39px;width:39px;height:39px;margin:0;border-radius:50%}
+#mainMenu .quick-visual svg{width:27px;height:27px}#mainMenu .quick-card .copy b,#mainMenu #messageMenu .copy b{font-size:16px;line-height:1.13;white-space:normal;word-break:keep-all;letter-spacing:-.3px}
+#mainMenu .mission-counter{flex:0 0 39px;width:39px;height:39px;margin-left:auto}#mainMenu .mission-counter strong{font-size:20px}#mainMenu .mission-counter small{font-size:7px}
+#missionMenu{order:1}#calendarMenu{order:2}#attendanceManagement,#staffWorkStatus{order:3}#onlineManagement{order:4}#guestMessageMenu{order:5}#messageMenu{order:6}
+#reportMenu{gap:7px}#reportMenu .report-card{height:67px;min-height:67px;padding:9px}#reportMenu .copy b{font-size:17px}#reportMenu .copy span{display:none}#reportMenu .report-icon{max-width:40px;max-height:40px}
+@media(max-width:350px){#mainMenu .quick-card{gap:6px;padding:8px}#mainMenu .quick-card .copy b,#mainMenu #messageMenu .copy b{font-size:14px}#mainMenu .quick-card .quick-visual{width:32px;height:32px;flex-basis:32px}#mainMenu .mission-counter{width:32px;height:32px;flex-basis:32px}}

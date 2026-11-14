@@ -24,7 +24,8 @@ const read=file=>fs.readFileSync(file,'utf8');
       return {data:scenario==='owner_platform'};
      }
      if(name==='list_working_employees')return {data:{ok:true,own_property_id:'property-a',own_property_name:'테스트 지점',employees:[{employee_id:'worker-b',display_name:'동료',property_id:'property-a',property_name:'테스트 지점'}]}};
-     if(name==='list_property_messages')return {data:{ok:true,can_manage:owner,messages:[],unread_count:2}};
+     if(name==='list_property_messages')return {data:{ok:true,can_manage:owner,messages:[{message_id:'s1'},{message_id:'s2'}],unread_count:2}};
+     if(name==='guest_message_unread')return {data:{ok:true,unread:0}};
      if(name==='work_report_inbox')return {data:{ok:true,unread_count:0,reports:[]}};
      if(name==='list_property_shares')return {data:{ok:true,properties:[{property_id:'property-a',is_own:true}]}};
      if(['list_missions','list_shared_missions'].includes(name))return {data:{ok:true,missions:[]}};
@@ -44,6 +45,7 @@ const read=file=>fs.readFileSync(file,'utf8');
    await page.goto('https://omgworks24.com/app.html');
    await page.waitForFunction(()=>document.querySelector('#appShell.ready'));
    assert.deepEqual(errors,[],scenario+' must finish actual Home initialization');
+   if(['owner','reported'].includes(scenario)){await page.waitForFunction(()=>[...document.querySelectorAll('#mainMenu .card')].filter(e=>e.getBoundingClientRect().width>0&&getComputedStyle(e).visibility==='visible').length===8);const cells=await page.locator('#mainMenu .card:visible').evaluateAll(els=>els.map(e=>({id:e.id,label:e.innerText,y:e.getBoundingClientRect().top})));assert.equal(cells.length,8);assert.equal(new Set(cells.map(e=>Math.round(e.y))).size,4);assert((await page.locator('#mainMenu').boundingBox()).height<300);await page.screenshot({path:'/tmp/online-home-eight-'+scenario+'.png'});}
    await page.waitForFunction(()=>document.querySelector('#todayOverviewItems').textContent.includes('오늘 일정이 없습니다.')&&document.querySelector('#workingGrid').textContent.includes('동료')&&document.querySelector('#messageCounter').textContent==='2');
    assert.equal(await page.locator('#mainMenu').evaluate(el=>el.inert),false);
    if(scenario.startsWith('owner')){

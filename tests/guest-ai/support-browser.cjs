@@ -31,7 +31,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  await page.addScriptTag({content:fs.readFileSync('notification-bot.js','utf8')});
  await page.evaluate(()=>NotificationBot.init({propertyId:'p',accessToken:'fixture',sessionKind:'staff'},{refresh:async()=>{},openDetail:i=>__details.push(i.message_id),compose:()=>{}}));
  await page.locator('.bot-room').click();await page.locator('[data-bot-row="ai"] .bot-notice').waitFor();
- const expectedCards=await page.evaluate(()=>__items.length);
+ const expectedCards=await page.evaluate(()=>__items.filter(i=>i.message_id!=='online').length);
  assert.equal(await page.locator('.bot-notice').count(),expectedCards,'all categories share the same card');
  assert.equal(await page.locator('.bot-notice-footer .bot-chat-action').count(),expectedCards,'all actions use compact footer');
  assert((await page.locator('.bot-chat-action').evaluateAll(xs=>xs.map(x=>({bg:getComputedStyle(x).backgroundColor,width:x.getBoundingClientRect().width,card:x.closest('.bot-notice').getBoundingClientRect().width})))).every(x=>x.bg==='rgba(0, 0, 0, 0)'&&x.width<x.card*.6),'text actions are transparent and compact');
@@ -45,7 +45,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  assert(await page.locator('#botTimeline').evaluate(el=>el.scrollWidth<=el.clientWidth),'no horizontal clipping');
  for(const id of ['holiday','system','attendance','share','notice','contract'])await page.locator('[data-bot-message="'+id+'"]').click();assert.deepEqual(await page.evaluate(()=>__details),['holiday','system','attendance','share','notice','contract']);
  const booking=page.locator('[data-bot-row="booking"]');assert.equal(await booking.locator('.is-urgent').count(),0);assert.equal(await booking.locator('.bot-notice-badge').innerText(),'당일 예약 접수');assert(!(await booking.innerText()).includes('OMS-BOOKING'));await booking.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'booking');
- const online=page.locator('[data-bot-row="online"]');await online.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'online','staff opens an authorized notice detail rather than an owner-only online page');
+ assert.equal(await page.locator('[data-bot-row=online]').count(),0,'ordinary guest arrivals appear in the unified inbox instead');
  // Opening cards retains their existing action and does not acknowledge approval/notice content.
  assert.equal(await page.locator('[data-bot-row="notice"] .bot-state').innerText(),'확인 필요');
  await page.locator('#botTimeline').evaluate(el=>el.scrollTop=0);await page.screenshot({path:'/tmp/oms-ai-support-mobile-'+width+'.png'});

@@ -11,6 +11,13 @@ function preview(text) {
   return [...(value.startsWith(normalMessagePrefix) ? value.slice(normalMessagePrefix.length) : value)].slice(0, 650).join('');
 }
 
+export function onlineNoticeBody(dispatch){
+ const c=dispatch.guest_context;if(!c?.translation||!c?.original)return preview(dispatch.message);
+ // Both sections fit on existing native clients; long content remains available in the conversation.
+ const cut=(s,n)=>{const a=[...String(s)];return a.length>n?a.slice(0,n).join('')+'…':a.join('');};
+ return cut(c.translation,340)+'\n\n원문: '+cut(c.original,280);
+}
+
 function guestPresentation(value){
  if(!value||!['online','onsite'].includes(value.kind))return {};
  const limits={kind:8,guest:120,room:60,arrival:10,departure:10,property:3,channel:80,sent:14},safe={};
@@ -139,7 +146,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if(!dispatch.ok)return reply({ok:false,code:'not_found'},404);
         if(env('PUSH_DELIVERY_ENABLED')!=='true')return reply({ok:false,code:'not_enabled'},503);
         deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
-        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route,...guestPresentation(dispatch.guest_context)};
+        payload={alertId:String(deliveryId),message:onlineNoticeBody(dispatch),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route?.replace(/^online\.html#thread\//,'guest-messages.html#thread/'),...guestPresentation(dispatch.guest_context)};
       } else if (path.endsWith('/reminder')) {
         if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);

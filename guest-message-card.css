@@ -31,3 +31,5 @@
 .bot-online-notice .guest-popup-source{grid-column:1/-1;grid-row:3}
 .bot-online-notice .guest-popup-name,.bot-online-fallback-name{display:block;font-size:15px;font-weight:700;margin:10px 0 5px;overflow-wrap:anywhere}
 .bot-online-notice .guest-popup-message{font-size:15px;line-height:1.6;font-weight:400}
+
+.guest-popup-original{margin-top:8px;font-size:12px;line-height:1.5;color:#758397;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}

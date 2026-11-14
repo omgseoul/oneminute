@@ -5,7 +5,7 @@
  let chatMessages=[],photoAssets=new Map(),viewerIndex=0,refreshingPhotos=null;
  const timeline=document.getElementById('timeline'),body=document.getElementById('body'),send=document.getElementById('send'),$=id=>document.getElementById(id);
  if(isGuest){document.body.classList.add('guest-facing-chat');const s=JSON.parse(localStorage.getItem('omg_guest_'+slug)||'null');if(!s){location.replace('guest.html?p='+encodeURIComponent(slug));return;}auth={guest_token:s.guest_token};roomId=s.room_id;$('back').href='guest.html?p='+encodeURIComponent(slug);$('back').textContent='‹ 숙소 안내';}
- else{const s=await omgSession.require({allowCompleted:true});if(!s)return;auth={access_token:s.accessToken};}
+ else{const s=await omgSession.require({allowCompleted:true});if(!s)return;auth={access_token:s.accessToken};$('back').href='guest-messages.html#inbox';}
  const call=(action,data={})=>G.call(action,{room_id:roomId,...data},auth);
  const draftKey='omg_chat_draft_'+roomId;body.value=sessionStorage.getItem(draftKey)||'';body.oninput=()=>{pending=null;sessionStorage.setItem(draftKey,body.value);body.style.height='auto';body.style.height=Math.min(body.scrollHeight,110)+'px';};
  const mine=m=>isGuest?m.sender_kind==='guest':m.sender_key===actor;

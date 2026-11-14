@@ -124,5 +124,7 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await require('./guest-popup-database.cjs')({db,p1,p2,id});
  await require('./checkin-list-database.cjs')({db,owner,internal,p1,p2,t2,id});
  await require('./arrival-database.cjs')({db,owner,internal,p1,p2,t1,t2,id});
+ await require('./popup-translation-database.cjs')({db,p1,id,owner,internal});
+ await require('./unified-database.cjs')({db,owner,internal,p1,p2,t1,t2,id});
  console.log('online database: tenant isolation, Vault secrecy, webhook dedupe, approval freshness, idempotent sends/billing passed');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

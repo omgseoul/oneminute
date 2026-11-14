@@ -26,7 +26,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require
  w.document.querySelector('[data-direction=guest]').click();await tick();assert.equal(calls.filter(x=>x.action==='inbox').at(-1).data.direction,'guest');w.document.querySelector('[data-direction=host]').click();await tick();assert.equal(calls.filter(x=>x.action==='inbox').at(-1).data.direction,'host');w.document.querySelector('[data-direction=all]').click();await tick();
  item=w.document.querySelector('.inbox-item');item.open=true;let reply=item.querySelector('textarea');reply.value='Draft stays';reply.dispatchEvent(new w.Event('input'));threads[0].preview+=' next';await poll();reply=w.document.querySelector('.inline-reply textarea');assert.equal(reply.value,'Draft stays','poll preserves inline reply');assert.equal(calls.filter(x=>x.action==='send').length,0);
  assert(w.document.querySelector('[data-translate]'),'translation is available through the shared allowance');
- assert(calls.filter(x=>x.action==='unread').at(-1).data.message_from,'badge uses saved period');
+ assert(!calls.some(x=>x.action==='unread'),'inbox polling no longer revives the removed menu badge');
  failSync=true;w.document.querySelector('#refreshInbox').click();await tick();assert(w.document.querySelector('.inbox-item'),'quota failure preserves stored conversation');assert(w.document.querySelector('#inboxFreshness').textContent.includes('저장된'));assert(w.document.querySelector('#refreshInbox svg'),'icon survives busy state');
  failRead=true;await poll();assert(w.document.querySelector('.inbox-item'),'offline fallback preserves last successful query');failRead=false;failSync=false;
  assert.equal(w.document.querySelector('#inviteCode').type,'password');assert.equal(w.document.querySelectorAll('#aiMode option').length,2,'no unattended-send toggle in trial');
@@ -50,10 +50,10 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require
  w.location.hash='settings';await tick();assert.equal(w.document.querySelectorAll('#propertyName input[type=checkbox]').length,0);assert.equal(w.document.querySelectorAll('#propertyName input[type=radio]').length,2);assert(w.document.querySelector('#bedsPropertyPickerButton').disabled,'custom picker respects fixed mapping');
  const home=fs.readFileSync('app.html','utf8');assert(home.indexOf('id="onlineManagement"')<home.indexOf('id="workingPropertyPicker"'));assert(home.includes('id="guestMessageMenu"'));assert(home.includes('onlineManagement").hidden=false'));
 
- // A fresh document/session restores the server-owned period before querying the menu badge.
+ // A fresh document restores the saved period without fetching the removed menu badge.
  const w2=new JSDOM(fs.readFileSync('online.html','utf8').replace(/<script[\s\S]*?<\/script>/g,''),{url:'https://omgworks24.com/online.html',runScripts:'outside-only'}).window;
  let reloadCalls=[];w2.omgSession={require:async()=>({sessionKind:'owner',accessToken:'new-login-token',propertyId:'home',ownerId:'same-owner'})};w2.OMG_SUPABASE=w.OMG_SUPABASE;w2.AbortSignal=AbortSignal;w2.setInterval=()=>1;
  w2.fetch=async(u,o)=>{const b=JSON.parse(o.body);reloadCalls.push(b);return {ok:true,json:async()=>b.action==='settings'?{...settings,message_period:{days:7}}:{ok:true,unread:5,threads:[]}};};
- for(const file of ['property-selector.js','select-picker.js','online.js'])w2.eval(fs.readFileSync(file,'utf8'));await tick();assert(w2.document.querySelector('#periodButton').textContent.includes('7일'));const badgeRange=reloadCalls.find(x=>x.action==='unread').data;assert.equal((Date.parse(badgeRange.message_to)-Date.parse(badgeRange.message_from))/86400000,6);assert.equal(w2.document.querySelector('#unreadBadge').textContent,'5');w2.close();
+ for(const file of ['property-selector.js','select-picker.js','online.js'])w2.eval(fs.readFileSync(file,'utf8'));await tick();assert(w2.document.querySelector('#periodButton').textContent.includes('7일'));assert(!reloadCalls.some(x=>x.action==='unread'),'removed menu does not fetch or expose its old unread count');assert.equal(w2.document.querySelector('#unreadBadge'),null);w2.close();
  dom.window.close();console.log('online UI: settings, secret input, owner menu placement, XSS escaping, approval-only sending passed');
 })().catch(e=>{console.error(e);process.exit(1)});

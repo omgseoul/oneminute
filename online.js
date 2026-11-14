@@ -170,7 +170,7 @@
   const key=rowKey(t);if(reading.has(key)||Number(t.unread||0)===0||t.source!=='guest')return;reading.add(key);
   try{await call('read_message',{message_id:t.message_id},t.property_id);t.unread=0;pinOpen(t,el);el.querySelector('.inbox-preview-row .badge')?.remove();
    for(const [cacheKey,value] of resultCache){const [property,action]=JSON.parse(cacheKey);if(action==='inbox'&&property===t.property_id)for(const row of value.threads||[])if(row.booking_id===t.booking_id&&row.message_id===t.message_id)row.unread=0;}
-   delete $('inboxList').dataset.signature;await loadUnread();if(view==='inbox')await loadInbox();
+   delete $('inboxList').dataset.signature;if(view==='inbox')await loadInbox();
   }catch(e){status('읽음 상태를 저장하지 못했습니다. '+e.message,true);}finally{reading.delete(key);}
  }
  async function task(button,fn){if(button?.disabled)return;const locksBranch=!['searchButton','refreshBookings','refreshInbox','refreshThread','refreshLogs','refreshBookingData','refreshCleaning','searchBookingData','webhookLogsButton'].includes(button?.id);if(locksBranch){taskCount++;lockPicker(true);}const taskVersion=version,text=button?.textContent;if(button){button.disabled=true;button.setAttribute('aria-busy','true');if(!button.classList.contains('icon-refresh'))button.textContent='처리 중…';}try{await fn();}catch(e){if(taskVersion===version)status(e.message,true);}finally{if(button){button.disabled=false;button.removeAttribute('aria-busy');if(!button.classList.contains('icon-refresh'))button.textContent=text;}if(locksBranch)taskCount--;lockPicker(switching||taskCount>0);}}
@@ -232,14 +232,13 @@
   }).join(''):'<div class="empty">선택한 기간·예약상태에 해당하는 대화가 없습니다.</div>';
   bindInline(rows);if(focused){const el=[...list.querySelectorAll('.inbox-item')].find(x=>x.dataset.booking===focused)?.querySelector(editing?'textarea':'summary');el?.focus({preventScroll:true});if(editing&&el&&selection)el.setSelectionRange(...selection);}
  }
- async function loadInbox(refresh=false){if(view==='menu'){await loadUnread();return;}const n=version,d=inboxQuery();const v=await collect(refresh?'sync_messages':'inbox',d);if(n!==version)return;renderInbox(v);$('inboxFreshness').textContent=v.warnings?.length?v.warnings.join(' · '):v.synced_at?'최근 동기화 '+time(v.synced_at):'';$('inboxFreshness').title=$('inboxFreshness').textContent;if(refresh&&!v.warnings?.length)status();await loadUnread();}
+ async function loadInbox(refresh=false){if(view==='menu')return;const n=version,d=inboxQuery();const v=await collect(refresh?'sync_messages':'inbox',d);if(n!==version)return;renderInbox(v);$('inboxFreshness').textContent=v.warnings?.length?v.warnings.join(' · '):v.synced_at?'최근 동기화 '+time(v.synced_at):'';$('inboxFreshness').title=$('inboxFreshness').textContent;if(refresh&&!v.warnings?.length)status();}
  function maybeSyncInbox(){
   if(view!=='inbox'||document.hidden||$('refreshInbox').disabled)return;
   const now=Date.now(),due=selectedProperties.filter(id=>{const cfg=settingsCache.get(id);return cfg?.beds_property_id&&now-Math.max(autoChecked.get(id)||0,Date.parse(cfg.synced_at)||0)>=300000;});
   if(!due.length)return;selectedProperties.forEach(id=>autoChecked.set(id,now));task($('refreshInbox'),()=>loadInbox(true));
  }
 
- async function loadUnread(){const n=version,ids=[...selectedProperties],results=await Promise.allSettled(ids.map(id=>call('unread',messageRange(),id)));if(n!==version||results.some(r=>r.status==='rejected'))return;const total=results.reduce((sum,r)=>sum+Number(r.value.unread||0),0);$('unreadBadge').hidden=!total;$('unreadBadge').textContent=total;}
  function bookingRange(){const end=bookingPeriod.days?today():bookingPeriod.to,start=bookingPeriod.days?new Date(Date.parse(end+'T12:00:00Z')-(bookingPeriod.days-1)*86400000).toISOString().slice(0,10):bookingPeriod.from;return {basis:'booked',from:start,to:end,statuses:[...selectedStatuses]};}
  function bookingPeriodLabel(){$('bookingPeriodButton').textContent=bookingPeriod.days?(bookingPeriod.days===1?'오늘':bookingPeriod.days+'일')+' ⌄':'기간설정 ⌄';$('bookingPeriodButton').title=bookingRange().from+' ~ '+bookingRange().to;$('bookingPeriodPanel')?.querySelectorAll('[data-booking-days]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.bookingDays)===bookingPeriod.days)));}
  function initBookingFilters(){

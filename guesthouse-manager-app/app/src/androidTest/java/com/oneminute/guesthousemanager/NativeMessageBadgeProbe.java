@@ -42,13 +42,28 @@ final class NativeMessageBadgeProbe {
         check(android.graphics.Color.alpha(small.getPixel(120,65))>240,"Status ring has thicker stroke");
         check(android.graphics.Color.alpha(small.getPixel(120,120))==0,"Status ring hole remains clear");
     }
+    // NotificationManager enqueues notify/cancel asynchronously, even after the Binder call returns.
+    // Observe one atomic, stable snapshot instead of mixing reads during a remove/add transition.
+    static void awaitCounts(Context c,int guest,int staff)throws Exception{
+        long end=System.currentTimeMillis()+5000;int stable=0;String last="";
+        while(System.currentTimeMillis()<end){
+            StatusBarNotification[] active=c.getSystemService(NotificationManager.class).getActiveNotifications();
+            int g=0,s=0;StringBuilder details=new StringBuilder();
+            for(StatusBarNotification item:active){Notification n=item.getNotification();if(item.getId()==NativeMessageBadge.GUEST_ID)g=n.number;if(item.getId()==NativeMessageBadge.ID)s=n.number;
+                details.append("id=").append(item.getId()).append(" number=").append(n.number).append(" channel=").append(n.getChannelId()).append(" group=").append(n.getGroup()).append("; ");}
+            last=details.toString();
+            if(g==guest&&s==staff&&active.length==(guest>0?1:0)+(staff>0?1:0)){if(++stable==3)return;}else stable=0;
+            Thread.sleep(50);
+        }
+        throw new AssertionError("Expected stable guest="+guest+" staff="+staff+" notifications, actual "+last);
+    }
     private static Notification guest(Context c){
         for(StatusBarNotification n:c.getSystemService(NotificationManager.class).getActiveNotifications())
             if(n.getId()==NativeMessageBadge.GUEST_ID)return n.getNotification();
         return null;
     }
     private static void verifySplit(Instrumentation instrumentation,Context c)throws Exception{
-        NativeMessageBadge.fromWeb(c,TOKEN,5,6);Thread.sleep(150);expect(c,6);
+        NativeMessageBadge.fromWeb(c,TOKEN,5,6);awaitCounts(c,5,6);
         check(guest(c)!=null&&guest(c).number==5,"Guest has its own exact count");
         check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==2,"Exactly two notifications, no combined third notification");
         check("게스트 메시지 5건 알림".contentEquals(guest(c).extras.getCharSequence(Notification.EXTRA_TITLE)),"Guest count title");
@@ -66,14 +81,14 @@ final class NativeMessageBadgeProbe {
         assertDestination(instrumentation,guest(c),NativeMessageBadge.url(true,false));
         assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,false));
         Notification alert=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentText("Guest latest message").build();
-        NativeMessageBadge.postAlert(c,alert,true,false);Thread.sleep(100);expect(c,6);check(guest(c).number==5,"Guest push does not overwrite staff or increment count");
+        NativeMessageBadge.postAlert(c,alert,true,false);awaitCounts(c,5,6);check(guest(c).number==5,"Guest push does not overwrite staff or increment count");
         Notification booking=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setSmallIcon(R.drawable.ic_oms_notification).setContentText("당일 예약 접수 · Synthetic guest").build();
-        NativeMessageBadge.postAlert(c,booking,false,true);Thread.sleep(100);assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,true));
-        NativeMessageBadge.fromWeb(c,TOKEN,4,5);Thread.sleep(100);expect(c,5);check(guest(c).number==4,"Both counts refresh independently");
+        NativeMessageBadge.postAlert(c,booking,false,true);awaitCounts(c,5,6);assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,true));
+        NativeMessageBadge.fromWeb(c,TOKEN,4,5);awaitCounts(c,4,5);check(guest(c).number==4,"Both counts refresh independently");
         assertDestination(instrumentation,summary(c),NativeMessageBadge.url(false,true));
-        NativeMessageBadge.fromWeb(c,TOKEN,0,5);Thread.sleep(100);check(guest(c)==null,"Reading guests clears only guest notification");expect(c,5);
-        NativeMessageBadge.fromWeb(c,TOKEN,4,0);Thread.sleep(100);expect(c,0);check(guest(c).number==4,"Reading staff preserves guest count");
-        NativeMessageBadge.fromWeb(c,TOKEN,0,0);Thread.sleep(100);check(guest(c)==null,"All read clears both");
+        NativeMessageBadge.fromWeb(c,TOKEN,0,5);awaitCounts(c,0,5);check(guest(c)==null,"Reading guests clears only guest notification");expect(c,5);
+        NativeMessageBadge.fromWeb(c,TOKEN,4,0);awaitCounts(c,4,0);check(guest(c).number==4,"Reading staff preserves guest count");
+        NativeMessageBadge.fromWeb(c,TOKEN,0,0);awaitCounts(c,0,0);check(guest(c)==null,"All read clears both");
     }
     private static void assertDestination(Instrumentation instrumentation,Notification n,String expected)throws Exception{
         Context c=instrumentation.getTargetContext();boolean isGuest=expected.contains("guest-messages.html");

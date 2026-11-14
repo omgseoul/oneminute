@@ -60,15 +60,16 @@ final class NativeNotificationModesProbe {
                 .addData("mode","weak").addData("alertId","guest-"+UUID.randomUUID()).addData("messageType","general")
                 .addData("route","guest-messages.html#thread/123").addData("message","합성 게스트 메시지").build());
             Notification guest=active(manager,NativeMessageBadge.GUEST_ID,weak,5);
+            NativeMessageBadgeProbe.awaitCounts(c,5,6);
             check(manager.getActiveNotifications().length==2,"Guest FCM keeps staff notification");
             check(guest.number==5&&weak.equals(guest.getChannelId()),"Online FCM uses guest slot with exact count and strength");
             new TestService(c).onMessageReceived(new RemoteMessage.Builder("synthetic")
                 .addData("mode","weak").addData("alertId","booking-"+UUID.randomUUID()).addData("messageType","general")
                 .addData("route","messages.html#bot").addData("message","당일 예약 접수 · 합성 예약").build());
-            Notification booking=active(manager,weak,6);
+            Notification booking=active(manager,weak,6);NativeMessageBadgeProbe.awaitCounts(c,5,6);
             check(booking.extras.getBoolean("oms_bot_notice")&&"staff".equals(booking.extras.getString("oms_message_bucket")),"Booking FCM stays in staff slot and targets BOT");
             check(manager.getActiveNotifications().length==2,"Booking FCM creates no third combined notice");
-            NativeMessageBadge.fromWeb(c,token,0);Thread.sleep(100);check(manager.getActiveNotifications().length==0,"Read clears notification");
+            NativeMessageBadge.fromWeb(c,token,0);NativeMessageBadgeProbe.awaitCounts(c,0,0);check(manager.getActiveNotifications().length==0,"Read clears notification");
             android.util.Log.i("OMSProbe","weak vibration pattern, phone mode, migration, silent-refresh race and single alert: PASS");
         }finally{
             audio.setRingerMode(ringer);SharedPreferences.Editor edit=push.edit().clear();

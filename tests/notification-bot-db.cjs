@@ -60,6 +60,18 @@ let todo=enriched.messages.find(m=>m.message_id===id(34)),calendar=enriched.mess
 assert.equal((await read(id(102))).messages.length,0,'metadata enrichment preserves recipient isolation');assert.equal((await read(id(999))).ok,false,'invalid tokens remain rejected');
 await db.query('update missions set property_id=$1',[id(3)]);assert.equal((await read(id(201))).messages.find(m=>m.message_id===id(34)).reminder_at,null,'cross-property target metadata never leaks');
 await db.query('delete from calendar_events');assert.equal((await read(id(201))).messages.find(m=>m.message_id===id(35)).reminder_at,null,'deleted target leaves original alert readable without fabricated date');
+// Enrich only already-authorized bot rows with existing online guest presentation data.
+await db.exec(`create table omg_private.online_bookings(property_id uuid,id bigint,guest_name text,room_name text,arrival date,departure date,channel text);
+create table omg_private.online_messages(property_id uuid,id bigint,booking_id bigint,notice_id uuid,sent_at timestamptz);`);
+const popupSql=fs.readFileSync('supabase/setup/beds24_guest_popup.sql','utf8');await db.exec(popupSql.slice(0,popupSql.indexOf('create or replace function omg_private.guest_popup_onsite')));
+await db.exec(`insert into property_messages(id,property_id,sender_type,message,message_type,source) values('${id(71)}','${id(1)}','system','[OMS-ONLINE:777]\nSynthetic\nHello','general','beds24');
+insert into property_message_recipients(message_id,employee_id,recipient_type,recipient_key) values('${id(71)}','${id(21)}','staff','employee:${id(21)}');
+insert into omg_private.online_bookings values('${id(1)}',777,'Synthetic','404','2026-11-14','2026-11-18','Booking.com');
+insert into omg_private.online_messages values('${id(1)}',778,777,'${id(71)}','2026-11-14T02:33Z');`);
+const botBefore=await read(id(201)),botSql=fs.readFileSync('supabase/setup/beds24_bot_message_cards.sql','utf8');await db.exec(botSql);await db.exec(botSql);const botAfter=await read(id(201));
+assert.equal(botAfter.messages.find(m=>m.message_id===id(71)).guest_context.room,'404');assert.equal(botAfter.messages.find(m=>m.message_id===id(71)).guest_context.channel,'Booking.com');assert.equal(botAfter.messages.find(m=>m.message_id===id(71)).guest_context.property,'본점');
+for(const m of botAfter.messages)delete m.guest_context;assert.deepEqual(botAfter,botBefore,'presentation patch preserves all original feed fields and recipient/read behavior');assert.equal((await read(id(102))).messages.length,0);assert.equal((await read(id(999))).ok,false);assert.equal((await db.query('select omg_private.guest_popup_online($1,$2) v',[id(2),id(71)])).rows[0].v,null);
+console.log('PASS bot reservation metadata, idempotent patch, unchanged feed, invalid session and property/recipient isolation');
 console.log('PASS legacy reminder date enrichment, calendar dates, deduplication, deleted targets and recipient/property isolation');
 console.log('PASS: invalid session, staff write denial, cross-property isolation, authorized shared editing, profile validation, bot outgoing mode, recipient cap, disabled schedule, ordinary chat preservation, contract duplication prevention, RLS.');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

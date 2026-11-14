@@ -26,7 +26,7 @@ window.NotificationBot=(()=>{
  function cardContent(i){
   const text=body(i),lines=text.split('\n');
   if(bookingNotice(i))return {heading:'당일 예약 접수',meta:lines[1]||'',text:lines.slice(2).join('\n')};
-  if(onlineBooking(i))return {heading:'온라인 게스트 문의',meta:lines[0],text:lines.slice(1).join('\n')};
+  if(onlineBooking(i))return {heading:'온라인 게스트 메세지',meta:lines[0],text:lines.slice(1).join('\n')};
   if(guestRoom(i)){
    const urgent=/^긴급 AI 지원요청$/.test(lines[0]?.trim());
    const known=/^(긴급 AI 지원요청|AI 메시지 지원요청)$/.test(lines[0]?.trim())&&lines[2]?.trim()==='게스트 문의가 왔습니다. 직원 확인이 필요합니다.';
@@ -70,14 +70,16 @@ window.NotificationBot=(()=>{
  }
  function ordinary(i){
   const c=cardContent(i),action=bookingNotice(i)?(session.sessionKind==='owner'?'예약 상세':'내용 확인'):onlineBooking(i)?(session.sessionKind==='owner'?'대화 열기':'내용 확인'):guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
+  if(onlineBooking(i)&&window.OMSGuestMessageCard?.read(i)?.kind==='online')return row(i,`<div class="bot-chat-bubble bot-notice bot-online-notice"><div class="bot-chat-category bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div data-bot-online-card="${e(i.message_id)}"></div>${footer(i,action)}</div>`);
   const heading=c.urgent?`<span class="bot-notice-badge">긴급</span><span>${e(c.heading.replace(/^긴급 · /,''))}</span>`:`<span class="bot-notice-badge">${e(c.heading)}</span>`;
-  return row(i,`<div class="bot-chat-bubble bot-notice ${c.urgent?'is-urgent':''}"><div class="bot-chat-category bot-notice-heading">${heading}</div><div class="bot-notice-body">${contentHTML(c)}</div>${footer(i,action,c.meta,guestRoom(i)?'게스트 대화 열기':'')}</div>`);
+  return row(i,`<div class="bot-chat-bubble bot-notice ${c.urgent?'is-urgent':''}"><div class="bot-chat-category bot-notice-heading">${heading}</div><div class="bot-notice-body">${onlineBooking(i)&&c.meta?'<strong class="bot-online-fallback-name">'+e(c.meta)+'</strong>':''}${contentHTML(c)}</div>${footer(i,action,onlineBooking(i)?'':c.meta,guestRoom(i)?'게스트 대화 열기':'')}</div>`);
  }
  function reminderCard(i){
   const r=reminder(i),label=r.overdue?'지연 · To do':r.calendar?'일정 알림'+(r.timing?' '+r.timing:''):'To do'+(r.timing?' '+r.timing:'');
   return row(i,`<div class="bot-chat-bubble bot-notice bot-reminder-panel ${r.overdue?'is-overdue':''}"><div class="bot-chat-category bot-notice-heading bot-reminder-heading"><span class="bot-notice-badge">${e(label)}</span>${r.overdue&&r.days!==null?`<span class="bot-overdue-days">+${Math.abs(r.days)}일</span>`:''}</div><div class="bot-notice-body bot-reminder-line"><div class="bot-notice-quote"><p>${e(r.title)}</p></div></div>${footer(i,'상세보기',r.dateLine,r.title+' 상세보기')}</div>`,'bot-reminder-card');
  }
  $('botTimeline').innerHTML=(hasOlder?'<button type="button" id="botOlder" class="bot-older">이전 대화 더 보기</button>':'')+(list.map(i=>{const date=new Date(i.created_at),key=date.toLocaleDateString('ko-KR'),divider=key!==day?`<div class="bot-date"><span>${e(date.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'}))}</span></div>`:'';day=key;return divider+(reminder(i)?reminderCard(i):ordinary(i));}).join('')||'<div class="bot-empty">'+(q?'검색 결과가 없습니다.':announcementMode?'발송한 공지가 없습니다.':'아직 받은 알림이 없습니다.')+'</div>');$('botOlder')?.addEventListener('click',()=>loadAlerts(true));
+ $('botTimeline').querySelectorAll('[data-bot-online-card]').forEach(host=>{const item=list.find(i=>i.message_id===host.dataset.botOnlineCard),card=window.OMSGuestMessageCard.render(item);if(card){card.querySelector('.guest-popup-time')?.remove();host.append(card);}});
  $('botTimeline').querySelectorAll('[data-bot-message]').forEach(b=>b.onclick=()=>{const item=list.find(i=>i.message_id===b.dataset.botMessage);if(bookingNotice(item)){if(session.sessionKind!=='owner'){callbacks.openDetail(item);return;}location.href='online.html#booking-data?property='+encodeURIComponent(item.property_id||session.propertyId)+'&booking='+encodeURIComponent(bookingNotice(item));return;}if(onlineBooking(item)){if(session.sessionKind!=='owner'){callbacks.openDetail(item);return;}location.href='online.html#thread/'+encodeURIComponent(onlineBooking(item))+'?property='+encodeURIComponent(item.property_id||session.propertyId);return;}if(guestRoom(item)){location.href='guest-chat.html?room='+encodeURIComponent(guestRoom(item));return;}callbacks.openDetail(item);});
  scroller.scrollTop=near?scroller.scrollHeight:oldTop;scheduleRead();
  }

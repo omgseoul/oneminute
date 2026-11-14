@@ -118,3 +118,8 @@ Read-only Beds24 GETs retrieve the matched booking notes/comments/group note/inf
 Private RLS-enabled tables retain per-booking/day/room estimates and per-date run leases. Repeated identical evidence hashes reuse prior analysis. Changed context may replace an ETA with newly evidenced time; a later unknown result preserves a confirmed time for the same booking/day/room. Reassignment/date changes cannot reuse the old room's time. User navigation does not cancel the server background task, and reopening fetches the stored result.
 
 AI processing uses the existing platform provider and property wallet/monthly cap, with bounded reservations and idempotent settlement at the existing gpt-6-luna rate policy. Concurrent starts share a lease and recent completions are briefly reused. Uncertain interrupted calls are conservatively settled once on retry. Provider/AI errors retain prior results and show a retryable inline message. CI uses synthetic data and mocked providers; no live guests, alerts or billable extraction calls are used for deployment verification.
+
+
+## Bot online guest cards
+
+Apply `supabase/setup/beds24_bot_message_cards.sql` after the existing guest popup setup. The bot feed adds the same private, property-scoped guest presentation metadata only to already authorized Beds24 message rows. Recipient selection, pagination, read state and push delivery are unchanged. Cards use the existing chat shell and title 온라인 게스트 메세지, then a reservation strip (room, three-character property, channel icon, check-in/out dates), guest name and message. Channel icons reveal their full names; the original timestamp/read line and conversation link remain outside the shared content. Full-screen native alert behavior is unchanged.

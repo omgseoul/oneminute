@@ -1,7 +1,7 @@
 name: Verify online reservation management
 on:
   pull_request:
-    paths: ['assets/booking-channels/**', 'property-selector.js', 'select-picker.js', 'online.*', 'translation-languages.js', 'app.html', 'supabase/functions/beds24/**', 'supabase/functions/online-arrivals/**', 'supabase/setup/beds24*.sql', 'supabase/setup/translation*.sql', 'platform-translation.js', 'platform-admin.html', 'operations-center.js', 'subscription.html', 'service-access.js', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
+    paths: ['notification-bot.js', 'guest-message-card.*', 'messages.html', 'assets/booking-channels/**', 'property-selector.js', 'select-picker.js', 'online.*', 'translation-languages.js', 'app.html', 'supabase/functions/beds24/**', 'supabase/functions/online-arrivals/**', 'supabase/setup/beds24*.sql', 'supabase/setup/translation*.sql', 'platform-translation.js', 'platform-admin.html', 'operations-center.js', 'subscription.html', 'service-access.js', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,7 @@ jobs:
           node tests/online/arrival-edge.mjs
           node tests/online/message-alert-transport.mjs
           node tests/online/guest-popup-ui.cjs
+          node tests/online/bot-cards-ui.cjs
           node tests/message-popup-queue/web.cjs
           node tests/online/ui.cjs
           node tests/online/booking-data-ui.cjs

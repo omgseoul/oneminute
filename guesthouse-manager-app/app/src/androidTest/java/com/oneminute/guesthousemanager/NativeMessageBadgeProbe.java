@@ -42,17 +42,29 @@ final class NativeMessageBadgeProbe {
         check(android.graphics.Color.alpha(small.getPixel(120,65))>240,"Status ring has thicker stroke");
         check(android.graphics.Color.alpha(small.getPixel(120,120))==0,"Status ring hole remains clear");
     }
+    // Android owns its automatic ranker header. It is not a third OMS message and
+    // launchers exclude it from the badge; the actual launcher probe verifies that sum.
+    static int appNotificationCount(Context c){
+        int count=0;for(StatusBarNotification item:c.getSystemService(NotificationManager.class).getActiveNotifications())
+            if(!systemHeader(item))count++;
+        return count;
+    }
+    private static boolean systemHeader(StatusBarNotification item){
+        Notification n=item.getNotification();
+        return item.getId()!=NativeMessageBadge.ID&&item.getId()!=NativeMessageBadge.GUEST_ID
+            &&(n.flags&Notification.FLAG_GROUP_SUMMARY)!=0&&"ranker_group".equals(n.getGroup());
+    }
     // NotificationManager enqueues notify/cancel asynchronously, even after the Binder call returns.
     // Observe one atomic, stable snapshot instead of mixing reads during a remove/add transition.
     static void awaitCounts(Context c,int guest,int staff)throws Exception{
         long end=System.currentTimeMillis()+5000;int stable=0;String last="";
         while(System.currentTimeMillis()<end){
             StatusBarNotification[] active=c.getSystemService(NotificationManager.class).getActiveNotifications();
-            int g=0,s=0;StringBuilder details=new StringBuilder();
-            for(StatusBarNotification item:active){Notification n=item.getNotification();if(item.getId()==NativeMessageBadge.GUEST_ID)g=n.number;if(item.getId()==NativeMessageBadge.ID)s=n.number;
+            int g=0,s=0,appCount=0;StringBuilder details=new StringBuilder();
+            for(StatusBarNotification item:active){if(!systemHeader(item))appCount++;Notification n=item.getNotification();if(item.getId()==NativeMessageBadge.GUEST_ID)g=n.number;if(item.getId()==NativeMessageBadge.ID)s=n.number;
                 details.append("id=").append(item.getId()).append(" number=").append(n.number).append(" channel=").append(n.getChannelId()).append(" group=").append(n.getGroup()).append("; ");}
             last=details.toString();
-            if(g==guest&&s==staff&&active.length==(guest>0?1:0)+(staff>0?1:0)){if(++stable==3)return;}else stable=0;
+            if(g==guest&&s==staff&&appCount==(guest>0?1:0)+(staff>0?1:0)){if(++stable==3)return;}else stable=0;
             Thread.sleep(50);
         }
         throw new AssertionError("Expected stable guest="+guest+" staff="+staff+" notifications, actual "+last);
@@ -65,7 +77,7 @@ final class NativeMessageBadgeProbe {
     private static void verifySplit(Instrumentation instrumentation,Context c)throws Exception{
         NativeMessageBadge.fromWeb(c,TOKEN,5,6);awaitCounts(c,5,6);
         check(guest(c)!=null&&guest(c).number==5,"Guest has its own exact count");
-        check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==2,"Exactly two notifications, no combined third notification");
+        check(appNotificationCount(c)==2,"Exactly two notifications, no combined third notification");
         check("게스트 메시지 5건 알림".contentEquals(guest(c).extras.getCharSequence(Notification.EXTRA_TITLE)),"Guest count title");
         check("직원 메시지 6건 알림".contentEquals(summary(c).extras.getCharSequence(Notification.EXTRA_TITLE)),"Staff count title");
         java.util.Map<String,String> data=new java.util.HashMap<>();data.put("messageType","general");data.put("route","guest-messages.html#thread/123");
@@ -131,7 +143,7 @@ final class NativeMessageBadgeProbe {
             verifySplit(instrumentation,c);
             Notification actual=new Notification.Builder(c,NativeMessageBadge.CHANNEL).setLargeIcon(android.graphics.Bitmap.createBitmap(24,24,android.graphics.Bitmap.Config.ARGB_8888)).setSmallIcon(R.drawable.ic_oms_notification).setContentTitle("새 메세지 도착").setContentText("보낸 사람 · 안녕하세요").build();
             NativeMessageBadge.postAlert(c,actual);NativeMessageBadge.postAlert(c,actual);
-            check(c.getSystemService(NotificationManager.class).getActiveNotifications().length==1,"One real message notification, no extra unread bulletin");
+            check(appNotificationCount(c)==1,"One real message notification, no extra unread bulletin");
             NativeMessageBadge.fromWeb(c,TOKEN,2);expect(c,2);
             verifyLogo(c,summary(c));
             check("보낸 사람 · 안녕하세요".contentEquals(summary(c).extras.getCharSequence(Notification.EXTRA_TEXT)),"Count updates preserve actual message content");

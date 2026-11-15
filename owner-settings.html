@@ -71,7 +71,7 @@ document.getElementById("importBedsRooms").onclick=async()=>{
  const button=document.getElementById("importBedsRooms"),out=document.getElementById("bedsRoomImportStatus"),property=selectedPropertyId;
  button.disabled=true;out.textContent="Beds24 객실정보를 불러오는 중…";
  try{
-  const response=await fetch(OMG_SUPABASE.url+"/functions/v1/beds24",{method:"POST",headers:{apikey:OMG_SUPABASE.publishableKey,"Content-Type":"application/json"},body:JSON.stringify({access_token:session.accessToken,action:"import_rooms",data:{property_id:property}}),signal:AbortSignal.timeout(60000)}),data=await response.json();
+  const response=await fetch(OMG_SUPABASE.url+"/functions/v1/online-room-import",{method:"POST",headers:{apikey:OMG_SUPABASE.publishableKey,"Content-Type":"application/json"},body:JSON.stringify({access_token:session.accessToken,action:"import_rooms",data:{property_id:property}}),signal:AbortSignal.timeout(60000)}),data=await response.json();
   if(property!==selectedPropertyId)return;
   if(!response.ok||!data.ok)throw Error(data.message||"Beds24 객실정보를 불러오지 못했습니다.");
   const result=OMSRoomImport.merge(parseRoomTypes(),data.room_types);

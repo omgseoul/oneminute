@@ -28,7 +28,7 @@ export function createArrivalHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
  async function rpc(name,data){const r=await fetcher(url()+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'도착예상 정보를 처리하지 못했습니다.');return v;}
  const internal=(action,p,data={})=>rpc('online_internal',{p_action:action,p_property:p,p_data:data}),control=(action,p,data={})=>rpc('online_sync_control',{p_action:action,p_property:p,p_data:data});
  async function run(token,property,day,runId,timezone){
-  const ctl=(action,data={})=>rpc('online_arrival_worker',{p_property:property,p_action:action,p_data:{...data,property_id:property,day,run_id:runId}});let prepared=false,attempted=false,received=false;const result={results:[]};
+  const ctl=(action,data={})=>rpc(token?'online_arrivals':'online_arrival_worker',{...(token?{p_token:token}:{p_property:property}),p_action:action,p_data:{...data,property_id:property,day,run_id:runId}});let prepared=false,attempted=false,received=false;const result={results:[]};
   try{
    // Existing credentials remain server-side. All provider operations here are GET-only.
    const c=await internal('credentials',property);if(!c.secret?.refreshToken||!c.beds_property_id)throw Error('Beds24 숙소 연결을 확인해주세요.');

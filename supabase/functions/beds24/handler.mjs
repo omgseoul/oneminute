@@ -110,13 +110,6 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     throw Error('지원하지 않는 운영센터 요청입니다.');
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
-   if(b.action==='import_rooms'){
-    const a=await rpc('online_room_import_auth',{p_token:b.access_token,p_property:d.property_id||null}),p=a.property_id,c=await credentials(p),props=[];
-    await pages('/properties?includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token},async items=>props.push(...items.map(selectProperty)));
-    const selected=props.find(item=>item.id===Number(a.beds_property_id));if(!selected)throw Error('연결된 Beds24 숙소의 객실 조회 권한을 확인해주세요.');
-    await internal('connect',p,{secret:c.secret,properties:props,actor:a.actor});
-    return reply({ok:true,property_id:p,property_name:selected.name,room_types:selected.roomTypes});
-   }
    const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
    if(b.action==='guest_settings')return reply(await scoped('guest_settings'));

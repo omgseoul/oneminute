@@ -3,7 +3,7 @@ module.exports=async({db,p1,p2,t1,t2,id})=>{
  const eid=id(99501),token=id(99502);await db.query("insert into employees(id,property_id,display_name) values($1,$2,'Cleaner')",[eid,p1]);await db.query("insert into work_sessions(employee_id,property_id,login_token_hash,token_expires_at,status)values($1,$2,omg_private.token_hash($3),'infinity','working')",[eid,p1,token]);
  const summary=async t=>(await db.query('select public.home_cleaning_summary($1) v',[t])).rows[0].v;
  const config=async(t,action='read',ids=null)=>(await db.query('select public.employee_cleaning_config($1,$2,$3,$4) v',[t,eid,action,ids])).rows[0].v;
- assert.equal((await summary(token)).properties.length,1);assert.equal((await summary(token)).properties[0].days.length,3);
+ await db.exec('set role anon');assert.equal((await summary(token)).properties.length,1,'public client can call scoped helper without private schema usage');await assert.rejects(()=>summary(id(99999)),/로그인/);await db.exec('reset role');assert.equal((await summary(token)).properties.length,1);assert.equal((await summary(token)).properties[0].days.length,3);
  await assert.rejects(()=>config(token),/권한/);await assert.rejects(()=>config(t2),/권한/);await assert.rejects(()=>config(t1,'save',[p2]),/권한/);await assert.rejects(()=>summary(id(99999)),/로그인/);
  await db.query("insert into property_share_requests(requester_property_id,target_property_id,status,requested_permissions)values($1,$2,'approved',array['messages'])",[p1,p2]);
  await config(t1,'save',[p1,p2]);assert.equal((await summary(token)).properties.length,2);assert.equal((await config(t1)).properties.filter(p=>p.selected).length,2);

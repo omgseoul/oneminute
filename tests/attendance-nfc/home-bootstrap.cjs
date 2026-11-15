@@ -23,17 +23,18 @@ const read=file=>fs.readFileSync(file,'utf8');
       if(scenario==='owner_permission_stalled')return new Promise(()=>{});
       return {data:scenario==='owner_platform'};
      }
+     if(name==='home_cleaning_summary')return {data:{ok:true,properties:(owner?['One Minute','Omghouse','Seoulnest','lazybear']:['One Minute']).map((name,index)=>({id:'property-'+index,name,days:[0,1,2].map(i=>({day:'2026-11-'+(15+i),count:3+i+index}))}))}};
      if(name==='list_working_employees')return {data:{ok:true,own_property_id:'property-a',own_property_name:'테스트 지점',employees:[{employee_id:'worker-b',display_name:'동료',property_id:'property-a',property_name:'테스트 지점'}]}};
      if(name==='list_property_messages')return {data:{ok:true,can_manage:owner,messages:[{message_id:'s1'},{message_id:'s2'}],unread_count:2}};
      if(name==='guest_message_summary')return {data:{ok:true,unread:0}};
      if(name==='work_report_inbox')return {data:{ok:true,unread_count:0,reports:[]}};
-     if(name==='list_property_shares')return {data:{ok:true,properties:[{property_id:'property-a',is_own:true}]}};
+     if(name==='list_property_shares')return {data:{ok:true,properties:[{property_id:'property-a',property_name:'테스트 지점',is_own:true}]}};
      if(['list_missions','list_shared_missions'].includes(name))return {data:{ok:true,missions:[]}};
      if(name==='calendar_event_action')return {data:{ok:true,events:[]}};
      throw Error('Unexpected RPC '+name);
     }};
    },scenario);
-   const scripts=new Set(['page-transition.js','attendance-nfc.js','attendance-flow.js','worker-tasks.js','home-guest-count.js','home-summary-state.js']);
+   const scripts=new Set(['page-transition.js','attendance-nfc.js','attendance-flow.js','worker-tasks.js','home-guest-count.js','home-summary-state.js','home-cleaning.js','property-selector.js']);
    const html=read(process.env.HOME_TEST_HTML||'app.html').replace(/<script src="([^"]+)"[^>]*><\/script>/g,(_,url)=>scripts.has(url.split('?')[0])?'<script>'+read(url.split('?')[0])+'</script>':'');
    await page.route('**/*',route=>{
     const url=new URL(route.request().url()),file=url.pathname.slice(1);
@@ -47,12 +48,16 @@ const read=file=>fs.readFileSync(file,'utf8');
    assert.deepEqual(errors,[],scenario+' must finish actual Home initialization');
    if(['owner','reported'].includes(scenario)){await page.waitForFunction(()=>[...document.querySelectorAll('#mainMenu .card')].filter(e=>e.getBoundingClientRect().width>0&&getComputedStyle(e).visibility==='visible').length===8);const cells=await page.locator('#mainMenu .card:visible').evaluateAll(els=>els.map(e=>({id:e.id,label:e.innerText,y:e.getBoundingClientRect().top})));assert.equal(cells.length,8);assert.equal(new Set(cells.map(e=>Math.round(e.y))).size,4);assert((await page.locator('#mainMenu').boundingBox()).height<300);await page.screenshot({path:'/tmp/online-home-eight-'+scenario+'.png'});}
    await page.waitForFunction(()=>document.querySelector('#todayOverviewItems').textContent.includes('오늘 일정이 없습니다.')&&document.querySelector('#workingGrid').textContent.includes('동료')&&document.querySelector('#messageCounter').textContent==='2');
-   assert.equal(await page.locator('#mainMenu').evaluate(el=>el.inert),false);
+   assert.equal(await page.locator('#mainMenu').evaluate(el=>el.inert),false);assert.equal(await page.locator('#emergencyQuick').count(),0);await page.locator('#homeCleaning a').first().waitFor();assert.equal(await page.locator('#homeCleaning a').count(),scenario.startsWith('owner')?8:3);assert((await page.locator('#homeCleaning a').first().getAttribute('href')).includes('#cleaning?property='));assert(await page.locator('#workingGrid #workingPropertyPicker button').isVisible());assert.equal(await page.locator('#workingHeading').isVisible(),false);
    if(scenario.startsWith('owner')){
     assert.equal(await page.locator('#onlineManagement').isVisible(),true);
     assert.equal(await page.locator('#todayMissionCount').textContent(),'0');
     assert.equal(await page.locator('#platformAdminQuick').isVisible(),scenario==='owner_platform');
     assert.equal(await page.locator('#workingHeading').textContent(),'근무중');
+    if(scenario==='owner'){
+     await page.evaluate(()=>{document.getElementById('workingPropertyPicker').replaceChildren();omgPropertySelector.mountStatic({host:document.getElementById('workingPropertyPicker'),permission:'messages',properties:[{property_id:'home',property_name:'One Minute',is_own:true},{property_id:'empty',property_name:'Empty House'}],defaultSelection:'all',alwaysShow:true});renderWorkingEmployees({own_property_id:'home',own_property_name:'One Minute',employees:[]},['empty']);});
+     assert(await page.locator('#workingGrid #workingPropertyPicker button').isVisible(),'empty remote branch keeps filter reachable');assert((await page.locator('#workingGrid').innerText()).includes('Empty House'));
+    }
     if(scenario==='owner_permission_denied')await page.screenshot({path:'/tmp/oms-home-permission-recovery.png'});
    }
    if(!scenario.startsWith('owner')){

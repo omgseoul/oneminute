@@ -153,11 +153,13 @@ final class NativeMessageBadge {
                 boolean repost=previous.number!=count||(previous.flags&Notification.FLAG_GROUP_SUMMARY)!=0||!categorized;
                 // Leave foreground alarm ownership with its service; refresh again when it stops.
                 if((previous.flags&Notification.FLAG_FOREGROUND_SERVICE)!=0)return;
-                if(!repost&&previous.getLargeIcon()==null&&previous.getGroup()==null&&!CHANNEL.equals(previous.getChannelId())&&!isSummary(previous))return;
+                // An unchanged bucket is not a new event: never repost it or move it above a real arrival.
+                if(!repost&&previous.getLargeIcon()==null&&previous.getGroup()==null)return;
                 if(categorized&&!isSummary(previous))notification=Notification.Builder.recoverBuilder(c,previous)
                     .setLargeIcon((android.graphics.Bitmap)null).setChannelId(CHANNEL).setGroup(null).setGroupSummary(false)
-                    .setNumber(count).setContentTitle(title(guest,count)).setOnlyAlertOnce(true).setFullScreenIntent(null,false).build();
-                if(repost)manager.cancel(id);
+                    .setNumber(count).setContentTitle(title(guest,count)).setWhen(previous.when).setOnlyAlertOnce(true).setFullScreenIntent(null,false).build();
+                // Updating a count is silent and keeps its original arrival timestamp.
+                notification=Notification.Builder.recoverBuilder(c,notification).setWhen(previous.when).setOnlyAlertOnce(true).build();
             }
             manager.notify(id,notification);
         }catch(SecurityException ignored){/* Respect notification permission. */}

@@ -76,6 +76,13 @@ final class NativeMessageBadgeProbe {
     }
     private static void verifySplit(Instrumentation instrumentation,Context c)throws Exception{
         NativeMessageBadge.fromWeb(c,TOKEN,5,6);awaitCounts(c,5,6);
+        long guestPosted=0;for(StatusBarNotification item:c.getSystemService(NotificationManager.class).getActiveNotifications())if(item.getId()==NativeMessageBadge.GUEST_ID)guestPosted=item.getPostTime();
+        long guestWhen=guest(c).when;Thread.sleep(120);
+        NativeMessageBadge.fromWeb(c,TOKEN,5,7);awaitCounts(c,5,7);
+        for(StatusBarNotification item:c.getSystemService(NotificationManager.class).getActiveNotifications())if(item.getId()==NativeMessageBadge.GUEST_ID)check(item.getPostTime()==guestPosted,"Unchanged guest summary must not repost when staff count changes");
+        check(guest(c).when==guestWhen,"Guest arrival time remains unchanged");
+        NativeMessageBadge.fromWeb(c,TOKEN,5,6);awaitCounts(c,5,6);
+
         check(guest(c)!=null&&guest(c).number==5,"Guest has its own exact count");
         check(appNotificationCount(c)==2,"Exactly two notifications, no combined third notification");
         check("게스트 메시지 5건 알림".contentEquals(guest(c).extras.getCharSequence(Notification.EXTRA_TITLE)),"Guest count title");

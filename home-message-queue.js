@@ -30,7 +30,8 @@
   updateCount();
   root.querySelector('.guest-popup-card')?.remove();const guest=window.OMSGuestMessageCard?.read(active),original=document.getElementById('messageArrivalBody');original.hidden=!!guest;document.getElementById('messageArrivalSender').hidden=!!guest;
   if(guest){root.querySelector('strong').textContent=window.OMSGuestMessageCard.title(guest);original.after(window.OMSGuestMessageCard.render(active));}
-  root.hidden=false;root.querySelector('button').focus({preventScroll:true});
+  if(guest?.kind==='same_day'){document.getElementById('messageArrivalDog').src='oms-dog-celebration.webp';original.textContent='';document.getElementById('messageArrivalSender').textContent='';}
+  root.hidden=false;if(guest?.kind==='same_day')requestAnimationFrame(()=>window.OMSGuestMessageCard?.fit?.(root));root.querySelector('button').focus({preventScroll:true});
  }
  function updateCount(){const count=popup()?.querySelector('.message-arrival-count');if(count){count.textContent=queue.length+1>=2?`${queue.length+1}건 대기`:'';count.hidden=queue.length+1<2;}}
  function saveReads(){try{sessionStorage.setItem('oms-popup-pending:'+token,JSON.stringify([...pendingReads]));}catch{}}

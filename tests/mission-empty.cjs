@@ -1,0 +1,6 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+const w=new JSDOM(fs.readFileSync('mission.html','utf8'),{runScripts:'outside-only'}).window;
+for(const file of ['worker-tasks.js','property-selector.js','select-picker.js'])w.eval(fs.readFileSync(file,'utf8'));w.setInterval=()=>0;
+const script=[...w.document.scripts].findLast(s=>!s.src).textContent.split('(async()=>{session=')[0];w.eval(script+';session={employeeId:"a"};config={property:{name:"Test"}};missions=[];render();window.testEval=code=>eval(code);');
+for(const key of ['this_week','anytime']){const section=w.document.getElementById('section-'+key);assert(!section.querySelector('.empty'));assert(section.querySelector('.section-empty-note').textContent.includes('할 일 없음'));assert.equal(section.querySelector('.count').textContent,'0');assert(section.classList.contains('section-empty'));}
+w.testEval('missions=[{id:"later",title:"Scheduled",due_at:dateAfterDays(10),created_at:"2026-01-01"}];render();');assert(w.document.querySelector('#section-anytime .mission'));assert(!w.document.querySelector('#section-anytime .section-empty-note'));w.close();console.log('Todo empty headers stay one line; populated sections retain cards');

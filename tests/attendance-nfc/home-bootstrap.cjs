@@ -54,6 +54,10 @@ const read=file=>fs.readFileSync(file,'utf8');
     assert.equal(await page.locator('#todayMissionCount').textContent(),'0');
     assert.equal(await page.locator('#platformAdminQuick').isVisible(),scenario==='owner_platform');
     assert.equal(await page.locator('#workingHeading').textContent(),'근무중');
+    if(scenario==='owner'){
+     await page.evaluate(()=>{document.getElementById('workingPropertyPicker').replaceChildren();omgPropertySelector.mountStatic({host:document.getElementById('workingPropertyPicker'),permission:'messages',properties:[{property_id:'home',property_name:'One Minute',is_own:true},{property_id:'empty',property_name:'Empty House'}],defaultSelection:'all',alwaysShow:true});renderWorkingEmployees({own_property_id:'home',own_property_name:'One Minute',employees:[]},['empty']);});
+     assert(await page.locator('#workingGrid #workingPropertyPicker button').isVisible(),'empty remote branch keeps filter reachable');assert((await page.locator('#workingGrid').innerText()).includes('Empty House'));
+    }
     if(scenario==='owner_permission_denied')await page.screenshot({path:'/tmp/oms-home-permission-recovery.png'});
    }
    if(!scenario.startsWith('owner')){

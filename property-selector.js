@@ -64,10 +64,10 @@
     label();
     return{properties,selectedIds,root,close};
   }
-  async function mount({accessToken,permission,host,onChange,defaultSelection="all",allLabel="All"}){
+  async function mount({accessToken,permission,host,onChange,defaultSelection="all",alwaysShow=false,allLabel="All"}){
     const data=await rpc("list_property_shares",{p_access_token:accessToken});
     const properties=(data.properties||[]).filter(item=>item.is_own||(item.permissions||[]).includes(permission));
-    return build({properties,permission,host,onChange,defaultSelection,allLabel});
+    return build({properties,permission,host,onChange,defaultSelection,alwaysShow,allLabel});
   }
   function mountStatic({properties,permission,host,onChange,defaultSelection="own",alwaysShow=false,allLabel="All"}){
     return build({properties,permission,host,onChange,defaultSelection,alwaysShow,allLabel});

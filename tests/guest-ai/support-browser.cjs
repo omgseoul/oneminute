@@ -44,7 +44,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  assert((await page.locator('.bot-notice-body p,.bot-notice-fields dd').evaluateAll(xs=>xs.map(x=>getComputedStyle(x).fontWeight))).every(w=>w==='400'));
  assert(await page.locator('#botTimeline').evaluate(el=>el.scrollWidth<=el.clientWidth),'no horizontal clipping');
  for(const id of ['holiday','system','attendance','share','notice','contract'])await page.locator('[data-bot-message="'+id+'"]').click();assert.deepEqual(await page.evaluate(()=>__details),['holiday','system','attendance','share','notice','contract']);
- const booking=page.locator('[data-bot-row="booking"]');assert.equal(await booking.locator('.is-urgent').count(),0);assert.equal(await booking.locator('.bot-notice-badge').innerText(),'당일 예약 접수');assert(!(await booking.innerText()).includes('OMS-BOOKING'));await booking.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'booking');
+ const booking=page.locator('[data-bot-row="booking"]');assert.equal(await booking.locator('.is-urgent').count(),0);assert.equal(await booking.locator('.bot-notice-badge').innerText(),'당일 예약 알림');assert(!(await booking.innerText()).includes('OMS-BOOKING'));await booking.getByRole('button',{name:'내용 확인'}).click();assert.equal(await page.evaluate(()=>__details.at(-1)),'booking');
  assert.equal(await page.locator('[data-bot-row=online]').count(),0,'ordinary guest arrivals appear in the unified inbox instead');
  // Opening cards retains their existing action and does not acknowledge approval/notice content.
  assert.equal(await page.locator('[data-bot-row="notice"] .bot-state').innerText(),'확인 필요');

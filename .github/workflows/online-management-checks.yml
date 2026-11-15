@@ -23,6 +23,7 @@ jobs:
           node tests/mission-empty.cjs
           node tests/online/database.cjs
           node tests/online/edge.mjs
+          node tests/online/booking-price-edge.mjs
           node tests/online/arrival-edge.mjs
           node tests/online/room-import-edge.mjs
           node tests/online/message-alert-transport.mjs

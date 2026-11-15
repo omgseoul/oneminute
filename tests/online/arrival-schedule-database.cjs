@@ -1,0 +1,24 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+module.exports=async({db,owner,internal,p1,p2,t1,t2,id})=>{
+ await db.exec(`create schema net;create table net.calls(body jsonb);create function net.http_post(url text,headers jsonb,body jsonb,timeout_milliseconds int)returns bigint language plpgsql as $$begin insert into net.calls values(body);return 1;end$$;`);
+ const sql=fs.readFileSync('supabase/setup/beds24_arrival_schedule.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const employee=id(99001),token=id(99002);await db.query("insert into employees(id,property_id,display_name)values($1,$2,'Arrival worker')",[employee,p1]);await db.query("insert into work_sessions(employee_id,property_id,login_token_hash,token_expires_at,status)values($1,$2,omg_private.token_hash($3),'infinity','working')",[employee,p1,token]);
+ const day='2027-03-01',ctl=async(action,t=token,data={})=>(await db.query('select public.online_arrivals($1,$2,$3) v',[t,action,JSON.stringify({property_id:p1,day,...data})])).rows[0].v;
+ assert((await ctl('read')).ok);await assert.rejects(()=>ctl('start'),/관리자/);await assert.rejects(()=>ctl('read',t2),/권한/);
+ await db.query("update property_share_requests set status='approved',requested_permissions=array['messages'] where requester_property_id=$1 and target_property_id=$2",[p1,p2]);assert((await ctl('read',t1,{property_id:p2})).ok);await assert.rejects(()=>ctl('start',t1,{property_id:p2}),/관리자 설정/);await db.query("update property_share_requests set status='revoked'");
+ const cfg=await owner('guest_settings',{},token);assert.equal(cfg.properties.length,1);assert(cfg.properties[0].roomTypes.length);assert(!JSON.stringify(cfg).includes('test-refresh'));
+ const before=(await ctl('read')).checked_at;await db.query("update omg_private.online_arrival_runs set checked_at=now()-interval '1 hour' where property_id=$1 and day=$2",[p1,day]);let run=await ctl('start',t1);await ctl('finish',t1,{run_id:run.id,error:'Synthetic failure'});assert.equal((await ctl('read')).checked_at,before,'failure keeps last successful timestamp');
+ await assert.rejects(()=>db.query('select public.online_room_import_auth($1,$2)',[token,p1]),/관리자/);assert((await db.query('select public.online_room_import_auth($1,$2) v',[t1,p1])).rows[0].v.ok);
+ await assert.rejects(()=>db.query('select public.online_room_import_auth($1,$2)',[t1,p2]),/권한/);
+ await db.query("insert into vault.secrets(name,decrypted_secret)values('oms_guest_ai_worker_secret',$1)on conflict(name)do update set decrypted_secret=excluded.decrypted_secret",['a'.repeat(64)]);
+ await db.exec("update omg_private.online_arrival_runs set attempted_at=now()-interval '13 hours',leased_until=now()-interval '1 minute';");
+ for(let i=0;i<4;i++)await db.query('select omg_private.dispatch_online_arrivals()');
+ let rows=(await db.query('select body from net.calls')).rows;const own=rows.filter(r=>r.body.property_id===p1);assert.equal(own.length,3,'only today through day+2 scheduled once');const today=(await db.query("select (now() at time zone 'Asia/Seoul')::date::text as day")).rows[0].day;assert.deepEqual(own.map(r=>r.body.day).sort(),[0,1,2].map(i=>new Date(Date.parse(today+'T12:00:00Z')+i*86400000).toISOString().slice(0,10)));
+ const count=rows.length;await db.query('select omg_private.dispatch_online_arrivals()');assert.equal((await db.query('select count(*)::int n from net.calls')).rows[0].n,count,'no repeat before 12 hours');
+ const future=new Date(Date.parse(today+'T12:00:00Z')+4*86400000).toISOString().slice(0,10);run=await ctl('start',t1,{day:future});await ctl('finish',t1,{day:future,run_id:run.id,results:[]});assert((await ctl('read',token,{day:future})).checked_at,'manual future result persists for staff');
+ await db.exec('set role anon');await assert.rejects(()=>db.query("select public.online_arrival_worker($1,'start',$2)",[p1,JSON.stringify({day})]),/permission/);await db.exec('reset role');
+ const popup=fs.readFileSync('supabase/setup/beds24_same_day_popup.sql','utf8');await db.exec(popup);await db.exec(popup);
+ await db.query("update properties set name='One Minute' where id=$1",[p1]);const mid=(await db.query('select message_id from omg_private.online_booking_notices where property_id=$1 limit 1',[p1])).rows[0].message_id;
+ const dispatch=(await db.query('select public.get_online_push_dispatch($1) v',[mid])).rows[0].v;assert.equal(dispatch.guest_context.kind,'same_day');assert.equal(dispatch.guest_context.property,'One Minute');assert.equal(dispatch.route,'messages.html#bot');assert.equal((await db.query('select omg_private.guest_popup_booking($1,$2) v',[p2,mid])).rows[0].v,null);
+ console.log('Arrival scheduler: three-day window, 12h dedupe, durable future/manual results, staff read-only, safe inventory and room-import authorization passed');
+};

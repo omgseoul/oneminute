@@ -93,9 +93,11 @@ public class MessageAlertActivity extends AppCompatActivity {
         card.setMinimumHeight(dp(520));
         scroll.addView(card, new ScrollView.LayoutParams(-1, -2));
 
+        GuestMessageCard guest=GuestMessageCard.parse(intent.getStringExtra("guestContext"),message);
         ImageView dog = new ImageView(this);
         boolean conversation = messageType == null || "general".equals(messageType) || "guest_chat".equals(messageType);
-        if (conversation) {
+        if (guest!=null&&guest.sameDay()) dog.setImageResource(R.drawable.oms_dog_celebration);
+        else if (conversation) {
             byte[] dogBytes = Base64.decode(MESSAGE_DOG_BASE64, Base64.DEFAULT);
             dog.setImageBitmap(BitmapFactory.decodeByteArray(dogBytes, 0, dogBytes.length));
         } else dog.setImageResource(R.drawable.oms_dog_normal_plain);
@@ -106,7 +108,6 @@ public class MessageAlertActivity extends AppCompatActivity {
 
         queueCount=label("",12,BLUE,false,Gravity.CENTER);
         card.addView(queueCount,new LinearLayout.LayoutParams(-1,-2));
-        GuestMessageCard guest=GuestMessageCard.parse(intent.getStringExtra("guestContext"),message);
         TextView title = label(guest!=null?guest.title():approval ? "결재 요청" : "새 메세지 도착", guest!=null?23:28, NAVY, true, Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.setMargins(0, dp(5), 0, dp(7));

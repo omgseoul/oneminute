@@ -19,8 +19,8 @@ export function onlineNoticeBody(dispatch){
 }
 
 function guestPresentation(value){
- if(!value||!['online','onsite'].includes(value.kind))return {};
- const limits={kind:8,guest:120,room:60,arrival:10,departure:10,property:3,channel:80,sent:14},safe={};
+ if(!value||!['online','onsite','same_day'].includes(value.kind))return {};
+ const limits={kind:8,guest:120,room:60,arrival:10,departure:10,property:value.kind==='same_day'?80:3,channel:80,sent:14},safe={};
  for(const [key,max]of Object.entries(limits))safe[key]=[...String(value[key]??'')].slice(0,max).join('');
  if(safe.kind==='onsite')safe.channel='';
  return {guestContext:JSON.stringify(safe)};

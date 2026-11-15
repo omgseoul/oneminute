@@ -28,7 +28,7 @@ export function createArrivalHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
  async function rpc(name,data){const r=await fetcher(url()+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'도착예상 정보를 처리하지 못했습니다.');return v;}
  const internal=(action,p,data={})=>rpc('online_internal',{p_action:action,p_property:p,p_data:data}),control=(action,p,data={})=>rpc('online_sync_control',{p_action:action,p_property:p,p_data:data});
  async function run(token,property,day,runId,timezone){
-  const ctl=(action,data={})=>rpc('online_arrivals',{p_token:token,p_action:action,p_data:{...data,property_id:property,day,run_id:runId}});let prepared=false,attempted=false,received=false;const result={results:[]};
+  const ctl=(action,data={})=>rpc(token?'online_arrivals':'online_arrival_worker',{...(token?{p_token:token}:{p_property:property}),p_action:action,p_data:{...data,property_id:property,day,run_id:runId}});let prepared=false,attempted=false,received=false;const result={results:[]};
   try{
    // Existing credentials remain server-side. All provider operations here are GET-only.
    const c=await internal('credentials',property);if(!c.secret?.refreshToken||!c.beds_property_id)throw Error('Beds24 숙소 연결을 확인해주세요.');
@@ -37,7 +37,7 @@ export function createArrivalHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
    if(!c.secret.token||c.secret.expiresAt<Date.now()+60000){const t=await api('/authentication/token',{refreshToken:c.secret.refreshToken});if(!t.token)throw Error('Beds24 연결을 확인해주세요.');c.secret={...c.secret,token:t.token,expiresAt:Date.now()+Math.max(60,Number(t.expiresIn)||3600)*1000};await internal('token',property,{secret:c.secret});}
    async function pages(path,max=10){const rows=[];for(let page=1;page<=max;page++){const v=await api(path+'&page='+page,{token:c.secret.token});if(!Array.isArray(v.data)||v.data.some(x=>Number(x.propertyId)!==Number(c.beds_property_id)))throw Error('조회한 숙소가 일치하지 않습니다.');rows.push(...v.data);if(v.pages?.nextPageExists!==true)return rows;}throw Error('대화가 너무 많아 도착예상을 확인하지 못했습니다.');}
    const select=b=>Object.fromEntries(['id','propertyId','roomId','roomName','unitId','firstName','lastName','arrival','departure','bookingTime','status','apiSource','referer','numAdult','numChild','arrivalTime'].map(k=>[k,b[k]??null]));
-   for(const status of ['', '&status=cancelled']){const rows=await pages('/bookings?propertyId='+c.beds_property_id+'&arrivalFrom='+day+'&arrivalTo='+day+status);await internal('bookings',property,{items:rows.map(select)});}
+   for(const basis of ['departure','arrival'])for(const status of ['', '&status=cancelled']){const rows=await pages('/bookings?propertyId='+c.beds_property_id+'&'+basis+'From='+day+'&'+basis+'To='+day+status);await internal('bookings',property,{items:rows.map(select)});}
    await ctl('synced');const candidates=await ctl('candidates');if(candidates.skip)return;
    if(candidates.items.length>40)throw Error('한 번에 확인할 수 있는 체크인은 최대 40건입니다.');const contexts=[];
    for(const candidate of candidates.items){
@@ -46,7 +46,7 @@ export function createArrivalHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
     const context=arrivalContext(bookings[0],messages);context.hash=await fingerprint({day,room_key:candidate.room_key,...context});if(context.hash!==candidate.input_hash)contexts.push(context);
    }
    if(!contexts.length){await ctl('finish',result);return;}
-   const request=buildArrivalRequest(contexts,day,timezone),inputBytes=new TextEncoder().encode(JSON.stringify(request.input)).length;if(inputBytes>240000)throw Error('대화가 너무 많아 한 번에 확인하지 못했습니다.');
+   const request=buildArrivalRequest(contexts,day,c.timezone||timezone),inputBytes=new TextEncoder().encode(JSON.stringify(request.input)).length;if(inputBytes>240000)throw Error('대화가 너무 많아 한 번에 확인하지 못했습니다.');
    const provider=await rpc('guest_ai_credentials',{});if(!provider?.enabled||!provider.key)throw Error('운영센터의 AI 연결을 확인해주세요.');
    const claim=await ctl('prepare',{items:contexts.map(c=>({booking_id:c.booking_id,hash:c.hash})),input_bytes:inputBytes});if(claim.skip)return;prepared=true;
    attempted=true;const response=await fetcher('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+provider.key,'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(45000)});received=true;
@@ -59,8 +59,15 @@ export function createArrivalHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
  return async req=>{
   const origin=req.headers.get('origin'),allowed=['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io'],headers={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'};if(allowed.includes(origin))headers['Access-Control-Allow-Origin']=origin;const reply=(v,status=200)=>new Response(JSON.stringify(v),{status,headers});
   if(origin&&!allowed.includes(origin))return reply({ok:false,message:'허용되지 않은 접속입니다.'},403);if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{...headers,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'content-type, apikey, authorization'}});if(req.method!=='POST')return reply({ok:false},405);
-  try{const raw=await req.text();if(raw.length>4000)return reply({ok:false},413);const b=JSON.parse(raw),d=b.data||{},time=Date.parse(d.day+'T12:00:00Z');if(!UUID.test(b.access_token||'')||!['read','start'].includes(b.action)||!/^\d{4}-\d{2}-\d{2}$/.test(d.day||'')||!Number.isFinite(time)||new Date(time).toISOString().slice(0,10)!==d.day)throw Error('관리자 로그인과 조회 날짜를 확인해주세요.');
-   const auth=await rpc('online_owner',{p_token:b.access_token,p_action:'auth',p_data:{property_id:d.property_id}}),property=auth.property_id;
+  try{const raw=await req.text();if(raw.length>4000)return reply({ok:false},413);const b=JSON.parse(raw);
+   if(new URL(req.url).pathname.endsWith('/worker')){
+    const secret=req.headers.get('x-worker-secret');if(!secret||secret.length!==64||!await internal('worker_verify',null,{secret}))return reply({ok:false},401);
+    if(!UUID.test(b.property_id||'')||!UUID.test(b.run_id||'')||!/^\d{4}-\d{2}-\d{2}$/.test(b.day||''))return reply({ok:false},400);
+    const v=await rpc('online_arrival_worker',{p_property:b.property_id,p_action:'resume',p_data:{day:b.day,run_id:b.run_id}});
+    if(!v.skip)waitUntil(run(null,b.property_id,b.day,b.run_id,v.timezone||'Asia/Seoul').catch(()=>{}));return reply({ok:true,skip:!!v.skip});
+   }
+   const d=b.data||{},time=Date.parse(d.day+'T12:00:00Z');if(!UUID.test(b.access_token||'')||!['read','start'].includes(b.action)||!/^\d{4}-\d{2}-\d{2}$/.test(d.day||'')||!Number.isFinite(time)||new Date(time).toISOString().slice(0,10)!==d.day)throw Error('관리자 로그인과 조회 날짜를 확인해주세요.');
+   const auth=await rpc('online_owner',{p_token:b.access_token,p_action:'auth',p_data:{property_id:d.property_id,request_action:'bookings'}}),property=auth.property_id;
    const v=await rpc('online_arrivals',{p_token:b.access_token,p_action:b.action,p_data:{property_id:property,day:d.day}});if(b.action==='start'&&!v.skip)waitUntil(run(b.access_token,property,d.day,v.id,auth.timezone||'Asia/Seoul').catch(()=>{}));return reply(v);
   }catch(e){return reply({ok:false,message:e instanceof SyntaxError?'요청 형식을 확인해주세요.':e.message},400);}
  };

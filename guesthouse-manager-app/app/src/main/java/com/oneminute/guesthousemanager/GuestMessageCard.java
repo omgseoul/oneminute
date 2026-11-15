@@ -13,31 +13,38 @@ final class GuestMessageCard {
  final JSONObject data;final String body;
  private GuestMessageCard(JSONObject data,String body){this.data=data;this.body=body;}
  static GuestMessageCard parse(String json,String message){
-  try{if(json==null||json.length()>3000)return null;JSONObject d=new JSONObject(json);String kind=d.optString("kind");if(!kind.equals("online")&&!kind.equals("onsite"))return null;
+  try{if(json==null||json.length()>3000)return null;JSONObject d=new JSONObject(json);String kind=d.optString("kind");if(!kind.equals("online")&&!kind.equals("onsite")&&!kind.equals("same_day"))return null;
    String body=message==null?"":message;
    if(kind.equals("online")){body=body.replaceFirst("^\\[OMS-ONLINE:[0-9]+\\]\\s*","");String name=d.optString("guest");if(!name.isEmpty()&&body.startsWith(name+"\n"))body=body.substring(name.length()+1);}
    return new GuestMessageCard(d,body);
   }catch(Exception e){return null;}
  }
- String title(){return data.optString("kind").equals("online")?"온라인 게스트 메세지":"현장 게스트 메세지";}
+ boolean sameDay(){return data.optString("kind").equals("same_day");}
+ String title(){return sameDay()?"당일 예약 발생":data.optString("kind").equals("online")?"온라인 게스트 메세지":"현장 게스트 메세지";}
  static int dp(Context c,int n){return Math.round(n*c.getResources().getDisplayMetrics().density);}
  static GradientDrawable round(int color,int radius,Context c){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));return d;}
  static TextView text(Context c,String value,int sp,boolean bold,int color){TextView t=new TextView(c);t.setText(value);t.setTextColor(color);t.setTextSize(sp);t.setTypeface(Typeface.DEFAULT,bold?Typeface.BOLD:Typeface.NORMAL);return t;}
  private static String date(String value){return value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")?value.substring(5).replace('-','.'):"—";}
  View view(Context c){
   int navy=Color.rgb(28,51,78),muted=Color.rgb(112,128,149);LinearLayout box=new LinearLayout(c);box.setOrientation(1);box.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));box.setBackground(round(Color.rgb(244,247,252),18,c));
-  LinearLayout strip=new LinearLayout(c);strip.setOrientation(1);strip.setPadding(dp(c,8),dp(c,7),dp(c,8),dp(c,7));strip.setBackground(round(Color.rgb(226,237,252),9,c));
+  LinearLayout strip=new LinearLayout(c);strip.setOrientation(1);strip.setPadding(dp(c,8),dp(c,7),dp(c,8),dp(c,7));strip.setBackground(round(sameDay()?Color.rgb(252,229,238):Color.rgb(226,237,252),9,c));
   LinearLayout top=new LinearLayout(c);top.setGravity(Gravity.CENTER_VERTICAL);String room=data.optString("room","객실 미정");if(room.matches("[0-9]+"))room+="호";
   String stay=date(data.optString("arrival"))+" → "+date(data.optString("departure"));
+  if(!sameDay()){
   TextView roomLabel=text(c,room,12,true,navy);roomLabel.setSingleLine(true);roomLabel.setMaxWidth(dp(c,60));roomLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);roomLabel.setContentDescription(room);top.addView(roomLabel,new LinearLayout.LayoutParams(-2,-2));
   TextView dates=text(c,stay,11,false,muted);dates.setSingleLine(true);dates.setAutoSizeTextTypeUniformWithConfiguration(9,11,1,android.util.TypedValue.COMPLEX_UNIT_SP);dates.setPadding(dp(c,5),0,dp(c,5),0);top.addView(dates,new LinearLayout.LayoutParams(0,-2,1));
   TextView property=text(c,data.optString("property"),12,true,navy);property.setSingleLine(true);property.setMaxWidth(dp(c,42));property.setEllipsize(android.text.TextUtils.TruncateAt.END);top.addView(property,new LinearLayout.LayoutParams(-2,-2));
   String channel=data.optString("kind").equals("online")?data.optString("channel"):"";
   if(!channel.isEmpty()){ChannelIcon icon=new ChannelIcon(c,channel);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(c,24),dp(c,24));ip.setMargins(dp(c,5),0,0,0);top.addView(icon,ip);}
   strip.addView(top,new LinearLayout.LayoutParams(-1,-2));
+  }else{
+   String source=data.optString("channel","출처 미확인");if(source.toLowerCase(java.util.Locale.ROOT).contains("booking"))source="Booking.com";
+   TextView summary=text(c,room+" · "+data.optString("property")+" · "+source,12,true,navy);summary.setSingleLine(true);summary.setAutoSizeTextTypeUniformWithConfiguration(6,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);strip.addView(summary,new LinearLayout.LayoutParams(-1,dp(c,25)));
+   TextView dates=text(c,stay,11,false,Color.rgb(136,101,120));dates.setSingleLine(true);strip.addView(dates,new LinearLayout.LayoutParams(-1,-2));
+  }
   TextView guest=text(c,data.optString("guest","게스트"),18,true,navy);guest.setPadding(0,dp(c,6),0,0);strip.addView(guest,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout.LayoutParams stripParams=new LinearLayout.LayoutParams(-1,-2);stripParams.bottomMargin=dp(c,10);box.addView(strip,stripParams);
-  TextView message=text(c,body.isEmpty()?"메세지 메뉴에서 확인해주세요.":body,16,false,navy);message.setLineSpacing(dp(c,3),1);box.addView(message,new LinearLayout.LayoutParams(-1,-2));
+  if(!sameDay()){TextView message=text(c,body.isEmpty()?"메세지 메뉴에서 확인해주세요.":body,16,false,navy);message.setLineSpacing(dp(c,3),1);box.addView(message,new LinearLayout.LayoutParams(-1,-2));}
   String time=data.optString("sent");if(!time.isEmpty()){TextView received=text(c,time,10,false,muted);received.setGravity(Gravity.RIGHT);received.setPadding(0,dp(c,9),0,0);box.addView(received,new LinearLayout.LayoutParams(-1,-2));}
   return box;
  }

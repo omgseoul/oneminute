@@ -57,6 +57,17 @@ const read=file=>fs.readFileSync(file,'utf8');
     if(scenario==='owner'){
      await page.evaluate(()=>{document.getElementById('workingPropertyPicker').replaceChildren();omgPropertySelector.mountStatic({host:document.getElementById('workingPropertyPicker'),permission:'messages',properties:[{property_id:'home',property_name:'One Minute',is_own:true},{property_id:'empty',property_name:'Empty House'}],defaultSelection:'all',alwaysShow:true});renderWorkingEmployees({own_property_id:'home',own_property_name:'One Minute',employees:[]},['empty']);});
      assert(await page.locator('#workingGrid #workingPropertyPicker button').isVisible(),'empty remote branch keeps filter reachable');assert((await page.locator('#workingGrid').innerText()).includes('Empty House'));
+     for(const width of [320,360,412]){
+      await page.setViewportSize({width,height:850});
+      for(const size of [5,6]){
+       await page.evaluate(size=>OMSHomeCleaning.render(document.getElementById('homeCleaning'),['One Minute','Omghouse','Seoulnest','lazybear','New House','Sixth'].slice(0,size).map((name,i)=>({id:'p'+i,name,days:[0,1,2].map(n=>({day:'2026-11-'+(15+n),count:i+n+1}))})),true),size);
+       assert.equal(await page.locator('.home-cleaning-grid small').count(),5);assert.equal(await page.locator('#homeCleaning .home-cleaning-count').count(),10);assert.equal(await page.locator('.home-cleaning-more').count(),size>5?1:0);
+       assert(await page.locator('#homeCleaning').evaluate(e=>e.scrollWidth<=e.clientWidth),'five branches fit without scrolling');
+       if(size>5){assert.equal(await page.locator('.home-cleaning-more').getAttribute('href'),'online.html#cleaning');assert(await page.locator('.home-cleaning-more').evaluate(e=>{const r=e.getBoundingClientRect(),g=document.querySelector('.home-cleaning-grid').getBoundingClientRect();return r.top>=g.bottom&&Math.abs(r.right-g.right)<2;}),'more occupies its own lower-right row');}
+       if(width===360)await page.screenshot({path:'/tmp/online-home-compact-'+size+'.png'});
+      }
+     }
+
     }
     if(scenario==='owner_permission_denied')await page.screenshot({path:'/tmp/oms-home-permission-recovery.png'});
    }

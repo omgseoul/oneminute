@@ -23,9 +23,16 @@ window.NotificationBot=(()=>{
  [...host.querySelectorAll('.staff-room')].sort((a,b)=>(Date.parse(b.dataset.roomTime)||0)-(Date.parse(a.dataset.roomTime)||0)).forEach(el=>host.append(el));
  }
  // Parse only known server-generated envelopes; unknown formats retain their full text.
+ function bookingCard(i,lines){
+  if(lines.length!==3||!/^당일 예약 (접수|알림)$/.test(lines[0]))return null;
+  const split=lines[1].lastIndexOf(' · '),stay=lines[2].match(/^((?:\d{4}-)?\d{2}[.-]\d{2}) → ((?:\d{4}-)?\d{2}[.-]\d{2}) · (.+)$/);
+  if(split<1||!stay)return null;
+  const room=lines[1].slice(split+3),property=profiles.find(p=>String(p.property_id)===String(i.property_id||session.propertyId))?.property_name||i.property_name||'';
+  return {guest:lines[1].slice(0,split),room:/^\d+$/.test(room)?room+'호':room,property,dates:stay.slice(1,3).map(v=>v.replace(/^\d{4}-/,'').replace('-','.')).join(' → '),channel:/booking/i.test(stay[3])?'Booking.com':stay[3]};
+ }
  function cardContent(i){
   const text=body(i),lines=text.split('\n');
-  if(bookingNotice(i))return {heading:'당일 예약 알림',meta:lines[1]||'',text:lines.slice(2).join('\n')};
+  if(bookingNotice(i))return {heading:'당일 예약 알림',meta:lines[1]||'',text:lines.slice(2).join('\n'),booking:bookingCard(i,lines)};
   if(onlineBooking(i))return {heading:'온라인 게스트 메세지',meta:lines[0],text:lines.slice(1).join('\n')};
   if(guestRoom(i)){
    const urgent=/^긴급 AI 지원요청$/.test(lines[0]?.trim());
@@ -70,6 +77,7 @@ window.NotificationBot=(()=>{
  }
  function ordinary(i){
   const c=cardContent(i),action=bookingNotice(i)?(session.sessionKind==='owner'?'예약 상세':'내용 확인'):onlineBooking(i)?(session.sessionKind==='owner'?'대화 열기':'내용 확인'):guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
+  if(c.booking){const b=c.booking;return row(i,`<div class="bot-chat-bubble bot-notice bot-booking-notice"><div class="bot-booking-header"><div class="bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-booking-summary"><strong class="bot-booking-room">${e(b.room)}</strong>${b.property?`<strong class="bot-booking-property" title="${e(b.property)}">· ${e(b.property)}</strong>`:''}<span class="bot-booking-channel" title="${e(b.channel)}">${e(b.channel)}</span></div></div><div class="bot-notice-body bot-booking-body"><p class="bot-booking-guest">${e(b.guest)}</p><div class="bot-notice-footer"><span class="bot-booking-dates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>${e(b.dates)}</span><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}">${e(action)} ›</button></div></div></div>`);}
   if(onlineBooking(i)&&window.OMSGuestMessageCard?.read(i)?.kind==='online')return row(i,`<div class="bot-chat-bubble bot-notice bot-online-notice"><div class="bot-chat-category bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div data-bot-online-card="${e(i.message_id)}"></div>${footer(i,action)}</div>`);
   const heading=c.urgent?`<span class="bot-notice-badge">긴급</span><span>${e(c.heading.replace(/^긴급 · /,''))}</span>`:`<span class="bot-notice-badge">${e(c.heading)}</span>`;
   return row(i,`<div class="bot-chat-bubble bot-notice ${c.urgent?'is-urgent':''}"><div class="bot-chat-category bot-notice-heading">${heading}</div><div class="bot-notice-body">${onlineBooking(i)&&c.meta?'<strong class="bot-online-fallback-name">'+e(c.meta)+'</strong>':''}${contentHTML(c)}</div>${footer(i,action,onlineBooking(i)?'':c.meta,guestRoom(i)?'게스트 대화 열기':'')}</div>`);

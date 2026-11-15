@@ -194,3 +194,19 @@
 .bot-reminder-heading{justify-content:space-between}.bot-overdue-days{flex:none;white-space:nowrap;font-size:12px}
 #botConversation .bot-chat-footer{padding:9px 12px calc(9px + env(safe-area-inset-bottom));font-size:11px}
 @media(max-width:360px){.bot-notice-fields>div{grid-template-columns:66px minmax(0,1fr);gap:6px}}
+
+/* Same-day booking: approved pink header, guest and stay dates below. */
+.bot-chat-bubble.bot-booking-notice{padding:0;border-color:#f2b5c8}
+.bot-booking-header{padding:10px 12px 9px;background:#fff0f5}
+.bot-booking-notice .bot-notice-heading{margin-bottom:7px}
+.bot-booking-notice .bot-notice-badge{padding:0;border-radius:0;background:transparent;color:#be245d;font-size:14px;font-weight:700}
+.bot-booking-summary{display:flex;align-items:baseline;gap:4px;min-width:0;color:#19334f;line-height:1.5}
+.bot-booking-room{flex:none;font-size:15px;max-width:35%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bot-booking-property{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.bot-booking-channel{flex:0 1 auto;max-width:34%;margin-left:auto;padding-left:8px;border-left:1px solid #dcc8d2;color:#6f7d90;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bot-booking-notice .bot-booking-body{padding:9px 12px 5px}
+.bot-booking-notice .bot-booking-guest{font-size:15px;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
+.bot-booking-notice .bot-notice-footer{margin-top:4px;gap:5px;flex-wrap:wrap}
+.bot-booking-dates{display:flex;align-items:center;gap:7px;color:#19334f;font-size:14px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bot-booking-dates svg{width:16px;height:16px;color:#7d8c9e;flex:none}
+@media(max-width:360px){.bot-booking-header{padding:9px 10px 8px}.bot-booking-notice .bot-booking-body{padding:8px 10px 4px}.bot-booking-property{font-size:13px}.bot-booking-channel{padding-left:5px;font-size:9px}.bot-booking-dates{gap:5px;font-size:13px}.bot-booking-notice .bot-chat-action{font-size:12px}}

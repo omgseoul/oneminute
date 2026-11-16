@@ -78,16 +78,18 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
   const staff=()=>({ok:false,code:'staff_required',message:'직원과의 채팅으로 예약을 확인하여 주십시오.'});
   if(!UUID.test(data.slug||'')||!UUID.test(data.verification_token||'')||!UUID.test(data.device_id||''))return {ok:false,code:'update_required',message:'화면을 새로고침한 뒤 다시 확인해주세요.'};
   const hash=async value=>[...new Uint8Array(await cryptoApi.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  // A retry ID is bound to its submitted values, so reusing it for new guesses still counts.
+  const attemptFor=async(kind,values)=>{const h=await hash(JSON.stringify([data.attempt_id,kind,values]));return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);};
   const addr=req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();if(!addr)return staff();
   const gate=await rpc('web_checkin_gate',{p_slug:data.slug,p_ip_hash:await hash(addr)});if(!gate.ok)return gate;
   const flow=(action,value={})=>rpc('web_checkin_flow',{p_property:gate.property_id,p_token:data.verification_token,p_device:data.device_id,p_action:action,p_data:value});
   const device=await flow('device');if(!device.ok)return device;
   const allowedDays=gate.days||[gate.day],active=b=>Number(b.propertyId)===Number(gate.beds_property_id)&&['new','confirmed'].includes(b.status)&&Number(b.roomQty||1)===1&&allowedDays.includes(b.arrival);
   const fingerprint=b=>hash(JSON.stringify([gate.property_id,b.id,b.firstName,b.lastName,b.arrival,b.departure,b.apiReference,b.roomId,b.unitId]));
-  const c=await credentials(gate.property_id);if(Number(c.beds_property_id)!==Number(gate.beds_property_id))return staff();
-  const list=async()=>{const all=[];for(const day of allowedDays)all.push(...await arrivals(c,day));return [...new Map(all.filter(active).map(b=>[String(b.id),b])).values()];};
-  const fresh=async id=>{const result=await api('/bookings?propertyId='+c.beds_property_id+'&id='+id+'&includeInfoItems=true',{token:c.secret.token});const rows=(result.data||[]).filter(b=>Number(b.id)===Number(id)&&active(b));return rows.length===1?rows[0]:null;};
-  const publicState=s=>{if(!s.ok)return s;const result={ok:true,stage:s.stage,mode:s.mode,name_remaining:s.name_remaining,date_remaining:s.date_remaining,attempts_remaining:s.attempts_remaining,...(s.message?{message:s.message}:{})};if(s.stage==='choice'){result.options=shuffle(s.options||[],cryptoApi);result.rejected_ids=s.rejected_ids||[];}if(s.stage==='name'&&!s.message)result.message='예약번호가 확인되지 않습니다. 예약자 이름을 입력해주세요.';return result;};
+  let c;const context=async()=>{if(!c){c=await credentials(gate.property_id);if(Number(c.beds_property_id)!==Number(gate.beds_property_id))throw Error('직원과의 채팅으로 예약을 확인하여 주십시오.');}return c;};
+  const list=async()=>{await context();const all=[];for(const day of allowedDays)all.push(...await arrivals(c,day));return [...new Map(all.filter(active).map(b=>[String(b.id),b])).values()];};
+  const fresh=async id=>{await context();const result=await api('/bookings?propertyId='+c.beds_property_id+'&id='+id+'&includeInfoItems=true',{token:c.secret.token});const rows=(result.data||[]).filter(b=>Number(b.id)===Number(id)&&active(b));return rows.length===1?rows[0]:null;};
+  const publicState=s=>{if(!s.ok)return s;if(!['reference','fallback_dates','name','dates','choice','upload'].includes(s.stage))return staff();const result={ok:true,stage:s.stage,mode:s.mode,reference_remaining:s.reference_remaining,name_remaining:s.name_remaining,date_remaining:s.date_remaining,attempts_remaining:s.attempts_remaining,...(s.message?{message:s.message}:{})};if(s.stage==='choice'){result.options=shuffle(s.options||[],cryptoApi);result.rejected_ids=s.rejected_ids||[];}return result;};
   async function disclose(state){
   // Re-read both the reservation and server state immediately before disclosure.
   const booking=await fresh(state.booking_id);if(!booking||await fingerprint(booking)!==state.fingerprint)return staff();
@@ -97,33 +99,41 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
   return {ok:true,stage:'complete',greeting:'안녕하세요. 예약이 확인되었습니다. 편안한 숙박 되세요!',property:gate.name,room:String(assigned.unit.name).slice(0,80),access_code:code,check_in:booking.arrival,check_out:booking.departure};
   }
   let state,booking;
-  if(data.step==='reference'){
-   if(typeof data.reference!=='string'||reference(data.reference).length<1||data.reference.length>80)return failure();
-   const rows=(await list()).filter(b=>referenceScore(data.reference,b)>=.9),match=rows.length===1?rows[0]:null;
-   state=await flow('start',match?{booking_id:match.id,fingerprint:await fingerprint(match)}:{});
+  if(['reference','unknown','resume'].includes(data.step)){
+   state=await flow('start');if(!state.ok)return state;
+   if(state.stage==='reference'&&data.step!=='resume'){
+    if(data.step==='unknown')state=await flow('reference',{unknown:true});
+    else{
+     if(typeof data.reference!=='string'||reference(data.reference).length<1||data.reference.length>80||!UUID.test(data.attempt_id||''))return failure();
+     const rows=(await list()).filter(b=>referenceScore(data.reference,b)>=.9),match=rows.length===1?rows[0]:null;
+     state=await flow('reference',{attempt_id:await attemptFor('reference',reference(data.reference)),...(match?{booking_id:match.id,fingerprint:await fingerprint(match)}:{})});
+    }
+   }
   }else{
    state=await flow('read');if(!state.ok)return state;if(state.stage==='verified')return disclose(state);
-   if(data.step==='name'){
-    if(state.stage!=='name'||!UUID.test(data.attempt_id||''))return staff();
-    const valid=typeof data.name==='string'&&data.name.trim().length>=2&&data.name.length<=100;
-    const matched=valid&&(await list()).some(b=>nameScore(data.name,b)>.9);
-    return publicState(await flow('name',{matched,name:valid?data.name.trim():'',attempt_id:data.attempt_id}));
-   }
+   let dateInput=data;
    if(state.stage==='fallback_dates'&&data.step==='dates'){
-    if(!validDate(data.check_in)||!allowedDays.includes(data.check_in))return {ok:true,stage:'fallback_dates',mode:'document',message:'체크인 날짜를 확인해주세요.'};
-    const rows=(await arrivals(c,data.check_in)).filter(b=>active(b)&&b.arrival===data.check_in&&nameScore(state.input_name,b)>.9);
-    // Dates disambiguate matching names before any image or real name is shown.
-    const exact=rows.filter(b=>b.departure===data.check_out),match=exact.length===1?exact[0]:rows.length===1?rows[0]:null;
+    if(!validDate(data.check_in)||!allowedDays.includes(data.check_in)||!validDate(data.check_out)||data.check_out<=data.check_in||Date.parse(data.check_out)-Date.parse(data.check_in)>93*86400000)return {ok:true,stage:'fallback_dates',mode:'document',message:'체크인·체크아웃 날짜를 확인해주세요.'};
+    return publicState(await flow('fallback_dates',{check_in:data.check_in,check_out:data.check_out}));
+   }
+   if(data.step==='name'){
+    if(state.stage!=='name'||!allowedDays.includes(state.selected_check_in)||!validDate(state.selected_check_out)||!UUID.test(data.attempt_id||''))return staff();
+    const valid=typeof data.name==='string'&&data.name.trim().length>=2&&data.name.length<=100;
+    dateInput={check_in:state.selected_check_in,check_out:state.selected_check_out};
+    const rows=valid?(await arrivals(await context(),state.selected_check_in)).filter(b=>active(b)&&b.arrival===state.selected_check_in&&nameScore(data.name,b)>.9):[];
+    state=await flow('name',{matched:rows.length>0,name:valid?data.name.trim():'',attempt_id:await attemptFor('name',data.name)});
+    if(!state.ok||state.stage==='name')return publicState(state);
+    const exact=rows.filter(b=>b.departure===dateInput.check_out),match=exact.length===1?exact[0]:rows.length===1?rows[0]:null;
     if(!match)return staff();
     state=await flow('bind',{booking_id:match.id,fingerprint:await fingerprint(match)});if(!state.ok)return state;
    }
    if(state.booking_id){booking=await fresh(state.booking_id);if(!booking||await fingerprint(booking)!==state.fingerprint)return staff();}
-   if(data.step==='dates'){
+   if(data.step==='dates'||data.step==='name'){
     if(state.stage!=='dates'||!booking||!UUID.test(data.attempt_id||''))return staff();
-    const matched=validDate(data.check_in)&&validDate(data.check_out)&&data.check_in===booking.arrival&&data.check_out===booking.departure;
+    const matched=validDate(dateInput.check_in)&&validDate(dateInput.check_out)&&dateInput.check_in===booking.arrival&&dateInput.check_out===booking.departure;
     const choices=matched&&state.mode==='reference'?nameChoices(booking,cryptoApi):null;
     if(matched&&state.mode==='reference'&&!choices)return staff();
-    state=await flow('dates',{matched,attempt_id:data.attempt_id,options:choices?.options||[],correct_id:choices?.correct_id||null});
+    state=await flow('dates',{matched,attempt_id:await attemptFor('dates',[dateInput.check_in,dateInput.check_out]),options:choices?.options||[],correct_id:choices?.correct_id||null});
    }else if(data.step==='choice'){
     if(state.stage!=='choice'||!booking||!UUID.test(data.choice_id||''))return staff();
     state=await flow('choice',{choice_id:data.choice_id});

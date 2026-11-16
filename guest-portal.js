@@ -13,9 +13,10 @@
   document.getElementById('propertyName').textContent=portal.name;document.querySelector('.entry-property').textContent=portal.name;document.title=portal.name+' · 숙소 안내';
   const list=document.getElementById('guides'),menus=portal.items.map(item=>({...item}));
   if(portal.chat_enabled)menus.push({title:'직원과 채팅',icon:'chat',chat:true});
+  if(portal.web_checkin_enabled)menus.push({title:'웹체크인 (Beds24 연동)',icon:'01',webcheckin:true});
   const rows=Math.max(3,Math.ceil(menus.length/2)),full=Math.max(0,rows*2-menus.length);list.style.setProperty('--rows',rows);list.dataset.rows=rows;
   menus.forEach((item,index)=>{const b=document.createElement('button');b.type='button';b.className='portal-menu'+(index<full?' full':'')+(item.chat?' chat-menu':'');const icon=I.svg(item.icon);b.innerHTML=(icon?'<span class="menu-icon">'+icon+'</span>':'')+'<b>'+G.esc(item.title)+'</b><span class="menu-arrow" aria-hidden="true">›</span>';b.title=item.title;
-   b.onclick=async()=>{if(item.chat){const previous=stored(localStorage,key);if(previous?.room_id&&previous.expires>Date.now()){location.href='guest-chat.html?p='+encodeURIComponent(slug);return;}openEntry();return;}
+   b.onclick=async()=>{if(item.webcheckin){WebCheckin.open(slug,portal.chat_enabled?()=>openEntry():null);return;}if(item.chat){const previous=stored(localStorage,key);if(previous?.room_id&&previous.expires>Date.now()){location.href='guest-chat.html?p='+encodeURIComponent(slug);return;}openEntry();return;}
     b.disabled=true;try{const fresh=await G.call('portal',{slug});G.viewer(fresh.assets.find(a=>a.id===item.asset_id),item.title);}catch(e){G.message(e.message,true);}finally{b.disabled=false;}};list.append(b);
   });G.message(menus.length?'':'등록된 안내가 없습니다.');
  }

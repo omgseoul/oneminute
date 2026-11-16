@@ -131,5 +131,6 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await require('./shared-booking-alerts-database.cjs')({db,p1,p2,t1,id});
  await require('./shared-guest-alerts-database.cjs')({db,internal,p1,p2,t1,id});
  await require('./staff-alert-fields-database.cjs')({db,p1,p2,t1,t2,id});
+ await require('./web-checkin-database.cjs')({db,p1,p2,t1,t2,id});
  console.log('online database: tenant isolation, Vault secrecy, webhook dedupe, approval freshness, idempotent sends/billing passed');await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

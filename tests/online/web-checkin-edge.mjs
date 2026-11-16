@@ -10,25 +10,8 @@ assert.equal(accessCode({...b,infoItems:[{code:'DOOR',text:'7351#',bookingId:999
 assert.equal(assignedUnit({...b,unitId:2},prop),null);assert.equal(assignedUnit(b,{...prop,id:999}),null);
 const probe=diagnostic([b],prop,day);assert.equal(probe.sources.length,2);assert(!JSON.stringify(probe).includes('7351'));assert.equal(probe.reservations[0].name,'María Fernández');assert.equal(probe.reservations[0].reference,b.apiReference);
 assert.equal(referenceScore('ABC 123456',b),1);assert(referenceScore('ABC1234567',{...b,apiReference:'ABC1234568'})>=.9);assert.equal(referenceScore('12345679',{...b,apiReference:null}),0);
-for(const fixture of [b,{firstName:'김민수'},{firstName:'王小明'},{firstName:'Иван',lastName:'Петров'}]){const a=nameChoices(fixture),other=nameChoices(fixture);assert.equal(a.options.length,15);assert.equal(new Set(a.options.map(x=>x.label)).size,15);assert.equal(a.options.filter(x=>x.id===a.correct_id).length,1);assert.notDeepEqual(a.options,other.options);}
-let rows=[b],fresh=b,enabled=true,release=true,credentialsCalls=0,adminAllowed=true,apiCalls=0;
-const rpc=async(name,args)=>{
- if(name==='web_checkin_gate')return enabled?{ok:true,day,property_id:'internal-property',beds_property_id:263281,name:'Synthetic',source:'info:DOOR'}:{ok:false,code:'unavailable'};
- if(name==='web_checkin_release'){assert.equal(args.p_day,day);return release;}
- if(name==='web_checkin_identity'){if(args.p_name_matches)return {ok:true,verified:true};if(args.p_can_challenge&&args.p_options.length===15)return {ok:true,challenge:true,options:args.p_options,attempts_remaining:2};return {ok:false};}
- if(name==='web_checkin_admin'){if(!adminAllowed||args.p_token!=='owner')throw Error('관리자 로그인이 필요합니다.');return {ok:true,property_id:'internal-property',day};}
- throw Error('unexpected rpc');
-};
-const run=createWebCheckin({rpc,credentials:async p=>{assert.equal(p,'internal-property');credentialsCalls++;return {beds_property_id:263281,secret:{token:'test'}};},api:async path=>{apiCalls++;if(path.startsWith('/properties'))return{data:[prop]};return{data:path.includes('&id=')?[fresh]:rows};}});
-const req=new Request('https://example.test',{headers:{'x-forwarded-for':'203.0.113.10'}});
-assert.equal((await run('web_checkin',input,null,req)).access_code,'7351#');
-assert(!(await run('web_checkin',{...input,name:'Different'},null,req)).ok);assert(!(await run('web_checkin',{...input,reference:'WRONG'},null,req)).ok);
-const challenged=await run('web_checkin',{...input,name:'Different',verification_token:'00000000-0000-4000-8000-000000000001'},null,req);assert.equal(challenged.options.length,15);assert.equal(challenged.attempts_remaining,2);assert.equal(challenged.access_code,undefined);assert.equal(challenged.correct_id,undefined);
-fresh={...b,status:'cancelled'};assert(!(await run('web_checkin',input,null,req)).ok);fresh=b;
-rows=[b,{...b,id:98765432}];assert(!(await run('web_checkin',input,null,req)).ok);rows=[b];
-release=false;assert(!(await run('web_checkin',input,null,req)).ok);release=true;
-enabled=false;const before=credentialsCalls;assert(!(await run('web_checkin',input,null,req)).ok);assert.equal(credentialsCalls,before);enabled=true;
-assert(!(await run('web_checkin',input,null,new Request('https://example.test'))).ok);
-adminAllowed=false;const apiBefore=apiCalls;await assert.rejects(()=>run('web_checkin_diagnose',{},null,req),/관리자/);assert.equal(apiCalls,apiBefore);
-adminAllowed=true;const liveProbe=await run('web_checkin_diagnose',{},'owner',req);assert.equal(liveProbe.bookings,1);assert(!JSON.stringify(liveProbe).includes('7351'));assert.equal(liveProbe.reservations[0].booking_id,String(b.id));
-console.log('Web check-in edge: name/reference similarity, 15 synthetic choices, no pre-verification codes, cancellation/race checks and owner-only reservation diagnostics passed');
+for(const fixture of [b,{firstName:'김민수'},{firstName:'王小明'},{firstName:'Иван',lastName:'Петров'}]){const a=nameChoices(fixture),other=nameChoices(fixture);assert.equal(a.options.length,10);assert.equal(new Set(a.options.map(x=>x.label)).size,10);assert.equal(a.options.filter(x=>x.id===a.correct_id).length,1);assert.notDeepEqual(a.options,other.options);}
+let allowed=true,apiCalls=0;
+const run=createWebCheckin({rpc:async(name,args)=>{assert.equal(name,'web_checkin_admin');if(!allowed||args.p_token!=='owner')throw Error('관리자');if(args.p_action==='record_probe')assert.equal(args.p_data.reservations,undefined);return {ok:true,property_id:'internal',day};},credentials:async()=>({beds_property_id:263281,secret:{token:'test'}}),api:async path=>{apiCalls++;return{data:path.startsWith('/properties')?[prop]:[b]};}});
+const req=new Request('https://fixture.test');assert.equal((await run('web_checkin',input,null,req)).code,'update_required');allowed=false;await assert.rejects(()=>run('web_checkin_diagnose',{},null,req),/관리자/);assert.equal(apiCalls,0);allowed=true;const summary=await run('web_checkin_diagnose',{},'owner',req);assert.equal(summary.reservations[0].name,'María Fernández');assert(!JSON.stringify(summary).includes('7351'));
+console.log('Web check-in matching, ten synthetic choices, source isolation, legacy bypass denial and owner diagnostic tests passed');

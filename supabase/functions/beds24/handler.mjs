@@ -1,4 +1,5 @@
 import {createWebCheckin} from './web-checkin.mjs';
+import {createDocumentReader} from './web-checkin-document.mjs';
 import {createTranslation} from './translation.mjs';
 import {buildRequest,validateAnswer} from '../guest-ai/handler.mjs';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -13,7 +14,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  const url=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
  async function rpc(name,args){const r=await fetcher(url()+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'서버 처리에 실패했습니다. 다시 시도해주세요.');return v;}
  const translation=createTranslation({rpc,fetcher});
- const webCheckin=createWebCheckin({rpc,credentials,api});
+ const webCheckin=createWebCheckin({rpc,credentials,api,readDocument:createDocumentReader({rpc,fetcher})});
  const internal=(action,property,data={})=>rpc('online_internal',{p_action:action,p_property:property,p_data:data});
  const tokenProperties=new Map();
  const control=(action,property,data={})=>rpc('online_sync_control',{p_action:action,p_property:property,p_data:data});
@@ -113,7 +114,11 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    }
    if(req.method!=='POST')return reply({ok:false},405);
    if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(drain());return reply({ok:true},202);}
-   const raw=await req.text();if(raw.length>30000)return reply({ok:false},413);const b=JSON.parse(raw),d=b.data||{};
+   const reader=req.body?.getReader();if(!reader)return reply({ok:false},400);let size=0;const chunks=[];
+   while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>3000000){await reader.cancel();return reply({ok:false,message:'첨부 이미지가 너무 큽니다.'},413);}chunks.push(value);}
+   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+   const raw=new TextDecoder().decode(bytes),b=JSON.parse(raw),d=b.data||{};
+   if(size>30000&&!(b.action==='web_checkin'&&d.step==='upload'))return reply({ok:false},413);
    if(['web_checkin','web_checkin_settings','web_checkin_save','web_checkin_diagnose'].includes(b.action))return reply(await webCheckin(b.action,d,b.access_token||null,req));
    if(b.platform_token){
     const r=await fetcher(url()+'/auth/v1/user',{headers:{apikey:key(),Authorization:'Bearer '+b.platform_token},signal:AbortSignal.timeout(10000)});

@@ -31,5 +31,6 @@ module.exports=async({db,p1,p2,t1,t2,id})=>{
  assert.equal((await identity(2)).attempts_remaining,2);assert.equal((await identity(2,options[1].id)).attempts_remaining,1);assert.equal((await identity(2,options[0].id)).verified,true);
  assert.equal((await identity(2,options[0].id,{fingerprint:'b'.repeat(64)})).ok,false);await identity(3);await q("update omg_private.web_checkin_name_challenges set expires_at=now()-interval '1 minute' where booking_id=3");assert.equal((await identity(3,options[0].id)).ok,false);
  for(const role of ['anon','authenticated']){assert.equal((await q("select has_function_privilege($1,'public.web_checkin_identity(uuid,bigint,uuid,text,boolean,boolean,jsonb,uuid,uuid)','execute') v",[role]))[0].v,false);assert.equal((await q("select has_table_privilege($1,'omg_private.web_checkin_name_challenges','select') v",[role]))[0].v,false);}
+ await require('./web-checkin-flow.cjs')({db,p1,p2,id});
  console.log('Web check-in database: default off, tested source required, property isolation, IP attempts, day/release/source recheck, portal secrecy and service-only RPC passed');
 };

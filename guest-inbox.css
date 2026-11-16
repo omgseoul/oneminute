@@ -4,3 +4,29 @@
 .qr-full-chat{display:flex;align-items:center;justify-content:center;padding:9px;border:1px solid #dce5ef;border-radius:12px;color:#396b98;text-decoration:none;font-size:13px;background:#f1f6ff}
 body[data-guest-inbox] #pageDescription{display:none}
 .hub-tabs{grid-template-columns:repeat(2,minmax(0,1fr)) auto}.hub-tabs.owner-hub{grid-template-columns:repeat(3,minmax(0,1fr)) auto}
+
+/* Approved slim conversation: identity, composer, then newest messages. */
+body[data-guest-inbox][data-view=thread] .heading .eyebrow{display:none}
+body[data-guest-inbox][data-view=thread] .heading h1{font-size:14px;letter-spacing:0;margin:2px 0 5px;font-weight:600;color:#62758d}
+body[data-guest-inbox][data-view=thread] #status:empty{display:none}
+body[data-guest-inbox] .thread-head{padding:6px 0 8px;margin:0 0 8px;border:0;border-bottom:1px solid #dfe7ef;border-radius:0;background:transparent;box-shadow:none}
+body[data-guest-inbox] #guestName{font-size:14px;font-weight:600;line-height:22px;margin:0 40px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body[data-guest-inbox] .thread-head .icon-refresh{right:0;top:0}
+body[data-guest-inbox] #guestMeta{display:grid;grid-template-columns:6.3em minmax(0,1fr);grid-template-rows:24px 24px;column-gap:10px;font-size:14px;align-items:center}
+.thread-property{grid-column:1;grid-row:1 / 3;display:grid;grid-template-rows:24px 24px;border-right:1px solid #dfe7ef;font-size:16px;font-weight:700;color:#1c334e;line-height:24px;min-width:0;letter-spacing:-.5px}
+.thread-property>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thread-stay{grid-column:2;grid-row:1;display:flex;align-items:center;gap:7px;min-width:0;color:#1c334e;font-size:12px}
+.thread-room{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thread-dates{flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.thread-source{grid-column:2;grid-row:2;display:flex;gap:5px;align-items:center;min-width:0;color:#52677f;font-size:12px}
+.thread-source>span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.thread-source img{flex-shrink:0}
+body[data-guest-inbox] #replyForm{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:6px 8px;border:0;border-radius:0;background:transparent;box-shadow:none;padding:0;margin:0 0 8px}
+body[data-guest-inbox] #replyBody{grid-column:1;grid-row:1;min-height:94px;height:94px;margin:0;padding:9px;resize:vertical;background:#fff;font-size:14px}
+body[data-guest-inbox] #replyForm>.actions{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:6px;align-self:start}
+body[data-guest-inbox] #replyForm>.actions button{display:flex;align-items:center;justify-content:center;gap:4px;flex:none;width:76px;height:44px;padding:4px;font-size:13px;white-space:nowrap;border-radius:11px}
+body[data-guest-inbox] #sendButton svg{width:19px;height:19px}
+body[data-guest-inbox] #replyForm>.reply-heading{grid-column:1 / -1;grid-row:2;justify-content:flex-end;margin:0;min-width:0}
+body[data-guest-inbox] #replyForm>.translation-compose{grid-column:1 / -1;grid-row:3}
+body[data-guest-inbox] #replyForm>.translation-compose:not(:has(.outgoing-preview:not([hidden]))):not(:has(.translation-feedback:not(:empty))){display:none}
+.thread-order{border-top:1px solid #dfe7ef;padding-top:8px;margin:6px 0 2px;font-size:11px;color:#778596}
+@media(max-width:350px){body[data-guest-inbox] #guestMeta{column-gap:7px}.thread-stay{gap:5px;font-size:11px}}

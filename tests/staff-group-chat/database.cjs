@@ -127,6 +127,7 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  ok(!(await rpc('staff_chat_peer_profile',[id(999),peer1])).ok,'invalid token still denied');
 
  // Fail if the upload, final send or attachment retrieval ever materializes the legacy inbox.
+ const savedInbox=(await q("select pg_get_functiondef('public.list_property_messages(uuid)'::regprocedure) def"))[0].def;
  await db.exec(`create or replace function public.list_property_messages(p_access_token uuid) returns jsonb language plpgsql as $$begin raise exception 'Legacy inbox must not run in video transport';end$$;`);
  const buffer=require('node:crypto').randomBytes(20971520);buffer.write('ftyp',4);
  const uploadId=id(801),upload=(who,index,chunk,peer=peer1)=>rpc('staff_chat_upload_chunk',[who,uploadId,peer,'video/mp4',index,20,chunk]);
@@ -171,6 +172,8 @@ async function rpc(name,args=[],role='anon'){await db.exec('set role '+role);try
  await assert.rejects(()=>call(o,'send',{peer:peer1,body:'bad',client_id:id(802),photo:'data:video/mp4;base64,%%%%'}),/손상/);checks++;
  await assert.rejects(()=>call(o,'send',{peer:peer1,body:'bad',client_id:id(802),photo:'data:video/mp4;base64,'+Buffer.alloc(15).toString('base64')}),/MP4/);checks++;
  await db.exec("set role anon");await assert.rejects(()=>db.query("select * from omg_private.staff_chat_upload_chunks"),/permission denied/);checks++;await db.exec('reset role');
+ await db.exec(savedInbox);
+ await require('../home-summary/database.cjs')({db,rpc,call,q,id,o,s1,s2,peer1,g});
  console.log('PASS '+checks+' group membership, shared history, receipts, photos, departure, permissions, retries and direct-chat isolation');
  await db.close();
 })().catch(async e=>{console.error(e);await db.close();process.exitCode=1});

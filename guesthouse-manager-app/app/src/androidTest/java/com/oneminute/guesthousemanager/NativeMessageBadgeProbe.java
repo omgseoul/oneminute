@@ -24,9 +24,7 @@ final class NativeMessageBadgeProbe {
         final boolean owner;org.json.JSONObject receivedQuery;
         CountApi(Context c,boolean owner)throws Exception{super(c);this.owner=owner;}
         @Override org.json.JSONObject rpc(String name,org.json.JSONObject args)throws Exception{
-            if("list_property_messages".equals(name))return new org.json.JSONObject().put("unread_count",846).put("can_manage",owner);
-            if("guest_message_summary".equals(name)){receivedQuery=args.getJSONObject("p_data");return new org.json.JSONObject().put("unread",31).put("messenger_unread",12).put("total_unread",830);}
-            if("work_report_inbox".equals(name)){check(owner,"Staff must not request reports");return new org.json.JSONObject().put("unread_count",4);}
+            if("home_message_summary".equals(name)){receivedQuery=args.getJSONObject("p_data");return new org.json.JSONObject().put("guest_unread",31).put("staff_unread",owner?16:12);}
             throw new AssertionError("Unexpected RPC");
         }
         @Override org.json.JSONObject guestRooms(org.json.JSONObject cursor)throws Exception{

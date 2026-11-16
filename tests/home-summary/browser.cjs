@@ -11,7 +11,7 @@ const read=f=>fs.readFileSync(f,'utf8');
   window.OMGNative={};window.HomeMessageQueue={update(){},add(){}};window.rpcCalls=[];window.pending=[];
   const value=name=>{
    const updated=sessionStorage.getItem('fixture-updated')==='yes';
-   if(name==='list_property_messages')return{ok:true,can_manage:true,unread_count:2,messages:[]};
+   if(name==='home_message_summary')return{ok:true,can_manage:true,guest_unread:updated?0:1,staff_unread:updated?2:3,report_unread:updated?0:1,messages_changed:true,revision:'v1',messages:[],reports:[]};
    if(name==='work_report_inbox')return{ok:true,unread_count:updated?0:1,reports:[]};
    if(name==='list_property_shares')return{ok:true,properties:[{property_id:'property-a',is_own:true}]};
    if(name==='list_shared_missions')return{ok:true,missions:updated?[]:[{id:'task-a',title:'오늘 업무 <img src=x>',timing:'today',active:true,target_count:1,completed_count:0}]};
@@ -24,7 +24,7 @@ const read=f=>fs.readFileSync(f,'utf8');
   window.readySnapshot=null;
   new MutationObserver(()=>{if(!readySnapshot&&document.querySelector('#appShell.ready'))window.readySnapshot={message:document.querySelector('#messageCounter').textContent,display:document.querySelector('#messageCounter').style.display,mission:document.querySelector('#todayMissionCount').textContent,today:document.querySelector('#todayOverviewItems').textContent};}).observe(document,{subtree:true,attributes:true,attributeFilter:['class']});
  });
- const allowed=new Set(['page-transition.js','worker-tasks.js','home-guest-count.js','home-summary-state.js']);
+ const allowed=new Set(['page-transition.js','worker-tasks.js','home-guest-count.js','home-summary-state.js','home-recovery.js']);
  const html=read('app.html').replace(/<script src="([^"]+)"[^>]*><\/script>/g,(_,url)=>allowed.has(url.split('?')[0])?'<script>'+read(url.split('?')[0])+'</script>':'');
  await page.route('**/*',route=>{const file=new URL(route.request().url()).pathname.slice(1);if(file==='app.html')return route.fulfill({contentType:'text/html',body:html});if(file==='away.html')return route.fulfill({contentType:'text/html',body:'<p>세부 메뉴</p>'});if(!file.includes('..')&&fs.existsSync(file)&&fs.statSync(file).isFile())return route.fulfill({path:file});return route.fulfill({status:204,body:''});});
  const home='https://omgworks24.com/app.html';
@@ -34,7 +34,7 @@ const read=f=>fs.readFileSync(f,'utf8');
  await page.evaluate(()=>sessionStorage.setItem('fixture-hold','yes'));await page.goto('https://omgworks24.com/away.html');await page.goto(home);await page.waitForFunction(()=>readySnapshot);
  let ready=await page.evaluate(()=>readySnapshot);assert.equal(ready.message,'3');assert.equal(ready.display,'grid');assert.equal(ready.mission,'1');assert(ready.today.includes('오늘 업무'),'snapshot must be visible on the first revealed frame');
  await page.evaluate(()=>{for(let i=0;i<4;i++){dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));dispatchEvent(new Event('pageshow'));}});
- assert.equal(await page.evaluate(()=>rpcCalls.filter(x=>x==='list_property_messages').length),1);
+ assert.equal(await page.evaluate(()=>rpcCalls.filter(x=>x==='home_message_summary').length),1);
  assert.equal(await page.evaluate(()=>rpcCalls.filter(x=>x==='calendar_event_action').length),1);
  await page.evaluate(()=>sessionStorage.setItem('fixture-updated','yes'));
  for(let i=0;i<4;i++){await page.evaluate(()=>pending.splice(0).forEach(p=>p.resolve()));await page.waitForTimeout(30);}

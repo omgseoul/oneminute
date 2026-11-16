@@ -23,8 +23,11 @@ window.StaffChat={
    }
    data={...data,uploaded:true};delete data.photo;
   }
-  check();const {data:value,error}=await this.rpc('staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data},transfer.signal);if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
+  if(action==='send'&&data.photo?.startsWith('data:image/jpeg;')&&window.OMSChatMediaCache){const preview=await OMSChatMediaCache.preview(data.photo).catch(()=>null);if(preview)data={...data,preview};}
+  check();const {data:value,error}=await this.rpc(['messages','send'].includes(action)?'staff_chat_compact':'staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data},transfer.signal);if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
  async download(session,peer,id,{signal,onProgress}={}){
+  if(signal?.aborted)throw new DOMException('불러오기 취소','AbortError');
+  const cached=await window.OMSChatMediaCache?.get(session,id);if(cached){onProgress?.(cached.size,cached.size);return cached;}
   const call=(action,data={})=>this.call(session,action,{peer,message_id:id,...data},{signal});
   const info=await call('download_info'),total=info.byte_length,size=info.part_size,mime=info.mime_type;
   if(!Number.isInteger(total)||total<3||total>20971520||size!==1048576||!['image/jpeg','video/mp4','video/webm'].includes(mime))throw new Error('첨부 파일을 확인해주세요.');
@@ -38,7 +41,7 @@ window.StaffChat={
    if(data.part_index!==part||data.byte_length!==total||data.mime_type!==mime||bytes.length!==Math.min(size,total-received))throw new Error('첨부 파일을 확인해주세요.');
    chunks.push(bytes);received+=bytes.length;onProgress?.(received,total);
   }
-  return new Blob(chunks,{type:mime});
+  const blob=new Blob(chunks,{type:mime});await window.OMSChatMediaCache?.put(session,id,blob);return blob;
  },
  async profile(session,peer){const {data:value,error}=await window.omgSupabase.rpc('staff_chat_peer_profile',{p_access_token:session.accessToken,p_peer:peer});if(error||!value?.ok)throw new Error(value?.message||error?.message||'근무자 정보를 불러오지 못했습니다.');return value.profile;},
  nativeOpen(peer='',propertyIds=null){if(!peer||typeof window.OMGNative?.openStaffChat!=='function')return false;try{if(window.OMGNative.openStaffChat(peer,JSON.stringify(propertyIds||[]))!==true)return false;window.omsNativeChatOpen=true;window.dispatchEvent(new Event('omg:native-navigation'));return true;}catch{return false;}},
@@ -48,7 +51,7 @@ window.StaffChat={
 window.StaffConversations=(()=>{
  let session,rooms=[],recipients=[],busy=false,visible=false,timer,query='',propertyIds=null;const profileCache=new Map(),profilePending=new Set();const $=id=>document.getElementById(id),e=s=>GuestSupport.esc(s);
  function render(){const filtered=rooms.filter(r=>!propertyIds||propertyIds.includes(String(r.property_id)));const rows=filtered.filter(r=>`${r.name} ${r.preview} ${r.property_name}`.toLowerCase().includes(query));$('staffRooms').innerHTML=rows.map(r=>`<a class="hub-room staff-room ${Number(r.unread)?'is-unread':''}" data-peer="${e(r.peer)}" data-room-time="${e(r.updated_at||'')}" href="${StaffChat.url(r.peer)}">${StaffChat.avatar(r.name,r.profile_image,r.is_group)}<span class="hub-room-copy"><strong class="staff-room-title"><span class="staff-room-name">${e(r.name)}</span>${r.is_group?`<small class="staff-room-property">단체 ${Number(r.member_count)||0}명</small>`:""}${r.property_name&&r.property_id&&String(r.property_id)!==String(session.propertyId)?`<small class="staff-room-property">${e(r.property_name)}</small>`:""}</strong><span class="hub-room-preview">${r.priority==='urgent'?'<span class="staff-urgent">긴급</span> ':''}${e(StaffChat.cleanText(r.preview))}</span></span><span class="hub-room-meta"><time>${e(new Date(r.updated_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))}</time>${Number(r.unread)?`<b class="hub-count">${Number(r.unread)}</b>` :''}</span></a>`).join('')||'<div class="empty">'+(query?'검색 결과가 없습니다.':'아직 대화가 없습니다. 오른쪽 아래에서 대화를 시작하세요.')+'</div>';$('staffCount').dataset.chatUnread=filtered.reduce((n,r)=>n+Number(r.unread||0),0);if(window.NotificationBot)NotificationBot.renderRooms();else $('staffCount').textContent=$('staffCount').dataset.chatUnread==='0'?'':$('staffCount').dataset.chatUnread;}
- async function load(){if(busy||document.hidden||window.omsNativeChatOpen)return;busy=true;clearTimeout(timer);try{rooms=(await StaffChat.call(session,'rooms')).rooms;render();$('staffError').textContent='';}catch(err){console.warn('Staff rooms load',err);$('staffError').textContent='데이터를 불러오는 중입니다.';}finally{busy=false;timer=setTimeout(load,4000);}}
+ async function load(){if(busy||document.hidden||window.omsNativeChatOpen)return;busy=true;clearTimeout(timer);try{rooms=(await StaffChat.call(session,'rooms')).rooms;render();$('staffError').textContent='';}catch(err){console.warn('Staff rooms load',err);$('staffError').textContent='데이터를 불러오는 중입니다.';}finally{busy=false;timer=setTimeout(load,window.omsInboxLive?.connected?120000:15000);}}
  let pressTimer,pressStart=null,suppressUntil=0,leavingRoom=null;
  function openRoomMenu(link){
   clearTimeout(pressTimer);const room=rooms.find(r=>r.peer===link.dataset.peer);if(!room)return;

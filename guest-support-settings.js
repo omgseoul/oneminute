@@ -1,4 +1,7 @@
 (async()=>{
+ function closeHelp(except){document.querySelectorAll('.qr-help').forEach(b=>{if(b===except)return;b.setAttribute('aria-expanded','false');document.getElementById(b.getAttribute('aria-controls')).hidden=true;});}
+ document.addEventListener('click',e=>{const b=e.target.closest('.qr-help');if(b){const open=b.getAttribute('aria-expanded')!=='true';closeHelp(b);b.setAttribute('aria-expanded',String(open));document.getElementById(b.getAttribute('aria-controls')).hidden=!open;}else if(!e.target.closest('.qr-help-content'))closeHelp();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeHelp();});
  const G=GuestSupport,I=GuestIcons,s=await omgSession.require({allowCompleted:true});if(!s)return;if(s.sessionKind!=='owner'){location.replace('app.html');return;}
  const auth={access_token:s.accessToken},call=(a,d={})=>G.call(a,d,auth);let state=await call('settings'),items=state.config.items.map(x=>({...x})),uploading=0,selectedItem=null;
  const form=document.getElementById('settings'),list=document.getElementById('items'),picker=document.getElementById('iconPicker'),enabled=document.getElementById('enabled');form.hidden=false;

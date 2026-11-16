@@ -56,7 +56,11 @@ window.WebCheckin=(()=>{
    if(stage==='choice')data.choice_id=root.querySelector('[name=choice_id]:checked')?.value;
    if(stage==='upload')data.image=await documentImage(form.elements.document.files[0]);
    if(current!==generation)return;const result=await call('web_checkin',data);if(current!==generation||!root.open)return;apply(result);
-  }catch(error){if(current!==generation)return;if(['staff_required','device_blocked'].includes(error.code)){locked=true;if(error.code==='device_blocked')try{localStorage.setItem('wc-blocked:'+slug,'1');}catch{}render(error.message);}else status.textContent=error.name==='TimeoutError'?'확인이 지연되고 있습니다. 잠시 후 다시 시도하거나 직원과 채팅해주세요.':error.message;}
+  }catch(error){if(current!==generation)return;
+   if(error.code==='session_expired'){
+    try{const result=await call('web_checkin',{slug,verification_token:verificationToken,device_id:deviceId,step:'resume'});if(current!==generation||!root.open)return;form.reset();apply(result);return;}catch(recovery){if(current!==generation)return;error=recovery;}
+   }
+   if(['staff_required','device_blocked'].includes(error.code)){locked=true;if(error.code==='device_blocked')try{localStorage.setItem('wc-blocked:'+slug,'1');}catch{}render(error.message);}else status.textContent=error.name==='TimeoutError'?'확인이 지연되고 있습니다. 잠시 후 다시 시도하거나 직원과 채팅해주세요.':error.message;}
   finally{if(current===generation){busy=false;next.disabled=locked;unknown.disabled=false;}}
  };
  form.onsubmit=event=>{event.preventDefault();submit();};unknown.onclick=()=>submit(true);

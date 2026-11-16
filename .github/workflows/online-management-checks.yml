@@ -1,7 +1,7 @@
 name: Verify online reservation management
 on:
   pull_request:
-    paths: ['home-cleaning.*', 'employee-cleaning-settings.js', 'staff-management.html', 'supabase/setup/home_cleaning.sql', 'supabase/migrations/*home_cleaning*.sql', 'owner-settings.html', 'property-room-import.js', 'mission.html', 'home-message-queue.js', 'guest-messages.html', 'guest-inbox.*', 'home-eight-menu.css', 'home-guest-count.js', 'notification-bot.js', 'guest-message-card.*', 'messages.html', 'assets/booking-channels/**', 'property-selector.js', 'select-picker.js', 'online.*', 'translation-languages.js', 'app.html', 'supabase/functions/beds24/**', 'supabase/functions/online-room-import/**', 'supabase/functions/online-arrivals/**', 'supabase/setup/beds24*.sql', 'supabase/setup/translation*.sql', 'platform-translation.js', 'platform-admin.html', 'operations-center.js', 'subscription.html', 'service-access.js', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
+    paths: ['employee-settings.js', 'employee-profile-warning.js', 'employee-cards.css', 'account-chat-preferences.*', 'report-session.js', 'report.html', 'tests/checkin-report/**', 'supabase/setup/staff_alert_fields.sql', 'supabase/setup/employee_profile_warning.sql', 'supabase/migrations/*staff_alert_fields_and_profile_warning.sql', 'home-cleaning.*', 'employee-cleaning-settings.js', 'staff-management.html', 'supabase/setup/home_cleaning.sql', 'supabase/migrations/*home_cleaning*.sql', 'owner-settings.html', 'property-room-import.js', 'mission.html', 'home-message-queue.js', 'guest-messages.html', 'guest-inbox.*', 'home-eight-menu.css', 'home-guest-count.js', 'notification-bot.js', 'guest-message-card.*', 'messages.html', 'assets/booking-channels/**', 'property-selector.js', 'select-picker.js', 'online.*', 'translation-languages.js', 'app.html', 'supabase/functions/beds24/**', 'supabase/functions/online-room-import/**', 'supabase/functions/online-arrivals/**', 'supabase/setup/beds24*.sql', 'supabase/setup/translation*.sql', 'platform-translation.js', 'platform-admin.html', 'operations-center.js', 'subscription.html', 'service-access.js', 'tests/online/**', 'supabase/functions/dispatch-notification/**', '.github/workflows/online-management-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,9 @@ jobs:
         run: |
           node --check online.js
           node tests/online/employee-cleaning-settings.cjs
+          node tests/online/staff-settings-ui.cjs
+          node tests/checkin-report/database.cjs
+          node tests/checkin-report/web.cjs
           node tests/settings-room-types.cjs
           node tests/mission-empty.cjs
           node tests/online/database.cjs

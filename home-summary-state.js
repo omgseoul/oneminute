@@ -26,13 +26,14 @@
         widgets[name] = {value, day: forDay, at: Date.now()};
         if (scope) try { sessionStorage.setItem(KEY, JSON.stringify({scope, widgets})); } catch (_) {}
       },
+      updatedAt(name){return widgets[name]?.at||null;},
       day,
       clear() { widgets = {}; clear(); }
     };
   }
   // Coalesce focus/pageshow/visibility events; allow a genuinely changed inbox to refresh again.
   // If a request stalls, the next refresh can replace it; late replies cannot repaint the UI.
-  function channel(task, {minInterval = 1500, timeout = 25000} = {}) {
+  function channel(task, {minInterval = 1500, timeout = 15000, onError = () => {}, onSuccess = () => {}} = {}) {
     let flight = null, generation = 0, lastStart = -Infinity, queued = null;
     function refresh(options = {}) {
       if (flight && Date.now() - lastStart < timeout) {
@@ -41,9 +42,12 @@
       }
       if (!options.force && !flight && Date.now() - lastStart < minInterval) return Promise.resolve();
       const id = ++generation; lastStart = Date.now(); queued = null;
-      const job = Promise.resolve().then(() => task(options, () => id === generation))
-        .catch(() => {}) // Keep the last successful display on temporary network failures.
+      let deadline;
+      const job = Promise.race([Promise.resolve().then(() => task(options, () => id === generation)), new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error("응답 시간 초과")), timeout); })])
+        .then(() => { if(id === generation) onSuccess(); })
+        .catch(error => { if(id === generation){ generation++;onError(error); } }) // Keep the last successful display on temporary network failures.
         .finally(() => {
+          clearTimeout(deadline);
           if (flight !== job) return;
           flight = null;
           if (queued) { const next = queued; queued = null; refresh(next); }

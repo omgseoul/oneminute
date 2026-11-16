@@ -9,6 +9,7 @@
     config.url,
     config.publishableKey,
     {
+      ...(window.OMSRpcFetch ? {global:{fetch:window.OMSRpcFetch}} : {}),
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -95,7 +96,7 @@
       });
       // A request from a previous page/account must not erase or restore a session.
       if (this.get()?.accessToken !== session.accessToken) return null;
-      if (error) throw new Error("로그인 상태를 확인하지 못했습니다. 연결을 확인하고 새로고침해주세요.");
+      if (error) throw Object.assign(new Error(error.status===402||/exceed_.*quota|service.*restrict/i.test(error.message||"")?"서버 이용 한도 제한으로 로그인 상태를 확인할 수 없습니다.":"로그인 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요."),{status:error.status||(/exceed_.*quota|service.*restrict/i.test(error.message||"")?402:0)});
       if (data?.ok === false && data.code === "invalid_session") {
         this.clear();
         location.replace(loginPage);

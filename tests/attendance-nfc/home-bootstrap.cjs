@@ -25,7 +25,7 @@ const read=file=>fs.readFileSync(file,'utf8');
      }
      if(name==='home_cleaning_summary')return {data:{ok:true,properties:(owner?['One Minute','Omghouse','Seoulnest','lazybear']:['One Minute']).map((name,index)=>({id:'property-'+index,name,days:[0,1,2].map(i=>({day:'2026-11-'+(15+i),count:3+i+index}))}))}};
      if(name==='list_working_employees')return {data:{ok:true,own_property_id:'property-a',own_property_name:'테스트 지점',employees:[{employee_id:'worker-b',display_name:'동료',property_id:'property-a',property_name:'테스트 지점'}]}};
-     if(name==='list_property_messages')return {data:{ok:true,can_manage:owner,messages:[{message_id:'s1'},{message_id:'s2'}],unread_count:2}};
+     if(name==='home_message_summary')return {data:{ok:true,can_manage:owner,messages_changed:true,revision:'v1',messages:[{message_id:'s1'},{message_id:'s2'}],guest_unread:0,staff_unread:2,report_unread:0,reports:[]}};
      if(name==='guest_message_summary')return {data:{ok:true,unread:0}};
      if(name==='work_report_inbox')return {data:{ok:true,unread_count:0,reports:[]}};
      if(name==='list_property_shares')return {data:{ok:true,properties:[{property_id:'property-a',property_name:'테스트 지점',is_own:true}]}};
@@ -34,7 +34,7 @@ const read=file=>fs.readFileSync(file,'utf8');
      throw Error('Unexpected RPC '+name);
     }};
    },scenario);
-   const scripts=new Set(['page-transition.js','attendance-nfc.js','attendance-flow.js','worker-tasks.js','home-guest-count.js','home-summary-state.js','home-cleaning.js','property-selector.js']);
+   const scripts=new Set(['page-transition.js','attendance-nfc.js','attendance-flow.js','worker-tasks.js','home-guest-count.js','home-summary-state.js','home-recovery.js','home-cleaning.js','property-selector.js']);
    const html=read(process.env.HOME_TEST_HTML||'app.html').replace(/<script src="([^"]+)"[^>]*><\/script>/g,(_,url)=>scripts.has(url.split('?')[0])?'<script>'+read(url.split('?')[0])+'</script>':'');
    await page.route('**/*',route=>{
     const url=new URL(route.request().url()),file=url.pathname.slice(1);

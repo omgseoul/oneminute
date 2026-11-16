@@ -81,13 +81,26 @@ final class NativeStaffChatMedia {
         if(video&&!new File(api.cacheDirectory(),id+".media").exists())return;
         image.post(()->{if(closed)return;worker.execute(()->{
             if(closed||!image.isAttachedToWindow()||!key.equals(image.getTag()))return;
-            try{Bitmap bitmap=thumbnail(file(peer,id),video);if(bitmap==null)return;thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}catch(Exception ignored){/* The row remains a tappable retry placeholder. */}
+            try{File local=new File(api.cacheDirectory(),id+".media");Bitmap bitmap;
+                if(local.exists())bitmap=thumbnail(local,video);
+                else{
+                    File small=new File(api.cacheDirectory(),id+".thumb");
+                    if(!small.exists()){
+                        JSONObject result=api.rpc("staff_chat_compact",new JSONObject().put("p_action","preview").put("p_data",new JSONObject().put("peer",peer).put("message_id",id)));
+                        String value=result.optString("preview");byte[] bytes=value.startsWith("data:image/jpeg;base64,")?Base64.decode(value.substring(value.indexOf(',')+1),Base64.DEFAULT):new byte[0];
+                        if(bytes.length>65536)return;try(FileOutputStream out=new FileOutputStream(small)){out.write(bytes);}prune();
+                    }
+                    bitmap=small.length()>0?thumbnail(small,false):null;
+                }if(bitmap==null)return;thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}catch(Exception ignored){/* The row remains a tappable retry placeholder. */}
         });});
     }
     void avatar(ImageView image,String data){
         image.setImageDrawable(null);if(data==null||!data.startsWith("data:image/")||data.length()>2200000)return;
         final String key="avatar:"+NativeStaffChatApi.hash(data);image.setTag(key);Bitmap hit=thumbs.get(key);if(hit!=null){image.setImageBitmap(hit);return;}
         image.post(()->{if(closed)return;avatars.execute(()->{if(closed||!key.equals(image.getTag()))return;try{int comma=data.indexOf(',');if(comma<0)return;byte[] bytes=Base64.decode(data.substring(comma+1),Base64.DEFAULT);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/128);Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);if(bitmap!=null){thumbs.put(key,bitmap);main.post(()->{if(!closed&&api.valid()&&key.equals(image.getTag()))image.setImageBitmap(bitmap);});}}catch(Exception ignored){}});});
+    }
+    static String preview(String data){
+        try{byte[] bytes=Base64.decode(data.substring(data.indexOf(',')+1),Base64.DEFAULT);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/640);Bitmap source=BitmapFactory.decodeByteArray(bytes,0,bytes.length,o);if(source==null)return null;float scale=Math.min(1,320f/Math.max(source.getWidth(),source.getHeight()));Bitmap small=Bitmap.createScaledBitmap(source,Math.max(1,Math.round(source.getWidth()*scale)),Math.max(1,Math.round(source.getHeight()*scale)),true);ByteArrayOutputStream out=new ByteArrayOutputStream();small.compress(Bitmap.CompressFormat.JPEG,60,out);if(small!=source)small.recycle();source.recycle();return out.size()<=65536?"data:image/jpeg;base64,"+Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP):null;}catch(Exception e){return null;}
     }
     static Bitmap thumbnail(File file,boolean video)throws Exception {
         if(!video){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/480);return BitmapFactory.decodeFile(file.getPath(),options);}
@@ -103,6 +116,6 @@ final class NativeStaffChatMedia {
     }
     private static boolean black(Bitmap bitmap){for(int y=1;y<=4;y++)for(int x=1;x<=4;x++){int pixel=bitmap.getPixel(Math.min(bitmap.getWidth()-1,bitmap.getWidth()*x/5),Math.min(bitmap.getHeight()-1,bitmap.getHeight()*y/5));if(Math.max(Color.red(pixel),Math.max(Color.green(pixel),Color.blue(pixel)))>20)return false;}return true;}
     static Bitmap fullImage(File file){BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/2048);return BitmapFactory.decodeFile(file.getPath(),o);}
-    private void prune(){File[] list=api.cacheDirectory().listFiles((dir,name)->name.endsWith(".media"));if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
+    private void prune(){File[] list=api.cacheDirectory().listFiles((dir,name)->(name.endsWith(".media")||name.endsWith(".thumb")));if(list==null)return;java.util.Arrays.sort(list,(a,b)->Long.compare(a.lastModified(),b.lastModified()));long bytes=0;for(File f:list)bytes+=f.length();for(File f:list){if(bytes<=128L*1024*1024)break;if(!f.equals(pinned)){long length=f.length();if(f.delete())bytes-=length;}}}
     void close(){closed=true;downloads.shutdownNow();worker.shutdownNow();avatars.shutdownNow();thumbs.evictAll();}
 }

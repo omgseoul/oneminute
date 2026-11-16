@@ -171,12 +171,8 @@ final class NativeMessageBadge {
         return counts(api,query);
     }
     static Counts counts(NativeStaffChatApi api,JSONObject query)throws Exception{
-        JSONObject messages=api.rpc("list_property_messages",new JSONObject());
-        JSONObject guests=api.rpc("guest_message_summary",new JSONObject().put("p_data",query));
-        // messenger_unread excludes guest copies already represented by the guest menu.
-        long staff=Math.max(0,guests.getLong("messenger_unread"));
-        if(messages.optBoolean("can_manage"))staff+=Math.max(0,api.rpc("work_report_inbox",new JSONObject()).getLong("unread_count"));
+        JSONObject summary=api.rpc("home_message_summary",new JSONObject().put("p_data",query));
         if(!api.valid())throw new IllegalStateException("Session changed");
-        return new Counts(guests.getLong("unread"),staff);
+        return new Counts(summary.getLong("guest_unread"),summary.getLong("staff_unread"));
     }
 }

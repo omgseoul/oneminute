@@ -50,11 +50,16 @@ class NativeStaffChatApi {
     }
     static boolean validPeer(String peer){return peer!=null&&peer.matches("(?i)(owner|employee|group):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");}
     JSONObject chat(String action,JSONObject data)throws Exception {
-        if("messages".equals(action))return rpc("staff_chat_native_messages",new JSONObject().put("p_data",data));
+        if("messages".equals(action)||"send".equals(action)){
+            if("send".equals(action)&&data.optString("photo").startsWith("data:image/jpeg;")){
+                String preview=NativeStaffChatMedia.preview(data.getString("photo"));if(preview!=null)data.put("preview",preview);
+            }
+            return rpc("staff_chat_compact",new JSONObject().put("p_action",action).put("p_data",data));
+        }
         return rpc("staff_chat_rpc",new JSONObject().put("p_action",action).put("p_data",data));
     }
     JSONObject rpc(String name,JSONObject args)throws Exception {
-        if(!name.matches("guest_message_summary|chat_live_ticket|staff_chat_upload_chunk|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
+        if(!name.matches("staff_chat_compact|home_message_summary|guest_message_summary|chat_live_ticket|staff_chat_upload_chunk|staff_chat_rpc|staff_chat_native_messages|staff_chat_peer_profile|list_property_messages|work_report_inbox|work_shift_confirmation"))throw new IOException("잘못된 요청입니다.");
         if(workConfirmationOnly&&!"work_shift_confirmation".equals(name))throw new IOException("잘못된 요청입니다.");
         args.put("p_access_token",token);
         JSONObject result=request(BASE+"rest/v1/rpc/"+name,args,true);

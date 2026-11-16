@@ -75,7 +75,7 @@
   async function finish() {
     notice.hidden = true;
     if (context.reportType === "clock_in" && typeof api.onFinished === "function") {
-      await api.onFinished();
+      await api.onFinished(saved);
       return;
     }
     if (formPage) formPage.style.display = "none";
@@ -106,6 +106,7 @@
         record=await rpc('save_work_report',{...args,p_payload:payload});
       }
       if (!record?.ok) throw new Error(record?.message || "보고를 저장하지 못했습니다. 다시 로그인해주세요.");
+      if(saved?.profile_missing?.length&&!record.profile_missing?.length)record.profile_missing=saved.profile_missing;
       saved = record;
       editing = false;
       // Check-in warnings are created in the same transaction as the report.

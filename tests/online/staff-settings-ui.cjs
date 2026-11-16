@@ -1,0 +1,33 @@
+const fs=require('fs'),assert=require('assert/strict'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch();try{for(const width of [320,390,412]){
+ const page=await browser.newPage({viewport:{width,height:850}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const source=fs.readFileSync('staff-management.html','utf8');
+ await page.route('https://staff.test/**',r=>r.fulfill({body:source.replace(/<script[\s\S]*?<\/script>/g,'').replace(/<link[^>]*>/g,'').replace('omg-booting',''),contentType:'text/html'}));
+ await page.goto('https://staff.test/');for(const file of ['employee-cards.css','account-chat-preferences.css'])await page.addStyleTag({path:file});
+ await page.evaluate(()=>{
+  window.savedFields=null;window.warningEnabled=false;window.deleteCount=0;
+  const config={can_manage:true,property:{property_id:'p1'},employees:[{employee_id:'e1',display_name:'정준하',login_id:'정준하'}],administrators:[]};
+  window.omgSession={require:async()=>({sessionKind:'owner',accessToken:'synthetic'})};window.omgTransition={ready(){}};
+  window.omgWorkConfig={load:async()=>config,loadEmployeeAttendanceSettings:async()=>({settings:[]}),loadAttendanceWarnings:async()=>({rules:[]}),deleteEmployee:async()=>{deleteCount++;return config;}};
+  window.omgPropertySelector={mountPropertySingle:async()=>({properties:[]})};window.omgWarningTargets={mount(){},mountConditions(){}};window.BotSettings={mount(){},matches(){return true;}};window.OMSBotAvatar={src:'',butler:{src:''}};
+  window.GuestSupport={esc:s=>String(s??'').replaceAll('<','&lt;'),call:async()=>({properties:[{id:'p1',name:'One Minute',own:true}],accounts:[{actor_key:'employee:e1',preferences:{}}]})};
+  window.omgSupabase={rpc:async(name,args)=>{let data={ok:true};if(name==='employee_profile_warning_config'){if(args.p_enabled!==null)warningEnabled=args.p_enabled;data.enabled=warningEnabled;}if(name==='get_employee_account_pay')data.employees=[];if(name==='employee_cleaning_config')data.properties=['One Minute','Omghouse','Seoulnest','lazybear'].map((name,i)=>({id:'p'+i,name,selected:i===0}));if(name==='save_guest_chat_alert_schedules'){savedFields=args.p_schedules[0].fields;data.schedules=args.p_schedules;}return{data};}};
+ });
+ for(const file of ['employee-settings.js','employee-login-fields.js','employee-account-details.js','employee-cleaning-settings.js','account-chat-preferences.js'])await page.addScriptTag({path:file});
+ for(const m of source.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g))if(!/\bsrc=/.test(m[1]||''))await page.addScriptTag({content:m[2]});
+ await page.locator('.employee-toggle').click();await page.locator('.employee-cleaning-settings input').first().waitFor();
+ assert.equal(await page.locator('.employee-cleaning-settings fieldset').count(),0);
+ assert.equal(await page.locator('.employee-cleaning-settings .employee-field-help').isVisible(),false);
+ await page.getByRole('button',{name:'청소스케줄 표기 지점 도움말'}).click();assert(await page.locator('.employee-cleaning-settings .employee-field-help').isVisible());await page.getByRole('button',{name:'청소스케줄 표기 지점 도움말'}).click();
+ await page.locator('.employee-menu-toggle').click();assert(await page.locator('.employee-menu').isVisible());await page.locator('.employee-field-title').click();assert.equal(await page.locator('.employee-menu').isVisible(),false);assert.equal(await page.evaluate(()=>deleteCount),0);
+ await page.locator('.employee-menu-toggle').click();await page.keyboard.press('Escape');assert.equal(await page.locator('.employee-menu').isVisible(),false);
+ await page.locator('.employee-cleaning-settings').scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/staff-account-'+width+'.png'});
+ await page.getByRole('tab',{name:'메시지 알림'}).click();assert.equal(await page.locator('.cp-field:checked').count(),3);
+ await page.locator('.cp-field[value=online_guest]').uncheck();await page.locator('.employee-alert-save').click();await page.waitForFunction(()=>savedFields!==null);assert.deepEqual(await page.evaluate(()=>savedFields),['onsite_guest','same_day_booking']);
+ await page.locator('.cp-fields').scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/staff-alerts-'+width+'.png'});
+ await page.getByRole('button',{name:'근무자 정보 미입력 경고 도움말'}).click();assert(await page.locator('#profileWarningHelp').isVisible());await page.locator('#profileWarningEnabled').check();await page.locator('#profileWarningSave').click();await page.waitForFunction(()=>warningEnabled);assert.match(await page.locator('#profileWarningStatus').innerText(),/저장/);
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');assert.deepEqual(errors,[]);
+ await page.addScriptTag({path:'employee-profile-warning.js'});const report=fs.readFileSync('report.html','utf8');await page.addStyleTag({content:[...report.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(x=>x[1]).find(x=>x.includes('employee-profile-reminder'))});
+ await page.evaluate(()=>{window.result=EmployeeProfileWarning.show(['직무','연락처']);});assert(await page.getByText('직무 · 연락처').isVisible());await page.getByRole('button',{name:'내 정보 입력',exact:true}).click();assert.equal(await page.evaluate(()=>result),true);
+ await page.close();
+}console.log('Staff UI: actual page at 320/390/412px, compact help, outside/Escape menu dismissal, category persistence, warning settings and profile prompt passed');}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

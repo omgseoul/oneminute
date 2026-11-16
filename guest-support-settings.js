@@ -2,6 +2,7 @@
  const G=GuestSupport,I=GuestIcons,s=await omgSession.require({allowCompleted:true});if(!s)return;if(s.sessionKind!=='owner'){location.replace('app.html');return;}
  const auth={access_token:s.accessToken},call=(a,d={})=>G.call(a,d,auth);let state=await call('settings'),items=state.config.items.map(x=>({...x})),uploading=0,selectedItem=null;
  const form=document.getElementById('settings'),list=document.getElementById('items'),picker=document.getElementById('iconPicker'),enabled=document.getElementById('enabled');form.hidden=false;
+ window.WebCheckinSettings?.mount(s.accessToken);
  enabled.checked=state.config.enabled;document.getElementById('chatEnabled').checked=state.config.chat_enabled;document.getElementById('chatIcon').innerHTML=I.svg('chat');
  enabled.onchange=()=>document.getElementById('enabledLabel').textContent=enabled.checked?'활성화':'비활성화';enabled.onchange();
  const closePicker=()=>{if(history.state?.qrIcons)history.back();else picker.close();};document.getElementById('closeIcons').onclick=closePicker;picker.addEventListener('cancel',e=>{e.preventDefault();closePicker();});window.addEventListener('popstate',()=>picker.open&&picker.close());
@@ -21,7 +22,7 @@
   });
  }
  renderItems();document.getElementById('add').onclick=()=>{if(items.length>=9)return;items.push({title:'',asset_id:null,icon:null});renderItems();list.lastChild.querySelector('input').focus();};
- form.onsubmit=async e=>{e.preventDefault();if(uploading)return;const btn=document.getElementById('save');btn.disabled=true;try{if(items.some(i=>!i.asset_id))throw new Error('각 안내 항목에 파일을 첨부해주세요.');await call('save_settings',{enabled:enabled.checked,chat_enabled:document.getElementById('chatEnabled').checked,items});G.message('안내 설정을 저장했습니다.');}catch(err){G.message(err.message,true);}finally{btn.disabled=false;}};
+ form.onsubmit=async e=>{e.preventDefault();if(uploading)return;const btn=document.getElementById('save');btn.disabled=true;try{if(items.some(i=>!i.asset_id))throw new Error('각 안내 항목에 파일을 첨부해주세요.');await call('save_settings',{enabled:enabled.checked,chat_enabled:document.getElementById('chatEnabled').checked,items});await window.WebCheckinSettings?.save();G.message('안내 설정을 저장했습니다.');}catch(err){G.message(err.message,true);}finally{btn.disabled=false;}};
  const url=new URL('guest.html',location.href);url.searchParams.set('p',state.config.slug);document.getElementById('url').value=url.href;document.getElementById('preview').href=url.href;
  if(typeof qrcode==='function'){
   const qr=qrcode(0,'M');qr.addData(url.href);qr.make();

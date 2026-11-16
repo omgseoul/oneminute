@@ -2,6 +2,7 @@ const fs=require('fs'),assert=require('assert/strict');
 module.exports=async({db,p1,p2,id})=>{
  const sql=fs.readFileSync('supabase/setup/web_checkin_reference_first.sql','utf8');await db.exec(sql);await db.exec(sql);
  const retries=fs.readFileSync('supabase/setup/web_checkin_reference_retries.sql','utf8');await db.exec(retries);await db.exec(retries);
+ const expiry=fs.readFileSync('supabase/setup/web_checkin_expired_session.sql','utf8');await db.exec(expiry);await db.exec(expiry);
  const q=async(s,a=[])=>(await db.query(s,a)).rows;
  const {createWebCheckin,documentMatches,nameChoices}=await import('../../supabase/functions/beds24/web-checkin.mjs');
  const {buildDocumentRequest,validDocumentImage,createDocumentReader}=await import('../../supabase/functions/beds24/web-checkin-document.mjs');
@@ -31,6 +32,18 @@ module.exports=async({db,p1,p2,id})=>{
  current={...base,id:70004,infoItems:[{code:'PIN',text:'TEST1234',bookingId:70004}]};documentResult={...doc,booking_reference:'FAKE'};const bad=session();await call(bad,'unknown');await call(bad,'dates',{check_in:day,check_out:base.departure});await call(bad,'name',{name:'Maria Fernandez'});r=await call(bad,'upload',{image});assert.equal(r.ok,false);assert.equal(r.message,'직원과의 채팅으로 예약을 확인하여 주십시오.');assert.equal(r.access_code,undefined);assert.equal(ocrCalls,2);
  allowedDays=[day,'2026-11-17'];otherDayRows=[{...base,id:70005,arrival:'2026-11-17',firstName:'Unique',lastName:'Tomorrow'}];const scoped=session();await call(scoped,'unknown');await call(scoped,'dates',{check_in:day,check_out:base.departure});const beforeName=apiPaths.length;r=await call(scoped,'name',{name:'Unique Tomorrow',check_in:'2026-11-17'});assert.equal(r.stage,'name');assert.equal(r.name_remaining,2);assert(apiPaths.slice(beforeName).every(x=>x.includes('&arrival='+day)),'uses server-selected arrival day, not client overrides');allowedDays=[day];
  current={...base,id:70006,infoItems:[{code:'PIN',text:'TEST1234',bookingId:70006}]};const dateRetry=session();await call(dateRetry,'unknown');await call(dateRetry,'dates',{check_in:day,check_out:'2026-11-20'});r=await call(dateRetry,'name',{name:'Maria Fernandez'});assert.equal(r.stage,'dates');assert.equal(r.date_remaining,1);assert.equal((await call(dateRetry,'dates',{check_in:day,check_out:base.departure})).stage,'upload');
+ // Expired sessions restart without granting access or resetting failure budgets.
+ const expire=async session=>q("update omg_private.web_checkin_flows set expires_at=now()-interval '1 minute' where property_id=$1 and token_hash=omg_private.token_hash($2)",[p1,session.verification_token]);
+ const stale=session();await call(stale,'reference',{reference:'WRONG999999'});await call(stale,'unknown');await call(stale,'dates',{check_in:day,check_out:base.departure});await call(stale,'name',{name:'Not Our Guest'});await expire(stale);
+ r=await call(stale,'name',{name:'Maria Fernandez'});assert.equal(r.code,'session_expired');assert.equal(r.access_code,undefined);
+ r=await call(stale,'resume');assert.equal(r.stage,'reference');assert.equal(r.reference_remaining,2);assert.equal(r.name_remaining,2);assert(r.message.includes('만료'));assert.equal(r.access_code,undefined);
+ assert.equal((await call(stale,'reference',{reference:'WRONG888888'})).reference_remaining,1);
+ await expire(retriesSession);r=await call(retriesSession,'resume');assert.equal(r.stage,'fallback_dates');assert.equal(r.reference_remaining,0,'expiry must not restore exhausted reference attempts');
+ await expire(names);assert.equal((await call(names,'resume')).code,'device_blocked','blocked device remains blocked after expiry');
+ await expire(bad);assert.equal((await call(bad,'resume')).code,'staff_required','failed verification remains failed');
+ await expire(locked);r=await call(locked,'resume');assert.equal(r.stage,'reference');current={...base,id:70002};assert.equal((await call(locked,'reference',{reference:base.apiReference})).ok,false,'expired session cannot bypass booking date lock');
+ const beforeResume=inventoryCalls;await expire(s);r=await call(s,'resume');assert.equal(r.stage,'reference');assert.equal(r.access_code,undefined);assert.equal(inventoryCalls,beforeResume,'expired verified flow cannot redisclose credentials');
+ await q("update omg_private.web_checkin_flows set expires_at=now()-interval '2 days' where property_id=$1 and token_hash=omg_private.token_hash($2)",[p1,stale.verification_token]);r=await call(stale,'resume');assert.equal(r.reference_remaining,1,'current expired flow retains attempts even across cleanup');assert.equal(r.name_remaining,2);
  const outOfOrder=session();assert.equal((await call(outOfOrder,'choice',{choice_id:right})).ok,false);
  for(const role of ['anon','authenticated']){assert.equal((await q("select has_function_privilege($1,'public.web_checkin_flow(uuid,uuid,uuid,text,jsonb)','execute') v",[role]))[0].v,false);for(const table of ['web_checkin_flows','web_checkin_devices','web_checkin_booking_guards'])assert.equal((await q('select has_table_privilege($1,$2,\'select\') v',[role,'omg_private.'+table]))[0].v,false);}
  const other=(await q("select public.web_checkin_flow($1,$2,$3,'read','{}') v",[p2,s.verification_token,s.device_id]))[0].v;assert.equal(other.ok,false);

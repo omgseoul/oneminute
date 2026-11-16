@@ -30,7 +30,7 @@ begin
  if not p_include_alerts then return answer;end if;
  -- Includes read/ack changes: a stable count alone cannot identify a new arrival.
  select md5(coalesce(string_agg(x.state,'|' order by x.created_at,x.id),'')) into rev from (
-  select m.id,m.created_at,concat_ws(':',m.id,r.read_at,r.acknowledged_at,md5(m.message),m.priority,m.source) state
+  select m.id,m.created_at,concat_ws(':',m.id,r.read_at,r.acknowledged_at,md5(m.message),m.priority,m.source,case when m.source='beds24' and r.read_at is null then md5(omg_private.guest_popup_online(m.property_id,m.id)::text) end) state
   from public.property_message_recipients r join public.property_messages m on m.id=r.message_id
   where r.recipient_key=a->>'key' order by m.created_at desc,m.id desc limit 150
  )x;

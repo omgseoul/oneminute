@@ -18,6 +18,7 @@ module.exports=async({db,rpc,call,q,id,o,s1,s2,peer1,g})=>{
  await db.exec(`create table public.work_reports(id uuid primary key,property_id uuid,employee_id uuid,submitted_at timestamptz,report_type text,payload jsonb);
  create table omg_private.report_inbox_started(id boolean,started_at timestamptz);insert into omg_private.report_inbox_started values(true,'2000-01-01');
  create table omg_private.work_report_reads(report_id uuid,owner_id uuid);
+ create function omg_private.guest_popup_online(uuid,uuid)returns jsonb language sql as $$select to_jsonb(current_setting('test.popup',true))$$;
  create function omg_private.guest_can_access(uuid,uuid)returns boolean language sql as $$select $1=$2$$;
  create function omg_private.guest_message_summary(uuid,jsonb)returns jsonb language sql as $$select jsonb_build_object('ok',true,'unread',7,'messenger_unread',(select count(*) from public.property_message_recipients where recipient_key=omg_private.guest_actor($1)->>'key' and read_at is null))$$;
  `);
@@ -32,6 +33,7 @@ module.exports=async({db,rpc,call,q,id,o,s1,s2,peer1,g})=>{
  const changed=await summary(o,first.revision,true);assert(changed.messages_changed);assert(changed.messages.some(m=>m.message==='new arrival'));
  const incoming=changed.messages.find(m=>m.message==='new arrival');await q('update property_message_recipients set read_at=now() where message_id=$1',[incoming.message_id]);
  assert((await summary(o,changed.revision,true)).messages_changed,'read transitions change revision even without a new message');
+ await q("update property_messages set source='beds24' where id=$1",[incoming.message_id]);await q('update property_message_recipients set read_at=null where message_id=$1',[incoming.message_id]);const beforeTranslation=await summary(o,null,true);await db.exec("set test.popup='translated'");assert((await summary(o,beforeTranslation.revision,true)).messages_changed,'completed translation refreshes an open popup without a new message');
  const baseline=await rpc('list_property_messages',[o]);console.log('HOME EGRESS FIXTURE decoded bytes:',JSON.stringify({before:Buffer.byteLength(JSON.stringify(baseline)),badge:Buffer.byteLength(JSON.stringify(owner)),unchangedHome:Buffer.byteLength(JSON.stringify(again))}));
  console.log('PASS compact badges, owner/staff scope, invalid sessions, revision/read changes, no profiles/report payload, direct/group thumbnails, original authorization and legacy compatibility');
 };

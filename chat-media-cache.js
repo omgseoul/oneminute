@@ -8,6 +8,7 @@
  async function get(s,id){const a=scope(s);if(!a||!active(s))return null;const item=await transaction('readonly',store=>store.get(a+':'+id));if(active(s)&&item&&Date.now()-item.at<7*86400000)return item.blob;return null;}
  async function put(s,id,blob){const a=scope(s);if(!a||!active(s)||blob.size>20*1024*1024)return;await transaction('readwrite',store=>store.put({key:a+':'+id,scope:a,blob,at:Date.now()}));const rows=await transaction('readonly',store=>store.getAll())||[];let total=0;for(const row of rows.sort((x,y)=>y.at-x.at)){total+=row.blob.size;if(row.scope!==a||total>MAX||Date.now()-row.at>7*86400000)await transaction('readwrite',store=>store.delete(row.key));}}
  async function preview(data){if(!/^data:image\/jpeg;base64,/.test(data||''))return null;const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=data;});const scale=Math.min(1,320/Math.max(image.naturalWidth,image.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);for(const quality of [.65,.45,.25]){const result=canvas.toDataURL('image/jpeg',quality);if(result.length<87000)return result;}return null;}
- addEventListener('omg:session-changed',()=>{transaction('readwrite',store=>store.clear());});
+ let lastScope=scope(window.omgSession?.get?.()||{});
+ addEventListener('omg:session-changed',()=>{const next=scope(window.omgSession?.get?.()||{});if(next!==lastScope)transaction('readwrite',store=>store.clear());lastScope=next;});
  window.OMSChatMediaCache={get,put,preview};
 })();

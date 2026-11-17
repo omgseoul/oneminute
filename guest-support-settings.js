@@ -3,9 +3,18 @@
  document.addEventListener('click',e=>{const b=e.target.closest('.qr-help');if(b){const open=b.getAttribute('aria-expanded')!=='true';closeHelp(b);b.setAttribute('aria-expanded',String(open));document.getElementById(b.getAttribute('aria-controls')).hidden=!open;}else if(!e.target.closest('.qr-help-content'))closeHelp();});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeHelp();});
  const G=GuestSupport,I=GuestIcons,s=await omgSession.require({allowCompleted:true});if(!s)return;if(s.sessionKind!=='owner'){location.replace('app.html');return;}
- const auth={access_token:s.accessToken},call=(a,d={})=>G.call(a,d,auth);let state=await call('settings'),items=state.config.items.map(x=>({...x})),uploading=0,selectedItem=null;
+ const targetProperty=new URLSearchParams(location.search).get('web_checkin_property')||s.propertyId,shared=!!targetProperty&&targetProperty!==s.propertyId;
+ let stale=false;
+ const current=()=>{const active=omgSession.get?.();return !omgSession.get||active?.accessToken===s.accessToken&&active?.propertyId===s.propertyId;};
+ function checkSession(){if(stale||current())return;stale=true;window.WebCheckinSettings?.invalidate();const form=document.getElementById('settings');form.hidden=true;form.inert=true;document.getElementById('webCheckinReservations').replaceChildren();document.querySelector('.web-checkin-dialog')?.close();G.message('로그인 지점이 변경되어 설정을 다시 불러옵니다…');const next=new URL(location.href),active=omgSession.get?.();if(active?.propertyId){next.searchParams.set('web_checkin_property',active.propertyId);if(next.href===location.href)location.reload();else location.replace(next.href);}else location.reload();}
+ for(const event of ['storage','omg:session-changed','pageshow'])window.addEventListener(event,checkSession);
+ const assertCurrent=()=>{checkSession();if(stale)throw Error('로그인 지점이 변경되었습니다.');};
+ const auth={access_token:s.accessToken},call=async(a,d={})=>{assertCurrent();const result=await G.call(a,d,auth);assertCurrent();if(result.config?.property_id&&s.propertyId&&result.config.property_id!==s.propertyId)throw Error('설정 지점이 일치하지 않습니다. 화면을 다시 열어주세요.');return result;};let state=shared?{config:{items:[],enabled:false,chat_enabled:false},assets:[]}:await call('settings'),items=state.config.items.map(x=>({...x})),uploading=0,selectedItem=null;
  const form=document.getElementById('settings'),list=document.getElementById('items'),picker=document.getElementById('iconPicker'),enabled=document.getElementById('enabled');form.hidden=false;
- window.WebCheckinSettings?.mount(s.accessToken);
+ document.getElementById('qrPropertyName').textContent=shared?'선택 지점 확인 중…':s.propertyName||'현재 지점';
+ if(shared){document.querySelector('h1').textContent='웹체크인 설정 (게스트용)';document.querySelector('.qr-intro').textContent='선택 지점의 예약 연동 · 웹체크인 테스트';for(const el of document.querySelectorAll('.qr-enable-row,.default-item:not(.web-checkin-config),#items,#add'))el.hidden=true;document.getElementById('qr').closest('.card').hidden=true;document.getElementById('save').textContent='웹체크인 설정 저장';}
+ const webState=await window.WebCheckinSettings?.mount(s.accessToken,targetProperty,shared?'':s.propertyName);assertCurrent();if(webState?.property_name)document.getElementById('qrPropertyName').textContent=webState.property_name;
+
  enabled.checked=state.config.enabled;document.getElementById('chatEnabled').checked=state.config.chat_enabled;document.getElementById('chatIcon').innerHTML=I.svg('chat');
  enabled.onchange=()=>document.getElementById('enabledLabel').textContent=enabled.checked?'활성화':'비활성화';enabled.onchange();
  const closePicker=()=>{if(history.state?.qrIcons)history.back();else picker.close();};document.getElementById('closeIcons').onclick=closePicker;picker.addEventListener('cancel',e=>{e.preventDefault();closePicker();});window.addEventListener('popstate',()=>picker.open&&picker.close());
@@ -20,12 +29,13 @@
    el.querySelector('.delete-item').onclick=()=>{items.splice(index,1);renderItems();};
    el.querySelector('.select-icon').onclick=()=>{selectedItem=item;document.querySelectorAll('.icon-option').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.icon===item.icon)));picker.showModal();history.pushState({...history.state,qrIcons:true},'');};
    if(asset)el.querySelector('.asset-preview').onclick=()=>G.viewer(asset,item.title);
-   el.querySelector('input[type=file]').onchange=async e=>{const f=e.target.files[0];if(!f)return;uploading++;document.getElementById('save').disabled=true;G.message('파일을 올리고 있습니다…');try{const prepared=await G.photo(f),v=await G.call('upload',{},auth,prepared);item.asset_id=v.asset_id;state.assets.push(...v.assets);renderItems();G.message('첨부했습니다. 안내 설정 저장을 눌러주세요.');}catch(err){G.message(err.message,true);}finally{uploading--;document.getElementById('save').disabled=!!uploading;}};
+   el.querySelector('input[type=file]').onchange=async e=>{const f=e.target.files[0];if(!f)return;assertCurrent();uploading++;document.getElementById('save').disabled=true;G.message('파일을 올리고 있습니다…');try{const prepared=await G.photo(f),v=await G.call('upload',{},auth,prepared);assertCurrent();item.asset_id=v.asset_id;state.assets.push(...v.assets);renderItems();G.message('첨부했습니다. 안내 설정 저장을 눌러주세요.');}catch(err){G.message(err.message,true);}finally{uploading--;document.getElementById('save').disabled=!!uploading;}};
    list.append(el);
   });
  }
  renderItems();document.getElementById('add').onclick=()=>{if(items.length>=9)return;items.push({title:'',asset_id:null,icon:null});renderItems();list.lastChild.querySelector('input').focus();};
- form.onsubmit=async e=>{e.preventDefault();if(uploading)return;const btn=document.getElementById('save');btn.disabled=true;try{if(items.some(i=>!i.asset_id))throw new Error('각 안내 항목에 파일을 첨부해주세요.');await call('save_settings',{enabled:enabled.checked,chat_enabled:document.getElementById('chatEnabled').checked,items});await window.WebCheckinSettings?.save();G.message('안내 설정을 저장했습니다.');}catch(err){G.message(err.message,true);}finally{btn.disabled=false;}};
+ form.onsubmit=async e=>{e.preventDefault();if(uploading)return;const btn=document.getElementById('save');btn.disabled=true;try{if(items.some(i=>!i.asset_id))throw new Error('각 안내 항목에 파일을 첨부해주세요.');if(!shared)await call('save_settings',{enabled:enabled.checked,chat_enabled:document.getElementById('chatEnabled').checked,items});await window.WebCheckinSettings?.save();G.message(shared?'웹체크인 설정을 저장했습니다.':'안내 설정을 저장했습니다.');}catch(err){G.message(err.message,true);}finally{btn.disabled=false;}};
+ if(shared){G.message('');return;}
  const url=new URL('guest.html',location.href);url.searchParams.set('p',state.config.slug);document.getElementById('url').value=url.href;document.getElementById('preview').href=url.href;
  if(typeof qrcode==='function'){
   const qr=qrcode(0,'M');qr.addData(url.href);qr.make();
@@ -37,12 +47,12 @@
   let downloadUrl=null,downloadExpires=0;
   const downloadButton=document.getElementById('download');
   const downloadStatus=document.createElement('p');downloadStatus.className='help';downloadStatus.setAttribute('role','status');downloadButton.closest('.row').after(downloadStatus);
-  async function downloadThroughBrowser(){
+  async function downloadThroughBrowser(){assertCurrent();
    downloadStatus.textContent='QR 다운로드를 준비하고 있습니다…';
    if(!downloadUrl||Date.now()>downloadExpires){
     const uploaded=await G.call('upload',{},auth,file),asset=uploaded.assets?.find(a=>a.id===uploaded.asset_id);
     if(!asset?.url)throw new Error('QR 다운로드 주소를 만들지 못했습니다. 다시 눌러주세요.');
-    const link=new URL(asset.url);link.searchParams.set('download',file.name);downloadUrl=link.href;downloadExpires=Date.now()+10*60*1000;
+    assertCurrent();const link=new URL(asset.url);link.searchParams.set('download',file.name);downloadUrl=link.href;downloadExpires=Date.now()+10*60*1000;
    }
    const link=document.createElement('a');link.href=downloadUrl;link.textContent='QR PNG 다운로드 다시 열기';link.className='btn wide';
    downloadStatus.replaceChildren(document.createTextNode('브라우저에서 QR 이미지를 저장해주세요. '),link);

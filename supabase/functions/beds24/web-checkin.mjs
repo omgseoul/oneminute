@@ -70,8 +70,8 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
  async function arrivals(c,day){const rows=[];for(let page=1;page<=3;page++){const result=await api('/bookings?propertyId='+c.beds_property_id+'&arrival='+day+'&includeInfoItems=true&page='+page,{token:c.secret.token});if(!Array.isArray(result.data)||result.data.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)))throw Error('예약 정보를 확인하지 못했습니다.');rows.push(...result.data);if(!result.pages?.nextPageExists)return rows;}throw Error('직원에게 체크인 확인을 요청해주세요.');}
  return async(action,data,token,req)=>{
   if(action==='web_checkin_preview'){
-   // Authenticate every request. The client cannot choose a property or reset live guards.
-   const admin=await rpc('web_checkin_admin',{p_token:token,p_action:'read',p_data:{}});
+   // Authorize the requested property on every call; test resets never touch live guards.
+   const admin=await rpc('web_checkin_admin',{p_token:token,p_action:'read',p_data:{property_id:data.property_id}});
    if(!admin.connected)throw Error('Beds24 연결을 먼저 설정해주세요.');
    if(!UUID.test(data.verification_token||'')||!UUID.test(data.device_id||''))return failure();
    const c=await credentials(admin.property_id);
@@ -86,11 +86,11 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
    };
    const run=createWebCheckin({rpc:isolatedRpc,credentials:async property=>{if(property!==admin.property_id)throw Error('권한이 없습니다.');return c;},api,readDocument,cryptoApi});
    const result=await run('web_checkin',{...data,slug:admin.property_id},null,req);
-   return {...result,preview_day:admin.day};
+   return {...result,preview_day:admin.day,property_id:admin.property_id,property_name:admin.property_name};
   }
   if(action==='web_checkin_diagnose'){
-   const gate=await rpc('web_checkin_admin',{p_token:token,p_action:'probe',p_data:{}}),c=await credentials(gate.property_id),rows=await arrivals(c,gate.day),property=await inventory(c),summary=diagnostic(rows,property,gate.day);
-   const {reservations,truncated,...counts}=summary;await rpc('web_checkin_admin',{p_token:token,p_action:'record_probe',p_data:counts});return {ok:true,...summary};
+   const gate=await rpc('web_checkin_admin',{p_token:token,p_action:'probe',p_data:{property_id:data.property_id}}),c=await credentials(gate.property_id),rows=await arrivals(c,gate.day),property=await inventory(c),summary=diagnostic(rows,property,gate.day);
+   const {reservations,truncated,...counts}=summary;await rpc('web_checkin_admin',{p_token:token,p_action:'record_probe',p_data:{...counts,property_id:gate.property_id}});return {ok:true,...summary,property_id:gate.property_id,property_name:gate.property_name};
   }
   if(action==='web_checkin_settings'||action==='web_checkin_save')return rpc('web_checkin_admin',{p_token:token,p_action:action==='web_checkin_save'?'save':'read',p_data:data});
   if(action!=='web_checkin')throw Error('지원하지 않는 요청입니다.');

@@ -1,11 +1,11 @@
 window.WebCheckin=(()=>{
  const root=document.createElement('dialog');root.className='web-checkin-dialog';
  root.innerHTML=`<header><div><small class="wc-heading-note">GUEST WEB CHECK-IN</small><h2>웹체크인</h2></div><div class="wc-header-actions"><button type="button" class="wc-retry" hidden>재시도</button><button type="button" class="wc-close" aria-label="닫기">×</button></div></header>
- <details class="wc-preview-tools" hidden><summary>테스트용 예약 정보</summary><p class="wc-preview-info"></p><label>확정서 모의 판독 결과<select class="wc-preview-outcome"><option value="success">성공</option><option value="failure">실패</option></select></label><p>가상 예약으로만 진행하며 실제 예약·차단 기록은 변경하지 않습니다. 이미지를 전송하거나 AI를 호출하지 않습니다.</p></details>
+ <details class="wc-preview-tools" hidden><summary>실제 예약 테스트 안내</summary><p class="wc-preview-info"></p><p class="wc-preview-day"></p><p>재시도를 누르면 새로운 테스트로 시작합니다. 실제 출입 비밀번호가 표시될 수 있습니다.</p></details>
  <div class="wc-progress" aria-label="진행 단계"><span>1 예약번호</span><span>2 숙박 날짜</span><span>3 예약자 확인</span></div>
  <form><section data-step="reference"><label>예약번호를 입력해주세요<small>Booking confirmation number</small><input name="reference" maxlength="80" minlength="1" autocomplete="off" required placeholder="예약확인서의 예약번호"></label><p class="wc-reference-note wc-attempt">3회 남음</p></section>
  <section data-step="name" hidden><label>예약자 이름을 입력해주세요<small>Name on your reservation</small><input name="name" maxlength="100" minlength="2" autocomplete="name" required placeholder="예약확인서에 표시된 이름"></label><p class="wc-name-note wc-attempt">3회 남음</p></section>
- <section data-step="dates" hidden><h3>체크인·체크아웃 날짜를 선택해주세요</h3><div class="wc-dates"><label>체크인 · Check-in<input type="date" name="check_in" required></label><label>체크아웃 · Check-out<input type="date" name="check_out" required></label></div><p class="wc-date-note wc-attempt">2회 남음</p></section>
+ <section data-step="dates" hidden><h3>체크인·체크아웃 날짜를 선택해주세요</h3><div class="wc-dates"><label>체크인 · Check-in<input type="date" name="check_in" required></label><label>체크아웃 · Check-out<input type="date" name="check_out" required></label></div></section>
  <section data-step="choice" hidden><h3>예약자 이름을 선택해주세요</h3><div class="wc-options"></div><p class="wc-choice-note wc-attempt">2회 남음</p></section>
  <section data-step="upload" hidden><h3>예약확정서 캡처를 올려주세요</h3><p class="wc-note">예약자 이름·예약번호·체크인·체크아웃 날짜가 모두 보이게 캡처해주세요. AI가 읽은 정보를 실제 예약과 대조합니다.</p><label class="wc-upload">예약확정서 이미지 선택<input type="file" name="document" accept="image/jpeg,image/png,image/webp" required></label><p class="wc-file-name"></p><p class="wc-attempt">1회 남음 · 실패 시 직원 확인이 필요합니다.</p><p class="wc-note">확인에 필요한 이미지만 AI로 전송하며 OMS에 이미지 파일을 저장하지 않습니다.</p></section>
  <p class="wc-status" role="status" aria-live="polite"></p><div class="wc-actions"><button type="button" class="wc-unknown">모름</button><button type="submit" class="wc-next">다음 →</button></div></form>
@@ -25,6 +25,7 @@ window.WebCheckin=(()=>{
   next.textContent=stage==='upload'?'확정서 확인 →':stage==='choice'?'선택 확인 →':'다음 →';if(locked){next.textContent='확인 종료';const note=root.querySelector('[data-step="'+stage+'"] .wc-attempt');if(note){note.textContent='확인 제한 · 직원과 채팅해주세요.';note.setAttribute('aria-label',note.textContent);}}next.disabled=locked||busy;status.textContent=message;
  }
  function apply(result){
+  if(preview&&result.preview_day)root.querySelector('.wc-preview-day').textContent='확인 대상 체크인 날짜: '+result.preview_day;
   if(result.stage==='complete'){
    root.querySelector('.wc-result h3').textContent=result.property;root.querySelector('.wc-room').textContent=result.room;root.querySelector('.wc-code').textContent=result.access_code;root.querySelector('.wc-greeting').textContent=result.greeting;form.hidden=true;root.querySelector('.wc-result').hidden=false;root.scrollTop=0;
    expiry=setTimeout(close,300000);return;
@@ -32,7 +33,6 @@ window.WebCheckin=(()=>{
   stage=result.stage==='fallback_dates'?'dates':result.stage;mode=result.mode||mode;
   if(stage==='reference')counter('.wc-reference-note',3,result.reference_remaining);
   if(stage==='name')counter('.wc-name-note',3,result.name_remaining);
-  if(stage==='dates')counter('.wc-date-note',2,result.date_remaining);
   if(stage==='upload'){const note=root.querySelector('[data-step=upload] .wc-attempt');note.textContent='1회 남음 · 실패 시 직원 확인';note.setAttribute('aria-label',note.textContent);}
   if(stage==='choice'){
    const list=root.querySelector('.wc-options');list.replaceChildren();for(const item of result.options||[]){const label=document.createElement('label'),input=document.createElement('input'),text=document.createElement('span');input.type='radio';input.name='choice_id';input.value=item.id;input.required=true;input.dataset.rejected=String((result.rejected_ids||[]).includes(item.id));text.textContent=item.label;label.append(input,text);list.append(label);}counter('.wc-choice-note',2,result.attempts_remaining);
@@ -58,7 +58,7 @@ window.WebCheckin=(()=>{
    if(stage==='name')data.name=form.elements.name.value.trim();
    if(stage==='dates'){data.check_in=form.elements.check_in.value;data.check_out=form.elements.check_out.value;}
    if(stage==='choice')data.choice_id=root.querySelector('[name=choice_id]:checked')?.value;
-   if(stage==='upload'){if(preview)data.document_outcome=root.querySelector('.wc-preview-outcome').value;else data.image=await documentImage(form.elements.document.files[0]);}
+   if(stage==='upload')data.image=await documentImage(form.elements.document.files[0]);
    if(current!==generation)return;const result=await verify(data);if(current!==generation||!root.open)return;apply(result);
   }catch(error){if(current!==generation)return;
    if(error.code==='session_expired'){
@@ -69,10 +69,10 @@ window.WebCheckin=(()=>{
  };
  form.onsubmit=event=>{event.preventDefault();submit();};unknown.onclick=()=>submit(true);
  async function open(value,onChat,previewFactory){clear();preview=previewFactory?previewFactory():null;slug=value;chat=onChat;stage='reference';mode='reference';locked=false;form.hidden=false;root.querySelector('.wc-result').hidden=true;root.querySelector('.wc-staff').hidden=!onChat&&!preview;
-  root.querySelector('.wc-heading-note').textContent=preview?'모의화면 · TEST':'GUEST WEB CHECK-IN';root.querySelector('.wc-retry').hidden=!preview;root.querySelector('.wc-preview-tools').hidden=!preview;root.querySelector('.wc-preview-tools').open=false;root.querySelector('.wc-preview-info').textContent=preview?.info||'';root.querySelector('.wc-preview-outcome').value='success';root.querySelector('.wc-retry').onclick=()=>open(value,onChat,previewFactory);
+  root.querySelector('.wc-heading-note').textContent=preview?'모의화면 · TEST':'GUEST WEB CHECK-IN';root.querySelector('.wc-retry').hidden=!preview;root.querySelector('.wc-preview-tools').hidden=!preview;root.querySelector('.wc-preview-tools').open=false;root.querySelector('.wc-preview-info').textContent=preview?.info||'';root.querySelector('.wc-preview-day').textContent='';root.querySelector('.wc-retry').onclick=()=>open(value,onChat,previewFactory);
   root.querySelector('.wc-staff').onclick=()=>{if(preview){status.textContent='모의화면입니다. 실제 게스트는 직원과의 채팅으로 연결됩니다.';return;}close();chat?.();};
-  root.querySelector('[data-step=upload] .wc-note').textContent=preview?'테스트용 이미지를 선택하면 모의 판독 결과를 표시합니다. 실제 예약확정서는 필요하지 않습니다.':'예약자 이름·예약번호·체크인·체크아웃 날짜가 모두 보이게 캡처해주세요. AI가 읽은 정보를 실제 예약과 대조합니다.';
-  root.querySelector('[data-step=upload] .wc-note:last-child').textContent=preview?'모의화면에서는 이미지나 개인정보를 전송하지 않습니다.':'확인에 필요한 이미지만 AI로 전송하며 OMS에 이미지 파일을 저장하지 않습니다.';
+  root.querySelector('[data-step=upload] .wc-note').textContent='예약자 이름·예약번호·체크인·체크아웃 날짜가 모두 보이게 캡처해주세요. AI가 읽은 정보를 실제 예약과 대조합니다.';
+  root.querySelector('[data-step=upload] .wc-note:last-child').textContent='확인에 필요한 이미지만 AI로 전송하며 OMS에 이미지 파일을 저장하지 않습니다.';
   if(preview){deviceId=uuid();verificationToken=uuid();}else try{deviceId=persistent(localStorage,'wc-device-id');verificationToken=persistent(sessionStorage,'wc-flow-token:'+slug);locked=localStorage.getItem('wc-blocked:'+slug)==='1';}catch{locked=true;}
   counter('.wc-reference-note',3);render(locked?'직원과의 채팅으로 예약을 확인하여 주십시오.':'');root.showModal();root.scrollTop=0;if(locked)return;
   const current=generation;busy=true;render('확인 중입니다…');try{const result=await verify({slug,verification_token:verificationToken,device_id:deviceId,step:'resume'});if(current===generation&&root.open)apply(result);}catch(error){if(current===generation){locked=['staff_required','device_blocked'].includes(error.code);rememberBlock(error);render(error.message);}}finally{if(current===generation){busy=false;next.disabled=locked;unknown.disabled=false;if(!locked&&stage==='reference')form.elements.reference.focus();}}

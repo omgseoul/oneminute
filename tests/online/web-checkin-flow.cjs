@@ -7,7 +7,7 @@ module.exports=async({db,p1,p2,id})=>{
  const q=async(s,a=[])=>(await db.query(s,a)).rows;
  const {createWebCheckin,documentMatches,nameChoices}=await import('../../supabase/functions/beds24/web-checkin.mjs');
  const {buildDocumentRequest,validDocumentImage,createDocumentReader}=await import('../../supabase/functions/beds24/web-checkin-document.mjs');
- const day='2026-11-16',base={id:70001,propertyId:100,roomId:20,unitId:1,roomQty:1,firstName:'Maria',lastName:'Fernandez',status:'confirmed',arrival:day,departure:'2026-11-19',apiReference:'CHANNEL123456',infoItems:[{code:'PIN',text:'TEST1234',bookingId:70001}]};
+ const day='2026-11-16',base={id:70001,propertyId:100,roomId:20,unitId:1,roomQty:1,firstName:'6081 Maria',lastName:'Fernandez １２',status:'confirmed',arrival:day,departure:'2026-11-19',apiReference:'CHANNEL123456',infoItems:[{code:'PIN',text:'TEST1234',bookingId:70001}]};
  const property={id:100,roomTypes:[{id:20,units:[{id:1,name:'201'}]}]},image='data:image/jpeg;base64,'+Buffer.concat([Buffer.from([255,216,255]),Buffer.alloc(40)]).toString('base64');
  assert(validDocumentImage(image));assert(!validDocumentImage('data:image/svg+xml;base64,AAAA'));assert(!validDocumentImage('data:image/jpeg;base64,'+Buffer.alloc(40).toString('base64')));
  const doc={readable:true,guest_name:'Maria Fernandez',booking_reference:'CHANNEL123456',check_in:day,check_out:'2026-11-19'};assert(documentMatches(doc,base));for(const change of [{booking_reference:'WRONG'},{check_out:'2026-11-20'},{guest_name:'Someone else'},{readable:false}])assert(!documentMatches({...doc,...change},base));
@@ -18,7 +18,12 @@ module.exports=async({db,p1,p2,id})=>{
  const run=createWebCheckin({rpc,credentials:async()=>({beds_property_id:100,secret:{token:'synthetic'}}),api:async path=>{apiPaths.push(path);if(path.startsWith('/properties')){inventoryCalls++;return {data:[property]};}if(path.includes('&arrival=2026-11-17'))return {data:otherDayRows};assert(path.includes('&arrival='+day)||path.includes('&id='));return {data:[current]};},readDocument:async()=>{ocrCalls++;return documentResult;}}),req=new Request('https://fixture.test',{headers:{'x-forwarded-for':'203.0.113.10'}});
  let counter=950000;const session=()=>({slug:id(123),verification_token:id(counter++),device_id:id(counter++)});const call=(s,step,data={})=>run('web_checkin',{...s,step,attempt_id:id(counter++),...data},null,req);
  const s=session();let r=await call(s,'reference',{reference:base.apiReference});assert.equal(r.stage,'dates');assert(!JSON.stringify(r).includes('Maria'));assert.equal(r.access_code,undefined);assert.equal(inventoryCalls,0);
- r=await call(s,'dates',{check_in:day,check_out:base.departure});assert.equal(r.stage,'choice');assert.equal(r.options.length,10);assert.equal(r.access_code,undefined);
+ r=await call(s,'dates',{check_in:day,check_out:base.departure});assert.equal(r.stage,'choice');assert.equal(r.options.length,10);assert(r.options.every(x=>!(/\p{N}/u.test(x.label))));assert.equal(r.access_code,undefined);
+ // Previously cached labels are cleaned on output without changing challenge IDs or source data.
+ const cachedOptions=r.options.map(option=>({...option,label:'1234 '+option.label}));
+ await q('update omg_private.web_checkin_booking_guards set options=$1 where property_id=$2 and booking_id=$3',[JSON.stringify(cachedOptions),p1,base.id]);
+ r=await call(s,'resume');assert.equal(r.stage,'choice');assert(r.options.every(x=>!(/\p{N}/u.test(x.label))));assert.deepEqual(r.options.map(x=>x.id).sort(),cachedOptions.map(x=>x.id).sort());
+ assert.deepEqual((await q('select options from omg_private.web_checkin_booking_guards where property_id=$1 and booking_id=$2',[p1,base.id]))[0].options,cachedOptions);
  const right=r.options.find(x=>x.label==='MARIA FERNANDEZ').id,wrong=r.options.find(x=>x.id!==right).id;
  r=await call(s,'choice',{choice_id:wrong});assert.equal(r.attempts_remaining,1);assert.deepEqual(r.rejected_ids,[]);r=await call(s,'choice',{choice_id:right});assert.equal(r.access_code,'TEST1234');assert.equal(r.stage,'complete');assert(r.greeting.includes('안녕하세요'));
  r=await call(s,'upload',{image});assert.equal(r.stage,'complete','completed retry resumes without a duplicate AI charge');assert.equal(ocrCalls,0);
@@ -66,5 +71,6 @@ module.exports=async({db,p1,p2,id})=>{
  const again=session();await previewCall(again,'reference',{reference:base.apiReference});r=await previewCall(again,'dates',{check_in:day,check_out:base.departure});assert.equal(r.stage,'choice');previewRight=r.options.find(x=>x.label==='MARIA FERNANDEZ').id;r=await previewCall(again,'choice',{choice_id:previewRight});assert.equal(r.stage,'complete');assert.equal(r.access_code,'TEST1234');assert.equal(r.preview_day,day);assert(previewApiCalls>0);assert.equal(authCalls,8);assert.deepEqual(await liveCount(),beforePreview);
  const synthetic=session();r=await previewCall(synthetic,'reference',{reference:'TEST123456'});assert.equal(r.stage,'reference','no fabricated booking fallback');assert.equal(r.reference_remaining,2);
  for(const role of ['anon','authenticated']){assert.equal((await q("select has_function_privilege($1,'public.web_checkin_preview_flow(uuid,uuid,uuid,text,jsonb)','execute') v",[role]))[0].v,false);for(const table of ['devices','flows','booking_guards','name_challenges'])assert.equal((await q('select has_table_privilege($1,$2,\'select\') v',[role,'omg_private.web_checkin_preview_'+table]))[0].v,false);}
+ assert.equal(base.firstName,'6081 Maria');assert.equal(base.lastName,'Fernandez １２');assert.equal(current.firstName,base.firstName,'all flows preserve the provider name');
  console.log('Reference-first check-in: real SQL state machine, 10 choices, deferred date verification, 3 name failures/device lock, no early codes, document match/failure, retries and tenant ACL passed');
 };

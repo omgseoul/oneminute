@@ -10,7 +10,9 @@ export function similarity(a,b){
  for(let i=0;i<x.length;i++){const next=[i+1];for(let j=0;j<y.length;j++)next.push(Math.min(next[j]+1,row[j+1]+1,row[j]+(x[i]===y[j]?0:1)));row=next;}
  return 1-row[y.length]/Math.max(x.length,y.length);
 }
-export const nameScore=(name,b)=>Math.max(similarity(name,[b.firstName,b.lastName].filter(Boolean).join(' ')),similarity(name,[b.lastName,b.firstName].filter(Boolean).join(' ')));
+// Provider names remain untouched; numeric annotations are ignored only for names.
+export const cleanGuestName=value=>String(value??'').normalize('NFC').replace(/\p{N}/gu,'').trim().replace(/\s+/g,' ');
+export const nameScore=(name,b)=>Math.max(similarity(cleanGuestName(name),cleanGuestName([b.firstName,b.lastName].filter(Boolean).join(' '))),similarity(cleanGuestName(name),cleanGuestName([b.lastName,b.firstName].filter(Boolean).join(' '))));
 export function referenceScore(value,b){
  const ref=reference(value),ota=reference(b.apiReference);
  // Sequential internal IDs are never fuzzy matched.
@@ -20,13 +22,14 @@ export function referenceScore(value,b){
 }
 export function matchingBookings(rows,input,property,today,additional=false){
  const ref=reference(input.reference);
- if(!validDate(input.check_in)||!validDate(input.check_out)||input.check_in!==today||input.check_out<=input.check_in||Date.parse(input.check_out)-Date.parse(input.check_in)>93*86400000||typeof input.name!=='string'||input.name.length>100||norm(input.name).length<2||ref.length<5||ref.length>80)return [];
+ if(!validDate(input.check_in)||!validDate(input.check_out)||input.check_in!==today||input.check_out<=input.check_in||Date.parse(input.check_out)-Date.parse(input.check_in)>93*86400000||typeof input.name!=='string'||input.name.length>100||norm(cleanGuestName(input.name)).length<2||ref.length<5||ref.length>80)return [];
  return rows.filter(b=>Number(b.propertyId)===Number(property)&&['new','confirmed'].includes(b.status)&&b.arrival===input.check_in&&b.departure===input.check_out&&Number(b.roomQty||1)===1&&(additional?(referenceScore(ref,b)>=.9||(nameScore(input.name,b)>=.95&&referenceScore(ref,b)>=.7)):(referenceScore(ref,b)>=.9&&nameScore(input.name,b)>=.95)));
 }
 const randomInt=(max,c)=>{const n=new Uint32Array(1),limit=Math.floor(4294967296/max)*max;do{c.getRandomValues(n);}while(n[0]>=limit);return n[0]%max;};
 export function shuffle(items,c=crypto){const out=[...items];for(let i=out.length-1;i>0;i--){const j=randomInt(i+1,c);[out[i],out[j]]=[out[j],out[i]];}return out;}
 export function nameChoices(b,c=crypto,count=10){
- const raw=[b.firstName,b.lastName].filter(Boolean).join(' ').normalize('NFC').trim().replace(/\s+/g,' ');
+ const raw=cleanGuestName([b.firstName,b.lastName].filter(Boolean).join(' '));
+ if(!norm(raw))return null;
  const label=/^[\p{Script=Latin}\p{M}\s.'’-]+$/u.test(raw)?raw.normalize('NFKD').replace(/\p{M}/gu,'').toUpperCase():raw;
  let generate;const pick=a=>a[randomInt(a.length,c)],latinFirst='ALEX MORGAN JAMIE TAYLOR ROBIN CHARLIE CAMERON JORDAN SAM RILEY DREW CASEY AVERY QUINN ROWAN JESSE'.split(' '),latinLast='MARTIN WILSON PARKER TURNER WALKER CLARK MILLER HALL ALLEN YOUNG KING SCOTT BROWN EVANS REED BELL'.split(' ');
  if(/^[A-Z\s.'’-]+$/.test(label)){const parts=label.split(' ');generate=()=>parts.map((_,i)=>pick(i===parts.length-1?latinLast:latinFirst)).join(' ');}
@@ -108,7 +111,7 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
   let c;const context=async()=>{if(!c){c=await credentials(gate.property_id);if(Number(c.beds_property_id)!==Number(gate.beds_property_id))throw Error('직원과의 채팅으로 예약을 확인하여 주십시오.');}return c;};
   const list=async()=>{await context();const all=[];for(const day of allowedDays)all.push(...await arrivals(c,day));return [...new Map(all.filter(active).map(b=>[String(b.id),b])).values()];};
   const fresh=async id=>{await context();const result=await api('/bookings?propertyId='+c.beds_property_id+'&id='+id+'&includeInfoItems=true',{token:c.secret.token});const rows=(result.data||[]).filter(b=>Number(b.id)===Number(id)&&active(b));return rows.length===1?rows[0]:null;};
-  const publicState=s=>{if(!s.ok)return s;if(!['reference','fallback_dates','name','dates','choice','upload'].includes(s.stage))return staff();const result={ok:true,stage:s.stage,mode:s.mode,reference_remaining:s.reference_remaining,name_remaining:s.name_remaining,attempts_remaining:s.attempts_remaining,...(s.message?{message:s.message}:{})};if(s.stage==='choice'){result.options=shuffle(s.options||[],cryptoApi);result.rejected_ids=s.rejected_ids||[];}return result;};
+  const publicState=s=>{if(!s.ok)return s;if(!['reference','fallback_dates','name','dates','choice','upload'].includes(s.stage))return staff();const result={ok:true,stage:s.stage,mode:s.mode,reference_remaining:s.reference_remaining,name_remaining:s.name_remaining,attempts_remaining:s.attempts_remaining,...(s.message?{message:s.message}:{})};if(s.stage==='choice'){const options=(s.options||[]).map(option=>({...option,label:cleanGuestName(option.label)}));if(options.some(option=>!norm(option.label))||new Set(options.map(option=>norm(option.label))).size!==options.length)return staff();result.options=shuffle(options,cryptoApi);result.rejected_ids=s.rejected_ids||[];}return result;};
   async function disclose(state){
   // Re-read both the reservation and server state immediately before disclosure.
   const booking=await fresh(state.booking_id);if(!booking||await fingerprint(booking)!==state.fingerprint)return staff();

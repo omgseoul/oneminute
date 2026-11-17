@@ -69,6 +69,25 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
  async function inventory(c){const result=await api('/properties?id='+c.beds_property_id+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});const props=(result.data||[]).filter(p=>Number(p.id)===Number(c.beds_property_id));if(props.length!==1)throw Error('객실 배정 정보를 확인하지 못했습니다. 직원에게 문의해주세요.');return props[0];}
  async function arrivals(c,day){const rows=[];for(let page=1;page<=3;page++){const result=await api('/bookings?propertyId='+c.beds_property_id+'&arrival='+day+'&includeInfoItems=true&page='+page,{token:c.secret.token});if(!Array.isArray(result.data)||result.data.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)))throw Error('예약 정보를 확인하지 못했습니다.');rows.push(...result.data);if(!result.pages?.nextPageExists)return rows;}throw Error('직원에게 체크인 확인을 요청해주세요.');}
  return async(action,data,token,req)=>{
+  if(action==='web_checkin_preview'){
+   // Authenticate every request. The client cannot choose a property or reset live guards.
+   const admin=await rpc('web_checkin_admin',{p_token:token,p_action:'read',p_data:{}});
+   if(!admin.connected)throw Error('Beds24 연결을 먼저 설정해주세요.');
+   if(!UUID.test(data.verification_token||'')||!UUID.test(data.device_id||''))return failure();
+   const c=await credentials(admin.property_id);
+   const bytes=await cryptoApi.subtle.digest('SHA-256',new TextEncoder().encode('preview:'+admin.property_id+':'+data.verification_token));
+   const h=[...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');
+   const scope=h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);
+   const isolatedRpc=async(name,args)=>{
+    if(name==='web_checkin_gate')return {ok:true,property_id:admin.property_id,beds_property_id:c.beds_property_id,day:admin.day,source:admin.source};
+    if(name==='web_checkin_flow')return rpc('web_checkin_preview_flow',{...args,p_property:scope});
+    if(name==='web_checkin_release')return args.p_property===admin.property_id&&args.p_source===admin.source&&args.p_day===admin.day;
+    throw Error('지원하지 않는 테스트 요청입니다.');
+   };
+   const run=createWebCheckin({rpc:isolatedRpc,credentials:async property=>{if(property!==admin.property_id)throw Error('권한이 없습니다.');return c;},api,readDocument,cryptoApi});
+   const result=await run('web_checkin',{...data,slug:admin.property_id},null,req);
+   return {...result,preview_day:admin.day};
+  }
   if(action==='web_checkin_diagnose'){
    const gate=await rpc('web_checkin_admin',{p_token:token,p_action:'probe',p_data:{}}),c=await credentials(gate.property_id),rows=await arrivals(c,gate.day),property=await inventory(c),summary=diagnostic(rows,property,gate.day);
    const {reservations,truncated,...counts}=summary;await rpc('web_checkin_admin',{p_token:token,p_action:'record_probe',p_data:counts});return {ok:true,...summary};
@@ -89,14 +108,14 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
   let c;const context=async()=>{if(!c){c=await credentials(gate.property_id);if(Number(c.beds_property_id)!==Number(gate.beds_property_id))throw Error('직원과의 채팅으로 예약을 확인하여 주십시오.');}return c;};
   const list=async()=>{await context();const all=[];for(const day of allowedDays)all.push(...await arrivals(c,day));return [...new Map(all.filter(active).map(b=>[String(b.id),b])).values()];};
   const fresh=async id=>{await context();const result=await api('/bookings?propertyId='+c.beds_property_id+'&id='+id+'&includeInfoItems=true',{token:c.secret.token});const rows=(result.data||[]).filter(b=>Number(b.id)===Number(id)&&active(b));return rows.length===1?rows[0]:null;};
-  const publicState=s=>{if(!s.ok)return s;if(!['reference','fallback_dates','name','dates','choice','upload'].includes(s.stage))return staff();const result={ok:true,stage:s.stage,mode:s.mode,reference_remaining:s.reference_remaining,name_remaining:s.name_remaining,date_remaining:s.date_remaining,attempts_remaining:s.attempts_remaining,...(s.message?{message:s.message}:{})};if(s.stage==='choice'){result.options=shuffle(s.options||[],cryptoApi);result.rejected_ids=s.rejected_ids||[];}return result;};
+  const publicState=s=>{if(!s.ok)return s;if(!['reference','fallback_dates','name','dates','choice','upload'].includes(s.stage))return staff();const result={ok:true,stage:s.stage,mode:s.mode,reference_remaining:s.reference_remaining,name_remaining:s.name_remaining,attempts_remaining:s.attempts_remaining,...(s.message?{message:s.message}:{})};if(s.stage==='choice'){result.options=shuffle(s.options||[],cryptoApi);result.rejected_ids=s.rejected_ids||[];}return result;};
   async function disclose(state){
   // Re-read both the reservation and server state immediately before disclosure.
   const booking=await fresh(state.booking_id);if(!booking||await fingerprint(booking)!==state.fingerprint)return staff();
   const property=await inventory(c),assigned=assignedUnit(booking,property),code=accessCode(booking,assigned,gate.source);
   if(!code)return staff();const finalState=await flow('read');if(!finalState.ok||finalState.stage!=='verified')return staff();
   if(!await rpc('web_checkin_release',{p_property:gate.property_id,p_source:gate.source,p_day:booking.arrival}))return staff();
-  return {ok:true,stage:'complete',greeting:'안녕하세요. 예약이 확인되었습니다. 편안한 숙박 되세요!',property:gate.name,room:String(assigned.unit.name).slice(0,80),access_code:code,check_in:booking.arrival,check_out:booking.departure};
+  return {ok:true,stage:'complete',greeting:'안녕하세요. 예약이 확인되었습니다. 편안한 숙박 되세요!',property:gate.name||String(property.name||'숙소'),room:String(assigned.unit.name).slice(0,80),access_code:code,check_in:booking.arrival,check_out:booking.departure};
   }
   let state,booking;
   if(['reference','unknown','resume'].includes(data.step)){
@@ -113,14 +132,14 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
    state=await flow('read');if(!state.ok)return state;if(state.stage==='verified')return disclose(state);
    let dateInput=data;
    if(state.stage==='fallback_dates'&&data.step==='dates'){
-    if(!validDate(data.check_in)||!allowedDays.includes(data.check_in)||!validDate(data.check_out)||data.check_out<=data.check_in||Date.parse(data.check_out)-Date.parse(data.check_in)>93*86400000)return {ok:true,stage:'fallback_dates',mode:'document',message:'체크인·체크아웃 날짜를 확인해주세요.'};
+    if(!validDate(data.check_in)||!validDate(data.check_out)||data.check_out<=data.check_in||Date.parse(data.check_out)-Date.parse(data.check_in)>93*86400000)return {ok:true,stage:'fallback_dates',mode:'document',message:'체크인·체크아웃 날짜를 확인해주세요.'};
     return publicState(await flow('fallback_dates',{check_in:data.check_in,check_out:data.check_out}));
    }
    if(data.step==='name'){
-    if(state.stage!=='name'||!allowedDays.includes(state.selected_check_in)||!validDate(state.selected_check_out)||!UUID.test(data.attempt_id||''))return staff();
+    if(state.stage!=='name'||!validDate(state.selected_check_in)||!validDate(state.selected_check_out)||!UUID.test(data.attempt_id||''))return staff();
     const valid=typeof data.name==='string'&&data.name.trim().length>=2&&data.name.length<=100;
     dateInput={check_in:state.selected_check_in,check_out:state.selected_check_out};
-    const rows=valid?(await arrivals(await context(),state.selected_check_in)).filter(b=>active(b)&&b.arrival===state.selected_check_in&&nameScore(data.name,b)>.9):[];
+    const rows=valid&&allowedDays.includes(state.selected_check_in)?(await arrivals(await context(),state.selected_check_in)).filter(b=>active(b)&&b.arrival===state.selected_check_in&&nameScore(data.name,b)>.9):[];
     state=await flow('name',{matched:rows.length>0,name:valid?data.name.trim():'',attempt_id:await attemptFor('name',data.name)});
     if(!state.ok||state.stage==='name')return publicState(state);
     const exact=rows.filter(b=>b.departure===dateInput.check_out),match=exact.length===1?exact[0]:rows.length===1?rows[0]:null;
@@ -131,12 +150,12 @@ export function createWebCheckin({rpc,credentials,api,readDocument=async()=>{thr
    if(data.step==='dates'||data.step==='name'){
     if(state.stage!=='dates'||!booking||!UUID.test(data.attempt_id||''))return staff();
     const matched=validDate(dateInput.check_in)&&validDate(dateInput.check_out)&&dateInput.check_in===booking.arrival&&dateInput.check_out===booking.departure;
-    const choices=matched&&state.mode==='reference'?nameChoices(booking,cryptoApi):null;
-    if(matched&&state.mode==='reference'&&!choices)return staff();
+    const choices=state.mode==='reference'?nameChoices(booking,cryptoApi):null;
+    if(state.mode==='reference'&&!choices)return staff();
     state=await flow('dates',{matched,attempt_id:await attemptFor('dates',[dateInput.check_in,dateInput.check_out]),options:choices?.options||[],correct_id:choices?.correct_id||null});
    }else if(data.step==='choice'){
-    if(state.stage!=='choice'||!booking||!UUID.test(data.choice_id||''))return staff();
-    state=await flow('choice',{choice_id:data.choice_id});
+    if(state.stage!=='choice'||!booking||!UUID.test(data.choice_id||'')||!UUID.test(data.attempt_id||''))return staff();
+    state=await flow('choice',{choice_id:data.choice_id,attempt_id:await attemptFor('choice',data.choice_id)});
    }else if(data.step==='upload'){
     if(state.stage!=='upload'||!booking)return staff();
     if(!validDocumentImage(data.image))return {ok:true,stage:'upload',mode:'document',message:'선명한 JPG·PNG·WebP 이미지를 선택해주세요. 전송 크기는 2MB 이하입니다.'};

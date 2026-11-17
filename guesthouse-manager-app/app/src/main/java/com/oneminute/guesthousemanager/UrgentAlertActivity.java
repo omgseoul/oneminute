@@ -48,6 +48,12 @@ public class UrgentAlertActivity extends AppCompatActivity {
     private String senderLabel;
     private long deadlineEpochMs;
     private boolean receiverRegistered;
+    private final PopupScreenTimeout popupTimeout = new PopupScreenTimeout(() -> {
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        finish(); // Keep the urgent service/notification unacknowledged.
+    });
+    @Override protected void onResume() { super.onResume(); popupTimeout.resume(); }
+    @Override protected void onSaveInstanceState(Bundle state) { popupTimeout.save(state); super.onSaveInstanceState(state); }
 
     private final BroadcastReceiver closeReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -81,6 +87,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
         buildDogCountdownScreen(getIntent().getStringExtra("message"));
         registerCloseReceiver();
         handler.post(tick);
+        popupTimeout.start(state);
     }
 
     @Override
@@ -234,6 +241,7 @@ public class UrgentAlertActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        popupTimeout.stop();
         handler.removeCallbacks(tick);
         if (receiverRegistered) unregisterReceiver(closeReceiver);
         super.onDestroy();

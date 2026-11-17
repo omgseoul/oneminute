@@ -23,14 +23,16 @@ public class WorkConfirmationActivity extends AppCompatActivity {
  private final Handler main=new Handler(Looper.getMainLooper());
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
  private TextView remaining,error;private Button yes;private String confirmationId;
+ private final PopupScreenTimeout popupTimeout=new PopupScreenTimeout(()->{getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);finish();});
+ @Override protected void onSaveInstanceState(Bundle state){popupTimeout.save(state);super.onSaveInstanceState(state);}
  private long deadlineElapsed;private boolean busy,destroyed;
  private final Runnable poll=new Runnable(){public void run(){request(null);main.postDelayed(this,10000);}};
  private final Runnable tick=new Runnable(){public void run(){updateCountdown();main.postDelayed(this,1000);}};
- @Override protected void onCreate(Bundle state){super.onCreate(state);if(Build.VERSION.SDK_INT>=27){setShowWhenLocked(true);setTurnScreenOn(true);}getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);build();}
+ @Override protected void onCreate(Bundle state){super.onCreate(state);if(Build.VERSION.SDK_INT>=27){setShowWhenLocked(true);setTurnScreenOn(true);}getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);build();popupTimeout.start(state);}
  @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);request(null);}
- @Override protected void onResume(){super.onResume();main.removeCallbacks(poll);main.removeCallbacks(tick);main.post(poll);main.post(tick);}
+ @Override protected void onResume(){super.onResume();popupTimeout.resume();main.removeCallbacks(poll);main.removeCallbacks(tick);main.post(poll);main.post(tick);}
  @Override protected void onPause(){super.onPause();main.removeCallbacks(poll);main.removeCallbacks(tick);}
- @Override protected void onDestroy(){destroyed=true;main.removeCallbacksAndMessages(null);worker.shutdownNow();super.onDestroy();}
+ @Override protected void onDestroy(){popupTimeout.stop();destroyed=true;main.removeCallbacksAndMessages(null);worker.shutdownNow();super.onDestroy();}
  @Override public void onBackPressed(){/* A dismiss action must never mean continued work. */}
  private void build(){
   FrameLayout shade=new FrameLayout(this);shade.setBackgroundColor(Color.argb(125,18,39,66));shade.setPadding(dp(20),dp(32),dp(20),dp(32));

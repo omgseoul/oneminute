@@ -35,6 +35,7 @@ final class UrgentOverlayController {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private View overlay;
     private Runnable tick;
+    private final PopupScreenTimeout popupTimeout = new PopupScreenTimeout(this::dismiss);
 
     UrgentOverlayController(Context context) {
         this.context = context;
@@ -157,10 +158,12 @@ final class UrgentOverlayController {
             }
         };
         handler.post(tick);
+        popupTimeout.start(null);
         return true;
     }
 
     void dismiss() {
+        popupTimeout.stop();
         if (tick != null) handler.removeCallbacks(tick);
         tick = null;
         if (overlay != null && windowManager != null) {

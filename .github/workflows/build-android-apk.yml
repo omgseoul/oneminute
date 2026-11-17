@@ -35,6 +35,8 @@ jobs:
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/reminder-settings/database.cjs
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/checkin-report/database.cjs
           NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/checkin-report/web.cjs
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/message-popup-queue/web.cjs
+          NODE_PATH="$PWD/tests/attendance-nfc/node_modules" node tests/message-popup-queue/timeout.cjs
           node tests/session-persistence/client.cjs
           node tests/attendance-time.cjs
       - name: Validate APK publication certificate parsing

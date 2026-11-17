@@ -25,5 +25,7 @@ final class MessagePopupQueue {
         JSONObject first=peek();if(first==null||!first.optString("alertId").equals(id))return false;
         pending.remove(0);confirmed.put(id);while(confirmed.length()>1000)confirmed.remove(0);return true;
     }
+    // Local presentation dedupe only; this queue never sends read receipts.
+    void dismissPending(){while(peek()!=null)confirm(peek().optString("alertId"));}
     String save(){try{return new JSONObject().put("pending",pending).put("confirmed",confirmed).toString();}catch(Exception e){throw new IllegalStateException(e);}}
 }

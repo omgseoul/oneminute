@@ -29,6 +29,7 @@ jobs:
           node tests/online/web-checkin-edge.mjs
           node tests/online/web-checkin-ui.cjs
           node tests/online/web-checkin-choice-ui.cjs
+          node tests/online/web-checkin-preview.cjs
           node supabase/tests/guest-qr-ui.test.cjs
           node tests/online/booking-price-edge.mjs
           node tests/online/arrival-edge.mjs

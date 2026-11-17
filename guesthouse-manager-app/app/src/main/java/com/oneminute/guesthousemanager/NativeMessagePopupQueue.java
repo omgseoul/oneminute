@@ -24,5 +24,6 @@ final class NativeMessagePopupQueue {
     static synchronized Intent peek(Context c){if(scope(c).isEmpty())return null;JSONObject item=load(c).peek();if(item==null)return null;Intent i=new Intent(c,MessageAlertActivity.class).putExtra("popupScope",scope(c));for(String key:FIELDS)i.putExtra(key,item.optString(key,""));return i.putExtra("notificationId",item.optInt("notificationId",NativeMessageBadge.ID));}
     static synchronized int size(Context c){return scope(c).isEmpty()?0:load(c).size();}
     static synchronized void confirm(Context c,String id){MessagePopupQueue q=load(c);q.confirm(id);save(c,q);}
+    static synchronized void dismissPending(Context c){MessagePopupQueue q=load(c);q.dismissPending();save(c,q);}
     static void launch(Context c){Intent first=peek(c);if(first!=null)c.startActivity(first.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));}
 }

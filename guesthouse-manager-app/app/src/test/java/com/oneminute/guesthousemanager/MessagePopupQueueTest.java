@@ -18,4 +18,8 @@ public class MessagePopupQueueTest {
   assertEquals("first",q.peek().getString("alertId"));q.confirm("first");q.offer(item("later"));
   assertEquals("next",q.peek().getString("alertId"));assertEquals(2,q.size());
  }
+ @Test public void timeoutDismissesBatchWithoutReopeningOnRetry()throws Exception{
+  MessagePopupQueue q=new MessagePopupQueue("{}");q.offer(item("first"));q.offer(item("next"));q.dismissPending();
+  q=new MessagePopupQueue(q.save());assertEquals(0,q.size());assertFalse(q.offer(item("first")));assertFalse(q.offer(item("next")));assertTrue(q.offer(item("new")));
+ }
 }

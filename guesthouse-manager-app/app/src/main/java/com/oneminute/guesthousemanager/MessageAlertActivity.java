@@ -28,6 +28,19 @@ public class MessageAlertActivity extends AppCompatActivity {
     private String alertId;
     private TextView queueCount;
     private long lastConfirmAt;
+    final PopupScreenTimeout popupTimeout = new PopupScreenTimeout(this::expirePopup);
+
+    private void expirePopup() {
+        // Dismiss the presentation, never acknowledge unread messages on the server.
+        if (NativeMessagePopupQueue.scope(this).equals(getIntent().getStringExtra("popupScope")))
+            NativeMessagePopupQueue.dismissPending(this);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        stopService(new Intent(this, MessageSoundService.class));
+        finish();
+    }
+    @Override protected void onResume() { super.onResume(); popupTimeout.resume(); }
+    @Override protected void onSaveInstanceState(Bundle state) { popupTimeout.save(state); super.onSaveInstanceState(state); }
+    @Override protected void onDestroy() { popupTimeout.stop(); super.onDestroy(); }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -35,6 +48,7 @@ public class MessageAlertActivity extends AppCompatActivity {
         showOverLockScreen();
         NativeMessagePopupQueue.offer(this,getIntent());
         showNext();
+        popupTimeout.start(state);
     }
 
     @Override
@@ -46,7 +60,7 @@ public class MessageAlertActivity extends AppCompatActivity {
 
     private void showNext() {
         Intent next=NativeMessagePopupQueue.peek(this);
-        if(next==null){cancelNotification();finish();return;}
+        if(next==null){finish();return;}
         if(!next.getStringExtra("alertId").equals(alertId)) {setIntent(next);buildMessageScreen(next);}
         if(queueCount!=null){int count=NativeMessagePopupQueue.size(this);queueCount.setText(count>=2?count+"건 대기":"");queueCount.setVisibility(count>=2?android.view.View.VISIBLE:android.view.View.GONE);}
     }

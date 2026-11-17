@@ -1,10 +1,16 @@
 (function(){
+ const POPUP_DURATION=5*60*1000;
+ let popupTimer=null,popupDeadline=0;
+ function stopTimer(){clearTimeout(popupTimer);popupTimer=null;popupDeadline=0;}
+ function saveSeen(){try{sessionStorage.setItem('oms-popup-seen:'+token,JSON.stringify([...seen].slice(-1000)));}catch{}}
+ function expire(){if(!popupDeadline)return;const remaining=popupDeadline-Date.now();if(remaining>0){clearTimeout(popupTimer);popupTimer=setTimeout(expire,remaining);return;}for(const item of [active,...queue])if(item)seen.add(item.message_id);saveSeen();active=null;queue=[];stopTimer();if(popup())popup().hidden=true;}
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)expire();});
  let token='',queue=[],active=null,seen=new Set(),observed=null,confirming=false,pendingReads=new Set(),reading=new Set();
  const popup=()=>document.getElementById('messageArrival');
- function bind(accessToken){if(token===accessToken)return;token=accessToken;queue=[];active=null;observed=null;confirming=false;reading=new Set();if(popup())popup().hidden=true;try{seen=new Set(JSON.parse(sessionStorage.getItem('oms-popup-seen:'+token)||'[]'));}catch{seen=new Set();}try{pendingReads=new Set(JSON.parse(sessionStorage.getItem('oms-popup-pending:'+token)||'[]'));}catch{pendingReads=new Set();}}
+ function bind(accessToken){if(token===accessToken)return;stopTimer();token=accessToken;queue=[];active=null;observed=null;confirming=false;reading=new Set();if(popup())popup().hidden=true;try{seen=new Set(JSON.parse(sessionStorage.getItem('oms-popup-seen:'+token)||'[]'));}catch{seen=new Set();}try{pendingReads=new Set(JSON.parse(sessionStorage.getItem('oms-popup-pending:'+token)||'[]'));}catch{pendingReads=new Set();}}
  function render(){
   const root=popup();if(!root)return;
-  if(!active)active=queue.shift();if(!active){root.hidden=true;return;}
+  if(!active)active=queue.shift();if(!active){stopTimer();root.hidden=true;return;}
   if(!root.querySelector('.message-arrival-confirm')){
    root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-label','새 알림');
    const card=root.querySelector('.message-arrival-card'),count=document.createElement('small'),button=document.createElement('button');
@@ -31,6 +37,7 @@
   root.querySelector('.guest-popup-card')?.remove();const guest=window.OMSGuestMessageCard?.read(active),original=document.getElementById('messageArrivalBody');original.hidden=!!guest;document.getElementById('messageArrivalSender').hidden=!!guest;
   if(guest){root.querySelector('strong').textContent=window.OMSGuestMessageCard.title(guest);original.after(window.OMSGuestMessageCard.render(active));}
   if(guest?.kind==='same_day'){document.getElementById('messageArrivalDog').src='oms-dog-celebration.webp';original.textContent='';document.getElementById('messageArrivalSender').textContent='';}
+  if(!popupDeadline){popupDeadline=Date.now()+POPUP_DURATION;popupTimer=setTimeout(expire,POPUP_DURATION);}
   root.hidden=false;if(guest?.kind==='same_day')requestAnimationFrame(()=>window.OMSGuestMessageCard?.fit?.(root));root.querySelector('button').focus({preventScroll:true});
  }
  function updateCount(){const count=popup()?.querySelector('.message-arrival-count');if(count){count.textContent=queue.length+1>=2?`${queue.length+1}건 대기`:'';count.hidden=queue.length+1<2;}}
@@ -46,7 +53,7 @@
  }
  function confirm(){
   if(confirming||!active)return;confirming=true;
-  const item=active;seen.add(item.message_id);try{sessionStorage.setItem('oms-popup-seen:'+token,JSON.stringify([...seen].slice(-1000)));}catch{}
+  const item=active;seen.add(item.message_id);saveSeen();
   if(!item.report){pendingReads.add(item.message_id);saveReads();flushReads();}
   active=null;render();setTimeout(()=>confirming=false,200);
  }

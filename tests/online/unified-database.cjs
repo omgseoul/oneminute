@@ -20,6 +20,25 @@ module.exports=async({db,owner,internal,p1,p2,t1,t2,id})=>{
  await db.exec('set role anon');await assert.rejects(()=>inbox({},id(98099)),/로그인/);assert.equal((await inbox()).threads.length,1);assert((await db.query('select public.guest_message_unread($1) v',[token])).rows[0].v.ok);await db.exec('reset role');
  let rows=(await inbox()).threads;assert.equal(rows.length,1);assert.equal(rows[0].status,'qr');assert.equal(rows[0].unread,1);assert(!rows[0].replied);assert.equal(rows[0].room_name,'401');
  const summary=async(data={},t=token)=>(await db.query('select public.guest_message_summary($1,$2) v',[t,JSON.stringify({filters:{version:1,qrVersion:1,statuses:data.statuses,direction:data.direction,stayTypes:data.stay_types,unreadOnly:data.unread_only,unrepliedOnly:data.unreplied_only,properties:data.properties},period:{days:0,from:data.message_from||'1900-01-01',to:data.message_to||'2100-01-01'}})])).rows[0].v;
+ // A self-addressed popup test must not become an invisible unread conversation.
+ const fixedSummary=fs.readFileSync('supabase/setup/beds24_guest_message_summary.sql','utf8');
+ await db.exec(fixedSummary.replace(" and (case m.sender_type when 'owner' then 'owner:'||m.sender_owner_id when 'staff' then 'employee:'||m.sender_employee_id else '' end) is distinct from a->>'key'",''));
+ const selfFix=fs.readFileSync('supabase/migrations/20261118110000_staff_unread_exclude_self.sql','utf8');await db.exec(selfFix);await db.exec(selfFix);
+ await db.exec('begin');
+ for(const [actorToken,kind,n] of [[t1,'owner',98100],[t2,'owner',98110],[token,'staff',98120]]){
+  const actor=(await db.query('select omg_private.guest_actor($1) a',[actorToken])).rows[0].a;
+  const baseline=(await summary({},actorToken)).messenger_unread;
+  const mid=id(n),incoming=id(n+1),system=id(n+2),senderColumn=kind==='owner'?'sender_owner_id':'sender_employee_id',recipientColumn=kind==='owner'?'owner_id':'employee_id';
+  await db.query(`insert into property_messages(id,property_id,sender_type,${senderColumn},message,message_type,source)values($1,$2,$3,$4,'Synthetic self popup','general','oms_popup_test')`,[mid,actor.property_id,kind,actor.id]);
+  await db.query(`insert into property_message_recipients(message_id,recipient_key,recipient_type,${recipientColumn})values($1,$2,$3,$4)`,[mid,actor.key,kind,actor.id]);
+  assert.equal((await summary({},actorToken)).messenger_unread,baseline,'self-sent messages are not unread for owners or workers in any property');
+  const otherOwner=(await db.query('select omg_private.guest_actor($1) a',[actorToken===t1?t2:t1])).rows[0].a;
+  await db.query("insert into property_messages(id,property_id,sender_type,sender_owner_id,message,message_type)values($1,$2,'owner',$3,'Incoming message','general'),($4,$2,'system',null,'System reminder','general')",[incoming,actor.property_id,otherOwner.id,system]);
+  for(const message of [incoming,system])await db.query(`insert into property_message_recipients(message_id,recipient_key,recipient_type,${recipientColumn})values($1,$2,$3,$4)`,[message,actor.key,kind,actor.id]);
+  assert.equal((await summary({},actorToken)).messenger_unread,baseline+2,'incoming and system messages remain counted');
+  assert.equal((await db.query('select read_at from property_message_recipients where message_id=$1',[mid])).rows[0].read_at,null,'fix must not mark the source message read');
+ }
+ await db.exec('rollback');
  await db.exec('set role anon');assert.equal((await summary({statuses:['qr']})).unread,1);await assert.rejects(()=>summary({},id(98099)),/로그인/);await db.exec('reset role');
  for(const filters of [{},{statuses:['confirmed']},{statuses:['qr']},{statuses:[]},{direction:'host'},{unreplied_only:true},{unread_only:true},{stay_types:['other']},{message_from:'2000-01-01',message_to:'2000-01-02'}]){
   const online=(await worker('inbox',{...filters,statuses:filters.statuses?.filter(x=>x!=='qr')})).threads;

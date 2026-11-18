@@ -45,7 +45,7 @@ begin
    end loop;
   end if;
  end loop;
- select count(*) into messenger from public.property_message_recipients r join public.property_messages m on m.id=r.message_id where r.recipient_key=a->>'key' and r.read_at is null and coalesce(m.source,'')<>'beds24' and coalesce(m.message_type,'')<>'guest_chat';
+ select count(*) into messenger from public.property_message_recipients r join public.property_messages m on m.id=r.message_id where r.recipient_key=a->>'key' and r.read_at is null and coalesce(m.source,'')<>'beds24' and coalesce(m.message_type,'')<>'guest_chat' and (case m.sender_type when 'owner' then 'owner:'||m.sender_owner_id when 'staff' then 'employee:'||m.sender_employee_id else '' end) is distinct from a->>'key';
  return jsonb_build_object('ok',true,'unread',n,'threads',threads,'messenger_unread',messenger,'total_unread',omg_private.guest_message_unread(p_access_token)->'unread');
 end$function$
 ;

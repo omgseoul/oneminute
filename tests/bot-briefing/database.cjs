@@ -2,6 +2,9 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
 (async()=>{
  const db=await setup({monthly:true}),p=id(1),other=id(2),owner=id(3),token=id(4),e1=id(5),e2=id(6),e3=id(7);
  await db.exec(fs.readFileSync('supabase/setup/briefing_delivery.sql','utf8'));
+ const pickerSql=fs.readFileSync('supabase/migrations/20261109061321_admin_target_picker.sql','utf8');
+ await db.exec(pickerSql.slice(pickerSql.indexOf('create or replace function omg_private.target_work_state'),pickerSql.indexOf('create or replace function public.list_target_people')));
+ await db.exec(fs.readFileSync('supabase/setup/briefing_shared_picker.sql','utf8'));
  await db.query("insert into properties(id,name,management_number,timezone)values($1,'A',1,'Asia/Seoul'),($2,'B',2,'Asia/Seoul')",[p,other]);
  await db.query("insert into owners(id,property_id,display_name)values($1,$2,'owner');",[owner,p]);
  await db.query("insert into owner_sessions(owner_id,property_id,login_token_hash,token_expires_at)values($1,$2,omg_private.token_hash($3),'infinity')",[owner,p,token]);
@@ -66,6 +69,21 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
  assert.equal((await work('pushes')).length,1,'fixed deliveries are still waiting');
  await db.query("update omg_private.briefing_deliveries set due_at=now()-interval '1 minute' where run_id=$1",[id(60)]);
  assert.equal((await work('pushes')).length,3,'fixed-time deliveries become due');
+ await db.query("insert into property_share_requests(requester_property_id,target_property_id,status,requested_permissions) values($1,$2,'approved',array['messages'])",[other,p]);
+ await call('save',{...delivery,notify_targets:[e3]});
+ const roster=await call('get');
+ assert.equal(roster.employees.find(e=>e.id===e3).property_id,other);
+ assert.match(roster.properties.find(x=>x.id===other).name,/타지점/);
+ await db.query(`insert into omg_private.briefing_runs(id,property_id,mode,status,period_start,period_end,timezone,settings,summary,finished_at)
+ values($1,$2,'auto','completed',now()-interval '2 hours',now()-interval '1 hour','Asia/Seoul',$3,'shared summary',now())`,[id(61),p,JSON.stringify({notify_kind:'checkin',notify_targets:[e3]})]);
+ await db.query('select omg_private.briefing_enqueue_delivery(r) from omg_private.briefing_runs r where id=$1',[id(61)]);
+ assert.equal((await query('select employee_id from omg_private.briefing_deliveries where run_id=$1',[id(61)])).employee_id,e3);
+ await db.query("insert into work_sessions(id,employee_id,property_id,clock_in_at,checkin_report_at,status) values($1,$2,$3,now(),now(),'working')",[id(62),e3,other]);
+ await db.query("update property_share_requests set status='pending' where requester_property_id=$1",[other]);
+ assert.equal((await work('pushes')).length,3,'revoked sharing blocks pending message');
+ await db.query("update property_share_requests set status='approved' where requester_property_id=$1",[other]);
+ assert.equal((await work('pushes')).length,4,'the remote check-in releases its authorized briefing');
+
  // A crash after attempted request settles conservatively once, with explicit estimated flag.
  const c=await call('preview',cfg);await call('run',{id:c.run.id});const lost=await work('claim');await work('attempt',{id:lost.id,lease:lost.lease});await db.query("update omg_private.briefing_runs set leased_until=now()-interval '1 second' where id=$1",[lost.id]);await work('claim');const failed=(await call('logs')).logs.find(x=>x.id===lost.id);assert.equal(failed.status,'failed');assert.equal(failed.estimated,true);assert.ok(Number(failed.credits)>0);
  console.log('PASS: tenant/role authorization, overnight and attendance boundaries, new-message filtering, dedupe, billing, timeout recovery and recipients');await db.close();

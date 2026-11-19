@@ -238,9 +238,10 @@
   list.dataset.signature=signature;
   inlinePickers.splice(0).forEach(p=>p?.destroy?.());
   list.innerHTML=rows.length?rows.map(t=>{if(t.kind==='qr'){const html=OMSGuestInbox.markup(t,{shortDate,time,stamp,rowKey,replyMarker});return opened.has(rowKey(t))?html.replace('<details ','<details open '):html;}
-   const name=t.guest_name||'예약 #'+t.booking_id,room=t.room_name||'객실 미정',property=t.property_name||settings.property_name||'지점 미정',dates=shortDate(t.arrival)+' → '+shortDate(t.departure),preview=String(t.preview||'');
-   return `<details class="inbox-item" data-booking="${escape(rowKey(t))}" ${opened.has(rowKey(t))?'open':''}><summary aria-label="${escape(name)} 메시지 펼치기"><span class="inbox-reservation"><span class="inbox-name" title="${escape(name)}">${escape(name)}</span><span class="inbox-room" title="${escape(room)}">${escape(room)}</span><span class="inbox-dates" title="체크인 ${escape(t.arrival||'미정')} · 체크아웃 ${escape(t.departure||'미정')}">${escape(dates)}</span><span class="inbox-property" title="${escape(property)}">${escape(Array.from(property).slice(0,3).join(''))}</span>${channelMarkup(t)}<span class="inbox-chevron" aria-hidden="true">⌄</span></span><span class="inbox-preview-row"><time class="inbox-timestamp" datetime="${escape(t.sent_at)}">${escape(stamp(t.sent_at,t.property_id))}</time><span class="inbox-preview">${escape(preview.replace(/\s+/g,' ').trim()||'첨부 메시지')}</span>${t.drafts?'<span class="inbox-ai">AI 승인</span>':''}${t.unread?`<span class="badge">${Number(t.unread)}</span>`:''}${t.replied?replyMarker():''}</span></summary><div class="inbox-expanded"><div class="inbox-message"><div class="message-meta"><time datetime="${escape(t.sent_at)}">${time(t.sent_at)} · ${t.source==='guest'?'수신':t.source==='host'?'발신':'메시지'}</time>${t.source==='guest'&&preview?translationControl(t):''}</div>${t.original_body?`<p class="sent-original"><small>원문</small>${escape(t.original_body)}</p><small>보낸 번역본</small>`:''}<p class="inbox-full-message">${escape(preview||'첨부 내용은 대화에서 확인해주세요.')}</p><p class="translation-result" hidden></p><div class="inbox-thread-link"><a class="text-link" href="${escape(threadURL(t.booking_id,t.property_id))}">전체 대화 열기 ›</a></div></div><form class="inline-reply"><div class="reply-heading"><label>답변 작성</label>${translationControlsMarkup()}</div><textarea rows="2" maxlength="4000" aria-label="${escape(name)}에게 답변" placeholder="게스트에게 보낼 답변" required></textarea>${translationComposerMarkup(true)}<div class="actions"><button type="button" data-inline-draft>AI 초안 만들기</button><button type="submit" class="primary">메시지 보내기</button></div><p class="inline-state" role="status"></p></form></div></details>`;
+   const name=t.guest_name||'예약 #'+t.booking_id,room=t.room_name||'객실 미정',property=t.property_name||settings.property_name||'지점 미정',dates=shortDate(t.arrival)+' → '+shortDate(t.departure),preview=String(t.preview||''),parsed=parseMessageAttachments(preview),hasAttachments=parsed.attachments.length>0,previewText=parsed.text.split(/<a\b|<img\b/i)[0],previewLabel=previewText.replace(/\s+/g,' ').trim();
+   return `<details class="inbox-item" data-booking="${escape(rowKey(t))}" ${opened.has(rowKey(t))?'open':''}><summary aria-label="${escape(name)} 메시지 펼치기"><span class="inbox-reservation"><span class="inbox-name" title="${escape(name)}">${escape(name)}</span><span class="inbox-room" title="${escape(room)}">${escape(room)}</span><span class="inbox-dates" title="체크인 ${escape(t.arrival||'미정')} · 체크아웃 ${escape(t.departure||'미정')}">${escape(dates)}</span><span class="inbox-property" title="${escape(property)}">${escape(Array.from(property).slice(0,3).join(''))}</span>${channelMarkup(t)}<span class="inbox-chevron" aria-hidden="true">⌄</span></span><span class="inbox-preview-row"><time class="inbox-timestamp" datetime="${escape(t.sent_at)}">${escape(stamp(t.sent_at,t.property_id))}</time><span class="inbox-preview">${escape(previewLabel||'첨부 메시지')}</span>${t.drafts?'<span class="inbox-ai">AI 승인</span>':''}${t.unread?`<span class="badge">${Number(t.unread)}</span>`:''}${t.replied?replyMarker():''}</span></summary><div class="inbox-expanded"><div class="inbox-message"><div class="message-meta"><time datetime="${escape(t.sent_at)}">${time(t.sent_at)} · ${t.source==='guest'?'수신':t.source==='host'?'발신':'메시지'}</time>${t.source==='guest'&&preview&&!hasAttachments&&previewLabel?translationControl(t):''}</div>${t.original_body?`<div class="sent-original"><small>원문</small>${renderMessageAttachments(parseMessageAttachments(t.original_body))}</div><small>보낸 번역본</small>`:''}<div class="inbox-full-message">${renderMessageAttachments(hasAttachments?parsed:{...parsed,text:previewText||'첨부 내용은 대화에서 확인해주세요.'})}</div><p class="translation-result" hidden></p><div class="inbox-thread-link"><a class="text-link" href="${escape(threadURL(t.booking_id,t.property_id))}">전체 대화 열기 ›</a></div></div><form class="inline-reply"><div class="reply-heading"><label>답변 작성</label>${translationControlsMarkup()}</div><textarea rows="2" maxlength="4000" aria-label="${escape(name)}에게 답변" placeholder="게스트에게 보낼 답변" required></textarea>${translationComposerMarkup(true)}<div class="actions"><button type="button" data-inline-draft>AI 초안 만들기</button><button type="submit" class="primary">메시지 보내기</button></div><p class="inline-state" role="status"></p></form></div></details>`;
   }).join(''):'<div class="empty">선택한 기간·예약상태에 해당하는 대화가 없습니다.</div>';
+  loadThreadPhotos(list);
   bindInline(rows);if(focused){const el=[...list.querySelectorAll('.inbox-item')].find(x=>x.dataset.booking===focused)?.querySelector(editing?'textarea':'summary');el?.focus({preventScroll:true});if(editing&&el&&selection)el.setSelectionRange(...selection);}
  }
  async function loadInbox(refresh=false){if(view==='menu')return;if(guestMode)window.HomeGuestCount?.syncNative(session);const n=version,d=inboxQuery();const v=await collect(refresh?'sync_messages':'inbox',d);if(n!==version)return;renderInbox(v);$('inboxFreshness').textContent=v.warnings?.length?v.warnings.join(' · '):v.synced_at?'최근 동기화 '+time(v.synced_at):'';$('inboxFreshness').title=$('inboxFreshness').textContent;if(refresh&&!v.warnings?.length)status();}
@@ -300,7 +301,7 @@
   if(!job){job={};job.promise=new Promise((resolve,reject)=>automaticQueue.push({resolve,reject,run:()=>{if(!isActive()||!autoConfig(property).enabled)return {cancelled:true};return call('translate',{message_id:id,automatic:true},property);}}));automaticJobs.set(fingerprint,job);job.promise.catch(()=>{job.failedAt=Date.now();});pumpAutomatic();}
   job.promise.then(value=>{if(value.cancelled){automaticJobs.delete(fingerprint);return;}if(value.skipped)return;if(!translated.has(key)||translated.get(key).automatic)translated.set(key,{...value,automatic:true});if(card.isConnected&&isActive())showIncoming(card.querySelector('.translation-result'),cachedIncoming(property,id,body),value.target||target,body);}).catch(()=>{/* Keep the original and manual translate control available; do not retry on every poll. */});
  }
- function observeThreadTranslations(messages){translationObserver?.disconnect();const property=threadProperty;const translate=card=>{const m=messages.find(x=>String(x.id)===card.dataset.message);if(m?.source==='guest'&&!card.querySelector('.message-photo'))automaticIncoming(card,property,m.id,m.body,()=>view==='thread'&&threadProperty===property&&card.isConnected);};
+ function observeThreadTranslations(messages){translationObserver?.disconnect();const property=threadProperty;const translate=card=>{const m=messages.find(x=>String(x.id)===card.dataset.message);if(m?.source==='guest'&&!card.querySelector('.message-attachments'))automaticIncoming(card,property,m.id,m.body,()=>view==='thread'&&threadProperty===property&&card.isConnected);};
   if(window.IntersectionObserver){translationObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting)translate(entry.target);});for(const card of $('threadMessages').querySelectorAll('.message.guest'))translationObserver.observe(card);}else for(const card of $('threadMessages').querySelectorAll('.message.guest'))translate(card);
  }
 
@@ -335,7 +336,7 @@
    const t=rows.find(x=>rowKey(x)===el.dataset.booking),c=composer(t),form=el.querySelector('.inline-reply'),input=form.querySelector('textarea'),state=form.querySelector('.inline-state');input.value=c.body;state.textContent=c.state;form.querySelector('[type=submit]').disabled=!!c.blocked;input.oninput=()=>{c.body=input.value;if(!c.ai)c.id=null;resetTranslation(form,c);};
    const target=incomingTarget(t.property_id),cacheKey=incomingKey(t.property_id,t.message_id,t.preview,target),output=el.querySelector('.translation-result');showIncoming(output,cachedIncoming(t.property_id,t.message_id,t.preview),target,t.preview);
    const translate=el.querySelector('[data-translate]');if(translate)translate.onclick=()=>task(translate,async()=>{const v=await call('translate',{message_id:t.message_id,target},t.property_id);if(v.unconfigured)throw Error('기본정보에서 번역 API 연결을 등록해주세요.');if(v.busy)throw Error('번역 중입니다. 잠시 후 다시 확인해주세요.');translated.set(cacheKey,v);showIncoming(output,v,target,t.preview);});
-   const auto=()=>{if(t.source==='guest')automaticIncoming(el,t.property_id,t.message_id,t.preview,()=>view==='inbox'&&el.isConnected&&el.open);};if(el.open)auto();
+   const auto=()=>{if(t.source==='guest'&&el.querySelector('[data-translate]'))automaticIncoming(el,t.property_id,t.message_id,t.preview,()=>view==='inbox'&&el.isConnected&&el.open);};if(el.open)auto();
    el.addEventListener('toggle',()=>{if(el.open&&t.message_id){markInboxRead(t,el);auto();}else if(!el.open&&openPins.delete(rowKey(t)))loadInbox().catch(e=>status(e.message,true));});
    async function run(button,fn){if(c.busy)return;c.busy=true;form.querySelectorAll('button').forEach(b=>b.disabled=true);input.disabled=true;try{await task(null,fn);}finally{c.busy=false;form.querySelectorAll('button').forEach(b=>b.disabled=false);form.querySelector('[type=submit]').disabled=!!c.blocked;input.disabled=false;state.textContent=c.state;if(c.refreshInbox){c.refreshInbox=false;loadInbox().catch(e=>status(e.message,true));}}}
    form.querySelector('[data-inline-draft]').onclick=e=>run(e.currentTarget,async()=>{c.state='AI 초안을 만들고 있습니다…';state.textContent=c.state;try{await call('draft',{booking_id:t.booking_id},t.property_id);const v=await call('peek_thread',{booking_id:t.booking_id},t.property_id),d=v.outbox?.find(d=>d.status==='draft');if(!d)throw Error(v.outbox?.[0]?.error||'생성할 초안이 없습니다. 전체 대화를 확인해주세요.');resetTranslation(form,c);c.body=d.body;c.id=d.id;c.ai=true;input.value=c.body;c.state='AI 초안 · 내용을 확인한 뒤 메시지 보내기를 누르세요.';}catch(e){c.state=e.message;throw e;}});
@@ -351,21 +352,44 @@
 
 
  function logCard(d){return `<article class="item"><div class="item-title"><span>${d.kind==='ai'?'AI 답변':'직접 답변'} · #${escape(d.booking_id)}</span><span class="status-tag ${escape(d.status)}">${escape(stateLabel[d.status]||d.status)}</span></div><p class="item-meta">${escape(d.property_name||branchName(d.property_id||threadProperty))} · ${time(d.created_at)}${d.charged_micro?' · '+Number(d.charged_micro/1000).toFixed(3)+' 크레딧':''}</p>${d.original_body?`<p class="sent-original"><small>원문</small>${escape(d.original_body)}</p><small>보낸 번역본 · ${escape(d.target_language)}</small>`:''}<p class="log-text">${escape(d.body||d.error||'답변 생성 중')}</p>${d.error?`<p class="item-meta">${escape(d.error)}</p>`:''}<details class="log-details"><summary>처리 상세</summary>승인자: ${escape(d.approved_name||d.approved_by||'미승인')}<br>처리시간: ${time(d.updated_at)}<br>판단: ${escape(d.result?.reason||'—')}<br>참고 DATA: ${escape((d.result?.sources||[]).filter(x=>(d.result?.parts||[]).some(p=>p.sources?.includes(String(x.id)))).map(x=>x.title).join(', ')||'—')}</details><p><a class="text-link" href="${escape(threadURL(d.booking_id,d.property_id||threadProperty))}">대화 열기 ›</a></p></article>`;}
- function airbnbPhoto(body){
-  const match=String(body??'').match(/^\s*<a\s+href=(["'])([^"'<>]+)\1[^<>]*>\s*<img\s+src=(["'])([^"'<>]+)\3[^<>]*>\s*<\/a>\s*$/i);
-  if(!match)return null;
-  function photoUrl(value){
-   try{
-    const url=new URL(value.replace(/&amp;|&#38;|&#x26;/gi,'&'));
-    if(url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&/^a[0-9]+\.muscache\.com$/.test(url.hostname)&&url.pathname.startsWith('/im/pictures-signed/messaging/'))return url.href;
-   }catch{}
-   return null;
-  }
-  const original=photoUrl(match[2]);
-  return original?{original,preview:photoUrl(match[4])||original}:null;
+ function attachmentUrl(value){
+  try{
+   const url=new URL(value.replace(/&amp;|&#38;|&#x26;/gi,'&'));
+   if(url.protocol==='https:'&&!url.username&&!url.password)return url;
+  }catch{}
+  return null;
  }
- function renderAirbnbPhoto(photo){
-  return `<a class="message-photo" href="${escape(photo.original)}" target="_blank" rel="noopener noreferrer" aria-label="Airbnb 사진 원본 열기"><img alt="Airbnb 첨부 사진" data-photo-src="${escape(photo.preview)}" referrerpolicy="no-referrer"></a><div class="photo-site-notice" hidden><span aria-hidden="true">🖼️</span> Airbnb 사이트에서 직접 확인 필요</div>`;
+ function isAirbnbImage(url){
+  return url&&!url.port&&/^a[0-9]+\.muscache\.com$/.test(url.hostname)&&url.pathname.startsWith('/im/pictures-signed/messaging/');
+ }
+ function parseMessageAttachments(body){
+  const attachments=[];
+  const text=String(body??'').replace(/<a\b[^<>]*>[\s\S]*?<\/a\s*>|<img\b[^<>]*>/gi,source=>{
+   const anchor=source.match(/^<a\b([^<>]*)>/i);
+   const image=source.match(/<img\b([^<>]*)>/i);
+   const href=anchor?.[1].match(/(?:^|\s)href\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+   const src=image?.[1].match(/(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+   if(!href&&!image)return source;
+   const imageUrl=attachmentUrl(src?.[1]??src?.[2]??'');
+   const destination=attachmentUrl(href?.[1]??href?.[2]??'')||imageUrl;
+   const preview=isAirbnbImage(destination)?(isAirbnbImage(imageUrl)?imageUrl:destination):null;
+   const kind=image||preview?'사진':'첨부';
+   attachments.push({source,destination,preview,kind});
+   return '';
+  });
+  return {text:attachments.length?text.trim():text,attachments};
+ }
+ function renderMessageAttachments(parsed){
+  if(!parsed.attachments.length)return escape(parsed.text);
+  const cards=parsed.attachments.map(({source,destination,preview,kind})=>{
+   const icon=kind==='사진'?'🖼️':'📎';
+   const sourceBox=label=>`<details class="attachment-source"><summary><span aria-hidden="true">${icon}</span> ${label}</summary><pre>${escape(source)}</pre></details>`;
+   const direct=destination?`<a class="attachment-open" href="${escape(destination.href)}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">${icon}</span> ${kind} 열기</a>`:'';
+   const photo=preview?`<a class="message-photo" href="${escape(destination.href)}" target="_blank" rel="noopener noreferrer" aria-label="사진 원본 열기"><img alt="첨부 사진" data-photo-src="${escape(preview.href)}" referrerpolicy="no-referrer"></a>`:'';
+   const fallback=preview?sourceBox('Airbnb 사이트에서 직접 확인 필요 · 원본 소스'):direct?direct+sourceBox('원본 소스'):sourceBox(kind+' · 원본 소스');
+   return `<div class="message-attachment">${photo}<div class="attachment-actions" ${preview?'hidden':''}>${fallback}</div></div>`;
+  }).join('');
+  return `${parsed.text?`<div>${escape(parsed.text)}</div>`:''}<div class="message-attachments">${cards}</div>`;
  }
  function loadThreadPhotos(container){
   for(const img of container.querySelectorAll('[data-photo-src]')){
@@ -378,15 +402,20 @@
    img.src=img.dataset.photoSrc;
   }
  }
+ const renderedThreadMarkup=new WeakMap();
  function renderThread(v){const b=v.booking;const guestName=b?.guest_name||'예약 #'+bookingId;$('guestName').textContent=guestName;$('guestName').title=guestName;
   if(guestMode&&b){
    const property=branchName(threadProperty),letters=Array.from(property),channel=bookingChannel(b.channel||'직접 예약');
    const first=letters.slice(0,5).join(''),second=letters.slice(5,10).join('')+(letters.length>10?'..':'');
    $('guestMeta').innerHTML=`<span class="thread-property" title="${escape(property)}" aria-label="${escape(property)}"><span>${escape(first)}</span><span>${escape(second)}</span></span><span class="thread-stay"><span class="thread-room" title="${escape(b.room_name||'객실 미정')}">${escape(b.room_name||'객실 미정')}</span><span class="thread-dates" title="체크인 ${escape(b.arrival||'미정')} · 체크아웃 ${escape(b.departure||'미정')}">${escape(shortDate(b.arrival))} ~ ${escape(shortDate(b.departure))}</span></span><span class="thread-source" title="${escape(channel.name)}">${channel.icon?`<img src="assets/booking-channels/${channel.icon}.svg" alt="" width="16" height="16">`:''}<span>${escape(channel.full||channel.name)}</span></span>`;
-  }else $('guestMeta').textContent=b?`${branchName(threadProperty)} · ${b.room_name||'객실 미정'} · ${b.arrival} → ${b.departure} · ${b.channel||'직접 예약'}`:'대화를 새로고침하면 예약정보를 가져옵니다.' ;const messages=[...(v.messages||[])].sort((a,b)=>(Date.parse(b.sent_at)||0)-(Date.parse(a.sent_at)||0));$('threadMessages').innerHTML=messages.length?messages.map(m=>{const photo=airbnbPhoto(m.body),target=incomingTarget(threadProperty),cache=photo?null:cachedIncoming(threadProperty,m.id,m.body),visible=cache&&!cache.same_language&&cache.text&&cache.text!==m.body;return `<div class="message ${escape(m.source==='host'?'host':m.source==='guest'?'guest':'system')}" data-message="${escape(m.id)}">${m.original_body?`<div class="sent-original"><small>원문</small>${escape(m.original_body)}</div><small>보낸 번역본</small>`:''}${photo?renderAirbnbPhoto(photo):`<div>${escape(m.body)}</div>`}${m.attachment_name&&!photo?`<p class="note">첨부: ${escape(m.attachment_name)} · 원본은 Beds24에서 확인</p>`:''}<div class="message-meta"><small>${escape(({guest:'게스트',host:'숙소',system:'시스템',internalNote:'내부 메모'})[m.source]||m.source)} · ${time(m.sent_at)}</small>${m.source==='guest'&&m.body&&!photo?translationControl():''}</div><p class="translation-result" ${visible?'':'hidden'}>${visible?escape((languageNames[target]||target)+' · '+cache.text):''}</p></div>`;}).join(''):'<div class="empty">저장된 메시지가 없습니다. 대화를 새로고침하세요.</div>';
-  $('threadMessages').querySelectorAll('[data-translate]').forEach(button=>button.onclick=()=>task(button,async()=>{const card=button.closest('[data-message]'),m=messages.find(m=>String(m.id)===card.dataset.message),property=threadProperty,target=incomingTarget(property),v=await call('translate',{message_id:m.id,target},property);translated.set(incomingKey(property,m.id,m.body,target),v);showIncoming(card.querySelector('.translation-result'),v,target,m.body);}));
+  }else $('guestMeta').textContent=b?`${branchName(threadProperty)} · ${b.room_name||'객실 미정'} · ${b.arrival} → ${b.departure} · ${b.channel||'직접 예약'}`:'대화를 새로고침하면 예약정보를 가져옵니다.' ;const messages=[...(v.messages||[])].sort((a,b)=>(Date.parse(b.sent_at)||0)-(Date.parse(a.sent_at)||0));const container=$('threadMessages'),markup=messages.length?messages.map(m=>{const parsed=parseMessageAttachments(m.body),hasAttachments=parsed.attachments.length>0,target=incomingTarget(threadProperty),cache=hasAttachments?null:cachedIncoming(threadProperty,m.id,m.body),visible=cache&&!cache.same_language&&cache.text&&cache.text!==m.body;return `<div class="message ${escape(m.source==='host'?'host':m.source==='guest'?'guest':'system')}" data-message="${escape(m.id)}">${m.original_body?`<div class="sent-original"><small>원문</small>${renderMessageAttachments(parseMessageAttachments(m.original_body))}</div><small>보낸 번역본</small>`:''}${renderMessageAttachments(parsed)}${m.attachment_name&&!hasAttachments?`<p class="note">첨부: ${escape(m.attachment_name)} · 원본은 Beds24에서 확인</p>`:''}<div class="message-meta"><small>${escape(({guest:'게스트',host:'숙소',system:'시스템',internalNote:'내부 메모'})[m.source]||m.source)} · ${time(m.sent_at)}</small>${m.source==='guest'&&m.body&&!hasAttachments?translationControl():''}</div><p class="translation-result" ${visible?'':'hidden'}>${visible?escape((languageNames[target]||target)+' · '+cache.text):''}</p></div>`;}).join(''):'<div class="empty">저장된 메시지가 없습니다. 대화를 새로고침하세요.</div>';
+  if(renderedThreadMarkup.get(container)!==markup){
+   renderedThreadMarkup.set(container,markup);
+   container.innerHTML=markup;
+   loadThreadPhotos(container);
+  }
+  container.querySelectorAll('[data-translate]').forEach(button=>button.onclick=()=>task(button,async()=>{const card=button.closest('[data-message]'),m=messages.find(m=>String(m.id)===card.dataset.message),property=threadProperty,target=incomingTarget(property),v=await call('translate',{message_id:m.id,target},property);translated.set(incomingKey(property,m.id,m.body,target),v);showIncoming(card.querySelector('.translation-result'),v,target,m.body);}));
 
-  loadThreadPhotos($('threadMessages'));
   observeThreadTranslations(messages);
   // Do not replace edited approval text while polling.
   const drafts=v.outbox.filter(d=>d.status==='draft');const signature=drafts.map(x=>x.id+':'+x.updated_at).join('|');if($('drafts').dataset.signature!==signature){$('drafts').dataset.signature=signature;$('drafts').innerHTML=drafts.map(d=>`<section class="card draft" data-draft="${escape(d.id)}"><h3>AI 답변 · 승인 대기</h3><p class="note">${escape(d.result?.reason||'안내 DATA를 참고한 답변입니다.')}<br>수정 후 승인하면 게스트에게 발송됩니다.</p><textarea rows="5" maxlength="4000" aria-label="AI 답변 수정">${escape(d.body)}</textarea><div class="actions"><button data-reject="${escape(d.id)}">반려</button><button data-approve="${escape(d.id)}" class="primary">승인하고 발송</button></div></section>`).join('');$('drafts').querySelectorAll('[data-approve]').forEach(el=>el.onclick=()=>task(el,async()=>{const body=el.closest('.draft').querySelector('textarea').value;await send(body,el.dataset.approve);}));$('drafts').querySelectorAll('[data-reject]').forEach(el=>el.onclick=()=>task(el,async()=>{await call('reject',{id:el.dataset.reject},threadProperty);await loadThread();}));}

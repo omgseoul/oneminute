@@ -93,3 +93,10 @@ body[data-view=thread] header{margin-bottom:4px}body[data-view=thread] .heading{
 .message-photo [hidden]{display:none}
 .message-photo[hidden],.photo-site-notice[hidden]{display:none}
 .photo-site-notice{display:flex;align-items:center;gap:6px;color:#52657a;font-size:.9em}
+
+.message-attachments{display:grid;gap:5px;margin-top:4px}
+.attachment-actions:not([hidden]){display:flex;align-items:baseline;gap:5px 10px;flex-wrap:wrap;font-size:.85em}
+.attachment-source{min-width:0;max-width:100%;color:#52657a}
+.attachment-source summary{cursor:pointer}
+.attachment-source pre{box-sizing:border-box;width:100%;max-height:9em;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.8em;margin:4px 0}
+.attachment-open{color:var(--accent,#2368b2)}

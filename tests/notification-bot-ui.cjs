@@ -19,7 +19,7 @@ if(name==='respond_attendance_warning'){if(args.p_agreed===true||(args.p_agreed=
 if(name==='mark_property_message_read')__items.find(x=>x.message_id===args.p_message_id).read_at=new Date().toISOString();
 if(name==='list_property_shares')v={ok:true,properties:[{property_id:pid,management_number:1},{property_id:pid2,management_number:2}]};
 if(name==='work_report_inbox')v={ok:true,reports:[],unread_count:0};
-if(name==='get_employee_account_pay')v={ok:true,employees:[]};
+if(name==='get_employee_account_pay'||name==='employee_duty_roles')v={ok:true,employees:[]};
 if(name==='staff_chat_peer_profile')v={ok:true,profile:{display_name:'문정국',property_name:'One Minute'}};
 if(name==='staff_chat_rpc'||name==='staff_chat_compact'){const a=args.p_action,d=args.p_data||{};if(a==='rooms')v={ok:true,rooms:[{peer:'employee:33333333-3333-4333-8333-333333333333',name:'문정국',property_id:pid,property_name:'One Minute',preview:'네 알겠습니다.',updated_at:'2026-10-10T12:00:00Z',unread:1}]};else if(a==='messages')v={ok:true,can_send:true,peer:{display_name:'문정국'},messages:d.before_time?[{id:'old',body:'이전 청소 안내',created_at:'2026-09-01T10:00:00Z',mine:true}]:d.after_time?[]:[{id:'now',body:'오늘 청소를 완료했습니다.',created_at:'2026-10-10T10:00:00Z',mine:true}]};}
 return {data:v};}};

@@ -1,6 +1,6 @@
 const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict');
 (async()=>{
- const db=await setup(),p=id(1),other=id(2),owner=id(3),token=id(4),e1=id(5),e2=id(6),e3=id(7);
+ const db=await setup({monthly:true}),p=id(1),other=id(2),owner=id(3),token=id(4),e1=id(5),e2=id(6),e3=id(7);
  await db.query("insert into properties(id,name,management_number,timezone)values($1,'A',1,'Asia/Seoul'),($2,'B',2,'Asia/Seoul')",[p,other]);
  await db.query("insert into owners(id,property_id,display_name)values($1,$2,'owner');",[owner,p]);
  await db.query("insert into owner_sessions(owner_id,property_id,login_token_hash,token_expires_at)values($1,$2,omg_private.token_hash($3),'infinity')",[owner,p,token]);

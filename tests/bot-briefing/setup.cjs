@@ -1,7 +1,7 @@
 const {PGlite}=require('@electric-sql/pglite');
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
-async function setup(){
+async function setup({monthly=false}={}){
  const db=new PGlite();await db.exec(fs.readFileSync('tests/holiday-requests/schema.sql','utf8'));
  await db.exec(`create role service_role;create schema extensions;create function extensions.gen_random_bytes(int) returns bytea language sql as $$select decode(repeat('ab',$1),'hex')$$;create function extensions.digest(bytea,text) returns bytea language sql as $$select decode(md5($1),'hex')$$;
  create schema vault;create table vault.secrets(id uuid primary key default gen_random_uuid(),name text unique,decrypted_secret text);create view vault.decrypted_secrets as select * from vault.secrets;
@@ -25,6 +25,7 @@ async function setup(){
 
  await db.exec(`alter table work_sessions add column unconfirmed_ended_at timestamptz;`);
  await db.exec(fs.readFileSync('supabase/setup/bot_briefing.sql','utf8'));
+ if(monthly)await db.exec(fs.readFileSync('supabase/setup/monthly_ai_allowance.sql','utf8'));
  return db;
 }
 module.exports={setup,id};

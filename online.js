@@ -300,7 +300,7 @@
   if(!job){job={};job.promise=new Promise((resolve,reject)=>automaticQueue.push({resolve,reject,run:()=>{if(!isActive()||!autoConfig(property).enabled)return {cancelled:true};return call('translate',{message_id:id,automatic:true},property);}}));automaticJobs.set(fingerprint,job);job.promise.catch(()=>{job.failedAt=Date.now();});pumpAutomatic();}
   job.promise.then(value=>{if(value.cancelled){automaticJobs.delete(fingerprint);return;}if(value.skipped)return;if(!translated.has(key)||translated.get(key).automatic)translated.set(key,{...value,automatic:true});if(card.isConnected&&isActive())showIncoming(card.querySelector('.translation-result'),cachedIncoming(property,id,body),value.target||target,body);}).catch(()=>{/* Keep the original and manual translate control available; do not retry on every poll. */});
  }
- function observeThreadTranslations(messages){translationObserver?.disconnect();const property=threadProperty;const translate=card=>{const m=messages.find(x=>String(x.id)===card.dataset.message);if(m?.source==='guest')automaticIncoming(card,property,m.id,m.body,()=>view==='thread'&&threadProperty===property&&card.isConnected);};
+ function observeThreadTranslations(messages){translationObserver?.disconnect();const property=threadProperty;const translate=card=>{const m=messages.find(x=>String(x.id)===card.dataset.message);if(m?.source==='guest'&&!card.querySelector('.message-photo'))automaticIncoming(card,property,m.id,m.body,()=>view==='thread'&&threadProperty===property&&card.isConnected);};
   if(window.IntersectionObserver){translationObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting)translate(entry.target);});for(const card of $('threadMessages').querySelectorAll('.message.guest'))translationObserver.observe(card);}else for(const card of $('threadMessages').querySelectorAll('.message.guest'))translate(card);
  }
 
@@ -351,14 +351,42 @@
 
 
  function logCard(d){return `<article class="item"><div class="item-title"><span>${d.kind==='ai'?'AI 답변':'직접 답변'} · #${escape(d.booking_id)}</span><span class="status-tag ${escape(d.status)}">${escape(stateLabel[d.status]||d.status)}</span></div><p class="item-meta">${escape(d.property_name||branchName(d.property_id||threadProperty))} · ${time(d.created_at)}${d.charged_micro?' · '+Number(d.charged_micro/1000).toFixed(3)+' 크레딧':''}</p>${d.original_body?`<p class="sent-original"><small>원문</small>${escape(d.original_body)}</p><small>보낸 번역본 · ${escape(d.target_language)}</small>`:''}<p class="log-text">${escape(d.body||d.error||'답변 생성 중')}</p>${d.error?`<p class="item-meta">${escape(d.error)}</p>`:''}<details class="log-details"><summary>처리 상세</summary>승인자: ${escape(d.approved_name||d.approved_by||'미승인')}<br>처리시간: ${time(d.updated_at)}<br>판단: ${escape(d.result?.reason||'—')}<br>참고 DATA: ${escape((d.result?.sources||[]).filter(x=>(d.result?.parts||[]).some(p=>p.sources?.includes(String(x.id)))).map(x=>x.title).join(', ')||'—')}</details><p><a class="text-link" href="${escape(threadURL(d.booking_id,d.property_id||threadProperty))}">대화 열기 ›</a></p></article>`;}
+ function airbnbPhoto(body){
+  const match=String(body??'').match(/^\s*<a\s+href=(["'])([^"'<>]+)\1[^<>]*>\s*<img\s+src=(["'])([^"'<>]+)\3[^<>]*>\s*<\/a>\s*$/i);
+  if(!match)return null;
+  function photoUrl(value){
+   try{
+    const url=new URL(value.replace(/&amp;|&#38;|&#x26;/gi,'&'));
+    if(url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&/^a[0-9]+\.muscache\.com$/.test(url.hostname)&&url.pathname.startsWith('/im/pictures-signed/messaging/'))return url.href;
+   }catch{}
+   return null;
+  }
+  const original=photoUrl(match[2]);
+  return original?{original,preview:photoUrl(match[4])||original}:null;
+ }
+ function renderAirbnbPhoto(photo){
+  return `<a class="message-photo" href="${escape(photo.original)}" target="_blank" rel="noopener noreferrer" aria-label="Airbnb 사진 원본 열기"><img alt="Airbnb 첨부 사진" data-photo-src="${escape(photo.preview)}" referrerpolicy="no-referrer"><span class="note" hidden>사진을 불러올 수 없습니다. Airbnb에서 확인해주세요.</span></a>`;
+ }
+ function loadThreadPhotos(container){
+  for(const img of container.querySelectorAll('[data-photo-src]')){
+   const link=img.closest('.message-photo');
+   img.addEventListener('error',()=>{
+    if(img.src!==link.href){img.src=link.href;return;}
+    img.hidden=true;
+    img.nextElementSibling.hidden=false;
+   });
+   img.src=img.dataset.photoSrc;
+  }
+ }
  function renderThread(v){const b=v.booking;const guestName=b?.guest_name||'예약 #'+bookingId;$('guestName').textContent=guestName;$('guestName').title=guestName;
   if(guestMode&&b){
    const property=branchName(threadProperty),letters=Array.from(property),channel=bookingChannel(b.channel||'직접 예약');
    const first=letters.slice(0,5).join(''),second=letters.slice(5,10).join('')+(letters.length>10?'..':'');
    $('guestMeta').innerHTML=`<span class="thread-property" title="${escape(property)}" aria-label="${escape(property)}"><span>${escape(first)}</span><span>${escape(second)}</span></span><span class="thread-stay"><span class="thread-room" title="${escape(b.room_name||'객실 미정')}">${escape(b.room_name||'객실 미정')}</span><span class="thread-dates" title="체크인 ${escape(b.arrival||'미정')} · 체크아웃 ${escape(b.departure||'미정')}">${escape(shortDate(b.arrival))} ~ ${escape(shortDate(b.departure))}</span></span><span class="thread-source" title="${escape(channel.name)}">${channel.icon?`<img src="assets/booking-channels/${channel.icon}.svg" alt="" width="16" height="16">`:''}<span>${escape(channel.full||channel.name)}</span></span>`;
-  }else $('guestMeta').textContent=b?`${branchName(threadProperty)} · ${b.room_name||'객실 미정'} · ${b.arrival} → ${b.departure} · ${b.channel||'직접 예약'}`:'대화를 새로고침하면 예약정보를 가져옵니다.' ;const messages=[...(v.messages||[])].sort((a,b)=>(Date.parse(b.sent_at)||0)-(Date.parse(a.sent_at)||0));$('threadMessages').innerHTML=messages.length?messages.map(m=>{const target=incomingTarget(threadProperty),cache=cachedIncoming(threadProperty,m.id,m.body),visible=cache&&!cache.same_language&&cache.text&&cache.text!==m.body;return `<div class="message ${escape(m.source==='host'?'host':m.source==='guest'?'guest':'system')}" data-message="${escape(m.id)}">${m.original_body?`<div class="sent-original"><small>원문</small>${escape(m.original_body)}</div><small>보낸 번역본</small>`:''}<div>${escape(m.body)}</div>${m.attachment_name?`<p class="note">첨부: ${escape(m.attachment_name)} · 원본은 Beds24에서 확인</p>`:''}<div class="message-meta"><small>${escape(({guest:'게스트',host:'숙소',system:'시스템',internalNote:'내부 메모'})[m.source]||m.source)} · ${time(m.sent_at)}</small>${m.source==='guest'&&m.body?translationControl():''}</div><p class="translation-result" ${visible?'':'hidden'}>${visible?escape((languageNames[target]||target)+' · '+cache.text):''}</p></div>`;}).join(''):'<div class="empty">저장된 메시지가 없습니다. 대화를 새로고침하세요.</div>';
+  }else $('guestMeta').textContent=b?`${branchName(threadProperty)} · ${b.room_name||'객실 미정'} · ${b.arrival} → ${b.departure} · ${b.channel||'직접 예약'}`:'대화를 새로고침하면 예약정보를 가져옵니다.' ;const messages=[...(v.messages||[])].sort((a,b)=>(Date.parse(b.sent_at)||0)-(Date.parse(a.sent_at)||0));$('threadMessages').innerHTML=messages.length?messages.map(m=>{const photo=airbnbPhoto(m.body),target=incomingTarget(threadProperty),cache=photo?null:cachedIncoming(threadProperty,m.id,m.body),visible=cache&&!cache.same_language&&cache.text&&cache.text!==m.body;return `<div class="message ${escape(m.source==='host'?'host':m.source==='guest'?'guest':'system')}" data-message="${escape(m.id)}">${m.original_body?`<div class="sent-original"><small>원문</small>${escape(m.original_body)}</div><small>보낸 번역본</small>`:''}${photo?renderAirbnbPhoto(photo):`<div>${escape(m.body)}</div>`}${m.attachment_name&&!photo?`<p class="note">첨부: ${escape(m.attachment_name)} · 원본은 Beds24에서 확인</p>`:''}<div class="message-meta"><small>${escape(({guest:'게스트',host:'숙소',system:'시스템',internalNote:'내부 메모'})[m.source]||m.source)} · ${time(m.sent_at)}</small>${m.source==='guest'&&m.body&&!photo?translationControl():''}</div><p class="translation-result" ${visible?'':'hidden'}>${visible?escape((languageNames[target]||target)+' · '+cache.text):''}</p></div>`;}).join(''):'<div class="empty">저장된 메시지가 없습니다. 대화를 새로고침하세요.</div>';
   $('threadMessages').querySelectorAll('[data-translate]').forEach(button=>button.onclick=()=>task(button,async()=>{const card=button.closest('[data-message]'),m=messages.find(m=>String(m.id)===card.dataset.message),property=threadProperty,target=incomingTarget(property),v=await call('translate',{message_id:m.id,target},property);translated.set(incomingKey(property,m.id,m.body,target),v);showIncoming(card.querySelector('.translation-result'),v,target,m.body);}));
 
+  loadThreadPhotos($('threadMessages'));
   observeThreadTranslations(messages);
   // Do not replace edited approval text while polling.
   const drafts=v.outbox.filter(d=>d.status==='draft');const signature=drafts.map(x=>x.id+':'+x.updated_at).join('|');if($('drafts').dataset.signature!==signature){$('drafts').dataset.signature=signature;$('drafts').innerHTML=drafts.map(d=>`<section class="card draft" data-draft="${escape(d.id)}"><h3>AI 답변 · 승인 대기</h3><p class="note">${escape(d.result?.reason||'안내 DATA를 참고한 답변입니다.')}<br>수정 후 승인하면 게스트에게 발송됩니다.</p><textarea rows="5" maxlength="4000" aria-label="AI 답변 수정">${escape(d.body)}</textarea><div class="actions"><button data-reject="${escape(d.id)}">반려</button><button data-approve="${escape(d.id)}" class="primary">승인하고 발송</button></div></section>`).join('');$('drafts').querySelectorAll('[data-approve]').forEach(el=>el.onclick=()=>task(el,async()=>{const body=el.closest('.draft').querySelector('textarea').value;await send(body,el.dataset.approve);}));$('drafts').querySelectorAll('[data-reject]').forEach(el=>el.onclick=()=>task(el,async()=>{await call('reject',{id:el.dataset.reject},threadProperty);await loadThread();}));}

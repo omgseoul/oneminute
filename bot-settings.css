@@ -24,3 +24,7 @@
 .briefing-notify{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .briefing-notify label{min-width:0}
 .briefing-notify select,.bot-settings-fields .briefing-notify input{width:100%;min-width:0;box-sizing:border-box;height:39px;margin-top:6px;padding:5px;border:1px solid #dce4ee;border-radius:10px;background:white;color:#183153;font-size:12px}
+
+.briefing-heading .briefing-help-button{flex:0 0 auto}
+.briefing-heading label{white-space:nowrap}
+.briefing-role-options+ .briefing-role-options{border-top:1px solid #e3eaf4;display:grid;gap:7px}

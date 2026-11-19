@@ -1,6 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {buildRequest,validateResult,createBriefingHandler} from '../../supabase/functions/bot-briefing/handler.mjs';
 const id='00000000-0000-0000-0000-000000000001',job={id,lease:id,prompt:'시설 문제를 요약',inputs:[{thread_id:'online:1',room_number:'객실 미확인',guest_name:'6081 Hwei Yen Ho',messages:[{id:'1',body:'Room 201 door will not open',sender:'guest',in_period:true},{id:'2',body:'We will check',sender:'host',in_period:true}]}]};
-const issue={thread_id:'online:1',evidence_ids:['1'],urgency:'urgent',status:'unresolved',issue:'문이 열리지 않습니다.',action:'문 상태를 확인해주세요.',reported_room:'201',room_quote:'Room 201'};
+const issue={thread_id:'online:1',evidence_ids:['1'],category:'onsite',urgency:'urgent',status:'unresolved',issue:'문이 열리지 않습니다.',action:'문 상태를 확인해주세요.',reported_room:'201',room_quote:'Room 201'};
+test('briefing lists reservation, onsite and cleaning separately',()=>{
+ const result=validateResult({issues:[issue,{...issue,category:'cleaning',issue:'수건 교체 필요'}]},job);
+ assert.match(result.summary,/■ 예약관리\n보고할 사항 없음/);
+ assert.match(result.summary,/■ 현장관리[\s\S]*문이 열리지 않습니다/);
+ assert.match(result.summary,/■ 청소[\s\S]*수건 교체 필요/);
+});
 test('validated evidence, mandatory room, name cleanup; no fabricated rooms or unrelated conversation',()=>{
  const v=validateResult({issues:[issue]},job);assert.match(v.summary,/201 \(대화에서 확인\)/);assert.match(v.summary,/Hwei Yen Ho/);assert.doesNotMatch(v.summary,/6081/);
  assert.equal(validateResult({issues:[{...issue,room_quote:'room 555',reported_room:'555'}]},job).issues[0].room_number,'객실 미확인');

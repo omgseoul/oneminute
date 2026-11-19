@@ -1,7 +1,7 @@
 name: Verify bot briefing and employee roles
 on:
   pull_request:
-    paths: ['bot-briefing.js', 'supabase/setup/briefing_test_delivery.sql', 'supabase/migrations/*briefing_test_delivery.sql', 'supabase/setup/briefing_shared_picker.sql', 'supabase/migrations/*briefing_shared_picker.sql', 'bot-settings.*', 'employee-duty-roles.js', 'staff-management.html', 'supabase/functions/bot-briefing/**', 'supabase/functions/dispatch-briefing/**', 'supabase/setup/bot_briefing.sql', 'supabase/migrations/*bot_briefing_roles.sql', 'supabase/setup/monthly_ai_allowance.sql', 'supabase/migrations/*monthly_ai_allowance.sql', 'platform-ai.js', 'tests/bot-briefing/**', '.github/workflows/bot-briefing-checks.yml']
+    paths: ['bot-briefing.js', 'supabase/setup/briefing_owner_delivery.sql', 'supabase/migrations/*briefing_owner_delivery.sql', 'supabase/setup/briefing_test_delivery.sql', 'supabase/migrations/*briefing_test_delivery.sql', 'supabase/setup/briefing_shared_picker.sql', 'supabase/migrations/*briefing_shared_picker.sql', 'bot-settings.*', 'employee-duty-roles.js', 'staff-management.html', 'supabase/functions/bot-briefing/**', 'supabase/functions/dispatch-briefing/**', 'supabase/setup/bot_briefing.sql', 'supabase/migrations/*bot_briefing_roles.sql', 'supabase/setup/monthly_ai_allowance.sql', 'supabase/migrations/*monthly_ai_allowance.sql', 'platform-ai.js', 'tests/bot-briefing/**', '.github/workflows/bot-briefing-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read

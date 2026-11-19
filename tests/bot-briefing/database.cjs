@@ -108,5 +108,25 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
  const empty=await query(`select m.message from omg_private.briefing_deliveries d
   join property_messages m on m.id=d.message_ids[1] where d.run_id=$1`,[noMessages.run.id]);
  assert.match(empty.message,/새로 수신한 게스트 대화가 없습니다/);
+ // Even with no selected staff, the source owner and approved shared owners get briefings.
+ await db.exec(fs.readFileSync('supabase/setup/briefing_owner_delivery.sql','utf8'));
+ await db.query("insert into owners(id,property_id,display_name)values($1,$2,'shared admin')",[id(71),other]);
+ const rosterOwners=(await call('get')).shared_owners;
+ assert.deepEqual(rosterOwners.map(x=>x.id),[id(71)]);
+ const ownerRuns=[];
+ for(const targets of [[],['skip-owner:'+id(71),'skip-owner:'+owner]]){
+  const run=await call('preview',{...cfg,notify_targets:targets});ownerRuns.push(run.run.id);
+  await call('run',{id:run.run.id});await work('claim');await work('pushes');
+ }
+ const recipients=async run=>(await db.query(`select r.owner_id from omg_private.briefing_deliveries d
+  join property_message_recipients r on r.message_id=d.message_ids[1]
+  where d.run_id=$1 and r.owner_id is not null order by r.owner_id`,[run])).rows.map(x=>x.owner_id);
+ assert.deepEqual(await recipients(ownerRuns[0]),[owner,id(71)]);
+ assert.deepEqual(await recipients(ownerRuns[1]),[owner]);
+ await db.exec(`create table public.notification_bots(property_id uuid,alert_mode text,display_name text);
+ create function omg_private.bot_recipient_modes(uuid,text) returns jsonb language sql as $$select '{"recipient_topics":[],"recipient_modes":{}}'::jsonb$$`);
+ const ownerDelivery=await query("select message_ids[1] mid from omg_private.briefing_deliveries where run_id=$1 and owner_id=$2",[ownerRuns[1],owner]);
+ const routes=(await query('select public.get_briefing_push_dispatch($1) v',[ownerDelivery.mid])).v;
+ assert.deepEqual(routes.recipient_topics,['property_1_owner_'+owner]);
  console.log('PASS: tenant/role authorization, overnight and attendance boundaries, new-message filtering, dedupe, billing, timeout recovery and recipients');await db.close();
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -1,0 +1,52 @@
+const {setup,id}=require('./setup.cjs'),fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ const db=await setup(),p=id(1),other=id(2),owner=id(3),token=id(4),employee=id(5),admin=id(6);
+ await db.query("insert into properties(id,name,management_number,timezone)values($1,'A',1,'Asia/Seoul'),($2,'B',2,'Asia/Seoul')",[p,other]);
+ await db.query("insert into owners(id,property_id,display_name)values($1,$2,'owner')",[owner,p]);
+ await db.query("insert into owner_sessions(owner_id,property_id,login_token_hash,token_expires_at)values($1,$2,omg_private.token_hash($3),'infinity')",[owner,p,token]);
+ await db.query("insert into employees(id,property_id,display_name)values($1,$2,'worker')",[employee,p]);
+ await db.query('insert into platform_administrators(user_id)values($1)',[admin]);
+ const one=async(sql,args=[])=>(await db.query(sql,args)).rows[0];
+ await db.exec("create or replace function omg_private.ai_month()returns date language sql stable as $$select '2026-11-01'::date$$");
+ await db.query("insert into omg_private.ai_wallets(property_id,monthly_limit_micro,balance_micro)values($1,1000000,0),($2,1000000,0)",[p,other]);
+ await db.query("insert into omg_private.ai_usage_month(property_id,month,used_micro)values($1,'2026-11-01',200000)",[p]);
+ await db.exec(fs.readFileSync('supabase/setup/monthly_ai_allowance.sql','utf8'));
+ const wallet=async(prop=p)=>one('select balance_micro,monthly_limit_micro,allowance_month from omg_private.ai_wallets where property_id=$1',[prop]);
+ const summary=async()=> (await one('select omg_private.ai_summary($1) v',[p])).v;
+ assert.equal((await wallet()).balance_micro,800000);assert.equal((await wallet(other)).balance_micro,1000000);
+ // Real API role, not postgres: successful reads/writes AND denial cases.
+ await db.exec('set role anon');
+ assert.equal((await one("select employee_duty_roles($1,$2,'get') v",[token,p])).v.ok,true);
+ await one("select employee_duty_roles($1,$2,'save',$3)",[token,p,JSON.stringify({employee_id:employee,roles:['reservation']})]);
+ assert.equal((await one("select bot_briefing_settings($1,$2,'get') v",[token,p])).v.ok,true);
+ await assert.rejects(()=>one("select employee_duty_roles($1,$2)",[id(99),p]),/권한/);
+ await assert.rejects(()=>one("select employee_duty_roles($1,$2)",[token,other]),/권한/);
+ await assert.rejects(()=>one('select * from omg_private.ai_wallets'),/permission/);
+ await db.exec('reset role');
+ // Reservation is reported separately; balance means allowance minus actual usage.
+ await db.query("update omg_private.ai_wallets set balance_micro=balance_micro-100000 where property_id=$1",[p]);
+ await db.query("update omg_private.ai_usage_month set reserved_micro=100000 where property_id=$1 and month='2026-11-01'",[p]);
+ assert.equal((await wallet()).balance_micro,800000);assert.equal(Number((await summary()).available),700);
+ // Existing debit/refund settlement writes cannot double-charge. Usage is canonical.
+ await db.query("update omg_private.ai_wallets set balance_micro=balance_micro+100000-15000 where property_id=$1",[p]);
+ await db.query("update omg_private.ai_usage_month set reserved_micro=0,used_micro=used_micro+15000 where property_id=$1 and month='2026-11-01'",[p]);
+ assert.equal((await wallet()).balance_micro,785000);
+ const save=async(cap,request,delta=0)=>one("select omg_private.ai_platform($1,'wallet',$2) v",[admin,JSON.stringify({property_id:p,monthly_limit:cap,delta,enabled:true,request_id:request})]);
+ await save(1200,id(11));assert.equal((await wallet()).balance_micro,985000);
+ await save(1200,id(11));assert.equal((await wallet()).balance_micro,985000,'retry cannot refill');
+ await assert.rejects(()=>save(1200,id(12),100),/별도 잔액/);
+ await save(100,id(13));assert.equal((await wallet()).balance_micro,0,'cap below usage disables remaining spend');
+ await save(1000,id(14));assert.equal((await wallet()).balance_micro,785000);
+ await db.exec("create or replace function omg_private.ai_month()returns date language sql stable as $$select '2026-12-01'::date$$");
+ assert.equal(Number((await summary()).balance),1000,'read is correct before cron');
+ await one('select omg_private.ai_refresh_month($1)',[p]);await one('select omg_private.ai_refresh_month($1)',[p]);
+ assert.equal((await wallet()).balance_micro,1000000,'new month resets without rollover');
+ await db.query("insert into omg_private.ai_usage_month(property_id,month,used_micro)values($1,'2026-12-01',50000)",[p]);
+ await db.query("update omg_private.ai_wallets set balance_micro=balance_micro-20000 where property_id=$1",[p]);
+ await db.query("update omg_private.ai_usage_month set used_micro=used_micro+20000 where property_id=$1 and month='2026-11-01'",[p]);
+ assert.equal((await wallet()).balance_micro,950000,'old period settlement does not debit new month');
+ await db.query("update omg_private.ai_wallets set balance_micro=balance_micro+100000 where property_id=$1",[p]);
+ assert.equal((await wallet()).balance_micro,950000,'old reservation refund does not inflate current month');
+ await db.query("insert into omg_private.ai_wallets(property_id,monthly_limit_micro)values($1,0) on conflict(property_id)do update set monthly_limit_micro=0",[other]);
+ assert.equal((await wallet(other)).balance_micro,0);await db.close();console.log('PASS: initial allowance, usage debit, reservations, cap changes, idempotency, month rollover/late settlement, real anon role permissions and tenant isolation');
+})().catch(e=>{console.error(e);process.exit(1)});

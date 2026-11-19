@@ -1,6 +1,7 @@
 window.BotSettings=(()=>{
- let currentName='OMS 알림',generation=0;
+ let currentName='OMS 알림',generation=0,activeBriefing;
  async function mount({host,accessToken,propertyId,profileEditor,bindProfileEditor,onReady}){
+ activeBriefing?.destroy?.();activeBriefing=null;
  const version=++generation;host.innerHTML='<div class="bot-settings-loading" role="status">알림 봇 불러오는 중…</div>';currentName='OMS 알림';
  async function rpc(action,data={}){const {data:v,error}=await omgSupabase.rpc('notification_bot_settings',{p_access_token:accessToken,p_property_id:propertyId,p_action:action,p_data:data});if(error||!v?.ok)throw Error(v?.message||error?.message||'봇 설정을 불러오지 못했습니다.');return v;}
  try{const v=await rpc('get');if(version!==generation)return;const b={...v.bot,profile_image:await window.OMSBotAvatar.upgrade(v.bot.profile_image)};if(version!==generation)return;currentName=b.display_name;const row=document.createElement('div');row.className='bot-settings-card';
@@ -10,6 +11,7 @@ window.BotSettings=(()=>{
  row.querySelector('.employee-toggle').onclick=event=>{const fields=row.querySelector('.bot-settings-fields'),open=fields.hidden;fields.hidden=!open;event.currentTarget.textContent=open?'⌃':'⌄';event.currentTarget.setAttribute('aria-expanded',String(open));event.currentTarget.setAttribute('aria-label',open?'봇 설정 접기':'봇 설정 펼치기');};
  let briefing;row.querySelector('.bot-save').onclick=async()=>{const button=row.querySelector('.bot-save'),status=row.querySelector('.bot-settings-actions [role=status]');button.disabled=true;status.textContent='';try{if(!briefing)throw Error('브리핑 설정을 불러오는 중입니다.');await briefing.save();const saved=await rpc('save',{display_name:row.querySelector('.bot-name').value.trim(),profile_image:row.querySelector('.profile-editor').dataset.profileImage||null,alert_mode:mode});currentName=saved.bot.display_name;row.querySelector('.employee-summary-name').textContent=currentName;status.textContent='저장했습니다.';}catch(error){status.textContent=error.message;}finally{button.disabled=false;}};
  host.replaceChildren(row);onReady();briefing=await BotBriefing.mount(row,accessToken,propertyId);
+ if(version===generation)activeBriefing=briefing;else briefing?.destroy?.();
  }catch(error){if(version!==generation)return;host.replaceChildren();const status=document.createElement('p');status.className='bot-settings-note';status.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.textContent='다시 불러오기';retry.onclick=()=>mount({host,accessToken,propertyId,profileEditor,bindProfileEditor,onReady});host.append(status,retry);onReady();}
  }
  return {mount,matches:q=>!q||`${currentName} 봇 알림`.toLowerCase().includes(q)};

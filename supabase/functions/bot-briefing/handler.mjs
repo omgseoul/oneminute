@@ -47,7 +47,7 @@ export function createBriefingHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()
  async function drain(){
   await worker('schedule');
   const started=Date.now();for(let n=0;n<4&&Date.now()-started<100000;n++){const job=await worker('claim');if(job.empty)break;if(!job.skip)await process(job);}
-  const pushes=await worker('pushes');for(const run of pushes){let success=true;for(const mid of run.message_ids){try{const res=await fetcher(base()+'/functions/v1/dispatch-notification/briefing',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:mid}),signal:AbortSignal.timeout(20000)});if(!res.ok)success=false;}catch{success=false;}}if(success)await worker('pushed',{id:run.id});}
+  const pushes=await worker('pushes');for(const run of pushes){let success=true;for(const mid of run.message_ids){try{const res=await fetcher(base()+'/functions/v1/dispatch-briefing',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:mid}),signal:AbortSignal.timeout(20000)});if(!res.ok)success=false;}catch{success=false;}}if(success)await worker('pushed',{id:run.id});}
  }
  return async req=>{
   const origin=req.headers.get('origin'),allowed=['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io'];const headers={'Content-Type':'application/json','Cache-Control':'no-store',Vary:'Origin'};if(allowed.includes(origin))headers['Access-Control-Allow-Origin']=origin;

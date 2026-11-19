@@ -1,7 +1,7 @@
 name: Verify bot briefing and employee roles
 on:
   pull_request:
-    paths: ['bot-briefing.js', 'bot-settings.*', 'employee-duty-roles.js', 'staff-management.html', 'supabase/functions/bot-briefing/**', 'supabase/setup/bot_briefing.sql', 'supabase/migrations/*bot_briefing_roles.sql', 'tests/bot-briefing/**', '.github/workflows/bot-briefing-checks.yml']
+    paths: ['bot-briefing.js', 'bot-settings.*', 'employee-duty-roles.js', 'staff-management.html', 'supabase/functions/bot-briefing/**', 'supabase/functions/dispatch-briefing/**', 'supabase/setup/bot_briefing.sql', 'supabase/migrations/*bot_briefing_roles.sql', 'tests/bot-briefing/**', '.github/workflows/bot-briefing-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,7 @@ jobs:
         run: |
           node tests/bot-briefing/database.cjs
           node --test tests/bot-briefing/edge.mjs
+          node tests/bot-briefing/dispatch.mjs
           node tests/bot-briefing/browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()

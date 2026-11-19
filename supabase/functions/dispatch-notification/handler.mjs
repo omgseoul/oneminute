@@ -147,15 +147,6 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if(env('PUSH_DELIVERY_ENABLED')!=='true')return reply({ok:false,code:'not_enabled'},503);
         deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
         payload={alertId:String(deliveryId),message:onlineNoticeBody(dispatch),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route?.replace(/^online\.html#thread\//,'guest-messages.html#thread/'),...guestPresentation(dispatch.guest_context)};
-      } else if (path.endsWith('/briefing')) {
-        const secret=env('PUSH_ADMIN_SECRET');
-        if(!secret||req.headers.get('x-webhook-secret')!==secret)return reply({ok:false,code:'unauthorized'},401);
-        if(!uuid.test(body.message_id||''))return reply({ok:false,code:'invalid_request'},400);
-        const dispatch=await rpc('get_briefing_push_dispatch',{p_message_id:body.message_id});
-        if(!dispatch.ok)return reply({ok:false,code:'not_found'},404);
-        if(env('PUSH_DELIVERY_ENABLED')!=='true')return reply({ok:false,code:'not_enabled'},503);
-        deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
-        payload={alertId:String(deliveryId),message:preview(dispatch.message),mode:dispatch.priority==='urgent'?'urgent':'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'메시지 브리핑'};
       } else if (path.endsWith('/reminder')) {
         if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);

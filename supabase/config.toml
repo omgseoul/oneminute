@@ -20,3 +20,6 @@ verify_jwt = false
 [functions.employment-contracts]
 # Every operation validates a custom OMS owner/worker session and contract ownership.
 verify_jwt = false
+
+[functions.bot-briefing]
+verify_jwt = false

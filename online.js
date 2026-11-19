@@ -365,15 +365,15 @@
   return original?{original,preview:photoUrl(match[4])||original}:null;
  }
  function renderAirbnbPhoto(photo){
-  return `<a class="message-photo" href="${escape(photo.original)}" target="_blank" rel="noopener noreferrer" aria-label="Airbnb 사진 원본 열기"><img alt="Airbnb 첨부 사진" data-photo-src="${escape(photo.preview)}" referrerpolicy="no-referrer"><span class="note" hidden>사진을 불러올 수 없습니다. Airbnb에서 확인해주세요.</span></a>`;
+  return `<a class="message-photo" href="${escape(photo.original)}" target="_blank" rel="noopener noreferrer" aria-label="Airbnb 사진 원본 열기"><img alt="Airbnb 첨부 사진" data-photo-src="${escape(photo.preview)}" referrerpolicy="no-referrer"></a><div class="photo-site-notice" hidden><span aria-hidden="true">🖼️</span> Airbnb 사이트에서 직접 확인 필요</div>`;
  }
  function loadThreadPhotos(container){
   for(const img of container.querySelectorAll('[data-photo-src]')){
    const link=img.closest('.message-photo');
    img.addEventListener('error',()=>{
     if(img.src!==link.href){img.src=link.href;return;}
-    img.hidden=true;
-    img.nextElementSibling.hidden=false;
+    link.hidden=true;
+    link.nextElementSibling.hidden=false;
    });
    img.src=img.dataset.photoSrc;
   }

@@ -91,3 +91,5 @@ body[data-view=thread] header{margin-bottom:4px}body[data-view=thread] .heading{
 .message-photo{display:block;max-width:100%;color:inherit}
 .message-photo img{display:block;max-width:100%;max-height:320px;width:auto;height:auto;border-radius:10px;object-fit:contain}
 .message-photo [hidden]{display:none}
+.message-photo[hidden],.photo-site-notice[hidden]{display:none}
+.photo-site-notice{display:flex;align-items:center;gap:6px;color:#52657a;font-size:.9em}

@@ -5,6 +5,7 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
  const pickerSql=fs.readFileSync('supabase/migrations/20261109061321_admin_target_picker.sql','utf8');
  await db.exec(pickerSql.slice(pickerSql.indexOf('create or replace function omg_private.target_work_state'),pickerSql.indexOf('create or replace function public.list_target_people')));
  await db.exec(fs.readFileSync('supabase/setup/briefing_shared_picker.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/briefing_test_delivery.sql','utf8'));
  await db.query("insert into properties(id,name,management_number,timezone)values($1,'A',1,'Asia/Seoul'),($2,'B',2,'Asia/Seoul')",[p,other]);
  await db.query("insert into owners(id,property_id,display_name)values($1,$2,'owner');",[owner,p]);
  await db.query("insert into owner_sessions(owner_id,property_id,login_token_hash,token_expires_at)values($1,$2,omg_private.token_hash($3),'infinity')",[owner,p,token]);
@@ -86,5 +87,26 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
 
  // A crash after attempted request settles conservatively once, with explicit estimated flag.
  const c=await call('preview',cfg);await call('run',{id:c.run.id});const lost=await work('claim');await work('attempt',{id:lost.id,lease:lost.lease});await db.query("update omg_private.briefing_runs set leased_until=now()-interval '1 second' where id=$1",[lost.id]);await work('claim');const failed=(await call('logs')).logs.find(x=>x.id===lost.id);assert.equal(failed.status,'failed');assert.equal(failed.estimated,true);assert.ok(Number(failed.credits)>0);
+ // A confirmed test sends to its current audience even while automatic delivery is off.
+ await call('save',{...cfg,enabled:false});
+ await assert.rejects(()=>call('preview',{...cfg,notify_targets:[id(999)]}),/근무자/);
+ const test=await call('preview',{...cfg,notify_targets:[e1]});
+ assert.equal((await query("select count(*) n from omg_private.briefing_deliveries where run_id=$1",[test.run.id])).n,0);
+ await call('run',{id:test.run.id});
+ const manual=await work('claim');assert.equal(manual.id,test.run.id);
+ await work('finish',{...res,id:manual.id,lease:manual.lease,issues:[]});
+ await work('finish',{...res,id:manual.id,lease:manual.lease,issues:[]});
+ await work('pushes');
+ const sent=await query(`select m.message,r.employee_id from omg_private.briefing_deliveries d
+  join property_messages m on m.id=d.message_ids[1] join property_message_recipients r on r.message_id=m.id
+  where d.run_id=$1`,[manual.id]);
+ assert.equal(sent.employee_id,e1);assert.match(sent.message,/\[테스트\]/);
+ assert.equal((await query("select count(*) n from omg_private.briefing_deliveries where run_id=$1",[manual.id])).n,1);
+ await db.query("delete from omg_private.online_messages where property_id=$1",[p]);
+ const noMessages=await call('preview',{...cfg,notify_targets:[e2]});await call('run',{id:noMessages.run.id});
+ await work('claim');await work('pushes');
+ const empty=await query(`select m.message from omg_private.briefing_deliveries d
+  join property_messages m on m.id=d.message_ids[1] where d.run_id=$1`,[noMessages.run.id]);
+ assert.match(empty.message,/새로 수신한 게스트 대화가 없습니다/);
  console.log('PASS: tenant/role authorization, overnight and attendance boundaries, new-message filtering, dedupe, billing, timeout recovery and recipients');await db.close();
 })().catch(e=>{console.error(e);process.exit(1);});

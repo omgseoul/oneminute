@@ -17,6 +17,13 @@ const server=http.createServer((req,res)=>{const f=path.resolve(root,'.'+new URL
  await page.locator('.briefing-start-kind').selectOption('time');await page.locator('.briefing-end-kind').selectOption('time');
  page.once('dialog',async d=>{assert.match(d.message(),/2026.*11.*18/);await d.dismiss();});await page.locator('.briefing-run').click();await page.waitForFunction(()=>document.querySelector('.briefing-run-status').textContent.includes('취소'));assert.equal(requests.filter(r=>r.action==='run').length,0);
  page.once('dialog',d=>d.accept());await page.locator('.briefing-run').click();await page.waitForFunction(()=>document.querySelector('.briefing-result').textContent.includes('201호'));assert.match(await page.locator('.briefing-run-status').innerText(),/0.527/);
- await page.locator('.briefing-logs').click();await page.waitForSelector('.briefing-log-dialog details');await page.locator('.briefing-log-dialog summary').click();assert.match(await page.locator('.briefing-log-dialog').innerText(),/1200/);await page.locator('.briefing-log-close').click();await page.locator('.bot-save').click();await page.waitForFunction(()=>document.querySelector('.bot-settings-actions small').textContent.includes('저장했습니다'));assert.ok(requests.some(r=>r.action==='save'&&r.data.enabled));
+ await page.locator('.briefing-targets summary').click();
+ await page.locator('.briefing-target-list input[value=all]').check();
+ assert.equal(await page.locator('.briefing-target-list input[value=onsite]').isDisabled(),true);
+ await page.locator('.briefing-target-list input[value=all]').uncheck();
+ await page.locator('.briefing-target-list input[value=onsite]').check();
+ await page.locator('.briefing-notify-kind').selectOption('checkin');
+ assert.equal(await page.locator('.briefing-notify-time').isVisible(),false);
+ await page.locator('.briefing-logs').click();await page.waitForSelector('.briefing-log-dialog details');await page.locator('.briefing-log-dialog summary').click();assert.match(await page.locator('.briefing-log-dialog').innerText(),/1200/);await page.locator('.briefing-log-close').click();await page.locator('.bot-save').click();await page.waitForFunction(()=>document.querySelector('.bot-settings-actions small').textContent.includes('저장했습니다'));assert.ok(requests.some(r=>r.action==='save'&&r.data.enabled&&r.data.notify_kind==='checkin'&&r.data.notify_targets.includes('onsite')));
  await page.screenshot({path:'/tmp/oms-briefing-mobile.png',fullPage:true});assert.deepEqual(errors,[]);console.log('PASS: real account screen, single-line roles at 320–716px, attendance-only inputs, confirm cancel/execute, summary/credit logs and saving');
  }finally{await browser.close();server.close();}})().catch(e=>{console.error(e);server.close();process.exit(1);});

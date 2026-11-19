@@ -3,15 +3,53 @@ window.BotBriefing=(()=>{
  function period(run){const fmt=new Intl.DateTimeFormat('ko-KR',{timeZone:run.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});return fmt.format(new Date(run.period_start))+' ~ '+fmt.format(new Date(run.period_end));}
  async function mount(host,token,property){
   const box=document.createElement('section');box.className='bot-briefing';host.querySelector('.bot-settings-actions').before(box);let loaded=false,logsDialog=null;
-  box.innerHTML=`<div class="briefing-heading"><label><input type="checkbox" class="briefing-enabled" disabled>브리핑</label><button type="button" class="employee-help briefing-help-button" aria-label="브리핑 도움말" aria-expanded="false">?</button></div><p class="briefing-help" hidden>정해진 시간에 메세지를 모두 종합하여 요약해주는 기능입니다.</p><div class="briefing-fields" hidden><div class="briefing-times"><label>시작시간<div class="briefing-time-controls"><select class="briefing-start-kind" aria-label="시작시간 기준"><option value="time">시간</option><option value="checkout">예약관리 퇴근시</option></select><span class="briefing-clock"><input class="briefing-start-time" type="time" aria-label="브리핑 시작시간"><span class="briefing-time-value" aria-hidden="true"></span></span></div></label><label>종료시간<div class="briefing-time-controls"><select class="briefing-end-kind" aria-label="종료시간 기준"><option value="time">시간</option><option value="checkin">예약관리 출근시</option></select><span class="briefing-clock"><input class="briefing-end-time" type="time" aria-label="브리핑 종료시간"><span class="briefing-time-value" aria-hidden="true"></span></span></div></label></div><p class="briefing-note">출퇴근 기준은 예약관리 담당자의 마지막 퇴근보고부터 첫 출근보고까지입니다. 자동 브리핑은 봇을 통해 관리자와 해당 지점 예약관리 담당자에게 전달됩니다.</p><label>브리핑 프롬프트<textarea class="briefing-prompt" rows="7" maxlength="12000"></textarea></label><p class="briefing-note">기간 내 새 메시지를 받은 온라인·현장 게스트 대화를 분석합니다. 사진·동영상의 내용은 직접 판독하지 않습니다.</p><button type="button" class="briefing-run">실행</button><p class="briefing-run-status" role="status"></p><pre class="briefing-result" hidden></pre></div><div class="briefing-footer"><small class="briefing-status" role="status">불러오는 중…</small><button type="button" class="briefing-logs">실행 로그</button></div>`;
+  box.innerHTML=`<div class="briefing-heading"><label><input type="checkbox" class="briefing-enabled" disabled>브리핑</label><button type="button" class="employee-help briefing-help-button" aria-label="브리핑 도움말" aria-expanded="false">?</button></div><p class="briefing-help" hidden>정해진 시간에 메세지를 모두 종합하여 요약해주는 기능입니다.</p><div class="briefing-fields" hidden><div class="briefing-times"><label>시작시간<div class="briefing-time-controls"><select class="briefing-start-kind" aria-label="시작시간 기준"><option value="time">시간</option><option value="checkout">예약관리 퇴근시</option></select><span class="briefing-clock"><input class="briefing-start-time" type="time" aria-label="브리핑 시작시간"><span class="briefing-time-value" aria-hidden="true"></span></span></div></label><label>종료시간<div class="briefing-time-controls"><select class="briefing-end-kind" aria-label="종료시간 기준"><option value="time">시간</option><option value="checkin">예약관리 출근시</option></select><span class="briefing-clock"><input class="briefing-end-time" type="time" aria-label="브리핑 종료시간"><span class="briefing-time-value" aria-hidden="true"></span></span></div></label></div><p class="briefing-note">출퇴근 기준은 예약관리 담당자의 마지막 퇴근보고부터 첫 출근보고까지입니다.</p><details class="briefing-targets"><summary>브리핑 대상 <span class="briefing-target-count"></span></summary><div class="briefing-target-list"></div></details><div class="briefing-notify"><label>알림 시점<select class="briefing-notify-kind"><option value="time">시간 지정</option><option value="checkin">출근보고 시</option></select></label><label class="briefing-notify-clock">알림 시간<input class="briefing-notify-time" type="time"></label></div><p class="briefing-note">분석이 끝난 브리핑을 선택한 근무자의 봇 알림으로 보냅니다.</p><label>브리핑 프롬프트<textarea class="briefing-prompt" rows="7" maxlength="12000"></textarea></label><p class="briefing-note">기간 내 새 메시지를 받은 온라인·현장 게스트 대화를 분석합니다. 사진·동영상의 내용은 직접 판독하지 않습니다.</p><button type="button" class="briefing-run">실행</button><p class="briefing-run-status" role="status"></p><pre class="briefing-result" hidden></pre></div><div class="briefing-footer"><small class="briefing-status" role="status">불러오는 중…</small><button type="button" class="briefing-logs">실행 로그</button></div>`;
   const q=s=>box.querySelector(s),enabled=q('.briefing-enabled'),status=q('.briefing-status');
   async function call(action,data={}){const res=await fetch(OMG_SUPABASE.url+'/functions/v1/bot-briefing',{method:'POST',headers:{apikey:OMG_SUPABASE.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({access_token:token,property_id:property,action,data})});const v=await res.json();if(!res.ok||!v.ok)throw Error(v.message||'브리핑 요청에 실패했습니다.');return v;}
+  const targetList=q('.briefing-target-list');
+  const allTargets=()=>[...targetList.querySelectorAll('input')];
+  const selectedTargets=()=>allTargets().filter(input=>input.checked).map(input=>input.value);
+  function updateTargets(){
+   const selected=selectedTargets(),all=selected.includes('all');
+   for(const input of allTargets())input.disabled=all&&input.value!=='all';
+   q('.briefing-target-count').textContent=all?'전체 근무자':selected.length?selected.length+'개 선택':'선택 없음';
+  }
+  function loadTargets(employees,selected){
+   const options=[['all','전체 근무자'],['reservation','예약관리자'],['onsite','현장관리자'],['cleaning','청소'],
+    ...employees.map(employee=>[employee.id,employee.name])];
+   targetList.replaceChildren(...options.map(([value,name])=>{
+    const label=document.createElement('label'),input=document.createElement('input');
+    input.type='checkbox';input.value=value;input.checked=selected.includes(value);
+    label.append(input,document.createTextNode(name));return label;
+   }));
+   updateTargets();
+  }
+  targetList.onchange=updateTargets;
+  function paintNotify(){
+   const fixed=q('.briefing-notify-kind').value==='time';
+   q('.briefing-notify-clock').hidden=!fixed;
+   q('.briefing-notify-time').disabled=!fixed;
+  }
+  q('.briefing-notify-kind').onchange=paintNotify;
   function paint(){q('.briefing-fields').hidden=!enabled.checked;for(const end of ['start','end']){const input=q('.briefing-'+end+'-time'),manual=q('.briefing-'+end+'-kind').value==='time';input.parentElement.hidden=!manual;input.disabled=!manual;input.parentElement.parentElement.classList.toggle('attendance-time',!manual);input.nextElementSibling.textContent=input.value||'--:--';} }
   for(const end of ['start','end']){const input=q('.briefing-'+end+'-time');input.oninput=()=>{input.nextElementSibling.textContent=input.value||'--:--';};input.onclick=()=>{try{input.showPicker?.();}catch{}};}
   enabled.onchange=paint;for(const end of ['start','end'])q('.briefing-'+end+'-kind').onchange=paint;
   q('.briefing-help-button').onclick=e=>{const help=q('.briefing-help');help.hidden=!help.hidden;e.currentTarget.setAttribute('aria-expanded',String(!help.hidden));};
   function read(){if(!loaded)throw Error('브리핑 설정을 먼저 불러와주세요.');const data={enabled:enabled.checked,start_kind:q('.briefing-start-kind').value,end_kind:q('.briefing-end-kind').value,start_time:q('.briefing-start-time').value||null,end_time:q('.briefing-end-time').value||null,prompt:q('.briefing-prompt').value.trim()};if(data.enabled){if(data.start_kind==='time'&&!data.start_time||data.end_kind==='time'&&!data.end_time)throw Error('시작·종료 시간을 선택해주세요.');if(!data.prompt)throw Error('프롬프트를 입력해주세요.');}return data;}
-  async function save(){if(!loaded)return;await call('save',read());status.textContent='브리핑 설정을 저장했습니다.';}
+  async function save(){
+   if(!loaded)return;
+   const data=read();
+   if(data.enabled){
+    const targets=selectedTargets();
+    if(!targets.length)throw Error('브리핑을 받을 근무자를 선택해주세요.');
+    data.notify_targets=targets.includes('all')?['all']:targets;
+    data.notify_kind=q('.briefing-notify-kind').value;
+    data.notify_time=data.notify_kind==='time'?q('.briefing-notify-time').value:null;
+    if(data.notify_kind==='time'&&!data.notify_time)throw Error('알림 시간을 선택해주세요.');
+   }
+   await call('save',data);
+   status.textContent='브리핑 설정을 저장했습니다.';
+  }
   function showRun(run){const result=q('.briefing-result');q('.briefing-run-status').textContent=`${statusLabels[run.status]||run.status} · ${run.conversation_count||0}개 대화 · ${Number(run.credits||0).toFixed(3)} 크레딧${run.estimated?' (추정 정산)':''}`;result.hidden=!run.summary&&!run.error;result.textContent=run.summary||run.error||'';}
   async function logs(){
    if(logsDialog?.isConnected)logsDialog.remove();logsDialog=document.createElement('dialog');logsDialog.className='briefing-log-dialog';logsDialog.innerHTML='<header><strong>브리핑 실행 로그</strong><button type="button" class="briefing-log-close" aria-label="실행 로그 닫기">×</button></header><p class="briefing-note">사용 크레딧은 지점 AI 잔액에서 차감됩니다. 1크레딧 = US$0.001</p><button type="button" class="briefing-log-refresh">새로고침</button><div class="briefing-log-list" role="status"></div>';
@@ -27,7 +65,7 @@ window.BotBriefing=(()=>{
    const result=await call('run',{id:preview.run.id});q('.briefing-run-status').textContent='분석 중입니다. 실행 로그에서도 확인할 수 있습니다.';
    for(let n=0;n<30;n++){if(!box.isConnected)return;const v=await call('logs');const run=v.logs.find(x=>x.id===result.id);if(run){showRun(run);if(!['pending','running'].includes(run.status))break;}await new Promise(resolve=>setTimeout(resolve,3000));}
   }catch(e){q('.briefing-run-status').textContent=e.message;}finally{button.disabled=false;}};
-  try{const v=await call('get'),s=v.settings;if(!box.isConnected)return {save};enabled.checked=s.enabled;for(const k of ['start','end']){q('.briefing-'+k+'-kind').value=s[k+'_kind'];q('.briefing-'+k+'-time').value=s[k+'_time']?.slice(0,5)||'';}q('.briefing-prompt').value=s.prompt;loaded=true;enabled.disabled=false;paint();status.textContent=v.provider_ready?`AI 잔액 ${Number(v.usage.balance).toFixed(3)} 크레딧`:'AI 연결을 확인해주세요.';}catch(e){status.textContent=e.message;}
+  try{const v=await call('get'),s=v.settings;if(!box.isConnected)return {save};enabled.checked=s.enabled;for(const k of ['start','end']){q('.briefing-'+k+'-kind').value=s[k+'_kind'];q('.briefing-'+k+'-time').value=s[k+'_time']?.slice(0,5)||'';}q('.briefing-prompt').value=s.prompt;loadTargets(v.employees||[],s.notify_targets||['reservation']);q('.briefing-notify-kind').value=s.notify_kind||'time';q('.briefing-notify-time').value=s.notify_time?.slice(0,5)||'09:00';paintNotify();loaded=true;enabled.disabled=false;paint();status.textContent=v.provider_ready?`AI 잔액 ${Number(v.usage.balance).toFixed(3)} 크레딧`:'AI 연결을 확인해주세요.';}catch(e){status.textContent=e.message;}
   return {save};
  }
  return {mount};

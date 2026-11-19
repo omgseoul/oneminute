@@ -11,3 +11,13 @@
 
 /* Keep a complete 24-hour value visible even at 320px; retain the native picker. */
 .briefing-clock{position:relative;display:flex;align-items:center;justify-content:center;flex:1;min-width:0;height:39px;border:1px solid #dce4ee;border-radius:10px;box-sizing:border-box;background:white;color:#183153;font-size:12px;font-weight:600}.bot-settings-fields .briefing-clock input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}.briefing-clock:focus-within{outline:2px solid #397bc6;outline-offset:1px}.briefing-time-value{pointer-events:none;font-variant-numeric:tabular-nums}
+
+.briefing-targets{border:1px solid #dce4ee;border-radius:10px;background:white;margin:12px 0;color:#183153;font-size:12px}
+.briefing-targets summary{padding:10px;cursor:pointer;font-weight:700}
+.briefing-target-count{float:right;color:#718198;font-weight:400}
+.briefing-target-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px;padding:0 10px 10px;max-height:170px;overflow:auto}
+.bot-settings-fields .briefing-target-list label{display:flex;gap:6px;align-items:center;color:#183153;overflow-wrap:anywhere}
+.bot-settings-fields .briefing-target-list input{width:15px;height:15px;min-height:0;margin:0;padding:0;flex:0 0 15px;accent-color:#397bc6}
+.briefing-notify{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.briefing-notify label{min-width:0}
+.briefing-notify select,.bot-settings-fields .briefing-notify input{width:100%;min-width:0;box-sizing:border-box;height:39px;margin-top:6px;padding:5px;border:1px solid #dce4ee;border-radius:10px;background:white;color:#183153;font-size:12px}

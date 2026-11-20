@@ -35,7 +35,7 @@
     if(!item.property_name||item.is_own_property===true||!(item.is_own_property===false||(ownPropertyId&&item.property_id&&item.property_id!==ownPropertyId)))return '';
     const name=String(item.property_name).trim(),chars=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(name)].map(x=>x.segment):Array.from(name);
     const lines=[chars.slice(0,5).join('')];if(chars.length>5)lines.push(chars.slice(5,chars.length>10?8:10).join('')+(chars.length>10?'..':''));
-    return `<small class="oms-mission-property" title="${escape(name)}" aria-label="타지점 ${escape(name)}">${lines.map(line=>`<b>${escape(line)}</b>`).join('')}</small>`;
+    return `<small class="oms-mission-property" title="${escape(name)}" aria-label="지점 ${escape(name)}">${lines.map(line=>`<b>${escape(line)}</b>`).join('')}</small>`;
   }
   window.OMSMissionTasks={complete,pending,dateKey,section,load,propertyTag};
   window.OMSWorkerTasks={events(items,employeeId){return items.filter(item=>(item.target_employee_ids||[]).includes(employeeId)||item.can_edit&&!item.holiday_request_id);},pending(items,employeeId){return pending(items,employeeId).filter(item=>!item.completed_at);}};

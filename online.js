@@ -448,6 +448,12 @@
   const options={host:$('propertyName'),items:branches.map(p=>({value:String(p.id),label:p.name})),title:'온라인 관리 지점'};
   propertyPicker=mode==='single'?omgPropertySelector.mountSingle({...options,value:selectedProperty,onChange:changeSettingsProperty}):omgPropertySelector.mountMulti({...options,allLabel:'All',allOptionLabel:'모든 지점',selectionUnit:'개 지점',selectedValues:selectedProperties,onChange:ids=>{
    if(switching||taskCount||sending){propertyPicker.setValues(selectedProperties,false);return;}
+   if(view==='cleaning'&&location.hash.startsWith('#cleaning?')){
+    // A Home shortcut sets the initial branch and date. Once the picker is used,
+    // keep that date and let the user's branch selection take precedence.
+    history.replaceState(history.state,'','#cleaning');
+    saveCleaning();
+   }
    selectedProperties=ids;saveInboxPreferences();pickerMode=JSON.stringify(['multi',branches,selectedProperties]);version++;bookingRows=inboxRows=cleaningRows=null;$('bookingList').replaceChildren();$('bookingDataList').replaceChildren();$('inboxList').replaceChildren();delete $('inboxList').dataset.signature;$('logList').replaceChildren();
    if(view==='thread'){go('inbox',true);return;}if(view==='booking-data'){go('booking-data',true);return;}navigate().catch(e=>status(e.message,true));
   }});lockPicker(switching||taskCount>0);

@@ -34,7 +34,7 @@
     <section id="calendarCompanion" hidden>
       <h2 id="companionDate"></h2>
       <div class="companion-section-head"><h3>To do</h3><button id="companionAddTask" class="companion-pen" type="button" aria-label="To do 추가" title="To do 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z"/></svg></button></div><div id="companionTasks"></div>
-      <div class="companion-section-head"><h3>일정</h3><button id="companionAddEvent" class="companion-pen" type="button" aria-label="일정 추가" title="일정 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z"/></svg></button></div><div id="companionEvents"></div>
+      <div class="companion-section-head"><h3>일정</h3></div><div id="companionEvents"></div>
     </section>
     <div class="calendar-legend"><span><i class="legend-event"></i>일정</span><span><i class="legend-task"></i>To do</span></div>
     <div class="calendar-floating-actions">
@@ -60,7 +60,7 @@
       </div>
       <label>내용<textarea id="eventDetails" maxlength="2000" rows="3" placeholder="필요한 내용을 적어주세요"></textarea></label>
       <div id="targetFieldset" class="calendar-target-field" hidden>
-        <label>대상</label><label><input type="checkbox" id="calendarPrivate"> 관리자 Only</label><div id="calendarTargets"></div>
+        <label>대상</label><label class="calendar-all-day"><input type="checkbox" id="calendarPrivate"> 관리자 Only</label><div id="calendarTargets"></div>
       </div>
       <div id="eventFormMessage" role="alert"></div>
       <div class="calendar-form-actions"><button id="deleteEvent" class="delete-event" type="button" hidden>삭제</button><button id="saveEvent" class="save-event" type="submit">저장</button></div>
@@ -69,7 +69,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script>
-  <script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script><script src="worker-tasks.js?v=20261123-private"></script><script src="calendar-companion.js?v=1"></script><script src="calendar.js?v=20261123-mobile-layout"></script>
+  <script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script><script src="worker-tasks.js?v=20261123-private"></script><script src="calendar-companion.js?v=1"></script><script src="calendar.js?v=20261123-date-editor"></script>
 </body>
 </html>
 

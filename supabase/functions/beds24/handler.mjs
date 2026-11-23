@@ -19,10 +19,17 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  const tokenProperties=new Map();
  const control=(action,property,data={})=>rpc('online_sync_control',{p_action:action,p_property:property,p_data:data});
  const owner=(token,action,data={})=>rpc('online_owner',{p_token:token,p_action:action,p_data:data});
- async function api(path,headers={},body){
+ async function api(path,headers={},body,{method=body?'POST':'GET',confirmation}={}){
+  const ordinary=method==='GET'||(method==='POST'&&['/bookings/messages','/authentication/setup'].includes(path));
+  if(!ordinary||confirmation){
+   if(!UUID.test(confirmation?.accessToken||'')||typeof confirmation.password!=='string'||!confirmation.password)
+    throw Error('관리자 2차 비밀번호를 입력해주세요.');
+   const verified=await rpc('verify_owner_sensitive_password',{p_access_token:confirmation.accessToken,p_password:confirmation.password});
+   if(!verified?.ok)throw Error(verified?.message||'관리자 2차 비밀번호를 확인해주세요.');
+  }
   const property=tokenProperties.get(headers.token||headers.refreshToken);
   if(property){const gate=await control('check',property);if(gate.skip){const e=Error('Beds24 요청 제한으로 동기화를 잠시 쉬고 있습니다.');e.status=429;throw e;}}
-  const r=await fetcher(BASE+path,{method:body?'POST':'GET',headers:{accept:'application/json','Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
+  const r=await fetcher(BASE+path,{method,headers:{accept:'application/json','Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
   if(property&&(r.status===429||(r.headers.get('x-five-min-limit-remaining')!==null&&Number(r.headers.get('x-five-min-limit-remaining'))<=0))){const reset=Number(r.headers.get('x-five-min-limit-resets-in'))||Number(r.headers.get('retry-after'))||300;await control('cooldown',property,{seconds:Math.ceil(reset)+2});}
   let v;try{v=await r.json();}catch{throw Error('Beds24 응답을 확인하지 못했습니다.');}
   if(!r.ok||v?.success===false){const e=Error(r.status===429?'Beds24 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.':r.status===401||r.status===403?'Beds24 연결 또는 API 권한을 확인해주세요.':'Beds24 요청에 실패했습니다. 연결 설정과 권한을 확인해주세요.');e.status=r.status;throw e;}

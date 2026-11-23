@@ -1,3 +1,4 @@
+import {createAutoMessages} from './auto-messages.mjs';
 import {createWebCheckin} from './web-checkin.mjs';
 import {createDocumentReader} from './web-checkin-document.mjs';
 import {createTranslation} from './translation.mjs';
@@ -14,6 +15,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  const url=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
  async function rpc(name,args){const r=await fetcher(url()+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'서버 처리에 실패했습니다. 다시 시도해주세요.');return v;}
  const translation=createTranslation({rpc,fetcher});
+ const autoMessages=createAutoMessages({rpc,credentials,api,saveBookings,messages});
  const webCheckin=createWebCheckin({rpc,credentials,api,readDocument:createDocumentReader({rpc,fetcher})});
  const internal=(action,property,data={})=>rpc('online_internal',{p_action:action,p_property:property,p_data:data});
  const tokenProperties=new Map();
@@ -120,12 +122,12 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     await internal('webhook',p,{key:secret,booking_id:positive(payload.booking?.id),event_kind:payload.message||payload.messages?'message':'booking'});waitUntil(drain());return reply({ok:true});
    }
    if(req.method!=='POST')return reply({ok:false},405);
-   if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(drain());return reply({ok:true},202);}
+   if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(Promise.all([drain(),autoMessages.drain()]));return reply({ok:true},202);}
    const reader=req.body?.getReader();if(!reader)return reply({ok:false},400);let size=0;const chunks=[];
    while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>3000000){await reader.cancel();return reply({ok:false,message:'첨부 이미지가 너무 큽니다.'},413);}chunks.push(value);}
    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
    const raw=new TextDecoder().decode(bytes),b=JSON.parse(raw),d=b.data||{};
-   if(size>30000&&!(['web_checkin','web_checkin_preview'].includes(b.action)&&d.step==='upload'))return reply({ok:false},413);
+   if(size>30000&&!(b.action==='auto_message_save'&&size<=300000)&&!(['web_checkin','web_checkin_preview'].includes(b.action)&&d.step==='upload'))return reply({ok:false},413);
    if(['web_checkin','web_checkin_preview','web_checkin_settings','web_checkin_save','web_checkin_diagnose'].includes(b.action))return reply(await webCheckin(b.action,d,b.access_token||null,req));
    if(b.platform_token){
     const r=await fetcher(url()+'/auth/v1/user',{headers:{apikey:key(),Authorization:'Bearer '+b.platform_token},signal:AbortSignal.timeout(10000)});
@@ -138,6 +140,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     throw Error('지원하지 않는 운영센터 요청입니다.');
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
+   if(['auto_message_list','auto_message_save','auto_message_toggle'].includes(b.action))return reply(await rpc('auto_message_owner',{p_token:b.access_token,p_action:b.action.slice(13),p_data:d}));
    const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
    if(b.action==='guest_settings')return reply(await scoped('guest_settings'));

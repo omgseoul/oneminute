@@ -1,0 +1,32 @@
+name: Guest automatic messages
+on:
+  pull_request:
+    paths: ['guest-auto-messages.*', 'guest-messages.html', 'guest-inbox.css', 'online.js', 'supabase/functions/beds24/**', 'supabase/setup/guest_auto_messages.sql', 'supabase/migrations/*guest_auto_messages.sql', 'tests/online/auto-messages-*', '.github/workflows/auto-message-checks.yml']
+  push:
+    branches: [main]
+    paths: ['guest-auto-messages.*', 'supabase/functions/beds24/auto-messages.mjs', 'supabase/setup/guest_auto_messages.sql', 'tests/online/auto-messages-*']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: cd tests/attendance-nfc && npx playwright install --with-deps chromium
+      - name: Validate scheduling, authorization, delivery and mobile editor
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node --check guest-auto-messages.js
+          node tests/online/auto-messages-database.cjs
+          node tests/online/auto-messages-edge.mjs
+          node tests/online/auto-messages-ui.cjs
+          node tests/online/unified-browser.cjs
+          node tests/online/edge.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auto-message-mobile-layouts
+          path: /tmp/auto-message-*.png

@@ -19,7 +19,19 @@
 <section class="card" id="profileWarningSettings"><h2>근무자 정보 관리</h2><div class="profile-warning-choice"><label><input id="profileWarningEnabled" type="checkbox" disabled>근무자 정보 미입력 경고</label><button type="button" class="employee-help" data-help-toggle aria-label="근무자 정보 미입력 경고 도움말" aria-expanded="false" aria-controls="profileWarningHelp">?</button></div><p id="profileWarningHelp" class="employee-field-help" hidden>근무자 정보 항목 중 미입력된 항목이 있는 경우, 매번 출근보고 시 입력 요청 알림이 발생합니다. 근무자 계정에서 볼 수 있고 직접 입력 가능한 정보만 확인합니다.</p><div class="profile-warning-footer"><small id="profileWarningStatus" role="status"></small><button id="profileWarningSave" type="button" disabled>설정 저장</button></div></section>
 
 <button id="saveButton" class="save" type="submit">계정 저장</button><div id="message" class="message" role="alert"></div>
-</form></main><div id="profileModal" class="profile-modal" hidden><section class="profile-sheet" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle"><div class="profile-handle" aria-hidden="true"></div><header class="profile-sheet-head"><h2 id="profileModalTitle">프로필 변경</h2><button id="profileClose" class="profile-close" type="button" aria-label="프로필 변경 닫기">×</button></header><span class="profile-section-title">동물 아바타 선택</span><div id="profileAvatarPicker" class="avatar-picker"></div><div class="profile-divider"><span>또는</span></div><label class="profile-upload">내 사진 업로드<input id="profileUpload" type="file" accept="image/*" hidden></label><button id="profileDelete" class="profile-delete" type="button">현재 프로필 사진 삭제</button></section></div>
+</form></main>
+<dialog id="sensitivePasswordDialog" aria-labelledby="sensitivePasswordTitle" style="width:min(420px,calc(100% - 32px));border:1px solid #dce4ee;border-radius:16px;padding:20px">
+<form id="sensitivePasswordForm">
+<h2 id="sensitivePasswordTitle">관리자 2차 비밀번호</h2>
+<p class="help">예약 삭제 같은 민감한 작업을 확인할 때 사용합니다.</p>
+<p><label>로그인 PIN <input name="loginPin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" maxlength="8" autocomplete="off" required></label></p>
+<p id="currentSensitivePasswordField" hidden><label>현재 2차 비밀번호 <input name="currentPassword" type="password" maxlength="72" autocomplete="current-password"></label></p>
+<p><label>새 2차 비밀번호 <input name="newPassword" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label></p>
+<p><label>새 비밀번호 확인 <input name="repeatPassword" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label></p>
+<div id="sensitivePasswordMessage" class="message" role="status"></div>
+<button id="closeSensitivePassword" class="small-btn" type="button">닫기</button>
+<button class="small-btn" type="submit">저장</button>
+</form></dialog><div id="profileModal" class="profile-modal" hidden><section class="profile-sheet" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle"><div class="profile-handle" aria-hidden="true"></div><header class="profile-sheet-head"><h2 id="profileModalTitle">프로필 변경</h2><button id="profileClose" class="profile-close" type="button" aria-label="프로필 변경 닫기">×</button></header><span class="profile-section-title">동물 아바타 선택</span><div id="profileAvatarPicker" class="avatar-picker"></div><div class="profile-divider"><span>또는</span></div><label class="profile-upload">내 사진 업로드<input id="profileUpload" type="file" accept="image/*" hidden></label><button id="profileDelete" class="profile-delete" type="button">현재 프로필 사진 삭제</button></section></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script><script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script>
 <style>.warning-choice>select[hidden]{display:none}.warning-choice:has(.warning-event) .warning-target-panel{left:auto;right:0}.employee-profile-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:9px}.employee-profile-row .profile-editor{grid-column:auto;min-width:0;gap:7px;padding:7px}.employee-profile-row .profile-preview{width:38px;height:38px;flex-basis:38px;font-size:15px}.employee-profile-row .profile-change{min-width:0;padding:0 8px;white-space:nowrap}.employee-job{display:grid;min-width:0;gap:4px;color:#7b889a;font-size:11px;font-weight:900}.employee-job input{min-width:0;height:52px;padding:8px 10px;font-size:13px}.employee-profile-row .profile-actions{min-width:0}
 </style>
@@ -65,7 +77,42 @@ function employeeRow(employee=null,expanded=false){
  row.querySelector(".employee-save").onclick=async()=>{const button=row.querySelector(".employee-save"),status=row.querySelector(".employee-action-status");button.disabled=true;status.textContent="";try{const employees=collect(employeesNode,"employee");validate(employees,"근무자","employee_id");EmployeeAccountDetails.validate(employeesNode);config=await window.omgWorkConfig.saveEmployees(session.accessToken,employees,selectedPropertyId!==ownPropertyId?selectedPropertyId:null);await EmployeeAccountDetails.saveRows(employeesNode,config.employees,session.accessToken);await EmployeeCleaningSettings.save(employeesNode,session.accessToken);await EmployeeDutyRoles.save(employeesNode,session.accessToken,selectedPropertyId);const savedSettings=await window.omgWorkConfig.saveEmployeeAttendanceSettings(session.accessToken,collect(employeesNode,"employee"),selectedPropertyId!==ownPropertyId?selectedPropertyId:null);mergeAttendanceSettings(savedSettings.settings);load(config);show("근무자 계정 정보를 저장했습니다.");}catch(error){status.textContent=error.message||"저장하지 못했습니다.";EmployeeLoginFields.report(error);}finally{button.disabled=false;}};
  employeesNode.append(row);renumber();
 }
-function adminRow(admin=null){const row=document.createElement("div");row.className="account-row";row.dataset.ownerId=admin?.owner_id||"";row.innerHTML=`<div class="account-head"><span class="account-label">관리자 ${admin?.is_current?'<span class="current">현재 계정</span>':""}</span>${admin?.is_current?"":'<button class="delete-account" type="button" aria-label="계정 삭제">Del</button>'}</div>${profileEditor(admin?.display_name||admin?.login_id,admin?.profile_image)}<label>이름<input class="admin-name" type="text" maxlength="50" placeholder="관리자 이름" value="${esc(admin?.display_name||"")}"></label><label>아이디<input class="admin-login-id" type="text" maxlength="50" autocomplete="off" placeholder="관리자 아이디" value="${esc(admin?.login_id||"admin")}"></label><input class="admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" maxlength="8" placeholder="${admin?"PIN 변경 시 입력":"PIN 6~8자리"}">`;bindProfileEditor(row,".admin-name");row.querySelector(".delete-account")?.addEventListener("click",async()=>{if(!admin){row.remove();renumber();return;}if(!confirm(`‘${admin.display_name}’ 관리자 계정을 삭제할까요?`))return;try{config=await window.omgWorkConfig.deleteAdministrator(session.accessToken,admin.owner_id,selectedPropertyId!==ownPropertyId?selectedPropertyId:null);load(config);show("관리자 계정이 삭제되었습니다.");}catch(error){show(error.message,false);}});adminsNode.append(row);renumber();}
+const sensitiveDialog=document.getElementById("sensitivePasswordDialog");
+const sensitiveForm=document.getElementById("sensitivePasswordForm");
+const sensitiveMessage=document.getElementById("sensitivePasswordMessage");
+async function sensitivePassword(args={}){
+ const {data,error}=await window.omgSupabase.rpc("manage_owner_sensitive_password",{p_access_token:session.accessToken,...args});
+ if(error||!data?.ok)throw Error(data?.message||"2차 비밀번호 설정을 불러오지 못했습니다.");
+ return data;
+}
+async function openSensitivePassword(button){
+ button.disabled=true;
+ try{
+  const {configured}=await sensitivePassword();
+  sensitiveForm.reset();sensitiveMessage.textContent="";
+  document.getElementById("currentSensitivePasswordField").hidden=!configured;
+  sensitiveForm.elements.currentPassword.required=configured;
+  sensitiveDialog.showModal();
+ }catch(error){show(error.message,false);}finally{button.disabled=false;}
+}
+document.getElementById("closeSensitivePassword").onclick=()=>sensitiveDialog.close();
+sensitiveDialog.addEventListener("close",()=>sensitiveForm.reset());
+sensitiveForm.onsubmit=async event=>{
+ event.preventDefault();
+ const {loginPin,currentPassword,newPassword,repeatPassword}=sensitiveForm.elements;
+ if(newPassword.value!==repeatPassword.value){sensitiveMessage.textContent="새 비밀번호가 서로 일치하지 않습니다.";return;}
+ const button=sensitiveForm.querySelector('button[type="submit"]');
+ button.disabled=true;sensitiveMessage.textContent="";
+ try{
+  await sensitivePassword({p_login_pin:loginPin.value,p_current_password:currentPassword.value||null,p_new_password:newPassword.value});
+  sensitiveDialog.close();show("2차 비밀번호를 저장했습니다.");
+ }catch(error){sensitiveMessage.textContent=error.message;loginPin.value="";currentPassword.value="";}
+ finally{button.disabled=false;}
+};
+function adminRow(admin=null){const row=document.createElement("div");row.className="account-row";row.dataset.ownerId=admin?.owner_id||"";row.innerHTML=`<div class="account-head"><span class="account-label">관리자 ${admin?.is_current?'<span class="current">현재 계정</span>':""}</span>${admin?.is_current?"":'<button class="delete-account" type="button" aria-label="계정 삭제">Del</button>'}</div>${profileEditor(admin?.display_name||admin?.login_id,admin?.profile_image)}<label>이름<input class="admin-name" type="text" maxlength="50" placeholder="관리자 이름" value="${esc(admin?.display_name||"")}"></label><label>아이디<input class="admin-login-id" type="text" maxlength="50" autocomplete="off" placeholder="관리자 아이디" value="${esc(admin?.login_id||"admin")}"></label><input class="admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" maxlength="8" placeholder="${admin?"PIN 변경 시 입력":"PIN 6~8자리"}">`;bindProfileEditor(row,".admin-name");row.querySelector(".delete-account")?.addEventListener("click",async()=>{if(!admin){row.remove();renumber();return;}if(!confirm(`‘${admin.display_name}’ 관리자 계정을 삭제할까요?`))return;try{config=await window.omgWorkConfig.deleteAdministrator(session.accessToken,admin.owner_id,selectedPropertyId!==ownPropertyId?selectedPropertyId:null);load(config);show("관리자 계정이 삭제되었습니다.");}catch(error){show(error.message,false);}});if(admin?.is_current&&!employeeOnly){
+ const button=document.createElement("button");button.type="button";button.className="small-btn";
+ button.textContent="2차 비밀번호 설정";button.onclick=()=>openSensitivePassword(button);row.append(button);
+ }adminsNode.append(row);renumber();}
 function collect(node,type){if(type==="employee")EmployeeLoginFields.validate(node);return[...node.querySelectorAll(".account-row")].map(row=>type==="employee"?{employee_id:row.dataset.employeeId||null,display_name:row.querySelector(".account-name").value.trim(),login_id:row.querySelector(".employee-login-id").value.trim(),pin:row.querySelector(".account-pin").value.trim(),profile_image:row.querySelector(".profile-editor").dataset.profileImage||null,job_title:row.querySelector(".employee-job").value.trim(),contact_phone:row.querySelector(".employee-contact").value.trim(),bank_account:row.querySelector(".employee-bank-account").value.trim(),scheduled_clock_in:row.querySelector(".employee-clock-in").value||null,scheduled_clock_out:row.querySelector(".employee-clock-out").value||null,lateness_threshold_minutes:row.querySelector(".employee-lateness").value===""?null:Number(row.querySelector(".employee-lateness").value)}:{owner_id:row.dataset.ownerId||null,display_name:row.querySelector(".admin-name").value.trim(),login_id:row.querySelector(".admin-login-id").value.trim(),pin:row.querySelector(".admin-pin").value.trim(),profile_image:row.querySelector(".profile-editor").dataset.profileImage||null}).filter(item=>item.display_name||item.pin);}
 function validate(items,label,idKey){if(idKey==="employee_id")EmployeeLoginFields.validate(employeesNode);if(!items.length)throw new Error(`${label} 계정을 한 개 이상 등록해주세요.`);items.forEach(item=>{if(!item.display_name)throw new Error(`${label} 계정명을 입력해주세요.`);if(!item[idKey]&&!item.pin)throw new Error(`${item.display_name}의 PIN을 입력해주세요.`);if(item.pin&&!/^[0-9]{6,8}$/.test(item.pin))throw new Error(`${item.display_name}의 PIN은 숫자 6~8자리여야 합니다.`);});}
 function renumberWarnings(){[...warningNode.querySelectorAll(".warning-rule")].forEach((row,index)=>{row.querySelector(".warning-label").textContent=`경고 조건 ${index+1}`;row.querySelector(".warning-toggle").setAttribute("aria-label",`경고 조건 ${index+1} 상세 보기`);});}

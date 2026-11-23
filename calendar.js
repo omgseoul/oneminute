@@ -211,7 +211,18 @@
     document.querySelector('.calendar-top>a').textContent='OMS Calendar';
     document.querySelector('.calendar-top>a').removeAttribute('href');
     $('calendarCompanion').hidden=false;$('companionControls').hidden=false;
-    $('companionScope').onchange=()=>{document.querySelector('#companionControls a').href=$('companionScope').value==='mine'?'mission.html?scope=mine':'mission.html';refresh();};
+    const switcher=$('viewButtons');
+    for(const button of switcher.querySelectorAll('[data-view]'))button.textContent={day:'일',week:'주',month:'월'}[button.dataset.view];
+    $('todayButton').before(switcher);
+    $('companionSettings').hidden=!window.OMSCalendarAndroid;
+    $('companionScope').onchange=refresh;
+    $('companionAddEvent').onclick=()=>{if(session&&focusDate)openEditor(key(companionDate||focusDate));};
+    $('companionAddTask').onclick=()=>{
+      if(!session||!focusDate)return;
+      const params=new URLSearchParams({create:'1',date:key(companionDate||focusDate)});
+      if($('companionScope').value==='mine')params.set('scope','mine');
+      location.href='mission.html?'+params;
+    };
     $('companionEmployee').onchange=refresh;
     $('companionSettings').onclick=()=>window.OMSCalendarCompanion?.settings();
     $('calendarCompanion').onclick=event=>{
@@ -238,7 +249,7 @@
   $('deleteEvent').onclick=async()=>{if(!confirm('이 일정을 삭제할까요?'))return;const button=$('deleteEvent');button.disabled=true;try{const id=$('eventId').value;if(events.find(i=>i.id===id)?.private_owner_id)await OMSMissionTasks.privateAction(session,'delete',{id});else await rpc('delete',{id});closeEditor();await refresh();}catch(error){$('eventFormMessage').textContent=error.message;}finally{button.disabled=false;}};
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)refresh();});
   (async()=>{session=await window.omgSession.require({allowCompleted:true});if(!session)return;
-    isOwner=session.sessionKind==='owner';if(companion)$('companionScope').hidden=!isOwner;timezone=session.timezone||'Asia/Seoul';focusDate=today();restoreView();
+    isOwner=session.sessionKind==='owner';if(companion)$('companionControls').hidden=!isOwner;timezone=session.timezone||'Asia/Seoul';focusDate=today();restoreView();
     $('targetFieldset').hidden=!isOwner;
     if(isOwner){const own=await window.omgWorkConfig.load(session.accessToken);ownPropertyId=own.property.property_id;const control=await window.omgPropertySelector.mount({accessToken:session.accessToken,permission:'missions',host:$('calendarPropertyPicker'),onChange:async ids=>{selectedPropertyIds=ids;$('addEvent').hidden=false;await refresh();}});selectedPropertyIds=control.selectedIds();$('addEvent').hidden=false;}
     await refresh();window.omgTransition.ready();

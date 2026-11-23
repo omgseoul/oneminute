@@ -157,3 +157,29 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 .calendar-companion #calendarCompanion h3{margin:.75rem 0 .45rem;font-size:1rem}
 .calendar-companion #calendarCompanion button{width:100%;margin-bottom:.35rem;text-align:left}
 .calendar-companion .companion-selected{box-shadow:inset 0 0 0 2px #667fe1}
+
+/* Calendar app header stays below the Android status bar and inside the viewport. */
+.calendar-companion .calendar-shell{padding:calc(12px + max(28px, env(safe-area-inset-top))) 12px calc(24px + max(24px, env(safe-area-inset-bottom)))}
+.calendar-companion .calendar-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;position:relative;z-index:22}
+.calendar-companion .calendar-top>a{grid-area:1/1;white-space:nowrap;font-size:17px}
+.calendar-companion #companionSettings{grid-area:1/2;justify-self:end}
+.calendar-companion #companionControls{grid-area:2/1;display:grid;gap:6px;min-width:0}
+.calendar-companion #companionControls[hidden],.calendar-companion #companionSettings[hidden]{display:none}
+.calendar-companion #calendarPropertyPicker{grid-area:2/2;justify-self:end;align-self:start;min-width:0;max-width:100%}
+.calendar-companion #calendarPropertyPicker .property-picker-button{max-width:100%}
+.calendar-companion #calendarPropertyPicker .property-picker-panel{right:0;width:min(250px,calc(100vw - 26px))}
+.calendar-companion #companionControls select,.calendar-companion #companionSettings{min-height:36px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--navy);font:inherit;font-size:13px}
+.calendar-companion #companionControls select{width:100%;min-width:0}
+.calendar-companion .calendar-toolbar{margin:14px 0 10px;align-items:center;flex-wrap:wrap}
+.calendar-companion .calendar-toolbar h1{font-size:clamp(16px,5vw,23px)}
+.calendar-companion .calendar-toolbar-actions{margin-left:auto;gap:2px}
+.calendar-companion .calendar-toolbar-actions>button{min-width:26px;padding:0 3px}
+.calendar-companion #viewButtons{display:flex;margin:0 3px 0 0;padding:2px;gap:1px;border:1px solid var(--line);border-radius:8px;background:white}
+.calendar-companion #viewButtons button{width:26px;min-width:26px;height:28px;padding:0;border:0;border-radius:5px;background:transparent;font-size:12px;box-shadow:none}
+.calendar-companion #viewButtons button.active{background:var(--soft)}
+.calendar-companion .calendar-floating-actions{display:none}
+.calendar-companion #calendarCompanion{margin-bottom:0}
+.calendar-companion .companion-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.calendar-companion #calendarCompanion .companion-section-head h3{margin:0}
+.calendar-companion #calendarCompanion .companion-pen{display:grid;place-items:center;width:40px;height:40px;margin:0;padding:0;background:white;color:var(--blue);border:1px solid var(--line);border-radius:10px}
+.companion-pen svg{width:19px;height:19px}

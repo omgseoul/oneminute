@@ -186,6 +186,7 @@ public final class CalendarRefresh extends JobService {
         JSONArray result = new JSONArray();
         for (JSONObject item : items) {
             JSONObject row = new JSONObject().put("title", item.optString("title"));
+            if (item.has("id")) row.put("id", item.get("id"));
             for (String field : task ? new String[]{"due_at", "priority", "timing"} : new String[]{"start_at", "end_at", "all_day"}) {
                 if (item.has(field)) row.put(field, item.get(field));
             }

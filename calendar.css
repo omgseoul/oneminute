@@ -149,3 +149,11 @@ button,input,textarea{font:inherit}.calendar-shell{position:relative;width:min(1
 .calendar-toolbar #todayButton,.calendar-toolbar.week-mode #todayButton{min-width:44px;padding:0 6px;font-size:inherit}
 @media(max-width:350px){.calendar-floating-actions{right:14px;gap:7px}.calendar-floating-actions .calendar-view-buttons button{width:45px;min-width:45px;height:46px}.calendar-floating-actions .calendar-view-buttons svg{width:29px;height:29px}.calendar-floating-actions .calendar-add{width:46px;min-width:46px;height:46px;border-radius:14px}}
 
+
+.calendar-companion #companionControls{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.calendar-companion #companionControls button,.calendar-companion #companionControls select{padding:6px;border:1px solid #d1daec;border-radius:8px;background:#f5f7ff;color:#253755}
+.calendar-companion #calendarCompanion{margin:1rem 0 5.5rem;padding:1rem;border:1px solid #dbe2f4;border-radius:14px;background:#f4f6ff}
+.calendar-companion #calendarCompanion h2{margin:0 0 .75rem;font-size:1.15rem}
+.calendar-companion #calendarCompanion h3{margin:.75rem 0 .45rem;font-size:1rem}
+.calendar-companion #calendarCompanion button{width:100%;margin-bottom:.35rem;text-align:left}
+.calendar-companion .companion-selected{box-shadow:inset 0 0 0 2px #667fe1}

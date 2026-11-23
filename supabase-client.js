@@ -54,6 +54,7 @@
     },
     clear() {
       localStorage.removeItem(this.key);
+      window.OMSCalendarAndroid?.clearSession?.();
       window.dispatchEvent(new Event("omg:session-changed"));
       window.OMGNative?.clearPushSession?.();
     },

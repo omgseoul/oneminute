@@ -22,14 +22,24 @@
     const week=new Date(today+'T12:00:00Z');week.setUTCDate(week.getUTCDate()+7);
     return due<=week.toISOString().slice(0,10)?'this_week':'anytime';
   }
-  async function load(session,{isOwner=session.sessionKind==='owner',propertyIds}={}){
+  async function load(session,{isOwner=session.sessionKind==='owner',propertyIds,includePrivate=false}={}){
     const rpc=async(name,args)=>{const {data,error}=await window.omgSupabase.rpc(name,{p_access_token:session.accessToken,...args});if(error||!data?.ok)throw new Error(data?.message||error?.message||'할 일을 불러오지 못했습니다.');return data;};
     if(!isOwner)return rpc('list_missions');
     if(propertyIds===undefined){
       const shares=await rpc('list_property_shares');
       propertyIds=(shares.properties||[]).filter(x=>x.is_own||(x.permissions||[]).includes('missions')).map(x=>x.property_id);
     }
-    return rpc('list_shared_missions',{p_property_ids:propertyIds?.length?propertyIds:null});
+    const shared=await rpc('list_shared_missions',{p_property_ids:propertyIds?.length?propertyIds:null});
+    if(!includePrivate)return shared;
+    const mine=await privateAction(session,'list');
+    const privateTasks=mine.items.filter(item=>item.kind==='task'&&(!propertyIds?.length||propertyIds.includes(item.property_id)));
+    return {...shared,missions:[...(shared.missions||[]),...privateTasks]};
+
+  }
+  async function privateAction(session,action,item={}){
+    const {data,error}=await window.omgSupabase.rpc('calendar_private_items_action',{p_access_token:session.accessToken,p_action:action,p_item:item});
+    if(error||!data?.ok)throw Error(data?.message||'관리자 개인 항목을 불러오지 못했습니다.');
+    return data;
   }
   function propertyTag(item,ownPropertyId){
     if(!item.property_name||item.is_own_property===true||!(item.is_own_property===false||(ownPropertyId&&item.property_id&&item.property_id!==ownPropertyId)))return '';
@@ -37,6 +47,6 @@
     const lines=[chars.slice(0,5).join('')];if(chars.length>5)lines.push(chars.slice(5,chars.length>10?8:10).join('')+(chars.length>10?'..':''));
     return `<small class="oms-mission-property" title="${escape(name)}" aria-label="지점 ${escape(name)}">${lines.map(line=>`<b>${escape(line)}</b>`).join('')}</small>`;
   }
-  window.OMSMissionTasks={complete,pending,dateKey,section,load,propertyTag};
+  window.OMSMissionTasks={complete,pending,dateKey,section,load,privateAction,propertyTag};
   window.OMSWorkerTasks={events(items,employeeId){return items.filter(item=>(item.target_employee_ids||[]).includes(employeeId)||item.can_edit&&!item.holiday_request_id);},pending(items,employeeId){return pending(items,employeeId).filter(item=>!item.completed_at);}};
 })();

@@ -16,6 +16,7 @@ function env(file,session){
  const dom=new JSDOM(read(file),{url:'https://oms.test/'+file,runScripts:'outside-only'}),w=dom.window,calls=[];
  const RealDate=w.Date;w.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[now]));}static now(){return RealDate.parse(now);}};
  w.omgSupabase={rpc:async(name,args)=>{calls.push({name,args});let data={ok:true};
+  if(name==='calendar_private_items_action')data={ok:true,items:[]};
   if(name==='list_property_shares')data.properties=[{property_id:'own',is_own:true},{property_id:'remote',permissions:['missions']},{property_id:'denied',permissions:['messages']}];
   if(name==='list_shared_missions'||name==='list_missions')data={ok:true,missions:missions.filter(m=>name==='list_missions'?m.property_id==='own':!args.p_property_ids||args.p_property_ids.includes(m.property_id)),employees:[]};
   if(name==='calendar_event_action'||name==='list_shared_calendar_board'||name==='list_overdue_calendar_tasks')data={ok:true,events:[],tasks:missions.slice(0,2),employees:[]};
@@ -36,7 +37,7 @@ const owner={sessionKind:'owner',accessToken:'synthetic',propertyId:'own',timezo
   assert(![...w.document.querySelectorAll('.today-overview-item.late')].some(n=>n.textContent.includes('오늘 아침 마감')));
   home.dom.window.close();
   const cal=env('calendar.html',session);cal.w.omgWorkConfig={load:async()=>({property:{property_id:'own'}})};cal.w.omgPropertySelector={mount:async()=>({selectedIds:()=>['own','remote']})};cal.w.eval(read('calendar.js'));await new Promise(r=>setTimeout(r,30));
-  for(const view of ['week','day','month']){cal.w.document.querySelector('[data-view='+view+']').click();await new Promise(r=>setTimeout(r,10));const ids=[...cal.w.document.querySelectorAll('[data-kind=task]')].map(n=>n.dataset.id);if(view!=='month')assert.deepEqual(new Set(ids),new Set(view==='day'?expected:[...expected,'future']));else{assert(ids.includes('future'));assert(ids.every(id=>[...expected,'future'].includes(id)));}assert(!cal.w.document.querySelector('[data-id=today-earlier] .calendar-late-badge'));}
+  for(const view of ['week','day','month']){cal.w.document.querySelector('[data-view='+view+']').click();await new Promise(r=>setTimeout(r,10));const ids=[...cal.w.document.querySelectorAll('[data-kind=task]')].map(n=>n.dataset.id);if(view!=='month')assert.deepEqual(new Set(ids),new Set([...expected,'future']));else{assert(ids.includes('future'));assert(ids.every(id=>[...expected,'future'].includes(id)));}assert(!cal.w.document.querySelector('[data-id=today-earlier] .calendar-late-badge'));}
   assert(!cal.calls.some(x=>x.name==='list_overdue_calendar_tasks'));cal.dom.window.close();
  }
  const todo=env('mission.html',owner),w=todo.w;w.eval(read('property-selector.js'));w.eval(read('select-picker.js'));

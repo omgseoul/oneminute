@@ -1,6 +1,10 @@
 name: Build OMS Calendar APK
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'oms-calendar-android/**'
+      - '.github/workflows/build-oms-calendar.yml'
   push:
     branches: [main, codex/oms-calendar]
     paths:
@@ -22,7 +26,7 @@ jobs:
           gradle-version: '8.9'
       - name: Build APK
         working-directory: oms-calendar-android
-        run: gradle assembleDebug
+        run: gradle testDebugUnitTest assembleDebug
       - name: Verify and prepare APK
         run: |
           APK=oms-calendar-android/app/build/outputs/apk/debug/app-debug.apk

@@ -42,7 +42,7 @@ public final class CalendarRefresh extends JobService {
         if (!"owner".equals(role) && !"staff".equals(role)) return;
         SharedPreferences prefs = preferences(c);
         if (!token.equals(prefs.getString("token", ""))) {
-            prefs.edit().remove("events_widget").remove("events_month").remove("tasks_widget").remove("events_last").remove("tasks_last").apply();
+            prefs.edit().remove("events_widget").remove("events_month").remove("widget_events").remove("widget_tasks").remove("tasks_widget").remove("events_last").remove("tasks_last").apply();
             CalendarWidgets.refresh(c, false);
             CalendarWidgets.refresh(c, true);
         }
@@ -52,7 +52,7 @@ public final class CalendarRefresh extends JobService {
     }
 
     static synchronized void clear(Context c) {
-        preferences(c).edit().remove("token").remove("events_widget").remove("events_month").remove("tasks_widget")
+        preferences(c).edit().remove("token").remove("events_widget").remove("events_month").remove("widget_events").remove("widget_tasks").remove("tasks_widget")
                 .remove("events_last").remove("tasks_last").apply();
         c.getSystemService(JobScheduler.class).cancelAll();
         c.getSystemService(NotificationManager.class).cancelAll();
@@ -126,8 +126,8 @@ public final class CalendarRefresh extends JobService {
         JSONObject items = rpc(owner ? "calendar_private_items_action" : "calendar_event_action",
                 owner ? new JSONObject().put("p_access_token", token).put("p_action", "list")
                         : new JSONObject().put("p_access_token", token).put("p_action", "list").put("p_event", new JSONObject()
-                        .put("range_start", today.atStartOfDay(zone).toInstant().toString())
-                        .put("range_end", today.plusDays(7).atStartOfDay(zone).toInstant().toString())));
+                        .put("range_start", today.withDayOfMonth(1).minusDays(7).atStartOfDay(zone).toInstant().toString())
+                        .put("range_end", today.withDayOfMonth(1).plusMonths(1).plusDays(7).atStartOfDay(zone).toInstant().toString())));
         if (!items.optBoolean("ok")) return;
         if (owner) for (JSONObject item : rows(items.optJSONArray("items"))) {
             if ("event".equals(item.optString("kind"))) events.add(item); else tasks.add(item);
@@ -139,9 +139,6 @@ public final class CalendarRefresh extends JobService {
             tasks.addAll(rows(mission.optJSONArray("missions")));
         }
         Instant start = today.atStartOfDay(zone).toInstant(), end = today.plusDays(1).atStartOfDay(zone).toInstant();
-        Instant nextWeek = today.plusDays(7).atStartOfDay(zone).toInstant();
-        events.removeIf(item -> !time(item, "end_at", Instant.MIN).isAfter(start)
-                || !time(item, "start_at", Instant.MAX).isBefore(nextWeek));
         events.sort(Comparator.comparing(item -> time(item, "start_at", Instant.MAX)));
         tasks.removeIf(item -> !item.optBoolean("active", true) || present(item, "owner_completed_at")
                 || present(item, "completed_at") || contains(item.optJSONArray("completion_employee_ids"), person)
@@ -149,13 +146,12 @@ public final class CalendarRefresh extends JobService {
         tasks.sort(Comparator.<JSONObject>comparingInt(item -> overdue(item, now) ? 0 : 1)
                 .thenComparingInt(CalendarRefresh::priority).thenComparing(item -> time(item, "due_at", Instant.MAX)));
         List<JSONObject> todayEvents = new ArrayList<>(events), overdue = new ArrayList<>(tasks);
-        todayEvents.removeIf(item -> !time(item, "start_at", Instant.MAX).isBefore(end));
+        todayEvents.removeIf(item -> !time(item, "start_at", Instant.MAX).isBefore(end) || !time(item, "end_at", Instant.MIN).isAfter(start));
         overdue.removeIf(item -> !overdue(item, now));
         synchronized (CalendarRefresh.class) {
             if (!token.equals(prefs.getString("token", ""))) return;
-            prefs.edit().putString("events_widget", widgetEvents(events, zone))
-                    .putString("events_month", monthGrid(today))
-                    .putString("tasks_widget", taskLines(tasks, now, 4)).apply();
+            prefs.edit().putString("widget_events", widgetData(events, false).toString())
+                    .putString("widget_tasks", widgetData(tasks, true).toString()).apply();
             CalendarWidgets.refresh(this, false);
             CalendarWidgets.refresh(this, true);
             notifyAt(prefs, "events", "오늘 일정", todayEvents.size(), widgetEvents(todayEvents, zone), now, 540, false);
@@ -163,7 +159,7 @@ public final class CalendarRefresh extends JobService {
         }
     }
 
-    private static List<JSONObject> rows(JSONArray values) {
+    static List<JSONObject> rows(JSONArray values) {
         List<JSONObject> list = new ArrayList<>();
         if (values != null) for (int i = 0; i < values.length(); i++) {
             JSONObject item = values.optJSONObject(i);
@@ -176,28 +172,26 @@ public final class CalendarRefresh extends JobService {
         if (ids != null) for (int i = 0; i < ids.length(); i++) if (id.equals(ids.optString(i))) return true;
         return false;
     }
-    private static Instant time(JSONObject item, String key, Instant fallback) {
+    static Instant time(JSONObject item, String key, Instant fallback) {
         try { return Instant.parse(item.optString(key)); } catch (Exception ignored) { return fallback; }
     }
     private static boolean overdue(JSONObject item, ZonedDateTime now) {
         return time(item, "due_at", Instant.MAX).isBefore(now.toInstant());
     }
-    private static int priority(JSONObject item) {
+    static int priority(JSONObject item) {
         String value = item.optString("priority");
         return "urgent".equals(value) ? 0 : "important".equals(value) ? 1 : 2;
     }
-    private static String monthGrid(LocalDate today) {
-        LocalDate first = today.withDayOfMonth(1);
-        int offset = first.getDayOfWeek().getValue() % 7;
-        StringBuilder grid = new StringBuilder(" Su  Mo  Tu  We  Th  Fr  Sa");
-        for (int cell = 0; cell < offset + today.lengthOfMonth(); cell++) {
-            if (cell % 7 == 0) grid.append('\n');
-            int date = cell - offset + 1;
-            if (date < 1) grid.append("    ");
-            else if (date == today.getDayOfMonth()) grid.append(String.format(java.util.Locale.ROOT, "[%2d]", date));
-            else grid.append(String.format(java.util.Locale.ROOT, " %2d ", date));
+    private static JSONArray widgetData(List<JSONObject> items, boolean task) throws Exception {
+        JSONArray result = new JSONArray();
+        for (JSONObject item : items) {
+            JSONObject row = new JSONObject().put("title", item.optString("title"));
+            for (String field : task ? new String[]{"due_at", "priority", "timing"} : new String[]{"start_at", "end_at", "all_day"}) {
+                if (item.has(field)) row.put(field, item.get(field));
+            }
+            result.put(row);
         }
-        return grid.toString();
+        return result;
     }
     private static String widgetEvents(List<JSONObject> events, ZoneId zone) {
         StringBuilder result = new StringBuilder();

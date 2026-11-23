@@ -48,7 +48,7 @@ public final class CalendarActivity extends Activity {
             }
         });
         setContentView(web);
-        web.loadUrl(getIntent().getBooleanExtra("tasks", false) ? ORIGIN + "/mission.html?scope=mine" : HOME);
+        web.loadUrl(getIntent().getBooleanExtra("tasks", false) ? ORIGIN + "/mission.html?scope=mine" + (getIntent().getBooleanExtra("create", false) ? "&create=1" : "") : HOME);
     }
 
     private boolean trusted(Uri uri) {

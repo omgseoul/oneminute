@@ -203,7 +203,7 @@
     const item=event.target.closest('[data-kind]');
     if(item){if(item.dataset.kind==='task'){location.href=companion&&$('companionScope').value==='mine'?'mission.html?scope=mine':'mission.html';return;}const record=events.find(e=>e.id===item.dataset.id);if(record)openEditor(zonedKey(record.start_at),record);return;}
     const date=event.target.closest('[data-create-date]')?.dataset.createDate||event.target.closest('[data-date]')?.dataset.date;
-    if(date&&companion){companionDate=parseKey(date);render();return;}
+    if(date&&companion){companionDate=parseKey(date);render();openEditor(date);return;}
     if(date){if(view==='day')focusDate=parseKey(date);openEditor(date);}
   };
   if(companion){
@@ -216,7 +216,6 @@
     $('todayButton').before(switcher);
     $('companionSettings').hidden=!window.OMSCalendarAndroid;
     $('companionScope').onchange=refresh;
-    $('companionAddEvent').onclick=()=>{if(session&&focusDate)openEditor(key(companionDate||focusDate));};
     $('companionAddTask').onclick=()=>{
       if(!session||!focusDate)return;
       const params=new URLSearchParams({create:'1',date:key(companionDate||focusDate)});

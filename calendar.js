@@ -36,12 +36,15 @@
   }
   function itemsFor(date){
     const start=new Date(dayStart(date)).getTime(),end=new Date(dayStart(addDays(date,1))).getTime();
-    const now=Date.now(),isToday=sameDay(date,today());
+    const now=Date.now(), current=today(), isToday=sameDay(date,current);
+    const lastDueDate=key(addDays(current,7));
     const dueTasks=tasks.flatMap(item=>{
       if(!item.due_at)return item.timing==='today'&&isToday?[{...item,kind:'task',sort:now,late:false}]:[];
       const due=new Date(item.due_at).getTime();
       if((companion&&due<now&&isToday)||OMSMissionTasks.section(item,{timezone})==='overdue')return isToday?[{...item,kind:'task',sort:due,late:true}]:[];
-      return due>=start&&due<end?[{...item,kind:'task',sort:due,late:false}]:[];
+      const deadline=zonedKey(due);
+      return deadline<=lastDueDate&&key(date)>=key(current)&&key(date)<=deadline
+        ?[{...item,kind:'task',sort:due,late:false}]:[];
     });
     return [
       ...events.filter(item=>new Date(item.start_at).getTime()<end&&new Date(item.end_at).getTime()>start).map(item=>({...item,kind:'event',sort:new Date(item.start_at).getTime()})),

@@ -34,6 +34,9 @@ declare tz text;cfg jsonb;local_day date;notice uuid;reserved uuid;begin
  select p.timezone,c.same_day_alert into tz,cfg from public.properties p join omg_private.online_connections c on c.property_id=p.id where p.id=new.property_id;
  local_day:=(now() at time zone coalesce(tz,'Asia/Seoul'))::date;
  if not coalesce((cfg->>'enabled')::boolean,false) or not coalesce(new.status in('new','confirmed','request'),false) or new.booked_at is null or new.arrival is distinct from local_day or (new.booked_at at time zone coalesce(tz,'Asia/Seoul'))::date<>local_day then return new;end if;
+ if lower(btrim(coalesce(nullif(btrim(new.channel),''),new.data->>'referer',''))) ~ '^(direct([ _-]+booking)?|booking[ _-]?page|manual([ _-]+booking)?|직접( 예약)?|다이렉트( 예약)?)$' then
+  return new;
+ end if;
  if tg_op='UPDATE' then
   if old.arrival is not distinct from new.arrival and old.booked_at is not distinct from new.booked_at and old.status in('new','confirmed','request') then return new;end if;
  end if;

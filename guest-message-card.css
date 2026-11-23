@@ -49,3 +49,8 @@
 #messageArrival .booking-popup-card .booking-popup-summary,.bot-online-notice .booking-popup-card .booking-popup-summary{grid-column:1;grid-row:1;display:block;white-space:nowrap;min-width:0;width:100%;font-size:12px;line-height:1.7}
 #messageArrival .booking-popup-card .guest-popup-dates,.bot-online-notice .booking-popup-card .guest-popup-dates{grid-column:1;grid-row:2;color:#886578;font-size:11px!important}
 #messageArrival .booking-popup-card .guest-popup-name,.bot-online-notice .booking-popup-card .guest-popup-name{grid-column:1;grid-row:3}
+
+.guest-popup-channel-icon{display:inline-grid;place-items:center;vertical-align:middle;width:20px;height:20px}
+.guest-popup-channel-initial{border-radius:5px;background:#e7eef8;color:#254b75;font-size:13px;font-weight:700}
+#messageArrival .guest-popup-channel-icon img,.guest-popup-channel-icon img{width:100%;height:100%}
+.booking-popup-summary .guest-popup-channel-icon{margin-inline-end:5px}

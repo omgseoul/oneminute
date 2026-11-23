@@ -216,11 +216,11 @@
   if(/agoda|아고다/.test(key))return {icon:'agoda',name:'아고다',full:'Agoda'};
   if(/expedia|익스피디아/.test(key))return {icon:'expedia',name:'익스피디아',full:'Expedia'};
   if(/^(direct(?: booking)?|booking[ _-]?page|manual|직접(?: 예약)?|다이렉트(?: 예약)?)$/i.test(raw))return {icon:'direct',name:'다이렉트 예약',full:'Direct'};
-  return {icon:null,name:raw||'출처 미확인',full:''};
+  return {icon:null,name:raw||'출처 미확인',full:'',initial:[...raw][0]?.toUpperCase()||'?'};
  }
  function channelMarkup(t,prefix='inbox'){
   const c=bookingChannel(t.channel),id='channel-'+prefix+'-'+encodeURIComponent(rowKey(t));
-  return `<span class="inbox-channel"><button type="button" class="channel-button" data-channel aria-label="예약 출처: ${escape(c.name)} · 전체 이름 보기" aria-expanded="false" aria-controls="${escape(id)}" title="${escape(c.name)}">${c.icon?`<img src="assets/booking-channels/${c.icon}.svg" alt="" width="20" height="20">`:'<span aria-hidden="true">?</span>'}</button><span class="channel-popover" id="${escape(id)}" role="tooltip" hidden><strong>${escape(c.name)}</strong>${c.full?`<small>${escape(c.full)}</small>`:''}</span></span>`;
+  return `<span class="inbox-channel"><button type="button" class="channel-button" data-channel aria-label="예약 출처: ${escape(c.name)} · 전체 이름 보기" aria-expanded="false" aria-controls="${escape(id)}" title="${escape(c.name)}">${c.icon?`<img src="assets/booking-channels/${c.icon}.svg" alt="" width="20" height="20">`:`<span class="channel-initial" aria-hidden="true">${escape(c.initial)}</span>`}</button><span class="channel-popover" id="${escape(id)}" role="tooltip" hidden><strong>${escape(c.name)}</strong>${c.full?`<small>${escape(c.full)}</small>`:''}</span></span>`;
  }
  function bindChannelButtons(root){for(const button of root.querySelectorAll('[data-channel]'))button.onclick=e=>{e.preventDefault();e.stopPropagation();const open=button.getAttribute('aria-expanded')!=='true';closeChannels();button.setAttribute('aria-expanded',String(open));document.getElementById(button.getAttribute('aria-controls')).hidden=!open;};}
  function closeChannels(){document.querySelectorAll('[data-channel][aria-expanded=true]').forEach(b=>{b.setAttribute('aria-expanded','false');document.getElementById(b.getAttribute('aria-controls')).hidden=true;});}

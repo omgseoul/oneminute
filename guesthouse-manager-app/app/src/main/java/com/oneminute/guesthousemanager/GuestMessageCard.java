@@ -38,8 +38,15 @@ final class GuestMessageCard {
   if(!channel.isEmpty()){ChannelIcon icon=new ChannelIcon(c,channel);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(c,24),dp(c,24));ip.setMargins(dp(c,5),0,0,0);top.addView(icon,ip);}
   strip.addView(top,new LinearLayout.LayoutParams(-1,-2));
   }else{
-   String source=data.optString("channel","출처 미확인");if(source.toLowerCase(java.util.Locale.ROOT).contains("booking"))source="Booking.com";
-   TextView summary=text(c,room+" · "+data.optString("property")+" · "+source,12,true,navy);summary.setSingleLine(true);summary.setAutoSizeTextTypeUniformWithConfiguration(6,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);strip.addView(summary,new LinearLayout.LayoutParams(-1,dp(c,25)));
+   String source=data.optString("channel","출처 미확인");if(source.toLowerCase(java.util.Locale.ROOT).matches(".*booking[. _-]*com.*|booking"))source="Booking.com";
+   TextView summary=text(c,room+" · "+data.optString("property")+" · "+source,12,true,navy);summary.setSingleLine(true);summary.setAutoSizeTextTypeUniformWithConfiguration(6,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);top.addView(summary,new LinearLayout.LayoutParams(0,dp(c,25),1));
+   if(!data.optString("channel").trim().isEmpty()){
+    ChannelIcon icon=new ChannelIcon(c,source);
+    LinearLayout.LayoutParams iconParams=new LinearLayout.LayoutParams(dp(c,20),dp(c,20));
+    iconParams.setMargins(dp(c,5),0,0,0);
+    top.addView(icon,iconParams);
+   }
+   strip.addView(top,new LinearLayout.LayoutParams(-1,-2));
    TextView dates=text(c,stay,11,false,Color.rgb(136,101,120));dates.setSingleLine(true);strip.addView(dates,new LinearLayout.LayoutParams(-1,-2));
   }
   TextView guest=text(c,data.optString("guest","게스트"),18,true,navy);guest.setPadding(0,dp(c,6),0,0);strip.addView(guest,new LinearLayout.LayoutParams(-1,-2));
@@ -48,15 +55,15 @@ final class GuestMessageCard {
   String time=data.optString("sent");if(!time.isEmpty()){TextView received=text(c,time,10,false,muted);received.setGravity(Gravity.RIGHT);received.setPadding(0,dp(c,9),0,0);box.addView(received,new LinearLayout.LayoutParams(-1,-2));}
   return box;
  }
- static String channelName(String source){String s=source.toLowerCase(java.util.Locale.ROOT);if(s.contains("airbnb"))return "에어비앤비";if(s.contains("booking"))return "부킹닷컴";if(s.contains("agoda"))return "아고다";if(s.contains("expedia"))return "익스피디아";if(s.contains("direct"))return "다이렉트 예약";return source;}
+ static String channelName(String source){String s=source.toLowerCase(java.util.Locale.ROOT);if(s.contains("airbnb"))return "에어비앤비";if(s.matches(".*booking[. _-]*com.*|booking"))return "부킹닷컴";if(s.contains("agoda"))return "아고다";if(s.contains("expedia"))return "익스피디아";if(s.contains("direct"))return "다이렉트 예약";return source;}
  static final class ChannelIcon extends View {
   final String name;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-  ChannelIcon(Context c,String source){super(c);name=channelName(source);setContentDescription(name);setFocusable(true);setOnClickListener(v->new AlertDialog.Builder(c).setMessage(name).setPositiveButton("확인",null).show());}
+  ChannelIcon(Context c,String source){super(c);name=channelName(source.trim().isEmpty()?"?":source.trim());setContentDescription(name);setFocusable(true);setOnClickListener(v->new AlertDialog.Builder(c).setMessage(name).setPositiveButton("확인",null).show());}
   void color(int c){paint.setColor(c);paint.setStyle(Paint.Style.FILL);}
   @Override protected void onDraw(Canvas original){super.onDraw(original);Canvas c=original;c.save();c.scale(getWidth()/32f,getHeight()/32f);color(name.equals("에어비앤비")?0xffff385c:name.equals("부킹닷컴")?0xff003b80:Color.WHITE);c.drawRoundRect(.6f,.6f,31.4f,31.4f,7,7,paint);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.2f);paint.setColor(0xffb9b9b9);c.drawRoundRect(.6f,.6f,31.4f,31.4f,7,7,paint);
    if(name.equals("에어비앤비")){Path p=new Path();p.moveTo(16,23.6f);p.cubicTo(12.2f,27.5f,8.6f,27.6f,7,25.3f);p.cubicTo(5.6f,23.3f,7.2f,20.3f,8.5f,17.5f);p.lineTo(12.7f,8.3f);p.cubicTo(13.6f,6.4f,14.6f,5.3f,16,5.3f);p.cubicTo(17.4f,5.3f,18.4f,6.4f,19.3f,8.3f);p.lineTo(23.5f,17.5f);p.cubicTo(24.8f,20.3f,26.4f,23.3f,25,25.3f);p.cubicTo(23.4f,27.6f,19.8f,27.5f,16,23.6f);p.cubicTo(13.8f,21.2f,11.8f,18.6f,11.8f,16.5f);p.cubicTo(11.8f,10.9f,20.2f,10.9f,20.2f,16.5f);p.cubicTo(20.2f,18.6f,18.2f,21.2f,16,23.6f);paint.setColor(Color.WHITE);paint.setStrokeWidth(1.65f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);c.drawPath(p,paint);
    }else if(name.equals("아고다")){paint.setColor(0xff555555);paint.setStrokeWidth(3.2f);c.drawCircle(15.5f,12.7f,7,paint);c.drawLine(22.5f,12.7f,22.5f,20,paint);int[] colors={0xffff2943,0xffffc400,0xff00ba72,0xffba329c,0xff00afd2};for(int i=0;i<5;i++){color(colors[i]);c.drawCircle(7+i*4.5f,26.2f,1.8f,paint);}
-   }else{color(name.equals("부킹닷컴")?Color.WHITE:name.equals("익스피디아")?0xff0064ed:0xff24856c);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextSize(name.equals("익스피디아")?33:24);paint.setTextAlign(Paint.Align.CENTER);String letter=name.equals("부킹닷컴")?"B":name.equals("익스피디아")?"e":name.equals("다이렉트 예약")?"D":name.substring(0,name.offsetByCodePoints(0,1));c.drawText(letter,name.equals("부킹닷컴")?14:16,25,paint);if(name.equals("부킹닷컴")){color(0xff00aeef);c.drawCircle(25,23,2.2f,paint);}}
+   }else{color(name.equals("부킹닷컴")?Color.WHITE:name.equals("익스피디아")?0xff0064ed:0xff24856c);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextSize(name.equals("익스피디아")?33:24);paint.setTextAlign(Paint.Align.CENTER);String letter=name.equals("부킹닷컴")?"B":name.equals("익스피디아")?"e":name.equals("다이렉트 예약")?"D":name.substring(0,name.offsetByCodePoints(0,1)).toUpperCase(java.util.Locale.ROOT);c.drawText(letter,name.equals("부킹닷컴")?14:16,25,paint);if(name.equals("부킹닷컴")){color(0xff00aeef);c.drawCircle(25,23,2.2f,paint);}}
    c.restore();
   }
  }

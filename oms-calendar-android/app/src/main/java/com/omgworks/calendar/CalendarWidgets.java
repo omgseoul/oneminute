@@ -8,6 +8,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Build;
+import android.util.SizeF;
+import android.content.res.Configuration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import android.view.View;
 import android.widget.RemoteViews;
 import org.json.JSONArray;
@@ -86,9 +91,27 @@ public final class CalendarWidgets {
 
     private static void render(Context context, AppWidgetManager manager, int id, boolean tasks) {
         SharedPreferences prefs = CalendarRefresh.preferences(context);
-        int height = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 120);
+        Bundle options = manager.getAppWidgetOptions(id);
         ZoneId zone = ZoneId.of(prefs.getString("zone", "Asia/Seoul"));
         ZonedDateTime now = ZonedDateTime.now(zone);
+        if (Build.VERSION.SDK_INT >= 31) {
+            ArrayList<SizeF> sizes = options.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES);
+            if (sizes != null && !sizes.isEmpty()) {
+                Map<SizeF, RemoteViews> layouts = new LinkedHashMap<>();
+                for (SizeF size : sizes) {
+                    if (size.getWidth() > 0 && size.getHeight() > 0 && layouts.size() < 16)
+                        layouts.put(size, buildViews(context, id, tasks, Math.round(size.getHeight()), now));
+                }
+                if (!layouts.isEmpty()) {
+                    manager.updateAppWidget(id, new RemoteViews(layouts));
+                    return;
+                }
+            }
+        }
+        boolean landscape = context.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        int height = options.getInt(landscape ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
+                : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
+                options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, tasks ? 72 : 240));
         manager.updateAppWidget(id, buildViews(context, id, tasks, height, now));
     }
 
@@ -108,6 +131,7 @@ public final class CalendarWidgets {
         // Always replace dynamic children, including when switching to an empty state.
         views.removeAllViews(R.id.widget_grid);
         views.removeAllViews(R.id.widget_entries);
+        views.setViewVisibility(R.id.widget_grid, !tasks && (month || week) && prefs.contains("token") ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.widget_action, tasks ? View.VISIBLE : View.GONE);
         views.setOnClickPendingIntent(R.id.widget_panel, open(context, tasks, false));
         views.setTextViewText(R.id.widget_title, tasks ? "OMS To do"
@@ -126,7 +150,7 @@ public final class CalendarWidgets {
             entry(context, views, "", "앱에서 로그인하면 표시됩니다.", "", "");
         } else if (tasks) {
             List<JSONObject> list = sortedTasks(prefs, now);
-            int limit = Math.max(1, (height - 44) / 25);
+            int limit = Math.max(1, (height - 44) / 28);
             for (JSONObject item : list.subList(0, Math.min(list.size(), limit))) {
                 Instant deadline = due(item);
                 String date = deadline.equals(Instant.MAX) ? "" : format(deadline.atZone(zone).toLocalDate(), "M월 d일");
@@ -137,17 +161,12 @@ public final class CalendarWidgets {
             if (list.isEmpty()) entry(context, views, "", "미완료 할 일이 없습니다.", "", "");
         } else {
             List<JSONObject> list = load(prefs, "widget_events");
-            List<JSONObject> taskList = sortedTasks(prefs, now);
-            if (month || week) grid(context, views, id, list, taskList, zone, today, selected, month);
-            int limit = month ? 1 : week ? Math.max(1, (height - 100) / 25) : Math.max(1, (height - 44) / 25);
+            if (month || week) grid(context, views, id, list, zone, today, selected, month);
+            int weeks = (today.withDayOfMonth(1).getDayOfWeek().getValue() % 7 + today.lengthOfMonth() + 6) / 7;
+            int gridMinimum = month ? (weeks + 1) * 24 : week ? 48 : 0;
+            int limit = Math.max(1, (height - 44 - gridMinimum) / 28);
+            if (month) limit = Math.min(3, limit);
             int count = 0;
-            for (JSONObject item : taskList) {
-                if (!taskOccurs(item, selected, now)) continue;
-                if (count >= limit) break;
-                entry(context, views, "□", item.optString("title"),
-                        due(item).isBefore(now.toInstant()) ? "지연" : "To do", "");
-                count++;
-            }
             for (JSONObject item : list) {
                 if (!occurs(item, selected, zone)) continue;
                 if (count >= limit) break;
@@ -156,7 +175,7 @@ public final class CalendarWidgets {
                         .withZone(zone).format(CalendarRefresh.time(item, "start_at", Instant.EPOCH));
                 entry(context, views, "•", when + "   " + item.optString("title"), "", "");
             }
-            if (count == 0) entry(context, views, "", "일정과 할 일이 없습니다.", "", "");
+            if (count == 0) entry(context, views, "", "선택한 날짜에 일정이 없습니다.", "", "");
         }
         return views;
     }
@@ -166,15 +185,6 @@ public final class CalendarWidgets {
         list.sort(Comparator.<JSONObject>comparingInt(item -> due(item).isBefore(now.toInstant()) ? 0 : 1)
                 .thenComparingInt(CalendarRefresh::priority).thenComparing(CalendarWidgets::due));
         return list;
-    }
-
-    static boolean taskOccurs(JSONObject item, LocalDate date, ZonedDateTime now) {
-        LocalDate today = now.toLocalDate();
-        Instant deadline = due(item);
-        if (deadline.equals(Instant.MAX)) return "today".equals(item.optString("timing")) && date.equals(today);
-        if (deadline.isBefore(now.toInstant())) return date.equals(today);
-        LocalDate last = deadline.atZone(now.getZone()).toLocalDate();
-        return !last.isAfter(today.plusDays(7)) && !date.isBefore(today) && !date.isAfter(last);
     }
 
     private static Instant due(JSONObject item) {
@@ -195,9 +205,9 @@ public final class CalendarWidgets {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private static void grid(Context context, RemoteViews views, int id, List<JSONObject> events, List<JSONObject> tasks,
+    private static void grid(Context context, RemoteViews views, int id, List<JSONObject> events,
                              ZoneId zone, LocalDate today, LocalDate selected, boolean month) {
-        RemoteViews labels = layout(context, R.layout.widget_date_row);
+        RemoteViews labels = layout(context, R.layout.widget_weekday_row);
         labels.removeAllViews(R.id.widget_dates);
         for (String day : WEEK) labels.addView(R.id.widget_dates, cell(context, day, false, false, false));
         views.addView(R.id.widget_grid, labels);
@@ -210,8 +220,7 @@ public final class CalendarWidgets {
                 LocalDate date = start.plusDays(offset);
                 boolean shown = !date.isBefore(first) && date.isBefore(end);
                 RemoteViews day = cell(context, shown ? String.valueOf(date.getDayOfMonth()) : "",
-                        date.equals(today), date.equals(selected), shown && (events.stream().anyMatch(event -> occurs(event, date, zone))
-                                || tasks.stream().anyMatch(task -> taskOccurs(task, date, today.atStartOfDay(zone)))));
+                        date.equals(today), date.equals(selected), shown && events.stream().anyMatch(event -> occurs(event, date, zone)));
                 if (shown) {
                     Intent pick = new Intent(context, Events.class).setAction(PICK_DATE)
                             .setData(android.net.Uri.parse("oms-widget:" + id + "/" + date))
@@ -229,7 +238,7 @@ public final class CalendarWidgets {
     private static RemoteViews cell(Context context, String value, boolean today, boolean selected, boolean dot) {
         RemoteViews cell = layout(context, R.layout.widget_date_cell);
         cell.setTextViewText(R.id.widget_number, value);
-        cell.setTextViewText(R.id.widget_dot, dot ? "●" : "");
+        cell.setViewVisibility(R.id.widget_dot, dot ? View.VISIBLE : View.INVISIBLE);
         cell.setInt(R.id.widget_number, "setBackgroundResource", today ? R.drawable.widget_today : selected ? R.drawable.widget_selected : 0);
         cell.setTextColor(R.id.widget_number, today ? 0xffffffff : 0xff17254b);
         return cell;
@@ -241,6 +250,8 @@ public final class CalendarWidgets {
         row.setTextViewText(R.id.widget_entry_title, title);
         row.setTextViewText(R.id.widget_status, status);
         row.setTextViewText(R.id.widget_when, when);
+        row.setViewVisibility(R.id.widget_status, status.isEmpty() ? View.GONE : View.VISIBLE);
+        row.setViewVisibility(R.id.widget_when, when.isEmpty() ? View.GONE : View.VISIBLE);
         if ("지연".equals(status)) row.setTextColor(R.id.widget_status, 0xffa54113);
         views.addView(R.id.widget_entries, row);
     }

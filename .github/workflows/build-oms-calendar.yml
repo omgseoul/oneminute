@@ -36,3 +36,7 @@ jobs:
         with:
           name: OMS-Calendar-APK
           path: OMS-Calendar.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Widget-layout-preview
+          path: oms-calendar-android/app/build/widget-previews/*.png

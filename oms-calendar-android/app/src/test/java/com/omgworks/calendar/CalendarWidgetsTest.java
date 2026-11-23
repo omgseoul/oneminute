@@ -103,24 +103,80 @@ public class CalendarWidgetsTest {
         for (int i = 0; i < expected.length; i++) assertEquals(expected[i], text(rows.getChildAt(i), R.id.widget_entry_title));
     }
 
-    @Test public void dailyTaskWindowAppliesOnlyToCalendar() throws Exception {
-        JSONObject task = task("1", "일주일 업무", "2026-11-30T14:59:59Z", "normal");
-        for (int day = 0; day <= 7; day++) assertTrue(CalendarWidgets.taskOccurs(task, now.toLocalDate().plusDays(day), now));
-        assertFalse(CalendarWidgets.taskOccurs(task, now.toLocalDate().minusDays(1), now));
-        assertFalse(CalendarWidgets.taskOccurs(task, now.toLocalDate().plusDays(8), now));
-        JSONObject distant = task("2", "먼 마감", "2026-12-01T14:59:59Z", "normal");
-        assertFalse(CalendarWidgets.taskOccurs(distant, now.toLocalDate(), now));
-        JSONObject planned = new JSONObject().put("timing", "planned");
-        assertFalse(CalendarWidgets.taskOccurs(planned, now.toLocalDate(), now));
-        JSONObject late = task("3", "지연", "2026-11-22T14:59:59Z", "normal");
-        assertTrue(CalendarWidgets.taskOccurs(late, now.toLocalDate(), now));
-        assertFalse(CalendarWidgets.taskOccurs(late, now.toLocalDate().plusDays(1), now));
-        tasks(task);
+    @Test public void calendarShowsOnlyEventsAndEventDots() throws Exception {
+        tasks(task("1", "캘린더에 나오면 안 되는 업무", "2026-11-30T14:59:59Z", "normal"));
+        for (int height : new int[]{120, 200, 300}) {
+            View root = apply(remote(false, height));
+            assertEquals("선택한 날짜에 일정이 없습니다.", text(root, R.id.widget_entry_title));
+            ViewGroup grid = group(root, R.id.widget_grid);
+            for (int row = 0; row < grid.getChildCount(); row++) {
+                ViewGroup days = (ViewGroup) grid.getChildAt(row);
+                for (int day = 0; day < days.getChildCount(); day++)
+                    assertEquals(View.INVISIBLE, days.getChildAt(day).findViewById(R.id.widget_dot).getVisibility());
+            }
+        }
+        JSONObject event = new JSONObject().put("id", "event-1").put("title", "사업자 등록 방문")
+                .put("start_at", "2026-11-23T01:00:00Z").put("end_at", "2026-11-23T02:00:00Z");
+        CalendarRefresh.preferences(context).edit().putString("widget_events", new JSONArray().put(event).toString()).commit();
         View root = apply(remote(false, 300));
-        assertEquals("일주일 업무", text(root, R.id.widget_entry_title));
+        assertEquals("10:00   사업자 등록 방문", text(root, R.id.widget_entry_title));
         remote(true, 300).reapply(context, root);
         assertEquals(1, group(root, R.id.widget_entries).getChildCount());
-        assertEquals(0, group(root, R.id.widget_grid).getChildCount());
+        assertEquals("캘린더에 나오면 안 되는 업무", text(root, R.id.widget_entry_title));
+    }
+
+    private void measure(View root, int width, int height) {
+        float density = context.getResources().getDisplayMetrics().density;
+        root.measure(View.MeasureSpec.makeMeasureSpec(Math.round(width * density), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(Math.round(height * density), View.MeasureSpec.EXACTLY));
+        root.layout(0, 0, root.getMeasuredWidth(), root.getMeasuredHeight());
+    }
+
+    @Test public void monthUsesAvailableHeightInsteadOfLeavingBlankBottom() {
+        int previousRowHeight = 0;
+        for (int height : new int[]{240, 300, 400}) {
+            View root = apply(remote(false, height));
+            measure(root, 320, height);
+            View entries = root.findViewById(R.id.widget_entries);
+            assertEquals(root.getHeight() - root.getPaddingBottom(), entries.getBottom());
+            ViewGroup grid = group(root, R.id.widget_grid);
+            int rowHeight = grid.getChildAt(1).getHeight();
+            assertTrue(rowHeight > previousRowHeight);
+            previousRowHeight = rowHeight;
+            assertEquals(grid.getHeight(), grid.getChildAt(grid.getChildCount() - 1).getBottom());
+        }
+    }
+
+    @Test public void singleTodoFitsOneRowWidgetHeight() throws Exception {
+        tasks(task("1", "연남동 사업자 확인", "2026-11-30T14:59:59Z", "normal"));
+        View root = apply(remote(true, 72));
+        measure(root, 320, 72);
+        assertEquals(View.GONE, root.findViewById(R.id.widget_grid).getVisibility());
+        ViewGroup rows = group(root, R.id.widget_entries);
+        assertEquals(1, rows.getChildCount());
+        assertTrue(rows.getBottom() <= root.getHeight() - root.getPaddingBottom());
+        assertEquals(root.getHeight() - root.getPaddingBottom(), rows.getBottom());
+    }
+
+    @Test
+    @Config(sdk = 35, qualifiers = "xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    public void renderActualWidgetPreviews() throws Exception {
+        tasks(task("1", "연남동 사업자 확인", "2026-11-30T14:59:59Z", "normal"));
+        JSONObject event = new JSONObject().put("id", "event-1").put("title", "사업자 등록 방문")
+                .put("start_at", "2026-11-23T01:00:00Z").put("end_at", "2026-11-23T02:00:00Z");
+        CalendarRefresh.preferences(context).edit().putString("widget_events", new JSONArray().put(event).toString()).commit();
+        java.io.File folder = new java.io.File("build/widget-previews");
+        assertTrue(folder.mkdirs() || folder.isDirectory());
+        for (int height : new int[]{72, 180, 320}) {
+            View root = apply(remote(height == 72, height));
+            measure(root, 320, height);
+            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(root.getWidth(), root.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+            root.draw(new android.graphics.Canvas(bitmap));
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(new java.io.File(folder, "widget-" + height + ".png"))) {
+                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out));
+            }
+        }
     }
 
     @Test public void sixWeekMonthFitsMinimumMonthHeight() {

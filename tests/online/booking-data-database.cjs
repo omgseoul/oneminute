@@ -23,4 +23,15 @@ module.exports=async({db,owner,internal,p1,p2,t2,id})=>{
  const utcBoundary=new Date(Date.parse(day+'T00:00:00Z')-8.5*3600000).toISOString();await internal('bookings',{items:[booking(90008,day,utcBoundary)]});assert((await owner('booking_data',{from:day,to:day})).bookings.some(b=>b.id===90008),'booking occurrence uses property timezone');
  for(const prop of [p1,p2])assert.equal((await db.query("select count(*)::int n from omg_private.online_booking_notices n join property_messages m on m.id=n.message_id where n.property_id=$1 and m.property_id<>n.property_id",[prop])).rows[0].n,0);
  assert.equal((await db.query("select has_function_privilege('anon','public.get_online_push_dispatch(uuid)','execute') ok")).rows[0].ok,false);console.log('Booking Data DB: local dates, historical tags, daily count, deduplicated duty/owner delivery, settings, retry queue and tenant boundaries passed');
+ await db.exec(fs.readFileSync('supabase/migrations/20261123010000_exclude_direct_same_day_alerts.sql','utf8'));
+ await internal('bookings',{items:[
+  {...booking(90908,day),apiSource:'  Direct  '},
+  {...booking(90909,day),apiSource:'Manual'},
+  {...booking(90910,day),apiSource:'',referer:'Direct'},
+  {...booking(90911,day),apiSource:'Vrbo'}
+ ]});
+ const extra=(await db.query('select booking_id from omg_private.online_booking_notices where property_id=$1 and booking_id between 90908 and 90911',[p1])).rows;
+ assert.deepEqual(extra.map(row=>Number(row.booking_id)),[90911]);
+ assert((await owner('booking_data',q)).bookings.some(b=>b.id===90908),'Direct booking stays in the booking list');
+
 };

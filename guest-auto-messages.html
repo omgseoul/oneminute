@@ -7,10 +7,10 @@
 <div class="auto-toolbar"><button id="addAutoMessage" type="button" class="primary" disabled><span aria-hidden="true">＋</span> 자동메시지 추가</button><button id="showAutoLogs" type="button" disabled>발송 기록</button></div>
 <p id="autoState" role="status" aria-live="polite">설정을 불러오는 중…</p>
 <section id="autoList" aria-label="자동메시지 목록"></section>
-<p class="note auto-policy">각 예약에 메시지별로 한 번 발송합니다. 설정을 켜기 전에 지난 발송 시점은 소급 적용하지 않습니다.</p>
+<p class="note auto-policy">각 예약에 메시지별로 한 번 발송합니다. 발송 시점을 놓치거나 발송에 문제가 생기면 관리자에게 봇 알림을 보냅니다.</p>
 <section id="autoLogs" class="card" hidden><div class="auto-row"><h2>발송 기록</h2><button id="refreshAutoLogs" type="button">새로고침</button></div><div id="autoLogList"></div></section>
 </main>
 <dialog id="autoTitleDialog"><form id="autoTitleForm"><h2>목록에 표시할 제목</h2><p class="note">어떤 안내인지 알아보기 쉽게 이름을 붙여주세요.</p><input id="autoTitle" maxlength="80" placeholder="예: 체크인 안내" aria-label="자동메시지 제목" required><p id="titleState" role="status"></p><div class="auto-dialog-actions"><button type="button" id="cancelAutoTitle">돌아가기</button><button type="submit" class="primary">저장</button></div></form></dialog>
 <dialog id="autoLanguageDialog"><form id="autoLanguageForm"><h2>언어 추가</h2><label for="autoLanguage">메시지 언어</label><select id="autoLanguage"></select><p class="note">예약의 국가 정보를 기준으로 선택합니다. 국가 정보가 없거나 해당 버전을 등록하지 않으면 공통 메시지를 보냅니다.</p><div class="auto-dialog-actions"><button type="button" id="cancelAutoLanguage">취소</button><button class="primary">추가</button></div></form></dialog>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script><script src="property-selector.js?v=20261112-online-multi"></script><script src="guest-auto-messages.js?v=20261123-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script><script src="property-selector.js?v=20261112-online-multi"></script><script src="guest-auto-messages.js?v=20261124-alerts"></script>
 </body></html>

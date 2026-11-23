@@ -19,13 +19,13 @@ export function renderAutoMessage(template,values){
  if(!text.trim()||text.length>4000)throw Error('발송 내용은 1~4,000자여야 합니다.');
  return text;
 }
-export function createAutoMessages({rpc,credentials,api,saveBookings,messages}){
+export function createAutoMessages({rpc,credentials,api,saveBookings,messages,dispatchNotice=async()=>false}){
  const ctl=(action,data={})=>rpc('auto_message_internal',{p_action:action,p_data:data});
  async function process(job){
   const finish=(status,error)=>ctl('finish',{id:job.id,lease:job.lease,status,error});
   let attempted=false;
   try{
-   if(!job.rule?.enabled)return await finish('skipped','설정이 중지되었습니다.');
+   if(!job.rule?.enabled)return await finish('skipped','자동 발송 설정이 중지되었습니다.');
    const c=await credentials(job.property_id);
    const v=await api('/bookings?id='+job.booking_id+'&propertyId='+c.beds_property_id+'&includeInfoItems=true',{token:c.secret.token});
    if(!Array.isArray(v.data))throw Error('예약정보를 확인하지 못했습니다.');
@@ -54,9 +54,9 @@ export function createAutoMessages({rpc,credentials,api,saveBookings,messages}){
    }else if(rows?.length&&rows.every(r=>r.success===false))await finish('failed','예약 채널에서 발송을 거절했습니다. 채널 지원·쓰기 권한을 확인해주세요.');
    else await finish('uncertain','발송 결과 확인 필요 · 게스트 대화를 확인해주세요.');
   }catch(e){
-   await finish(attempted?(e.status>=400&&e.status<500?'failed':'uncertain'):'waiting',attempted?'발송 결과를 게스트 대화에서 확인해주세요.':e.message);
+   await finish(attempted?(e.status>=400&&e.status<500?'failed':'uncertain'):'waiting',attempted?(e.status>=400&&e.status<500?e.message:'전송 중 응답이 끊겨 발송 성공 여부를 확인하지 못했습니다.'):(/[가-힣]/.test(e.message)?e.message:'Beds24 연결이 끊겼거나 응답 시간이 초과되었습니다.'));
   }
  }
- async function drain(){for(let i=0;i<4;i++){const job=await ctl('claim');if(job.empty)break;await process(job);}}
+ async function drain(){try{for(let i=0;i<4;i++){const job=await ctl('claim');if(job.empty)break;await process(job);}}finally{for(const notice of await ctl('pushes')){try{if(await dispatchNotice(notice.message_id))await ctl('pushed',{id:notice.id});}catch{/* Keep pending; push transport deduplicates by message and recipient. */}}}}
  return {drain,process};
 }

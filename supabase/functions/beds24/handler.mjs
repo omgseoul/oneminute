@@ -127,7 +127,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>3000000){await reader.cancel();return reply({ok:false,message:'첨부 이미지가 너무 큽니다.'},413);}chunks.push(value);}
    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
    const raw=new TextDecoder().decode(bytes),b=JSON.parse(raw),d=b.data||{};
-   if(size>30000&&!(['web_checkin','web_checkin_preview'].includes(b.action)&&d.step==='upload'))return reply({ok:false},413);
+   if(size>30000&&!(b.action==='auto_message_save'&&size<=300000)&&!(['web_checkin','web_checkin_preview'].includes(b.action)&&d.step==='upload'))return reply({ok:false},413);
    if(['web_checkin','web_checkin_preview','web_checkin_settings','web_checkin_save','web_checkin_diagnose'].includes(b.action))return reply(await webCheckin(b.action,d,b.access_token||null,req));
    if(b.platform_token){
     const r=await fetcher(url()+'/auth/v1/user',{headers:{apikey:key(),Authorization:'Bearer '+b.platform_token},signal:AbortSignal.timeout(10000)});

@@ -21,3 +21,11 @@ b.propertyId=100;b.infoItems=[{code:'LOCK_PIN',text:'0658'}];ready=false;await w
 ready=true;sendMode='timeout';await worker.process(job);assert.equal(finish.at(-1).status,'uncertain');
 sendMode='rejected';await worker.process(job);assert.equal(finish.at(-1).status,'failed');
 console.log('Auto messages: country fallback, token rendering, PIN leading zero/conflict, live cancellation, tenancy, final gate and ambiguous response passed');
+
+// Several full-length CJK translations exceed the ordinary 30 KB request budget.
+const {createBedsHandler}=await import('../../supabase/functions/beds24/handler.mjs');
+let savedAction;const handler=createBedsHandler({env:()=> 'fixture',fetcher:async(url,options)=>{const data=JSON.parse(options.body);savedAction=data.p_action;return new Response(JSON.stringify({ok:true}));}});
+const multilingual={common:'안'.repeat(4000),ja:'あ'.repeat(4000),'zh-CN':'好'.repeat(4000)};
+const response=await handler(new Request('https://fixture.test/beds24',{method:'POST',body:JSON.stringify({action:'auto_message_save',access_token:'00000000-0000-0000-0000-000000000001',data:{messages:multilingual}})}));
+assert.equal(response.status,200);assert.equal(savedAction,'save');
+console.log('Multilingual request budget accepts full-length CJK versions');

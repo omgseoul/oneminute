@@ -1,10 +1,10 @@
 name: Guest automatic messages
 on:
   pull_request:
-    paths: ['guest-auto-messages.*', 'guest-messages.html', 'guest-inbox.css', 'online.js', 'supabase/functions/beds24/**', 'supabase/setup/guest_auto_messages.sql', 'supabase/migrations/*guest_auto_messages.sql', 'tests/online/auto-messages-*', '.github/workflows/auto-message-checks.yml']
+    paths: ['guest-auto-messages.*', 'guest-messages.html', 'guest-inbox.css', 'online.js', 'supabase/functions/beds24/**', 'supabase/setup/guest_auto_messages.sql', 'supabase/migrations/*guest_auto_messages.sql', 'tests/online/auto-messages-*', 'tests/online/auto-message-alerts-*', 'supabase/setup/auto_message_exception_alerts.sql', 'supabase/migrations/*auto_message_exception_alerts.sql', '.github/workflows/auto-message-checks.yml']
   push:
     branches: [main]
-    paths: ['guest-auto-messages.*', 'supabase/functions/beds24/auto-messages.mjs', 'supabase/setup/guest_auto_messages.sql', 'tests/online/auto-messages-*']
+    paths: ['guest-auto-messages.*', 'supabase/functions/beds24/auto-messages.mjs', 'supabase/setup/guest_auto_messages.sql', 'tests/online/auto-messages-*', 'tests/online/auto-message-alerts-*', 'supabase/setup/auto_message_exception_alerts.sql', 'supabase/migrations/*auto_message_exception_alerts.sql']
 permissions:
   contents: read
 jobs:
@@ -21,10 +21,15 @@ jobs:
         run: |
           node --check guest-auto-messages.js
           node tests/online/auto-messages-database.cjs
+          node tests/online/auto-message-alerts-database.cjs
+          node tests/online/auto-message-alerts-edge.mjs
+          node tests/bot-briefing/dispatch.mjs
           node tests/online/auto-messages-edge.mjs
           node tests/online/auto-messages-ui.cjs
           node tests/online/unified-browser.cjs
           node tests/online/edge.mjs
+          node tests/online/booking-details-edge.mjs
+          node tests/online/booking-data-ui.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

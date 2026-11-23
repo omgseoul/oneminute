@@ -1,5 +1,5 @@
 import {createAutoMessages} from './auto-messages.mjs';
-import {createWebCheckin} from './web-checkin.mjs';
+import {createWebCheckin,accessCode,assignedUnit} from './web-checkin.mjs';
 import {createDocumentReader} from './web-checkin-document.mjs';
 import {createTranslation} from './translation.mjs';
 import {buildRequest,validateAnswer} from '../guest-ai/handler.mjs';
@@ -15,7 +15,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  const url=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
  async function rpc(name,args){const r=await fetcher(url()+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'서버 처리에 실패했습니다. 다시 시도해주세요.');return v;}
  const translation=createTranslation({rpc,fetcher});
- const autoMessages=createAutoMessages({rpc,credentials,api,saveBookings,messages});
+ const autoMessages=createAutoMessages({rpc,credentials,api,saveBookings,messages,dispatchNotice:async id=>{const r=await fetcher(url()+'/functions/v1/dispatch-briefing',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:id}),signal:AbortSignal.timeout(20000)});return r.ok&&(await r.json()).ok===true;}});
  const webCheckin=createWebCheckin({rpc,credentials,api,readDocument:createDocumentReader({rpc,fetcher})});
  const internal=(action,property,data={})=>rpc('online_internal',{p_action:action,p_property:property,p_data:data});
  const tokenProperties=new Map();
@@ -141,8 +141,25 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
    if(['auto_message_list','auto_message_save','auto_message_toggle'].includes(b.action))return reply(await rpc('auto_message_owner',{p_token:b.access_token,p_action:b.action.slice(13),p_data:d}));
-   const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action}),p=a.property_id;
+   const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action==='booking_detail'?'booking_data':b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
+   if(b.action==='booking_detail'){
+    const id=positive(d.booking_id),c=await credentials(p);
+    const path='/bookings?id='+id+'&propertyId='+positive(c.beds_property_id)+'&includeInfoItems=true';
+    let v=await api(path,{token:c.secret.token});
+    if(Array.isArray(v.data)&&!v.data.length)v=await api(path+'&status=cancelled',{token:c.secret.token});
+    if(!Array.isArray(v.data)||v.data.length!==1)throw Error('예약 상세정보를 찾지 못했습니다.');
+    const b=v.data[0];if(Number(b.id)!==id||Number(b.propertyId)!==Number(c.beds_property_id))throw Error('예약의 지점 또는 번호가 일치하지 않습니다.');
+    const detail={id};for(const [key,field] of [['reference','apiReference'],['phone','phone'],['mobile','mobile']]){if(typeof b[field]==='string'&&b[field].trim())detail[key]=b[field].trim();}
+    // Fetch sensitive values only for the opened, authorized reservation; never cache in ordinary bookings.
+    if((b.infoItems||[]).some(i=>i.code==='LOCK_PIN')){
+     try{const inv=await api('/properties?id='+positive(c.beds_property_id)+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
+      const prop=inv.data?.find(x=>Number(x.id)===Number(c.beds_property_id)),assigned=prop&&assignedUnit(b,prop),pin=accessCode(b,assigned,'info:LOCK_PIN');
+      if(pin)detail.password=pin;else detail.warning='비밀번호의 객실 연결 또는 중복 값을 확인해주세요.';
+     }catch{detail.warning='비밀번호 정보를 불러오지 못했습니다. 잠시 후 다시 확인해주세요.';}
+    }
+    return reply({ok:true,detail});
+   }
    if(b.action==='guest_settings')return reply(await scoped('guest_settings'));
    if(b.action==='settings'){const v=await scoped('settings'),t=await translation.ctl('status',p);return reply({...v,translation:t.usage,translation_connected:!!(t.usage?.platform_ready||t.usage?.personal_connected)});}
    if(['save_message_alert','save_message_alert_draft','save_auto_translation','booking_data','booking_data_count','save_booking_alert','save_settings','save_translation_language','reuse_connection','bookings','inbox','unread','save_period','read_message','peek_thread','webhook_logs','thread','logs','reject'].includes(b.action))return reply(await scoped(b.action));

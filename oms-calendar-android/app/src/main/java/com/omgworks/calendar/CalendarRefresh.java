@@ -64,10 +64,15 @@ public final class CalendarRefresh extends JobService {
         if (!preferences(c).contains("token")) return;
         JobScheduler jobs = c.getSystemService(JobScheduler.class);
         ComponentName service = new ComponentName(c, CalendarRefresh.class);
-        if (jobs.getPendingJob(PERIODIC) == null) jobs.schedule(new JobInfo.Builder(PERIODIC, service)
-                .setPeriodic(15 * 60 * 1000L).setPersisted(true).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).build());
-        if (immediate && jobs.getPendingJob(IMMEDIATE) == null) jobs.schedule(new JobInfo.Builder(IMMEDIATE, service)
-                .setMinimumLatency(0).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).build());
+        try {
+            if (jobs.getPendingJob(PERIODIC) == null) jobs.schedule(new JobInfo.Builder(PERIODIC, service)
+                    .setPeriodic(15 * 60 * 1000L).setPersisted(true).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).build());
+            if (immediate && jobs.getPendingJob(IMMEDIATE) == null) jobs.schedule(new JobInfo.Builder(IMMEDIATE, service)
+                    .setMinimumLatency(0).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).build());
+        } catch (SecurityException | IllegalStateException unavailable) {
+            // A background refresh failure must not close the signed-in calendar.
+            android.util.Log.w("OMSCalendar", "Background calendar refresh could not be scheduled", unavailable);
+        }
     }
 
     @Override public boolean onStartJob(JobParameters params) {

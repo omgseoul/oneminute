@@ -30,3 +30,6 @@ body[data-guest-inbox] #replyForm>.translation-compose{grid-column:1 / -1;grid-r
 body[data-guest-inbox] #replyForm>.translation-compose:not(:has(.outgoing-preview:not([hidden]))):not(:has(.translation-feedback:not(:empty))){display:none}
 .thread-order{border-top:1px solid #dfe7ef;padding-top:8px;margin:6px 0 2px;font-size:11px;color:#778596}
 @media(max-width:350px){body[data-guest-inbox] #guestMeta{column-gap:7px}.thread-stay{gap:5px;font-size:11px}}
+
+/* Auto is a compact bubble beside the existing inbox branch filter. */
+.auto-message-entry{display:flex;align-items:center;justify-content:center;flex:none;width:47px;height:40px;margin-left:auto;color:#356d9f;text-decoration:none}.auto-message-entry svg{width:47px;height:39px}.auto-message-entry[hidden]{display:none}.auto-message-entry:not([hidden])+#propertyName{margin-left:0}

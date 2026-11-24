@@ -31,7 +31,7 @@ assert.equal(nameScore('6081',{firstName:'6081'}),0);assert.equal(nameChoices({f
 assert.equal(matchingBookings([b],{...input,name:'1234'},b.propertyId,day,true).length,0);
 assert.equal(nameScore('Someone else',{...b,firstName:'6081 María'}),nameScore('Someone else',b));
 assert.equal(referenceScore('ABC999999',b)<.9,true,'booking reference digits still matter');
-assert.equal(documentMatches({readable:true,guest_name:'Maria Fernandez',booking_reference:'ABC999999',check_in:day,check_out:b.departure},b),false);
+assert.equal(documentMatches({readable:true,guest_name:'Maria Fernandez',booking_reference:'ABC999999',check_in:day,check_out:b.departure},b),true);
 for(const fixture of [{firstName:'6081 김민수'},{firstName:'王123小明'},{firstName:'12 Иван',lastName:'Петров34'}]){
  const choices=nameChoices(fixture);assert(choices.options.every(x=>!(/\p{N}/u.test(x.label))));
  assert.equal(nameScore(cleanGuestName([fixture.firstName,fixture.lastName].filter(Boolean).join(' ')),fixture),1);
@@ -40,3 +40,14 @@ let allowed=true,apiCalls=0;
 const run=createWebCheckin({rpc:async(name,args)=>{assert.equal(name,'web_checkin_admin');if(!allowed||args.p_token!=='owner')throw Error('관리자');assert.equal(args.p_data.property_id,'selected-branch');if(args.p_action==='record_probe')assert.equal(args.p_data.reservations,undefined);return {ok:true,property_id:'selected-branch',property_name:'Selected branch',day};},credentials:async property=>{assert.equal(property,'selected-branch');return{beds_property_id:263281,secret:{token:'test'}};},api:async path=>{apiCalls++;return{data:path.startsWith('/properties')?[prop]:[b]};}});
 const req=new Request('https://fixture.test');assert.equal((await run('web_checkin',input,null,req)).code,'update_required');allowed=false;await assert.rejects(()=>run('web_checkin_diagnose',{},null,req),/관리자/);assert.equal(apiCalls,0);allowed=true;const summary=await run('web_checkin_diagnose',{property_id:'selected-branch'},'owner',req);assert.equal(summary.property_id,'selected-branch');assert.equal(summary.reservations[0].name,'María Fernández');assert(!JSON.stringify(summary).includes('7351'));
 console.log('Web check-in matching, ten synthetic choices, source isolation, legacy bypass denial and owner diagnostic tests passed');
+
+// Document identity is an OR, dates remain mandatory, and 90% is inclusive.
+const identity={id:987654,firstName:'ABCDEFGHIJ',lastName:'',apiReference:'REF123456',arrival:day,departure:'2026-11-19'};
+const proof={readable:true,guest_name:'ABCDEFGHIX',booking_reference:'',check_in:day,check_out:'2026-11-19'};
+assert.equal(nameScore(proof.guest_name,identity),.9);assert(documentMatches(proof,identity));
+assert(!documentMatches({...proof,guest_name:'ABCDEFGHXY'},identity));
+assert(documentMatches({...proof,guest_name:'',booking_reference:'REF123456'},identity));
+assert(documentMatches({...proof,guest_name:'Different Name',booking_reference:'987654'},identity));
+assert(!documentMatches({...proof,check_out:'2026-11-20',booking_reference:'REF123456'},identity));
+assert(!documentMatches({...proof,readable:false,booking_reference:'REF123456'},identity));
+assert(!documentMatches({...proof,guest_name:'',booking_reference:''},identity));

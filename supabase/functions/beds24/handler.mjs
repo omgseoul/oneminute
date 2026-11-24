@@ -124,7 +124,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    if(req.method!=='POST')return reply({ok:false},405);
    if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(Promise.all([drain(),autoMessages.drain()]));return reply({ok:true},202);}
    const reader=req.body?.getReader();if(!reader)return reply({ok:false},400);let size=0;const chunks=[];
-   while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>3000000){await reader.cancel();return reply({ok:false,message:'첨부 이미지가 너무 큽니다.'},413);}chunks.push(value);}
+   while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>5700000){await reader.cancel();return reply({ok:false,message:'첨부 이미지가 너무 큽니다.'},413);}chunks.push(value);}
    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
    const raw=new TextDecoder().decode(bytes),b=JSON.parse(raw),d=b.data||{};
    if(size>30000&&!(b.action==='auto_message_save'&&size<=300000)&&!(['web_checkin','web_checkin_preview'].includes(b.action)&&d.step==='upload'))return reply({ok:false},413);

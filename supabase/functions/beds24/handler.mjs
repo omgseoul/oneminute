@@ -212,7 +212,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     return reply({...await scoped(read),cached:!success,...(warning?{warning}:{})});
    }
    const c=await credentials(p);
-   if(b.action==='properties'){const props=[];await pages('/properties?includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token},async items=>props.push(...items.map(selectProperty)));await internal('connect',p,{secret:c.secret,properties:props,actor:a.actor});return reply(await scoped('settings'));}
+   if(b.action==='properties'){const props=[];await pages('/properties?includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token},async items=>props.push(...items.map(selectProperty)));await internal('inventory',p,{properties:props});return reply(await scoped('settings'));}
    if(!c.beds_property_id)throw Error('기본정보에서 연동할 숙소를 선택하고 저장해주세요.');
    if(b.action==='draft'){const id=positive(d.booking_id);await booking(p,c,id);await messages(p,c,id,true);return reply(await draft(p,id,a.actor));}
    if(b.action==='send'){

@@ -33,3 +33,13 @@ body[data-guest-inbox] #replyForm>.translation-compose:not(:has(.outgoing-previe
 
 /* Auto is a compact bubble beside the existing inbox branch filter. */
 .auto-message-entry{display:flex;align-items:center;justify-content:center;flex:none;width:47px;height:40px;margin-left:auto;color:#356d9f;text-decoration:none}.auto-message-entry svg{width:47px;height:39px}.auto-message-entry[hidden]{display:none}.auto-message-entry:not([hidden])+#propertyName{margin-left:0}
+
+/* Matching white controls: branch picker remains 34px; AI and Auto share its height. */
+body[data-guest-inbox] .message-settings-actions{display:flex;align-items:center;gap:5px;margin-left:auto;flex:none}
+body[data-guest-inbox] .message-settings-actions:has(a:not([hidden]))+#propertyName{margin-left:0}
+body[data-guest-inbox] .auto-message-entry{width:43px;height:34px;margin:0;color:#356D9F}
+body[data-guest-inbox] .auto-message-entry svg{width:43px;height:34px;overflow:visible}
+body[data-guest-inbox] .auto-message-entry svg path{fill:#fff;stroke:#CBD8E8;stroke-width:1.5}
+body[data-guest-inbox] #propertyName .property-picker-button{box-sizing:border-box;height:34px!important;min-height:34px!important;max-width:min(155px,38vw);padding:0 9px;background:#fff!important;border:1px solid #CBD8E8;border-radius:10px;font-size:11px;font-weight:600;box-shadow:none}
+body[data-guest-inbox] .auto-message-entry:focus-visible{outline:2px solid #2563EB;outline-offset:2px;border-radius:8px}
+@media(max-width:350px){body[data-guest-inbox] main>header{gap:5px}body[data-guest-inbox] #propertyName .property-picker-button{max-width:112px}}

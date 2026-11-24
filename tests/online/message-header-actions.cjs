@@ -1,0 +1,10 @@
+const fs=require('fs'),assert=require('node:assert/strict'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch();try{for(const width of [320,390,768]){
+ const page=await browser.newPage({viewport:{width,height:850}});let html=fs.readFileSync('guest-messages.html','utf8').replace(/<script[\s\S]*?<\/script>/g,'').replace(/<link[^>]+>/g,'');await page.setContent(html);
+ for(const path of ['online.css','top-layout.css','guest-inbox.css'])await page.addStyleTag({path});
+ await page.addScriptTag({path:'property-selector.js'});
+ await page.evaluate(()=>{for(const id of ['aiMessageLink','autoMessageLink'])document.getElementById(id).hidden=false;omgPropertySelector.mountMulti({host:document.getElementById('propertyName'),items:[{value:'one',label:'oneminute'},{value:'omg',label:'OMG House'}],values:['one'],onChange(){}});});
+ const result=await page.evaluate(()=>{const a=document.getElementById('aiMessageLink'),b=document.getElementById('autoMessageLink'),p=document.querySelector('#propertyName .property-picker-button');return {a:a.getBoundingClientRect().height,b:b.getBoundingClientRect().height,p:p.getBoundingClientRect().height,fill:getComputedStyle(a.querySelector('path')).fill,bg:getComputedStyle(p).backgroundColor,order:a.getBoundingClientRect().left<b.getBoundingClientRect().left,overflow:document.documentElement.scrollWidth>innerWidth};});
+ assert.equal(result.a,34);assert.equal(result.b,34);assert.equal(result.p,34);assert.equal(result.fill,'rgb(255, 255, 255)');assert.equal(result.bg,'rgb(255, 255, 255)');assert(result.order);assert(!result.overflow);
+ assert.equal(await page.locator('#aiMessageLink').getAttribute('href'),'guest-ai-settings.html');await page.screenshot({path:'/tmp/online-message-header-'+width+'.png'});await page.close();
+ }console.log('PASS AI/Auto white speech bubbles, 34px branch alignment, order, destination, 320/390/768px overflow');}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

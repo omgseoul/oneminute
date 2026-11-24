@@ -4,17 +4,30 @@ on:
   pull_request:
     paths:
       - 'oms-calendar-android/**'
+      - 'mission-widget.js'
+      - 'mission.html'
+      - 'tests/mission-widget.cjs'
+      - 'tests/android-signing-authorization.mjs'
+      - 'supabase/functions/android-signing/**'
       - '.github/workflows/build-oms-calendar.yml'
   push:
     branches: [main, codex/oms-calendar]
     paths:
       - 'oms-calendar-android/**'
+      - 'mission-widget.js'
+      - 'mission.html'
+      - 'tests/mission-widget.cjs'
+      - 'tests/android-signing-authorization.mjs'
+      - 'supabase/functions/android-signing/**'
       - '.github/workflows/build-oms-calendar.yml'
 permissions:
   contents: read
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,14 +37,35 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - name: Check widget navigation
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/mission-widget.cjs
+          node tests/android-signing-authorization.mjs
+      - name: Restore persistent release signing
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: python guesthouse-manager-app/scripts/restore-signing.py
       - name: Build APK
         working-directory: oms-calendar-android
-        run: gradle testDebugUnitTest assembleDebug
+        run: gradle testDebugUnitTest assembleDebug assembleRelease
       - name: Verify and prepare APK
         run: |
           APK=oms-calendar-android/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          if [ "$GITHUB_REF" = 'refs/heads/main' ] && [ "$GITHUB_EVENT_NAME" != 'pull_request' ]; then
+            test -n "$OMS_CERTIFICATE_SHA256"
+            APK=oms-calendar-android/app/build/outputs/apk/release/app-release.apk
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" > /tmp/calendar-cert.txt
+            grep -Fx "Signer #1 certificate SHA-256 digest: $OMS_CERTIFICATE_SHA256" /tmp/calendar-cert.txt
+          else
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          fi
           cp "$APK" OMS-Calendar.apk
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/oms-release.p12"
       - uses: actions/upload-artifact@v4
         with:
           name: OMS-Calendar-APK
@@ -40,3 +74,9 @@ jobs:
         with:
           name: Widget-layout-preview
           path: oms-calendar-android/app/build/widget-previews/*.png
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Widget-test-reports
+          path: oms-calendar-android/app/build/test-results/**/*.xml

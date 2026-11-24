@@ -3,7 +3,7 @@
  if(guestMode)window.addEventListener('omg:messages-changed',()=>{try{window.OMGNative?.refreshMessageBadge?.();}catch{}});
  const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let settings={},view='',bookingId=null,version=0,activeBasis='arrival',busy=false,sendId=null,sending=false,selectedProperty=null,switching=false,taskCount=0,bookingRows=null,inboxRows=null,selectedProperties=[],branches=[],propertyPicker=null,pickerMode=null,threadProperty=null;
- if(guestMode&&!isStaff&&$('autoMessageLink')){$('autoMessageLink').hidden=false;$('autoMessageLink').onclick=()=>{$('autoMessageLink').href='guest-auto-messages.html?property='+encodeURIComponent(selectedProperties.length===1?selectedProperties[0]:selectedProperty||session.propertyId);};}
+ if(guestMode&&!isStaff&&$('autoMessageLink')){if($('aiMessageLink'))$('aiMessageLink').hidden=false;$('autoMessageLink').hidden=false;$('autoMessageLink').onclick=()=>{$('autoMessageLink').href='guest-auto-messages.html?property='+encodeURIComponent(selectedProperties.length===1?selectedProperties[0]:selectedProperty||session.propertyId);};}
  const bookingDataChecked=new Map(),bookingDetails=new Map();
  const bookingPeriodKey='oms-online-booking-period:'+String(session.ownerId||session.employeeId||session.propertyId);let bookingPeriod={days:7,from:'',to:''};
  try{const v=JSON.parse(localStorage.getItem(bookingPeriodKey)||'null');if(v&&(Number.isInteger(v.days)&&v.days>=1&&v.days<=93||v.days===0&&/^\d{4}-\d{2}-\d{2}$/.test(v.from)&&/^\d{4}-\d{2}-\d{2}$/.test(v.to)&&v.to>=v.from&&Date.parse(v.to)-Date.parse(v.from)<=92*86400000))bookingPeriod=v;}catch{}

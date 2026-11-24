@@ -23,6 +23,8 @@ public final class CalendarActivity extends Activity {
     static final String HOME = ORIGIN + "/calendar.html?app=calendar";
     private static final Pattern UUID = Pattern.compile("[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}");
     private WebView web;
+    private boolean taskEntry, resetHistory;
+    private String launchUrl;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -43,12 +45,44 @@ public final class CalendarActivity extends Activity {
                     }
                     return true;
                 }
-                if ("/app.html".equals(url.getPath())) { view.loadUrl(HOME); return true; }
+                if ("/app.html".equals(url.getPath())) {
+                    if (taskEntry && web.getUrl() != null && "/mission.html".equals(Uri.parse(web.getUrl()).getPath())) onBackPressed();
+                    else view.loadUrl(taskEntry ? launchUrl : HOME);
+                    return true;
+                }
                 return false;
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                if (resetHistory && trusted(Uri.parse(url)) && ("/mission.html".equals(Uri.parse(url).getPath()) || "/calendar.html".equals(Uri.parse(url).getPath()))) {
+                    view.clearHistory(); resetHistory = false;
+                }
             }
         });
         setContentView(web);
-        web.loadUrl(getIntent().getBooleanExtra("tasks", false) ? ORIGIN + "/mission.html?scope=mine" + (getIntent().getBooleanExtra("create", false) ? "&create=1" : "") : HOME);
+        launch(getIntent());
+    }
+
+    static Intent taskIntent(android.content.Context context, String id, boolean create) {
+        return new Intent(context, CalendarActivity.class)
+                .setData(Uri.parse("oms-calendar://todo/" + (create ? "new" : id)))
+                .putExtra("tasks", true).putExtra("task_id", id).putExtra("create", create)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    }
+    static String taskUrl(Intent intent) {
+        Uri.Builder url = Uri.parse(ORIGIN + "/mission.html").buildUpon().appendQueryParameter("scope", "mine").appendQueryParameter("app", "todo");
+        String id = intent.getStringExtra("task_id");
+        if (id != null && UUID.matcher(id).matches()) url.appendQueryParameter("task", id);
+        if (intent.getBooleanExtra("create", false)) url.appendQueryParameter("create", "1");
+        return url.build().toString();
+    }
+    private void launch(Intent intent) {
+        taskEntry = intent.getBooleanExtra("tasks", false);
+        launchUrl = taskEntry ? taskUrl(intent) : HOME;
+        resetHistory = true;
+        web.loadUrl(launchUrl);
+    }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); launch(intent);
     }
 
     private boolean trusted(Uri uri) {
@@ -71,6 +105,12 @@ public final class CalendarActivity extends Activity {
         }
         @JavascriptInterface public void clearSession() {
             runOnUiThread(() -> { if (trustedCurrentPage()) CalendarRefresh.clear(CalendarActivity.this); });
+        }
+        @JavascriptInterface public void exitToLauncher() {
+            runOnUiThread(() -> { if (trustedCurrentPage()) finishAndRemoveTask(); });
+        }
+        @JavascriptInterface public void refreshWidgets() {
+            runOnUiThread(() -> { if (trustedCurrentPage()) CalendarRefresh.schedule(CalendarActivity.this, true); });
         }
         @JavascriptInterface public void openSettings() {
             runOnUiThread(() -> { if (trustedCurrentPage()) settings(); });
@@ -123,6 +163,13 @@ public final class CalendarActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (web.canGoBack()) web.goBack(); else super.onBackPressed();
+        if (trustedCurrentPage() && "/mission.html".equals(Uri.parse(web.getUrl()).getPath())) {
+            web.evaluateJavascript("Boolean(window.OMSWidgetNavigation && window.OMSWidgetNavigation.back())", result -> {
+                if (!"true".equals(result)) finishAndRemoveTask();
+            });
+        } else if (taskEntry) {
+            if (web.getUrl() != null && "/login.html".equals(Uri.parse(web.getUrl()).getPath())) finishAndRemoveTask();
+            else { resetHistory = true; web.loadUrl(ORIGIN + "/mission.html?scope=mine&app=todo"); }
+        } else if (web.canGoBack()) web.goBack(); else finishAndRemoveTask();
     }
 }

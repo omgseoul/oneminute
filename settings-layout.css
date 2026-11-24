@@ -55,3 +55,9 @@
 .ai-settings-page .ai-usage b{margin-top:2px;font-size:21px}
 .ai-settings-page #aiPropertyPicker{margin-left:auto;min-width:0}
 .ai-settings-page #aiPropertyPicker .property-picker-button{height:34px!important;max-width:46vw}
+
+/* Keep each help action beside its section title, separate from the switch. */
+.ai-settings-page .ai-alert-heading{gap:8px}
+.ai-settings-page .ai-alert-title{display:flex;align-items:center;gap:6px;min-width:0}
+.ai-settings-page .ai-alert-title .ai-prompt-help{flex:0 0 28px;width:28px;height:28px}
+.ai-settings-page .ai-prompt-row{grid-template-columns:minmax(0,1fr)}

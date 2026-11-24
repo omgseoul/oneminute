@@ -13,10 +13,11 @@ const read=file=>fs.readFileSync(file,'utf8');
     window.omgSession={require:async()=>session,get:()=>session,logout:async()=>{}};
     window.omgWorkConfig={load:async()=>({can_manage:owner,property:{name:'테스트 지점',property_id:'property-a',management_number:1}})};
     const picker={selectedIds:()=>['property-a']};window.omgPropertySelector={mount:async()=>picker,mountStatic:()=>picker};
-    window.GuestSupport={call:async()=>({rooms:[]})};window.OMGNative={};window.rpcCalls=[];
+    window.GuestSupport={call:async()=>({rooms:[]})};window.OMGNative={};window.rpcCalls=[];window.tagged=['tagged','reported'].includes(scenario);
     window.omgSupabase={rpc:async(name,args)=>{
      rpcCalls.push(name);
-     if(name==='attendance_nfc_entry')return {data:{ok:true,basis:scenario==='first_login'?'first_login':'nfc',status:'working',entry_at:['tagged','reported'].includes(scenario)?'2026-10-24T00:00:00Z':null,checkin_report_at:scenario==='reported'?'2026-10-24T00:01:00Z':null}};
+     if(name==='attendance_nfc_entry')return {data:{ok:true,basis:scenario==='first_login'?'first_login':'nfc',status:'working',entry_at:tagged?'2026-10-24T00:00:00Z':null,nfc_entries:tagged?[{id:'entry',recorded_at:'2026-10-24T00:00:00Z'}]:[],checkin_report_at:scenario==='reported'?'2026-10-24T00:01:00Z':null}};
+     if(name==='attendance_nfc_select')return {data:{ok:true,basis:'nfc',status:'working',selected_entry_id:args.p_entry_id,entry_at:'2026-10-24T00:00:00Z'}};
      if(name==='is_platform_administrator'){
       if(scenario==='owner_permission_denied')return {data:null,error:{code:'42501',message:'permission denied for function is_platform_administrator'}};
       if(scenario==='owner_permission_rejected')throw Error('Network unavailable');
@@ -81,7 +82,7 @@ const read=file=>fs.readFileSync(file,'utf8');
     await page.locator('#reportMenu a').first().click();await page.locator('dialog[open]').waitFor();
     await page.waitForTimeout(1800);assert(page.url().endsWith('/app.html'));
     await page.getByRole('button',{name:'확인',exact:true}).click();await page.waitForTimeout(1800);assert(page.url().endsWith('/app.html'));assert.equal(await page.locator('dialog[open]').count(),0);
-    await page.locator('#reportMenu a').first().click();await page.getByRole('button',{name:'무시하고 메뉴보기',exact:true}).click();await page.waitForURL('**/report.html?type=clock_in');
+    assert.equal(await page.getByRole('button',{name:'무시하고 메뉴보기',exact:true}).count(),0);await page.evaluate(()=>tagged=true);await page.locator('#reportMenu a').first().click();await page.waitForURL('**/report.html?type=clock_in');
    }
    assert.deepEqual(errors,[],scenario);console.log('PASS actual Home bootstrap: '+scenario);await page.close();
   }

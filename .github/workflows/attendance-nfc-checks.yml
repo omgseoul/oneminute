@@ -23,6 +23,7 @@ jobs:
           node tests/attendance-nfc/ui.cjs
           node tests/attendance-nfc/integration.cjs
           node tests/attendance-nfc/selection-browser.cjs
+          node tests/attendance-nfc/home-bootstrap.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -27,13 +27,18 @@
         if(error||!data?.ok)throw new Error(data?.message||'출근 상태를 확인하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');return data;
       }finally{clearTimeout(timeout);}
     }
+    async function select(id){
+      const {data,error}=await window.omgSupabase.rpc('attendance_nfc_select',{p_access_token:session.accessToken,p_entry_id:id});
+      if(error||!data?.ok)throw new Error(data?.message||'출근시각을 선택하지 못했습니다. 다시 시도해주세요.');
+      if(!current())throw new Error('로그인 상태가 변경되었습니다.');revision++;state=data;paint();return data;
+    }
     function paint(){options.onChange?.(state);window.dispatchEvent(new CustomEvent('omg:attendance-entry',{detail:state}));}
-    function canRead(){return current()&&!document.hidden&&state?.basis==='nfc'&&!state.entry_at&&!state.checkin_report_at&&state.status==='working'&&window.OMGNative?.startAttendanceNfc;}
+    function canRead(){return current()&&!document.hidden&&state?.basis==='nfc'&&!state.checkin_report_at&&state.status==='working'&&window.OMGNative?.startAttendanceNfc;}
     async function read(){
       if(busy||!canRead())return;busy=true;let received=false;
       try{pending=scan({timeoutMs:0});const uid=await pending.promise;received=true;if(!current())return;const result=await rpc(uid);if(current()){revision++;state=result;paint();}}
       catch(error){if(current()&&received){options.onError?.(error);retryTimer=setTimeout(read,1500);}}
-      finally{pending=null;busy=false;}
+      finally{pending=null;busy=false;if(canRead()){clearTimeout(retryTimer);retryTimer=setTimeout(read,1500);}}
     }
     async function refresh(){
       if(refreshing)return refreshing;
@@ -49,7 +54,7 @@
     window.addEventListener('focus',resume);
     document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();else resume();});
     startTimer();
-    const controller={get state(){return state;},refresh,read,stop:suspend};
+    const controller={get state(){return state;},refresh,read,select,stop:suspend,resume};
     try{await refresh();}catch(error){options.onLoadError?.(error);}
     return controller;
   }

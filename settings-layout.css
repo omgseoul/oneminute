@@ -31,3 +31,27 @@
 .ai-settings-page:has(dialog[open]){overflow:hidden}
 .ai-settings-page #aiLeaveDialog{max-height:calc(100dvh - var(--settings-safe-top) - var(--settings-safe-bottom) - 32px)}
 .ai-settings-page #aiLeaveTitle{word-break:keep-all;font-size:20px}
+
+/* Compact property-aware AI settings, retaining comfortable touch targets. */
+.ai-settings-page main>.top{margin-bottom:8px;min-height:34px;gap:8px}
+.ai-settings-page main>.top .back{font-size:13px;white-space:nowrap}
+.ai-settings-page main>h1{font-size:25px;line-height:1.25;margin:8px 0 5px}
+.ai-settings-page main>.help,.property-settings-page .head>p{font-size:12px;line-height:1.5;margin:5px 0 10px}
+.ai-settings-page .card{padding:12px 14px;margin:8px 0;border-radius:17px}
+.ai-settings-page .card h2{font-size:17px;margin:0 0 6px}
+.ai-settings-page .ai-channels{margin:2px 0;gap:6px}
+.ai-settings-page .ai-mode{margin:10px 0 4px;gap:0}
+.ai-settings-page .ai-mode legend{margin-bottom:2px;font-size:16px}
+.ai-settings-page .ai-mode label{min-height:36px;font-size:14px}
+.ai-settings-page .card .help{margin:4px 0 6px;font-size:12px;line-height:1.45}
+.ai-settings-page .ai-alert-heading{margin-bottom:6px}
+.ai-settings-page .ai-alert-heading h2{margin:0}
+.ai-settings-page .ai-alert-recipients{margin-top:6px;gap:4px}
+.ai-settings-page .ai-prompt-row{gap:4px 8px}
+.ai-settings-page .ai-menu{padding:10px 12px!important;margin-bottom:6px;min-height:54px}
+.ai-settings-page .ai-menu small{margin-top:2px;font-size:11px}
+.ai-settings-page .ai-usage{gap:6px;margin:6px 0}
+.ai-settings-page .ai-usage>div{padding:8px 10px}
+.ai-settings-page .ai-usage b{margin-top:2px;font-size:21px}
+.ai-settings-page #aiPropertyPicker{margin-left:auto;min-width:0}
+.ai-settings-page #aiPropertyPicker .property-picker-button{height:34px!important;max-width:46vw}

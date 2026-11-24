@@ -43,4 +43,5 @@ window.OMSSettingsNavigation={install(isDirty){
     if(!leaving&&isDirty()){event.preventDefault();event.returnValue='';}
   });
   window.addEventListener('pageshow',()=>{leaving=false;restoring=false;});
+  return {async navigate(url){if(isDirty()&&!await confirmLeave())return false;leaving=true;location.assign(url);return true;}};
 }};

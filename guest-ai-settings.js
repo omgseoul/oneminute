@@ -1,6 +1,18 @@
 (async()=>{
  const G=GuestSupport,$=id=>document.getElementById(id),s=await omgSession.require({allowCompleted:true});if(!s)return;if(s.sessionKind!=='owner'){location.replace('app.html');return;}
- const auth={access_token:s.accessToken},call=(a,d={})=>GuestAI.call(a,d,auth);let state=await call('get'),dirty=false;
+ let navigation;
+ const {data:shares,error:shareError}=await omgSupabase.rpc('list_property_shares',{p_access_token:s.accessToken});
+ if(shareError||!shares?.ok)throw Error('지점 목록을 불러오지 못했습니다. 다시 시도해주세요.');
+ const properties=(shares.properties||[]).filter(p=>p.is_own||(p.permissions||[]).includes('property_settings'));
+ const propertyId=new URLSearchParams(location.search).get('property_id')||(properties.find(p=>p.is_own)||properties[0])?.property_id;
+ if(!properties.some(p=>p.property_id===propertyId))throw Error('이 지점의 설정을 볼 권한이 없습니다.');
+ const pickerItems=properties.map(p=>({value:p.property_id,label:p.property_name,meta:p.is_own?'본지점':String(p.management_number||'')}));
+ const picker=omgPropertySelector.mountSingle({host:$('aiPropertyPicker'),title:'지점 선택',items:pickerItems,value:propertyId,onChange:async id=>{
+  if(id===propertyId)return;
+  const url=new URL(location.href);url.searchParams.set('property_id',id);
+  if(!navigation||!await navigation.navigate(url.href))picker.setItems(pickerItems,propertyId);
+ }});
+ const auth={access_token:s.accessToken},call=(a,d={})=>GuestAI.call(a,{...d,property_id:propertyId},auth);let state=await call('get'),dirty=false;
  const topics=['위치·찾아오는 길','체크인','체크아웃','얼리 체크인','레이트 체크아웃','짐 보관','Wi-Fi','출입 방법','주차','세탁','객실·침구','청소','소음·정숙 시간','흡연','시설 고장','분실물','예약 변경·환불','긴급 상황·직원 연락'];
  let rows=state.settings.data.length?state.settings.data.map(x=>({...x})):topics.map(title=>({title,answer:''}));
  $('aiEnabled').checked=state.settings.enabled;$('aiPrompt').value=state.settings.prompt;document.querySelector('[name=mode][value="'+state.settings.mode+'"]').checked=true;$('aiStart').value=(state.settings.start_time||'22:00').slice(0,5);$('aiEnd').value=(state.settings.end_time||'08:00').slice(0,5);
@@ -22,5 +34,5 @@
  $('applyAIImport').onclick=()=>{if(!pendingImport)return;rows=pendingImport;pendingImport=null;dirty=true;$('aiImportPreview').hidden=true;renderRows();$('dataError').textContent='표에 적용했습니다. 입력 완료 후 설정 저장을 눌러주세요.';};
  $('openData').onclick=()=>{renderRows();$('dataDialog').showModal();};$('openPrompt').onclick=()=>$('promptDialog').showModal();document.querySelectorAll('[data-ai-help]').forEach(b=>b.onclick=()=>$(b.dataset.aiHelp).showModal());document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());$('resetPrompt').onclick=()=>{$('aiPrompt').value=state.default_prompt;dirty=true;};document.querySelectorAll('[name=mode]').forEach(el=>el.onchange=mode);$('aiForm').oninput=()=>dirty=true;$('aiPrompt').oninput=()=>dirty=true;
  $('aiForm').onsubmit=async e=>{e.preventDefault();$('saveAI').disabled=true;try{const mode=document.querySelector('[name=mode]:checked').value;const data=rows.filter(r=>r.title.trim()||r.answer.trim());if(data.some(r=>!r.title.trim()))throw Error('답변이 있는 행에는 제목도 입력해주세요.');state=await call('save',{enabled:$('aiEnabled').checked,mode,start_time:mode==='schedule'?$('aiStart').value:null,end_time:mode==='schedule'?$('aiEnd').value:null,prompt:$('aiPrompt').value,data,handoff_config:readAlert('handoff'),emergency_config:readAlert('emergency')});dirty=false;renderUsage();G.message('AI 자동답변 설정을 저장했습니다.');}catch(err){G.message(err.message,true);}finally{$('saveAI').disabled=false;}};
- OMSSettingsNavigation.install(()=>dirty);mode();count();renderUsage();$('aiForm').hidden=false;G.message('');
+ navigation=OMSSettingsNavigation.install(()=>dirty);$('aiPropertyPicker').inert=false;mode();count();renderUsage();$('aiForm').hidden=false;G.message('');
 })().catch(e=>GuestSupport.message(e.message,true));

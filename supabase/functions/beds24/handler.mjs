@@ -151,13 +151,28 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     if(!Array.isArray(v.data)||v.data.length!==1)throw Error('예약 상세정보를 찾지 못했습니다.');
     const b=v.data[0];if(Number(b.id)!==id||Number(b.propertyId)!==Number(c.beds_property_id))throw Error('예약의 지점 또는 번호가 일치하지 않습니다.');
     const detail={id};for(const [key,field] of [['reference','apiReference'],['phone','phone'],['mobile','mobile']]){if(typeof b[field]==='string'&&b[field].trim())detail[key]=b[field].trim();}
-    // Fetch sensitive values only for the opened, authorized reservation; never cache in ordinary bookings.
-    if((b.infoItems||[]).some(i=>i.code==='LOCK_PIN')){
-     try{const inv=await api('/properties?id='+positive(c.beds_property_id)+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
-      const prop=inv.data?.find(x=>Number(x.id)===Number(c.beds_property_id)),assigned=prop&&assignedUnit(b,prop),pin=accessCode(b,assigned,'info:LOCK_PIN');
-      if(pin)detail.password=pin;else detail.warning='비밀번호의 객실 연결 또는 중복 값을 확인해주세요.';
-     }catch{detail.warning='비밀번호 정보를 불러오지 못했습니다. 잠시 후 다시 확인해주세요.';}
+    // Reservation-level PINs do not depend on the optional room inventory API.
+    const source=c.password_source||'info:LOCK_PIN';
+    const sources=[...new Set([source,'info:LOCK_PIN'])];
+    for(const candidate of sources){
+     if(candidate.startsWith('info:')){
+      const items=(b.infoItems||[]).filter(i=>i.code===candidate.slice(5)&&(!i.bookingId||Number(i.bookingId)===id));
+      if(!items.length)continue;
+      const values=[...new Set(items.map(i=>typeof i.text==='string'?i.text.trim():''))];
+      if(values.length===1&&/^[A-Za-z0-9*#-]{4,32}$/.test(values[0]))detail.password=values[0];
+      else detail.warning='비밀번호의 중복 값 또는 형식을 확인해주세요.';
+      break;
+     }
+     if(/^unit:name[2-8]$/.test(candidate)){
+      try{const inv=await api('/properties?id='+positive(c.beds_property_id)+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
+       const prop=inv.data?.find(x=>Number(x.id)===Number(c.beds_property_id)),pin=accessCode(b,prop&&assignedUnit(b,prop),candidate);
+       if(pin){detail.password=pin;break;}
+      }catch{detail.warning='객실 비밀번호 정보를 불러오지 못했습니다. 다시 확인해주세요.';}
+     }
     }
+    // Refresh only the existing booking allowlist; PINs and contact fields never enter the cache.
+    await saveBookings(p,c,[b]);
+    detail.price=selectBooking(b).price;detail.currency=detail.price!==null?c.bookingCurrency||null:null;
     return reply({ok:true,detail});
    }
    if(b.action==='guest_settings')return reply(await scoped('guest_settings'));

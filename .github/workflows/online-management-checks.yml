@@ -33,6 +33,7 @@ jobs:
           node tests/online/web-checkin-context.cjs
           node supabase/tests/guest-qr-ui.test.cjs
           node tests/online/booking-price-edge.mjs
+          node tests/online/booking-details-edge.mjs
           node tests/online/arrival-edge.mjs
           node tests/online/room-import-edge.mjs
           node tests/online/message-alert-transport.mjs

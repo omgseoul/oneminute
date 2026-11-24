@@ -27,6 +27,7 @@ jobs:
           node tests/online/database.cjs
           node tests/online/edge.mjs
           node tests/online/web-checkin-edge.mjs
+          node tests/online/web-checkin-languages.cjs
           node tests/online/web-checkin-ui.cjs
           node tests/online/web-checkin-choice-ui.cjs
           node tests/online/web-checkin-preview.cjs

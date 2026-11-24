@@ -2,6 +2,7 @@ const {JSDOM}=require('jsdom'),fs=require('node:fs'),assert=require('node:assert
 const tick=()=>new Promise(r=>setImmediate(r));
 (async()=>{
  const d=new JSDOM(fs.readFileSync('guest-support-settings.html','utf8'),{url:'https://fixture.test/settings',runScripts:'outside-only'}),w=d.window;
+ Object.defineProperty(w.navigator,'languages',{value:['ko-KR']});
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.OMG_SUPABASE={url:'https://fixture.test',publishableKey:'public'};w.AbortSignal.timeout=()=>undefined;
  const calls=[];let storage=0,remaining=3;
@@ -15,7 +16,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
   }return{ok:true,json:async()=>result};
  };
  for(const key of ['localStorage','sessionStorage'])Object.defineProperty(w,key,{get(){storage++;throw Error('Preview must not access guest identity storage');}});
- for(const file of ['web-checkin.js','web-checkin-preview.js','web-checkin-settings.js'])w.eval(fs.readFileSync(file,'utf8'));
+ for(const file of ['web-checkin-i18n.js','web-checkin.js','web-checkin-preview.js','web-checkin-settings.js'])w.eval(fs.readFileSync(file,'utf8'));
  const root=w.document.querySelector('.web-checkin-dialog'),form=root.querySelector('form'),field=n=>form.elements.namedItem(n),text=s=>root.querySelector(s).textContent;
  const step=()=>root.querySelector('[data-step]:not([hidden])').dataset.step;
  const submit=async(values={})=>{for(const [k,v]of Object.entries(values))field(k).value=v;form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();};

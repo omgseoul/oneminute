@@ -209,10 +209,11 @@
   for(const item of list.querySelectorAll('.booking-data-item')){
    const b=rows.find(x=>rowKey(x)===item.dataset.booking),key=rowKey(b),host=item.querySelector('.booking-contact-details');let loading=false;
    if(refresh)bookingDetails.delete(key);
-   const cached=bookingDetails.get(key);if(cached&&Date.now()-cached.at<300000)host.innerHTML=bookingDetailMarkup(b,cached.detail);
-   async function load(){if(!item.open||loading)return;const cached=bookingDetails.get(key);if(cached&&Date.now()-cached.at<300000){host.innerHTML=bookingDetailMarkup(b,cached.detail);return;}
+   const show=detail=>{host.innerHTML=bookingDetailMarkup(b,detail);if(Object.hasOwn(detail,'price')){const price=item.querySelector('.booking-data-price strong');if(price)price.textContent=bookingPriceLabel({data:detail});}};
+   const cached=bookingDetails.get(key);if(cached&&Date.now()-cached.at<300000)show(cached.detail);
+   async function load(){if(!item.open||loading)return;const cached=bookingDetails.get(key);if(cached&&Date.now()-cached.at<300000){show(cached.detail);return;}
     loading=true;host.innerHTML=bookingDetailMarkup(b)+'<p role="status">예약 상세정보 확인 중…</p>';
-    try{const v=await call('booking_detail',{booking_id:b.id},b.property_id);if(!v.detail)throw Error('예약 상세정보를 불러오지 못했습니다.');bookingDetails.set(key,{at:Date.now(),detail:v.detail});if(item.isConnected)host.innerHTML=bookingDetailMarkup(b,v.detail);}
+    try{const v=await call('booking_detail',{booking_id:b.id},b.property_id);if(!v.detail)throw Error('예약 상세정보를 불러오지 못했습니다.');bookingDetails.set(key,{at:Date.now(),detail:v.detail});if(item.isConnected)show(v.detail);}
     catch(e){if(item.isConnected){host.innerHTML=bookingDetailMarkup(b)+`<p class="error">${escape(e.message)}</p><button type="button" class="text-link">다시 확인</button>`;host.querySelector('button').onclick=load;}}
     finally{loading=false;}
    }

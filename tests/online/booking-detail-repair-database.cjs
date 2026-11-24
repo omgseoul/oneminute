@@ -1,0 +1,24 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+module.exports=async({db,owner,internal,p1,p2})=>{
+ const sql=fs.readFileSync('supabase/setup/beds24_booking_detail_repair.sql','utf8');await db.exec(sql);await db.exec(sql);
+ await db.exec(fs.readFileSync('supabase/setup/beds24_inventory_preserve_connection.sql','utf8'));
+ const current=await internal('credentials');
+ const item={id:98000,propertyId:current.beds_property_id,status:'cancelled',price:128000,currency:'KRW'};
+ await internal('bookings',{items:[item]});
+ const read=async()=>(await db.query('select data from omg_private.online_bookings where property_id=$1 and id=98000',[p1])).rows[0].data;
+ const partial={...item};delete partial.price;delete partial.currency;partial.arrivalTime='17:00';
+ await internal('bookings',{items:[partial]});assert.equal((await read()).price,128000);assert.equal((await read()).currency,'KRW');assert.equal((await read()).arrivalTime,'17:00');
+ await internal('bookings',{items:[{...item,price:0}]});await internal('bookings',{items:[partial]});assert.equal((await read()).price,0);
+ await internal('bookings',{items:[{...item,price:null,currency:null}]});assert.equal((await read()).price,null);
+ await db.query("update property_share_requests set status='approved',requested_permissions=array['property_settings','messages'] where requester_property_id=$1 and target_property_id=$2",[p1,p2]);
+ await db.query('update omg_private.online_connections set vault_id=null where property_id=$1',[p2]);
+ await owner('reuse_connection',{property_id:p2,source_property_id:p1});
+ const before=await internal('credentials',{},p2);await internal('inventory',{properties:[{id:101,name:'Refreshed inventory'}]},p2);assert.equal((await db.query('select credential_source_property_id from omg_private.online_connections where property_id=$1',[p2])).rows[0].credential_source_property_id,p1,'inventory refresh preserves linked credentials');
+ await internal('connect',{secret:{token:'main-renewed',refreshToken:'main-refresh'},properties:[{id:100},{id:101}]});
+ assert.equal((await internal('credentials',{},p2)).secret.token,'main-renewed');assert.equal((await internal('credentials',{},p2)).beds_property_id,before.beds_property_id,'branch mapping unchanged');
+ await internal('connect',{secret:{token:'separate-branch',refreshToken:'separate-refresh'}},p2);
+ await internal('connect',{secret:{token:'main-renewed-again',refreshToken:'main-refresh'}});
+ assert.equal((await internal('credentials',{},p2)).secret.token,'separate-branch','explicit reconnect detaches branch');
+ assert.equal((await db.query("select has_function_privilege('anon','public.online_internal(text,uuid,jsonb)','execute') ok")).rows[0].ok,false);
+ console.log('Booking detail repair DB: partial price retention, zero/null, durable main connection reuse, independent branch reconnect and service-only access passed');
+};

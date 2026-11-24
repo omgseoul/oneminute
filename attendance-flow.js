@@ -14,6 +14,21 @@
     const promise=new Promise(resolve=>node.addEventListener('close',()=>{node.remove();activeDialog=null;resolve(node.returnValue==='proceed');},{once:true}));
     activeDialog={promise,node};document.body.append(node);node.showModal();okay.focus();return promise;
   }
+  function chooseNfc(entries,timezone){
+    return new Promise(resolve=>{
+      const node=document.createElement('dialog');node.className='oms-action-dialog attendance-dialog nfc-time-dialog';node.setAttribute('aria-labelledby','nfcChoiceTitle');
+      node.innerHTML='<div class="oms-action-head"><h2 id="nfcChoiceTitle">출근시각 선택</h2><p class="attendance-dialog-message">NFC 태그 기록 중 실제 출근시각을 선택해주세요.</p></div><div class="nfc-time-options" role="radiogroup" aria-label="NFC 태그 시각"></div><div class="oms-action-buttons"><button type="button" data-cancel class="oms-action-button">취소</button><button type="button" data-confirm class="oms-action-button primary" disabled>선택 완료</button></div>';
+      const confirm=node.querySelector('[data-confirm]');let selected=null;
+      const format=new Intl.DateTimeFormat('ko-KR',{timeZone:timezone||'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+      for(const entry of entries){
+        const label=document.createElement('label'),radio=document.createElement('input');radio.type='radio';radio.name='nfcEntry';radio.value=entry.id;
+        radio.onchange=()=>{selected=entry.id;confirm.disabled=false;};label.append(radio,document.createTextNode(format.format(new Date(entry.recorded_at))));node.querySelector('.nfc-time-options').append(label);
+      }
+      node.querySelector('[data-cancel]').onclick=()=>node.close('cancel');confirm.onclick=()=>{if(selected)node.close('confirm');};
+      node.addEventListener('close',()=>{node.remove();resolve(node.returnValue==='confirm'?selected:null);},{once:true});
+      document.body.append(node);node.showModal();node.querySelector('input')?.focus();
+    });
+  }
   function firstLabel(basis){return basis==='nfc'?'도착':basis?'로그인':'확인중';}
   function renderProgress(host,state,session){
     const completed=(state?.status||session.status)==='completed';
@@ -53,8 +68,13 @@
         window.omgSession.set(window.omgSession.fromResponse(data,session.accessToken));state=await controller.refresh();
       }
       if(!state)throw new Error('출근 상태를 확인하지 못했습니다. 다시 시도해주세요.');
-      if(state.basis!=='nfc'||state.entry_at||state.checkin_report_at||state.status==='completed')return true;
-      return await dialog('현장도착 태그(NFC)를 먼저 해주세요',{secondary:'무시하고 메뉴보기'});
+      if(state.basis!=='nfc'||state.checkin_report_at||state.status==='completed')return true;
+      const entries=state.nfc_entries||[];
+      if(!entries.length){await dialog('새로 NFC 태그해주세요');return false;}
+      const id=entries.length===1?entries[0].id:await chooseNfc(entries,window.omgSession.get()?.timezone);
+      if(!id)return false;
+      await controller.select(id);
+      return true;
     }catch(error){await dialog(error.message);return false;}
   }
   function bindCheckin(link,controller,navigate=url=>location.assign(url)){

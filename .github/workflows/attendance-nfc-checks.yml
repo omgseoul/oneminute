@@ -1,0 +1,31 @@
+name: Verify NFC attendance time selection
+on:
+  pull_request:
+    paths: ['attendance-nfc.js', 'attendance-flow.*', 'report-session.js', 'report.html', 'supabase/setup/attendance_nfc*.sql', 'supabase/migrations/*ai_property_nfc_selection.sql', 'tests/attendance-nfc/**', 'tests/checkin-report/**', '.github/workflows/attendance-nfc-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: tests/attendance-nfc/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify recorded times and report flow
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node tests/checkin-report/database.cjs
+          node tests/checkin-report/web.cjs
+          node tests/attendance-nfc/selection-web.cjs
+          node tests/attendance-nfc/ui.cjs
+          node tests/attendance-nfc/integration.cjs
+          node tests/attendance-nfc/selection-browser.cjs
+          node tests/attendance-nfc/home-bootstrap.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: NFC-selection-preview
+          path: /tmp/nfc-selection-*.png

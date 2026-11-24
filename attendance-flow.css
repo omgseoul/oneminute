@@ -30,3 +30,6 @@
 
 .attendance-dialog-character{display:block;width:144px;height:144px;object-fit:contain;margin:0 auto 12px}.attendance-dialog-message{margin:12px 0 0;color:#6d7b90;font-size:16px;line-height:1.6;text-align:center}
 .attendance-celebration .oms-action-head{display:flex;flex-direction:column;align-items:center;gap:0;text-align:center}
+
+.nfc-time-options{display:grid;gap:7px;max-height:42dvh;overflow:auto;margin:0 16px 16px;text-align:left}.nfc-time-options label{display:flex;align-items:center;gap:10px;min-height:48px;padding:8px 12px;border:1px solid #dfe8f4;border-radius:12px;font-size:15px}.nfc-time-options input{width:20px;height:20px;margin:0;accent-color:#2467bd}.nfc-time-dialog button:disabled{opacity:.45}.nfc-time-dialog{max-height:85dvh;overflow:auto}
+.nfc-time-dialog .oms-action-head{display:block;text-align:left}.nfc-time-dialog .oms-action-head h2{margin:0;font-size:20px;line-height:1.3;word-break:keep-all}.nfc-time-dialog .attendance-dialog-message{margin:8px 0 0;font-size:13px;text-align:left;line-height:1.5}

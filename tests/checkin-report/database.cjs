@@ -49,6 +49,10 @@ await db.exec(fs.readFileSync('supabase/migrations/20261107030048_notification_c
 await db.exec(fs.readFileSync('supabase/migrations/20261107035108_checkin_report_warning.sql','utf8'));
 await db.exec("alter table employees add job_title text,add contact_phone text,add bank_account text,add lateness_threshold_minutes int;");
 await db.exec(fs.readFileSync('supabase/setup/employee_profile_warning.sql','utf8'));
+const nfcBase=fs.readFileSync('supabase/migrations/20261024105646_attendance_nfc_report_offset.sql','utf8');
+await db.exec(nfcBase.slice(nfcBase.indexOf('create or replace function omg_private.normalize_attendance_uid'),nfcBase.indexOf('-- Use the existing owner session')));
+await db.exec(fs.readFileSync('supabase/setup/attendance_nfc_entries.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/setup/attendance_nfc_selection_report.sql','utf8'));
 const emps=await q('select * from employees order by id'),e=emps[0],token=randomUUID();
 await db.query("update employees set pin_hash='123456',scheduled_clock_in='00:00',scheduled_clock_out='23:59'");
 const prop=await one('select p.*,b.code business_code from properties p join businesses b on b.id=p.business_id where p.id=$1',[e.property_id]);
@@ -78,5 +82,6 @@ await db.query("update employees set job_title='업무',contact_phone='010',bank
 assert.deepEqual((await one('select omg_private.employee_profile_missing($1) v',[e.id])).v,[],'zero lateness and absent owner-only payroll/PIN are not missing self-edit fields');
 await db.query("update employees set contact_phone='  ' where id=$1",[e.id]);assert.deepEqual((await one('select omg_private.employee_profile_missing($1) v',[e.id])).v,['연락처']);
 await rpc('employee_profile_warning_config',[token,e.property_id,false]);assert.deepEqual((await one('select omg_private.employee_profile_missing($1) v',[e.id])).v,[]);
+await require('../attendance-nfc/selection-scenarios.cjs')({db,rpc,token:login.access_token,session:s,employee:e});
 console.log('PASS '+checks+' check-in report warning assertions');await db.close();
 })().catch(async e=>{console.error(e.message,e.code,e.position,e.where);if(e.query&&e.position)console.error(e.query.slice(Number(e.position)-150,Number(e.position)+150));await db.close();process.exitCode=1});

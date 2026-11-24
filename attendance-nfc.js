@@ -38,7 +38,7 @@
       if(busy||!canRead())return;busy=true;let received=false;
       try{pending=scan({timeoutMs:0});const uid=await pending.promise;received=true;if(!current())return;const result=await rpc(uid);if(current()){revision++;state=result;paint();}}
       catch(error){if(current()&&received){options.onError?.(error);retryTimer=setTimeout(read,1500);}}
-      finally{pending=null;busy=false;if(canRead()){clearTimeout(retryTimer);retryTimer=setTimeout(read,1500);}}
+      finally{pending=null;busy=false;if(received&&canRead()){clearTimeout(retryTimer);retryTimer=setTimeout(read,1500);}}
     }
     async function refresh(){
       if(refreshing)return refreshing;

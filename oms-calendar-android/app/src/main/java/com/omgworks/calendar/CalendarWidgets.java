@@ -176,7 +176,9 @@ public final class CalendarWidgets {
         views.setViewVisibility(R.id.widget_task_empty, View.GONE);
         views.setViewVisibility(R.id.widget_entries, tasks ? View.GONE : View.VISIBLE);
         views.setViewVisibility(R.id.widget_count, tasks ? View.VISIBLE : View.GONE);
-        views.setInt(R.id.widget_title, "setGravity", tasks ? android.view.Gravity.CENTER_VERTICAL : android.view.Gravity.CENTER);
+        views.setViewVisibility(R.id.widget_title, tasks ? View.GONE : View.VISIBLE);
+        views.setViewVisibility(R.id.widget_task_heading, tasks ? View.VISIBLE : View.GONE);
+        views.setOnClickPendingIntent(R.id.widget_task_heading, open(context, true, false));
         if (month) {
             views.setOnClickPendingIntent(R.id.widget_previous, changeMonth(context, id, -1));
             views.setOnClickPendingIntent(R.id.widget_next, changeMonth(context, id, 1));

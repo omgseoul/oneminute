@@ -11,7 +11,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
    if(data.step==='resume'){remaining=3;result={...result,stage:'reference',reference_remaining:3,preview_day:'2026-11-17'};}
    else if(data.step==='reference'){remaining--;result={...result,stage:remaining?'reference':'fallback_dates',mode:remaining?'reference':'document',reference_remaining:remaining};}
    else if(data.step==='dates')result={...result,stage:'name',mode:'document',name_remaining:3};
-   else if(data.step==='name')result={ok:false,code:'device_blocked',message:'직원과의 채팅으로 예약을 확인하여 주십시오.'};
+   else if(data.step==='name')result={preview_diagnostics:['확정서 날짜: 불일치','<img src=x onerror=alert(1)>'],ok:false,code:'device_blocked',message:'직원과의 채팅으로 예약을 확인하여 주십시오.'};
   }return{ok:true,json:async()=>result};
  };
  for(const key of ['localStorage','sessionStorage'])Object.defineProperty(w,key,{get(){storage++;throw Error('Preview must not access guest identity storage');}});
@@ -23,8 +23,8 @@ const tick=()=>new Promise(r=>setImmediate(r));
  assert(root.open);assert(text('.wc-heading-note').includes('모의화면'));assert(!root.querySelector('.wc-retry').hidden);assert(text('.wc-preview-info').includes('실제 Beds24'));assert(text('.wc-preview-day').includes('2026-11-17'));assert.equal(root.querySelector('.wc-preview-outcome'),null);assert(!root.textContent.includes('홍길동'));assert(!root.textContent.includes('TEST123456'));
  const initial=calls.at(-1).data;
  for(let i=0;i<3;i++)await submit({reference:'WRONG999999'});
- assert.equal(step(),'dates');assert.equal(root.querySelector('.wc-date-note'),null);await submit({check_in:'2026-11-01',check_out:'2026-11-02'});assert.equal(step(),'name');await submit({name:'No Such Guest'});assert(root.querySelector('.wc-next').disabled);assert.equal(text('.wc-code'),'');
- root.querySelector('.wc-retry').click();await tick();assert.equal(step(),'reference');assert(!field('reference').disabled);assert(text('.wc-reference-note').startsWith('3회 남음'));assert.equal(field('reference').value,'');const retry=calls.at(-1).data;assert.notEqual(retry.verification_token,initial.verification_token);assert.notEqual(retry.device_id,initial.device_id);assert.equal(storage,0);
+ assert.equal(step(),'dates');assert.equal(root.querySelector('.wc-date-note'),null);await submit({check_in:'2026-11-01',check_out:'2026-11-02'});assert.equal(step(),'name');await submit({name:'No Such Guest'});assert(root.querySelector('.wc-next').disabled);assert.equal(text('.wc-code'),'');assert(!root.querySelector('.wc-preview-diagnostics').hidden);assert(text('.wc-preview-diagnostics').includes('날짜: 불일치'));assert.equal(root.querySelector('.wc-preview-diagnostics img'),null);
+ root.querySelector('.wc-retry').click();await tick();assert.equal(step(),'reference');assert(root.querySelector('.wc-preview-diagnostics').hidden);assert(!field('reference').disabled);assert(text('.wc-reference-note').startsWith('3회 남음'));assert.equal(field('reference').value,'');const retry=calls.at(-1).data;assert.notEqual(retry.verification_token,initial.verification_token);assert.notEqual(retry.device_id,initial.device_id);assert.equal(storage,0);
  root.querySelector('.wc-close').click();assert(!root.open);w.close();
  console.log('PASS real preview adapter: authenticated API, no fabricated data, date continuation, isolated retry IDs, zero guest storage');
 })().catch(e=>{console.error(e);process.exitCode=1;});

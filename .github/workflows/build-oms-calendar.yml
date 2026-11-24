@@ -4,11 +4,17 @@ on:
   pull_request:
     paths:
       - 'oms-calendar-android/**'
+      - 'mission-widget.js'
+      - 'mission.html'
+      - 'tests/mission-widget.cjs'
       - '.github/workflows/build-oms-calendar.yml'
   push:
     branches: [main, codex/oms-calendar]
     paths:
       - 'oms-calendar-android/**'
+      - 'mission-widget.js'
+      - 'mission.html'
+      - 'tests/mission-widget.cjs'
       - '.github/workflows/build-oms-calendar.yml'
 permissions:
   contents: read
@@ -24,6 +30,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - name: Check widget navigation
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: node tests/mission-widget.cjs
       - name: Build APK
         working-directory: oms-calendar-android
         run: gradle testDebugUnitTest assembleDebug

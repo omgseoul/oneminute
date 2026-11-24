@@ -42,7 +42,7 @@ public final class CalendarRefresh extends JobService {
         if (!"owner".equals(role) && !"staff".equals(role)) return;
         SharedPreferences prefs = preferences(c);
         if (!token.equals(prefs.getString("token", ""))) {
-            prefs.edit().remove("events_widget").remove("events_month").remove("widget_events").remove("widget_tasks").remove("tasks_widget").remove("events_last").remove("tasks_last").apply();
+            prefs.edit().remove(WidgetTasks.PENDING).putString(WidgetTasks.EPOCH, java.util.UUID.randomUUID().toString()).remove("events_widget").remove("events_month").remove("widget_events").remove("widget_tasks").remove("tasks_widget").remove("events_last").remove("tasks_last").apply();
             CalendarWidgets.refresh(c, false);
             CalendarWidgets.refresh(c, true);
         }
@@ -52,7 +52,7 @@ public final class CalendarRefresh extends JobService {
     }
 
     static synchronized void clear(Context c) {
-        preferences(c).edit().remove("token").remove("events_widget").remove("events_month").remove("widget_events").remove("widget_tasks").remove("tasks_widget")
+        preferences(c).edit().remove(WidgetTasks.PENDING).remove(WidgetTasks.EPOCH).remove("token").remove("events_widget").remove("events_month").remove("widget_events").remove("widget_tasks").remove("tasks_widget")
                 .remove("events_last").remove("tasks_last").apply();
         c.getSystemService(JobScheduler.class).cancelAll();
         c.getSystemService(NotificationManager.class).cancelAll();
@@ -75,15 +75,27 @@ public final class CalendarRefresh extends JobService {
         }
     }
 
+    static void scheduleCompletion(Context c) {
+        if (!preferences(c).contains("token")) return;
+        try { c.getSystemService(JobScheduler.class).schedule(new JobInfo.Builder(73, new ComponentName(c, CalendarRefresh.class))
+                .setMinimumLatency(0).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPersisted(true).build()); }
+        catch (SecurityException | IllegalStateException ignored) { schedule(c, true); }
+    }
+
     @Override public boolean onStartJob(JobParameters params) {
         NETWORK.execute(() -> {
-            try { refresh(); }
+            try { WidgetTasks.process(this, this::rpc); refresh(); }
             catch (Exception ignored) { /* Keep the last successful read during transient network failures. */ }
-            finally { jobFinished(params, false); }
+            finally {
+                synchronized (CalendarRefresh.class) {
+                    jobFinished(params, false);
+                    if (!WidgetTasks.pending(preferences(this)).isEmpty()) scheduleCompletion(this);
+                }
+            }
         });
         return true;
     }
-    @Override public boolean onStopJob(JobParameters params) { return false; }
+    @Override public boolean onStopJob(JobParameters params) { return true; }
 
     private JSONObject rpc(String name, JSONObject data) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(API + name).openConnection();
@@ -120,14 +132,23 @@ public final class CalendarRefresh extends JobService {
         ZoneId zone = ZoneId.of(prefs.getString("zone", "Asia/Seoul"));
         ZonedDateTime now = ZonedDateTime.now(zone);
         LocalDate today = now.toLocalDate();
+        LocalDate rangeFirst = today.withDayOfMonth(1), rangeLast = rangeFirst;
+        for (java.util.Map.Entry<String, ?> pref : prefs.getAll().entrySet()) {
+            if (!pref.getKey().startsWith("widget_month_")) continue;
+            try { LocalDate month = LocalDate.parse(String.valueOf(pref.getValue()));
+                if (month.isBefore(today.minusYears(1)) || month.isAfter(today.plusYears(1))) continue;
+                if (month.isBefore(rangeFirst)) rangeFirst = month;
+                if (month.isAfter(rangeLast)) rangeLast = month;
+            } catch (Exception ignored) {}
+        }
         boolean owner = "owner".equals(prefs.getString("role", ""));
         String person = prefs.getString("id", "");
         List<JSONObject> events = new ArrayList<>(), tasks = new ArrayList<>();
         JSONObject items = rpc(owner ? "calendar_private_items_action" : "calendar_event_action",
                 owner ? new JSONObject().put("p_access_token", token).put("p_action", "list")
                         : new JSONObject().put("p_access_token", token).put("p_action", "list").put("p_event", new JSONObject()
-                        .put("range_start", today.withDayOfMonth(1).minusDays(7).atStartOfDay(zone).toInstant().toString())
-                        .put("range_end", today.withDayOfMonth(1).plusMonths(1).plusDays(7).atStartOfDay(zone).toInstant().toString())));
+                        .put("range_start", rangeFirst.minusDays(7).atStartOfDay(zone).toInstant().toString())
+                        .put("range_end", rangeLast.plusMonths(1).plusDays(7).atStartOfDay(zone).toInstant().toString())));
         if (!items.optBoolean("ok")) return;
         if (owner) for (JSONObject item : rows(items.optJSONArray("items"))) {
             if ("event".equals(item.optString("kind"))) events.add(item); else tasks.add(item);
@@ -187,7 +208,7 @@ public final class CalendarRefresh extends JobService {
         for (JSONObject item : items) {
             JSONObject row = new JSONObject().put("title", item.optString("title"));
             if (item.has("id")) row.put("id", item.get("id"));
-            for (String field : task ? new String[]{"due_at", "priority", "timing"} : new String[]{"start_at", "end_at", "all_day"}) {
+            for (String field : task ? new String[]{"due_at", "priority", "timing", "photo_required", "private_owner_id"} : new String[]{"start_at", "end_at", "all_day"}) {
                 if (item.has(field)) row.put(field, item.get(field));
             }
             result.put(row);

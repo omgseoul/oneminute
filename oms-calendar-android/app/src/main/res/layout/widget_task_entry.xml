@@ -1,0 +1,10 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_task_row" android:layout_width="match_parent" android:layout_height="44dp" android:gravity="center_vertical" android:orientation="horizontal">
+ <FrameLayout android:id="@+id/widget_complete" android:layout_width="40dp" android:layout_height="match_parent" android:contentDescription="할 일 완료">
+  <ImageView android:id="@+id/widget_checkbox" android:layout_width="16.5dp" android:layout_height="16.5dp" android:layout_gravity="center" android:src="@drawable/widget_checkbox" android:importantForAccessibility="no"/>
+ </FrameLayout>
+ <LinearLayout android:id="@+id/widget_task_open" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center_vertical" android:paddingEnd="6dp">
+  <TextView android:id="@+id/widget_priority" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingEnd="4dp" android:text="★" android:textSize="16sp" android:textColor="#E5A000"/>
+  <TextView android:id="@+id/widget_task_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#17243A" android:textSize="13sp" android:maxLines="1" android:ellipsize="end"/>
+  <TextView android:id="@+id/widget_task_due" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="6dp" android:textSize="11sp" android:textColor="#758094"/>
+ </LinearLayout>
+</LinearLayout>

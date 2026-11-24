@@ -24,7 +24,7 @@ android {
             }
         }
     }
-    buildTypes { release { signingConfig signingConfigs.release } }
+    buildTypes { release { if (System.getenv('OMS_KEYSTORE_FILE')) signingConfig signingConfigs.release } }
 }
 dependencies {
     testImplementation 'junit:junit:4.13.2'

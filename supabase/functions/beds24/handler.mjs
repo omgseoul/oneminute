@@ -140,7 +140,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     throw Error('지원하지 않는 운영센터 요청입니다.');
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
-   if(['auto_message_list','auto_message_save','auto_message_toggle'].includes(b.action))return reply(await rpc('auto_message_owner',{p_token:b.access_token,p_action:b.action.slice(13),p_data:d}));
+   if(['auto_message_list','auto_message_save','auto_message_toggle','auto_message_retry'].includes(b.action))return reply(await rpc('auto_message_owner',{p_token:b.access_token,p_action:b.action.slice(13),p_data:d}));
    const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action==='booking_detail'?'booking_data':b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
    if(b.action==='booking_detail'){

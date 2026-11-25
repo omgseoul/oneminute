@@ -11,41 +11,57 @@ export function messageLanguage(booking,messages){
  const language=Object.entries(groups).find(([,countries])=>countries.includes(country))?.[0];
  return language&&messages[language]?.trim()?language:'common';
 }
+class MessageValidationError extends Error {}
+function templateVariables(template){
+ if(typeof template!=='string'||!template.trim())throw new MessageValidationError('발송할 메시지 내용이 없습니다.');
+ const keys=[...new Set([...template.matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]))];
+ if(keys.some(k=>!['이름','체크인','체크아웃','객실','비밀번호'].includes(k))||/\{\{|\}\}/.test(template.replace(/\{\{([^{}]+)\}\}/g,'')))
+  throw new MessageValidationError('자동 입력 변수 형식이 잘못되었거나 지원하지 않는 변수입니다. 메시지 설정을 확인해주세요.');
+ return keys;
+}
 export function renderAutoMessage(template,values){
- const text=String(template).replace(/\{\{([^{}]+)\}\}/g,(_,key)=>{
-  if(!Object.hasOwn(values,key)||!String(values[key]??'').trim())throw Error(key+' 정보가 없어 발송을 대기합니다.');
-  return String(values[key]);
+ const missing=templateVariables(template).filter(key=>{
+  const value=values[key];
+  if(!Object.hasOwn(values,key)||!['string','number'].includes(typeof value)||!String(value).trim()||(typeof value==='number'&&!Number.isFinite(value)))return true;
+  if(key==='체크인'||key==='체크아웃')return !/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value))||new Date(value).toISOString().slice(0,10)!==value;
+  return false;
  });
- if(!text.trim()||text.length>4000)throw Error('발송 내용은 1~4,000자여야 합니다.');
+ if(missing.length)throw new MessageValidationError('필수 정보가 없거나 확인되지 않았습니다: '+missing.join(', ')+'. 발송하지 않았습니다.');
+ const text=template.replace(/\{\{([^{}]+)\}\}/g,(_,key)=>String(values[key]));
+ if(!text.trim()||text.length>4000)throw new MessageValidationError('발송 내용은 1~4,000자여야 합니다.');
  return text;
 }
 export function createAutoMessages({rpc,credentials,api,saveBookings,messages,dispatchNotice=async()=>false}){
  const ctl=(action,data={})=>rpc('auto_message_internal',{p_action:action,p_data:data});
  async function process(job){
-  const finish=(status,error)=>ctl('finish',{id:job.id,lease:job.lease,status,error});
-  let attempted=false;
+  const finish=(status,error)=>ctl('finish',{id:job.id,lease:job.lease,status:job.manual_retry&&status==='skipped'?'failed':status,error});
+  let attempted=false,stage='Beds24 연결정보 확인';
   try{
    if(!job.rule?.enabled)return await finish('skipped','자동 발송 설정이 중지되었습니다.');
    const c=await credentials(job.property_id);
+   stage='예약정보 조회';
    const v=await api('/bookings?id='+job.booking_id+'&propertyId='+c.beds_property_id+'&includeInfoItems=true',{token:c.secret.token});
-   if(!Array.isArray(v.data))throw Error('예약정보를 확인하지 못했습니다.');
-   if(v.data.length===0)return await finish('skipped','예약이 없거나 취소되었습니다.');
-   if(v.data.length!==1||Number(v.data[0].id)!==Number(job.booking_id)||Number(v.data[0].propertyId)!==Number(c.beds_property_id))throw Error('예약의 지점이 일치하지 않습니다.');
-   const b=v.data[0];await saveBookings(job.property_id,c,[b]);
+   if(!Array.isArray(v.data)||v.data.length===0)throw new MessageValidationError('예약정보를 조회하지 못했습니다. 예약 연동 상태를 확인해주세요.');
+   if(v.data.length!==1||Number(v.data[0].id)!==Number(job.booking_id)||Number(v.data[0].propertyId)!==Number(c.beds_property_id))throw new MessageValidationError('예약의 지점이 일치하지 않습니다.');
+   const b=v.data[0];stage='예약정보 동기화';await saveBookings(job.property_id,c,[b]);
    if(!['new','confirmed'].includes(b.status))return await finish('skipped','확정·신규 예약이 아닙니다.');
    const today=new Intl.DateTimeFormat('en-CA',{timeZone:job.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
    if(b.departure<today)return await finish('skipped','체크아웃한 예약입니다.');
-   const language=messageLanguage(b,job.rule.messages),template=job.rule.messages[language];
+   const language=messageLanguage(b,job.rule.messages||{}),template=job.rule.messages?.[language],keys=templateVariables(template);
    let room='',pin='';
-   if(template.includes('{{객실}}')||template.includes('{{비밀번호}}')){
+   if(keys.includes('객실')||keys.includes('비밀번호')){
+    stage='객실·비밀번호 조회';
     const inventory=await api('/properties?id='+c.beds_property_id+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
-    const property=inventory.data?.find(p=>Number(p.id)===Number(c.beds_property_id));
+    const property=Array.isArray(inventory.data)&&inventory.data.find(p=>Number(p.id)===Number(c.beds_property_id));
+    if(!property)throw new MessageValidationError('객실·비밀번호 조회 실패: 숙소정보를 확인하지 못했습니다.');
     const assigned=property&&assignedUnit(b,property);
     room=assigned?.unit?.name||'';pin=accessCode(b,assigned,'info:LOCK_PIN')||'';
    }
-   const body=renderAutoMessage(template,{'이름':((b.firstName||'')+' '+(b.lastName||'')).replace(/[\d\uFF10-\uFF19]/g,'').replace(/\s+/g,' ').trim(),
+   const body=renderAutoMessage(template,{'이름':[b.firstName,b.lastName].filter(v=>typeof v==='string').join(' ').replace(/[\d\uFF10-\uFF19]/g,'').replace(/\s+/g,' ').trim(),
     '체크인':b.arrival,'체크아웃':b.departure,'객실':room,'비밀번호':pin});
-   const ready=await ctl('prepare',{id:job.id,lease:job.lease,language});if(ready.skip)return;
+   stage='발송 조건 재확인';
+   const ready=await ctl('prepare',{id:job.id,lease:job.lease,language});if(ready?.skip)return;
+   if(ready?.ok!==true)throw new MessageValidationError('최종 발송 조건을 확인하지 못해 발송하지 않았습니다.');
    attempted=true;
    const response=await api('/bookings/messages',{token:c.secret.token},[{bookingId:job.booking_id,message:body}]);
    const rows=Array.isArray(response)?response:response.data;
@@ -54,7 +70,10 @@ export function createAutoMessages({rpc,credentials,api,saveBookings,messages,di
    }else if(rows?.length&&rows.every(r=>r.success===false))await finish('failed','예약 채널에서 발송을 거절했습니다. 채널 지원·쓰기 권한을 확인해주세요.');
    else await finish('uncertain','발송 결과 확인 필요 · 게스트 대화를 확인해주세요.');
   }catch(e){
-   await finish(attempted?(e.status>=400&&e.status<500?'failed':'uncertain'):'waiting',attempted?(e.status>=400&&e.status<500?e.message:'전송 중 응답이 끊겨 발송 성공 여부를 확인하지 못했습니다.'):(/[가-힣]/.test(e.message)?e.message:'Beds24 연결이 끊겼거나 응답 시간이 초과되었습니다.'));
+   // Provider errors may contain tokens, PINs or message bodies: record only controlled reasons.
+   const denied=e.status>=400&&e.status<500;
+   const reason=e.status===401||e.status===403?'연동 인증 또는 조회 권한을 확인해주세요.':e.status===429?'Beds24 요청 한도를 초과했습니다.':e.status>=400&&e.status<=599?'Beds24 HTTP '+e.status+' 오류입니다.':'연결이 끊겼거나 응답을 확인하지 못했습니다.';
+   await finish(attempted?(denied?'failed':'uncertain'):'failed',attempted?(denied?'메시지 발송 거절: '+reason:'전송 중 응답이 끊겨 발송 성공 여부를 확인하지 못했습니다.'):(e instanceof MessageValidationError?e.message:stage+' 실패: '+reason));
   }
  }
  async function drain(){try{for(let i=0;i<4;i++){const job=await ctl('claim');if(job.empty)break;await process(job);}}finally{for(const notice of await ctl('pushes')){try{if(await dispatchNotice(notice.message_id))await ctl('pushed',{id:notice.id});}catch{/* Keep pending; push transport deduplicates by message and recipient. */}}}}

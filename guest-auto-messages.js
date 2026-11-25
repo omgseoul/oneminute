@@ -52,11 +52,23 @@
  $('cancelAutoLanguage').onclick=()=>$('autoLanguageDialog').close();
  $('autoLanguageForm').onsubmit=e=>{e.preventDefault();const {d,card}=languageTarget,k=$('autoLanguage').value;d.messages[k]='';d.active=k;dirty.add(d.id);
   const f=card.querySelector('form');d.trigger=f.elements.trigger.value;d.days=Number(f.elements.days.value);d.send_time=f.elements.send_time.value;d.enabled=f.elements.enabled.checked;editor(card);$('autoLanguageDialog').close();card.querySelector('textarea').focus();};
- const statusNames={waiting:'대기',preparing:'확인 중',sending:'발송 중',sent:'발송 완료',failed:'실패',uncertain:'결과 확인 필요',skipped:'발송 제외'};
- function renderLogs(){$('autoLogList').innerHTML=logs.length?logs.map(l=>`<div class="auto-log"><strong>${esc(l.title)} · ${statusNames[l.status]||esc(l.status)}</strong><span>예약 #${esc(l.booking_id)}${l.language?' · '+languages[l.language]:''}</span><br><small>${esc(new Date(l.updated_at).toLocaleString('ko-KR'))}${l.error?' · '+esc(l.error):''}</small></div>`).join(''):'<p class="note">아직 발송 기록이 없습니다.</p>';}
+ const statusNames={waiting:'대기',preparing:'확인 중',sending:'발송 중',sent:'발송 완료',failed:'발송실패',uncertain:'결과 확인 필요',skipped:'발송 제외'};
+ let retryBusy=false;
+ async function retryLogs(targets){if(retryBusy||!targets.length)return;retryBusy=true;lock(true);renderLogs();try{
+  const v=await call('retry',{targets});logs=v.logs;status(v.retry_queued?`${v.retry_queued}명의 재전송을 접수했습니다. 결과는 발송 기록과 실패 알림에서 확인해주세요.`:v.retry_results?.[0]?.message||'재전송할 실패 건이 없습니다.',!v.retry_queued);
+ }catch(e){status(e.message,true);}finally{retryBusy=false;lock(false);renderLogs();}}
+ function renderLogs(){
+  const eligible=logs.some(l=>l.can_retry);
+  $('autoLogList').innerHTML=(eligible?`<div class="auto-retry-toolbar"><span>재전송할 게스트를 선택하세요.</span><button type="button" id="retrySelected" disabled>선택 재전송</button></div>`:'')+(logs.length?logs.map(l=>`<div class="auto-log"><strong>${esc(l.title)} · ${statusNames[l.status]||esc(l.status)}</strong><div class="auto-log-guest">${l.can_retry?`<input type="checkbox" data-retry-select="${esc(l.id)}" aria-label="${esc(l.guest_name||'게스트')} 예약 ${esc(l.booking_id)} 재전송 선택" ${retryBusy?'disabled':''}>`:''}<span><b>${esc(l.guest_name||'이름 미등록')}</b> · 객실 ${esc(l.room_name||'미정')}<br>예약 #${esc(l.booking_id)}${l.booking_reference?' · '+esc(l.booking_reference):''}<br>${esc(l.arrival||'체크인 미정')} ~ ${esc(l.departure||'체크아웃 미정')}</span>${l.can_retry?`<button type="button" data-retry="${esc(l.id)}" ${retryBusy?'disabled':''}>재전송</button>`:''}</div><small>${esc(new Date(l.updated_at).toLocaleString('ko-KR'))}${l.retry_count?' · 재전송 '+Number(l.retry_count)+'회':''}${l.error?' · '+esc(l.error):''}</small></div>`).join(''):'<p class="note">아직 발송 기록이 없습니다.</p>');
+  const target=l=>({id:l.id,retry_count:l.retry_count||0});
+  $('autoLogList').querySelectorAll('[data-retry]').forEach(b=>b.onclick=()=>retryLogs([target(logs.find(l=>l.id===b.dataset.retry))]));
+  const selected=()=>[...$('autoLogList').querySelectorAll('[data-retry-select]:checked')].map(b=>target(logs.find(l=>l.id===b.dataset.retrySelect)));
+  $('autoLogList').querySelectorAll('[data-retry-select]').forEach(b=>b.onchange=()=>{$('retrySelected').disabled=retryBusy||!selected().length;$('retrySelected').textContent=selected().length?`선택 ${selected().length}명 재전송`:'선택 재전송';});
+  if($('retrySelected'))$('retrySelected').onclick=()=>retryLogs(selected());
+ }
  $('showAutoLogs').onclick=()=>{$('autoLogs').hidden=!$('autoLogs').hidden;if(!$('autoLogs').hidden)$('autoLogs').scrollIntoView({behavior:'smooth',block:'nearest'});};
  $('refreshAutoLogs').onclick=async()=>{try{logs=(await call('list')).logs;renderLogs();}catch(e){status(e.message,true);}};
  window.addEventListener('beforeunload',e=>{if(dirty.size){e.preventDefault();e.returnValue='';}});
  if(session.sessionKind!=='owner'){status('자동메시지는 관리자 계정에서 설정할 수 있습니다.',true);return;}
- try{populate(await call('list'));const requested=new URLSearchParams(location.search).get('property');if(requested&&requested!==property&&branches.some(p=>p.id===requested))populate(await call('list',{},requested));status('');$('addAutoMessage').disabled=false;$('showAutoLogs').disabled=false;}catch(e){status(e.message,true);}
+ try{populate(await call('list'));const requested=new URLSearchParams(location.search).get('property');if(requested&&requested!==property&&branches.some(p=>p.id===requested))populate(await call('list',{},requested));if(new URLSearchParams(location.search).get('logs')==='1')$('autoLogs').hidden=false;status('');$('addAutoMessage').disabled=false;$('showAutoLogs').disabled=false;}catch(e){status(e.message,true);}
 })();

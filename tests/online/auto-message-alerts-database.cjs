@@ -19,6 +19,12 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.exec(`create function public.list_property_messages(uuid) returns text language sql as $$select case when m.sender_type='system' then '근태관리' else '시스템' end from public.property_messages m limit 1$$;create function public.list_notification_bot_messages(uuid,timestamptz,uuid) returns text language sql as $$select case when m.sender_type='system' then '근태관리' else '시스템' end from public.property_messages m limit 1$$;`);
  await db.exec(fs.readFileSync('supabase/setup/guest_auto_messages.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/setup/auto_message_exception_alerts.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/auto_message_required_values.sql','utf8'));
+ await db.exec(`drop function public.list_property_messages(uuid);drop function public.list_notification_bot_messages(uuid,timestamptz,uuid);
+ create function public.list_property_messages(uuid) returns jsonb language plpgsql as $$declare v_is_owner boolean:=true;begin return (select jsonb_build_object('message_id',m.id,'property_id',m.property_id,'message',m.message) from public.property_messages m limit 1);end$$;
+ create function public.list_notification_bot_messages(uuid,timestamptz,uuid) returns jsonb language plpgsql as $$declare v_is_owner boolean:=true;begin return (select jsonb_build_object('message_id',m.id,'property_id',m.property_id,'message',m.message) from public.property_messages m limit 1);end$$;`);
+ await db.exec(fs.readFileSync('supabase/setup/auto_message_targeted_retry.sql','utf8'));
+
  await db.query("insert into properties(id,name,management_number) values($1,'Nest',1),($2,'OMG',2),($3,'Other',3)",[id(1),id(2),id(3)]);
  await db.query('insert into owners(id,property_id) values($1,$2),($3,$4),($5,$6)',[id(10),id(1),id(20),id(2),id(30),id(3)]);
  await db.query("insert into property_share_requests values($1,$2,'approved','{messages,property_settings}'),($3,$2,'approved','{messages}')",[id(2),id(1),id(3)]);
@@ -41,29 +47,71 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.query("update property_share_requests set status='revoked' where requester_property_id=$1",[id(2)]);push=(await db.query('select get_briefing_push_dispatch($1) v',[notice.id])).rows[0].v;assert.equal(push.recipient_topics.length,1,'recheck sharing at actual push');
  assert.equal((await ctl('pushes')).length,1);await ctl('pushed',{id:(await ctl('pushes'))[0].id});assert.equal((await ctl('pushes')).length,0);
  await db.query("insert into property_messages(id,source) values($1,'bot_briefing')",[id(70)]);assert.equal((await db.query('select get_briefing_push_dispatch($1) v',[id(70)])).rows[0].v.original,true,'existing briefing path unchanged');
- // A due reservation with missing PIN: one delay, retries, then one recovery.
+ // Missing required values fail before prepare/send, retain all reasons and notify exactly once.
  await db.exec("update omg_private.auto_message_rules set trigger='booking',days=0");
  await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,101,now()-interval '1 minute',current_date,current_date+2,'confirmed')",[id(1)]);
- j=await ctl('claim');assert.equal(j.booking_id,101);await ctl('finish',{...j,status:'waiting',error:'비밀번호 정보가 없어 발송을 대기합니다.'});assert.equal(await count('blocked'),1);
- await db.exec("update omg_private.auto_message_deliveries set next_at=now() where booking_id=101");j=await ctl('claim');await ctl('finish',{...j,status:'waiting',error:'비밀번호 정보가 없어 발송을 대기합니다.'});assert.equal(await count('blocked'),1);
- await db.exec("update omg_private.auto_message_deliveries set next_at=now() where booking_id=101");j=await ctl('claim');await ctl('prepare',j);await ctl('finish',{...j,status:'sent'});assert.equal(await count('recovered'),1);
+ j=await ctl('claim');assert.equal(j.booking_id,101);
+ await ctl('finish',{...j,lease:id(999),status:'failed',error:'wrong lease'});
+ assert.equal((await db.query('select status from omg_private.auto_message_deliveries where id=$1',[j.id])).rows[0].status,'preparing');
+ const missing='필수 정보가 없거나 확인되지 않았습니다: 이름, 비밀번호. 발송하지 않았습니다.';
+ await ctl('finish',{...j,status:'failed',error:missing});
+ const failed=(await db.query('select status,error,lease from omg_private.auto_message_deliveries where id=$1',[j.id])).rows[0];
+ assert.equal(failed.status,'failed');assert.equal(failed.error,missing);assert.equal(failed.lease,null);
+ assert.equal(await count('terminal'),2);assert.equal(await count('blocked'),0);
+ const failedNotice=(await db.query("select m.message from property_messages m join omg_private.auto_message_notices n on n.message_id=m.id where n.delivery_id=$1",[j.id])).rows[0].message;
+ assert.match(failedNotice,/자동메시지 발송실패/);assert.match(failedNotice,/이름, 비밀번호/);assert.match(failedNotice,/발송 기록에서 사유와 예약정보를 확인/);
+ await ctl('finish',{...j,status:'failed',error:missing});await scan();
+ assert.equal(await count('terminal'),2);assert.equal((await ctl('claim')).empty,true,'missing fields never automatically retry');
  // Provider failed/uncertain sends are terminal, with no retry and one notice.
  await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,102,now()-interval '1 minute',current_date,current_date+2,'confirmed')",[id(1)]);
- j=await ctl('claim');await ctl('prepare',j);await ctl('finish',{...j,status:'uncertain',error:'전송 응답 끊김'});assert.equal(await count('terminal'),2);assert.equal((await ctl('claim')).empty,true);await ctl('finish',{...j,status:'uncertain',error:'전송 응답 끊김'});assert.equal(await count('terminal'),2);
+ j=await ctl('claim');await ctl('prepare',j);await ctl('finish',{...j,status:'uncertain',error:'전송 응답 끊김'});assert.equal(await count('terminal'),3);assert.equal((await ctl('claim')).empty,true);await ctl('finish',{...j,status:'uncertain',error:'전송 응답 끊김'});assert.equal(await count('terminal'),3);
  // Independent scan records an Edge worker that never claimed a pending job.
- await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,103,now()-interval '10 minutes',current_date,current_date+2,'confirmed')",[id(1)]);await scan();await db.exec("update omg_private.auto_message_deliveries set created_at=now()-interval '10 minutes' where booking_id=103");await scan();assert.equal(await count('blocked'),2);
- j=await ctl('claim');await ctl('prepare',j);await db.exec("update omg_private.auto_message_deliveries set updated_at=now()-interval '4 minutes' where booking_id=103");await scan();assert.equal(await count('terminal'),3,'stuck sending becomes uncertain');
+ await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,103,now()-interval '10 minutes',current_date,current_date+2,'confirmed')",[id(1)]);await scan();await db.exec("update omg_private.auto_message_deliveries set created_at=now()-interval '10 minutes' where booking_id=103");await scan();assert.equal(await count('blocked'),1);
+ j=await ctl('claim');await ctl('prepare',j);await db.exec("update omg_private.auto_message_deliveries set updated_at=now()-interval '4 minutes' where booking_id=103");await scan();assert.equal(await count('terminal'),4,'stuck sending becomes uncertain');
  // Intentional pause is not an error notification.
- await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,104,now()-interval '1 minute',current_date,current_date+2,'confirmed')",[id(1)]);await scan();await db.exec('update omg_private.auto_message_rules set enabled=false');await scan();assert.equal(await count('terminal'),3);
+ await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,104,now()-interval '1 minute',current_date,current_date+2,'confirmed')",[id(1)]);await scan();await db.exec('update omg_private.auto_message_rules set enabled=false');await scan();assert.equal(await count('terminal'),4);
  // A cancellation discovered before sending is terminal; future check-in changes reschedule.
  await db.exec('update omg_private.auto_message_rules set enabled=true');
  await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,105,now()-interval '1 minute',current_date,current_date+2,'confirmed')",[id(1)]);
- j=await ctl('claim');await db.exec("update omg_private.online_bookings set status='cancelled' where id=105");assert.equal((await ctl('prepare',j)).skip,true);assert.equal(await count('terminal'),4);
+ j=await ctl('claim');await db.exec("update omg_private.online_bookings set status='cancelled' where id=105");assert.equal((await ctl('prepare',j)).skip,true);assert.equal(await count('terminal'),5);
  await db.exec("update omg_private.auto_message_rules set trigger='checkin_before',days=1");
  await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status) values($1,106,now()-interval '2 days',current_date+1,current_date+3,'confirmed')",[id(1)]);
  await db.query("insert into omg_private.auto_message_deliveries(rule_id,property_id,booking_id,title,revision,due_at) values($1,$2,106,'입실 안내',1,now()-interval '2 days')",[id(50),id(1)]);
  await db.exec("update omg_private.online_bookings set arrival=current_date+5,departure=current_date+7 where id=106");await scan();
  let future=(await db.query('select status,due_at>now() future from omg_private.auto_message_deliveries where booking_id=106')).rows[0];assert.equal(future.status,'waiting');assert.equal(future.future,true,'postponed check-in refreshes before expiration');
+ // A worker that dies during lookup cannot leave a retryable delivery behind.
+ await db.query("insert into omg_private.auto_message_deliveries(rule_id,property_id,booking_id,title,revision,due_at,status,lease,leased_until) values($1,$2,107,'입실 안내',1,now(),'preparing',gen_random_uuid(),now()-interval '1 second')",[id(50),id(1)]);
+ await scan();const expired=(await db.query('select status,error,lease from omg_private.auto_message_deliveries where booking_id=107')).rows[0];
+ assert.equal(expired.status,'failed');assert.equal(expired.lease,null);assert.match(expired.error,/확인 시간이 초과/);assert.equal(await count('terminal'),6);
+ await scan();assert.equal(await count('terminal'),6);assert.equal((await ctl('claim')).empty,true);
+ // Three guests: one already sent, two failures. Only the two selected failures are retried.
+ await db.exec("update omg_private.auto_message_rules set trigger='booking',days=0");
+ await db.query("insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status,guest_name,room_name) values($1,201,now()-interval '1 minute',current_date,current_date+2,'confirmed','Guest A','201'),($1,202,now()-interval '1 minute',current_date,current_date+2,'confirmed','Guest B','202'),($1,203,now()-interval '1 minute',current_date,current_date+2,'confirmed','Guest C','203')",[id(1)]);
+ // Finish an earlier rescheduled fixture before the three-guest scenario.
+ await db.exec("update omg_private.auto_message_deliveries set status='sent' where booking_id=106");
+ const deliveries={};for(let n=0;n<3;n++){const x=await ctl('claim');deliveries[x.booking_id]=x;if(x.booking_id===201){await ctl('prepare',x);await ctl('finish',{...x,status:'sent'});}else await ctl('finish',{...x,status:'failed',error:'비밀번호 누락'});}
+ const retry=async data=>(await db.query("select public.auto_message_owner($1,'retry',$2) v",[id(10),JSON.stringify({property_id:id(1),...data})])).rows[0].v;
+ const targets=[202,203].map(n=>({id:deliveries[n].id,retry_count:0}));
+ const oldNotice=(await db.query("select message_id from omg_private.auto_message_notices where delivery_id=$1 and kind='terminal'",[deliveries[203].id])).rows[0].message_id;
+ assert.equal((await db.query('select omg_private.auto_message_notice_context($1,$2) v',[oldNotice,id(1)])).rows[0].v.can_retry,true);
+ assert.equal((await db.query('select omg_private.auto_message_notice_context($1,$2) v',[oldNotice,id(2)])).rows[0].v,null,'notice metadata respects property');
+ await assert.rejects(()=>retry({targets:[{id:id(999),retry_count:0}]}),/이 지점/);
+ await db.exec("update omg_private.auto_message_deliveries set due_at=now()-interval '2 days' where booking_id in(202,203)");
+ const selected=await retry({targets});assert.equal(selected.retry_queued,2);assert.equal(selected.logs.find(l=>l.booking_id===202).guest_name,'Guest B');assert.equal(selected.logs.find(l=>l.booking_id===201).status,'sent');
+ assert.equal((await retry({targets})).retry_queued,0,'double tap cannot enqueue twice');
+ assert.equal((await retry({notice_id:oldNotice})).retry_queued,0,'old notice cannot enqueue an active retry');
+ const beforeRetryFailures=await count('terminal');
+ for(let n=0;n<2;n++){const x=await ctl('claim');assert([202,203].includes(x.booking_id));assert.equal(x.manual_retry,true);assert.equal(x.retry_count,1);assert.equal((await ctl('prepare',x)).ok,true);await ctl('finish',{...x,status:x.booking_id===202?'sent':'failed',error:x.booking_id===203?'비밀번호 누락':null});}
+ assert.equal((await ctl('claim')).empty,true);assert.equal(await count('terminal'),beforeRetryFailures+1,'only the guest who fails again generates a new failure notice');
+ assert.equal((await retry({targets})).retry_queued,0,'stale batch cannot resend successful or newer-failed guests');
+ const newNotice=(await db.query("select message_id from omg_private.auto_message_notices where delivery_id=$1 and retry_count=1 and kind='terminal'",[deliveries[203].id])).rows[0].message_id;
+ const newBody=(await db.query('select message from property_messages where id=$1',[newNotice])).rows[0].message;assert.match(newBody,/Guest C/);assert(!newBody.includes('Guest B'));assert.match(newBody,/재전송: 1회/);
+ assert.equal((await retry({notice_id:oldNotice})).retry_queued,0,'old failure cannot retry a newer failure');
+ assert.equal((await retry({notice_id:newNotice})).retry_queued,1);const last=await ctl('claim');assert.equal(last.booking_id,203);assert.equal(last.retry_count,2);await ctl('finish',{...last,status:'failed',error:'비밀번호 누락'});
+ assert.equal((await retry({targets:[{id:deliveries[201].id,retry_count:0}]})).retry_queued,0,'successful guest is never resent');
+ await db.exec("update omg_private.auto_message_rules set enabled=false");assert.equal((await retry({targets:[{id:last.id,retry_count:2}]})).retry_queued,0,'paused rules require enabling');
+ await db.exec(`create or replace function omg_private.guest_actor(uuid) returns jsonb language sql as $$select jsonb_build_object('kind','staff','property_id','${id(1)}')$$`);
+ await assert.rejects(()=>retry({targets}),/관리자/);
  assert.equal((await db.query("select has_function_privilege('anon','omg_private.auto_message_scan()','execute') v")).rows[0].v,false);
- console.log('Auto alerts DB: min-day/time, missed deadline, deduped bot receipts, owner/shared access + revocation, delay/recovery, uncertain sends, watchdog and pause exclusion passed');
+ console.log('Auto alerts DB: min-day/time, missed deadline, deduped bot receipts, owner/shared access + revocation, strict missing-value failure, uncertain sends, failed lookup watchdog and pause exclusion passed');
  }finally{await db.close();}})().catch(e=>{console.error(e);process.exit(1)});

@@ -86,3 +86,5 @@
 .calendar-companion .companion-task-icon{width:20px;height:20px;border:1.5px solid #a5b5c9;border-radius:4px;background:white}
 
 .calendar-companion #calendarPropertyPicker .property-picker-button span{color:inherit;font-size:inherit;letter-spacing:inherit}
+
+.calendar-companion #calendarUpdate{flex:none;min-height:28px;padding:2px 4px;margin:0;border:1px solid #d7e5f6;border-radius:6px;background:#edf5ff;color:#2869bb;font-size:10px;line-height:1;white-space:nowrap}.calendar-companion #calendarUpdate[hidden]{display:none}

@@ -96,6 +96,10 @@ public final class CalendarActivity extends Activity {
     }
 
     private final class Bridge {
+        @JavascriptInterface public String getAppInfo() {
+            try { android.content.pm.PackageInfo p=getPackageManager().getPackageInfo(getPackageName(),0);return new org.json.JSONObject().put("version_code",android.os.Build.VERSION.SDK_INT>=28?p.getLongVersionCode():p.versionCode).put("version_name",p.versionName).toString(); }catch(Exception e){return "{}";}
+        }
+        @JavascriptInterface public void checkForUpdate() { runOnUiThread(()->{if(trustedCurrentPage())AppUpdateInstaller.install(CalendarActivity.this,ORIGIN+"/downloads/oms-calendar-update.json");}); }
         @JavascriptInterface public void setSession(String token, String role, String id, String property, String timezone) {
             runOnUiThread(() -> {
                 if (!trustedCurrentPage() || token == null || !UUID.matcher(token).matches()
@@ -116,6 +120,8 @@ public final class CalendarActivity extends Activity {
             runOnUiThread(() -> { if (trustedCurrentPage()) settings(); });
         }
     }
+
+    @Override protected void onResume(){super.onResume();AppUpdateInstaller.resume(this);}
 
     private void settings() {
         SharedPreferences prefs = CalendarRefresh.preferences(this);

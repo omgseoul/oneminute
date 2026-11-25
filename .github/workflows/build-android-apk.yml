@@ -183,7 +183,7 @@ jobs:
             adb shell am instrument -w -e phase verify com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-verify.txt"
             grep -q 'oms_update=ok' "$RUNNER_TEMP/oms-verify.txt"
             adb shell am instrument -w -e phase staff-schedule com.oneminute.guesthousemanager.test/com.oneminute.guesthousemanager.UpdateProbe | tee "$RUNNER_TEMP/oms-schedule.txt"
-            grep -q 'oms_schedule=ok' "$RUNNER_TEMP/oms-schedule.txt
+            grep -q 'oms_schedule=ok' "$RUNNER_TEMP/oms-schedule.txt"
       - name: Verify release identity and prepare download
         run: python3 guesthouse-manager-app/scripts/publish-apk.py guesthouse-manager-app/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4

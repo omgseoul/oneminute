@@ -6,7 +6,7 @@ let release,fail=false,calls=[],saved=new Map();w.setTimeout=()=>0;w.clearTimeou
 w.omgSession={require:async()=>({accessToken:'fixture'})};w.omgNotifications={send:async()=>{throw Error('Client must not dispatch push');}};w.GuestSupport={esc:s=>String(s??'')};
 w.omgSupabase={rpc:async(name,args)=>{if(args?.p_action==='send'){calls.push(args.p_data);await new Promise(r=>release=r);const a=args.p_data;const message={id:a.client_id,client_id:a.client_id,mine:true,body:a.body,created_at:new Date().toISOString()};saved.set(a.client_id,message);if(fail)return {error:{message:'network'}};return {data:{ok:true,message_id:a.client_id,message}};}return {data:{ok:true,can_send:true,peer:{display_name:'직원'},profile:{display_name:'직원'},messages:[]}};}};
 w.OMGPhoto={media:async()=>({type:'image/jpeg',size:1})};w.FileReader=class{readAsDataURL(){this.result='data:image/jpeg;base64,eA==';this.onload();}};
-for(const file of ['staff-chat-client.js','photo-viewer-zoom.js','staff-chat.js'])w.eval(read(file));
+for(const file of ['staff-chat-client.js','photo-viewer-zoom.js','staff-chat-schedule.js','staff-chat.js'])w.eval(read(file));
 const flush=()=>new Promise(setImmediate),until=async f=>{for(let i=0;i<100;i++){if(f())return;await flush();}assert(f(),'condition timed out');},send=d.getElementById('send'),input=d.getElementById('body');
 const type=value=>{input.value=value;input.dispatchEvent(new w.Event('input',{bubbles:true}));};const submit=()=>d.getElementById('composer').dispatchEvent(new w.Event('submit',{cancelable:true}));
 (async()=>{try{

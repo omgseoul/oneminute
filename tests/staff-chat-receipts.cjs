@@ -10,7 +10,7 @@ w.omgSupabase={rpc:async(name,args)=>{if(name==='staff_chat_peer_profile')return
  {id:'received',created_at:'2026-10-19T00:01:00Z',body:'[시바:ㅋㅋㅋ]',mine:false,read_at:null},
  {id:'sent',created_at:'2026-10-19T00:02:00Z',body:'[시바:청소 완료]',mine:true,read_at:null}
 ]:[],receipts:loads===1?[]:[{id:'sent',read_at:'2026-10-19T00:03:00Z'}]}};}};
-for(const file of ['shiba-stickers.js','staff-chat-client.js','photo-viewer-zoom.js','staff-chat.js'])w.eval(read(file));
+for(const file of ['shiba-stickers.js','staff-chat-client.js','photo-viewer-zoom.js','staff-chat-schedule.js','staff-chat.js'])w.eval(read(file));
 (async()=>{try{
  for(let i=0;i<15;i++)await tick();assert.equal(d.querySelectorAll('.message-avatar').length,2);assert.equal(d.querySelector('.mine .message-avatar'),null);assert.equal(d.querySelector('.mine .bubble-name'),null);assert.equal(d.querySelector('[data-id=received] .bubble-name').textContent,'상대 직원');assert.equal(d.querySelectorAll('.oms-sticker').length,2);assert.equal(d.querySelector('.message-unread').textContent,'1');assert.deepEqual(reads,['sent']);assert.equal(d.querySelector('[data-id=hidden] .message-unread'),null,'older incoming history is read through our latest outgoing sticker');assert.equal(d.querySelector('[data-id=received] .message-unread'),null,'reading removes incoming counter immediately');
  d.querySelector('[data-id=received] .message-avatar').click();assert(d.getElementById('peerProfileDialog').hasAttribute('open'));d.getElementById('peerProfileClose').click();assert(!d.getElementById('peerProfileDialog').hasAttribute('open'));

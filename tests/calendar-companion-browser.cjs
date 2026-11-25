@@ -24,6 +24,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    const top=await page.locator('.calendar-top').evaluate(el=>[...el.children].filter(x=>!x.hidden).map(x=>({top:x.getBoundingClientRect().top,bottom:x.getBoundingClientRect().bottom,right:x.getBoundingClientRect().right})));
    assert(top.every(r=>Math.abs(r.top-top[0].top)<9),`same header row ${width}: ${JSON.stringify(top)}`);
    assert.deepEqual(await page.locator('.calendar-top').evaluate(el=>[...el.children].filter(x=>!x.hidden).map(x=>x.id||'title')),['title','companionControls','calendarPropertyPicker','companionSettings']);
+   const controls=await page.locator('#companionScope,#calendarPropertyPicker .property-picker-button,#companionSettings').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {top:r.top,height:r.height};}));
+   assert(controls.every(r=>r.height===36&&Math.abs(r.top-controls[0].top)<1),'equal filter and settings heights/alignment '+JSON.stringify(controls));
+   assert.equal(await page.locator('#companionTasks .companion-task-icon').first().textContent(),'');
    assert(top.every(r=>r.right<=width),`header fits ${width}`);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');
    assert.equal(await page.locator('#viewButtons svg').count(),3);assert.equal(await page.locator('#companionDate').count(),0);

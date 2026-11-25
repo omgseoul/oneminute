@@ -62,9 +62,9 @@
   }
   function companionItemMarkup(item){
     const task=item.kind==='task',p=task||item.all_day?null:zonedParts(item.start_at);
-    const time=task?'':item.all_day?'종일':zonedKey(item.start_at)<key(companionDate||focusDate)?'이전 시작':`${pad(p.hour)}:${pad(p.minute)}`;
+    const time=task?'':item.all_day?'종일':zonedKey(item.start_at)<key(companionDate||focusDate)?'이전':`${pad(p.hour)}:${pad(p.minute)}`;
     const important=task&&['important','urgent'].includes(item.priority);
-    return `<button type="button" class="companion-entry ${task?'task':'event'}${item.late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}">${task?'<span class="companion-task-icon" aria-hidden="true">☷</span>':`<time>${time}</time>`}<span class="companion-entry-copy"><span>${escape(calendarTitle(item))}</span>${selectedPropertyIds.length>1&&task&&item.property_name?`<small>${escape(item.property_name)}</small>`:''}</span>${important?`<span class="companion-priority" aria-label="${item.priority==='urgent'?'긴급':'중요'}">★</span>`:''}${item.late?'<span class="companion-overdue">지연</span>':''}<span class="companion-entry-arrow" aria-hidden="true">›</span></button>`;
+    return `<button type="button" class="companion-entry ${task?'task':'event'}${item.late?' late':''}" data-kind="${item.kind}" data-id="${escape(item.id)}">${task?'<span class="companion-task-icon" aria-hidden="true"></span>':`<time>${time}</time>`}<span class="companion-entry-copy"><span>${escape(calendarTitle(item))}</span>${selectedPropertyIds.length>1&&task&&item.property_name?`<small>${escape(item.property_name)}</small>`:''}</span>${important?`<span class="companion-priority" aria-label="${item.priority==='urgent'?'긴급':'중요'}">★</span>`:''}${item.late?'<span class="companion-overdue">지연</span>':''}<span class="companion-entry-arrow" aria-hidden="true">›</span></button>`;
   }
   function renderCompanionWeek(){
     const [first]=range(),selected=key(companionDate||focusDate);

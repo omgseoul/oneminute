@@ -75,3 +75,14 @@
 @media(max-width:350px){.calendar-companion main.calendar-shell{padding-left:9px!important;padding-right:9px!important}.calendar-companion .calendar-top{gap:4px}.calendar-companion #companionControls,.calendar-companion #calendarPropertyPicker{flex-basis:72px}.calendar-companion #viewButtons button{width:23px;min-width:23px}.calendar-companion #viewButtons svg{width:17px;height:17px}.calendar-companion .calendar-toolbar h1{font-size:13px}.calendar-companion .calendar-toolbar-actions{gap:0}}
 
 .calendar-companion #calendarBoard .companion-selected{box-shadow:none}
+
+/* Override the shared 28px header picker rule only in the Calendar app. */
+.calendar-companion #companionControls,.calendar-companion #calendarPropertyPicker{align-self:center}
+.calendar-companion #companionScope,.calendar-companion #calendarPropertyPicker .property-picker-button,.calendar-companion #companionSettings{box-sizing:border-box;height:36px!important;min-height:36px!important;max-height:36px;line-height:1.2!important;border:1px solid var(--line);border-radius:9px!important;background:#fff;box-shadow:none}
+.calendar-companion #companionSettings{flex-basis:36px;width:36px;padding:5px}
+.calendar-companion #companionControls #companionScope{appearance:none;-webkit-appearance:none;padding:0 23px 0 8px!important;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%232d6dbc' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 7px center;background-size:12px 12px}
+.calendar-companion #calendarPropertyPicker .property-picker-button{justify-content:space-between;padding:0 8px!important;color:var(--navy);font-weight:650}
+.calendar-companion #companionScope:focus-visible{outline:2px solid #6ca2e3;outline-offset:2px}
+.calendar-companion .companion-task-icon{width:20px;height:20px;border:1.5px solid #a5b5c9;border-radius:4px;background:white}
+
+.calendar-companion #calendarPropertyPicker .property-picker-button span{color:inherit;font-size:inherit;letter-spacing:inherit}

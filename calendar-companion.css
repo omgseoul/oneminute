@@ -1,0 +1,77 @@
+/* Calendar companion: clean white cards, compact header, and a seven-day grid. */
+.calendar-companion{--bg:#f6f8fc;--line:#e0e7f0;--blue:#2d6dbc}
+.calendar-companion main.calendar-shell{max-width:780px;padding:calc(10px + max(28px,env(safe-area-inset-top))) 12px calc(22px + max(24px,env(safe-area-inset-bottom)))!important}
+.calendar-companion .calendar-top{display:flex;align-items:center;gap:6px;min-height:34px;z-index:22}
+.calendar-companion .calendar-top>a{flex:none;font-size:clamp(13px,3.9vw,19px);letter-spacing:-.05em;color:var(--navy)}
+.calendar-companion #companionControls{display:block;flex:0 1 86px;margin-left:auto;min-width:0}
+.calendar-companion #calendarPropertyPicker{flex:0 1 86px;margin-left:0;min-width:0}
+.calendar-companion #calendarPropertyPicker:empty{display:none}
+.calendar-companion #companionScope,.calendar-companion #calendarPropertyPicker .property-picker-button{width:100%;max-width:100%!important;height:34px;min-height:34px;padding:4px 7px!important;font-size:11px!important;font-weight:650;border:1px solid var(--line);border-radius:9px;background:#fff;box-shadow:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calendar-companion #calendarPropertyPicker .property-picker-button::after{margin-left:4px;font-size:12px}
+.calendar-companion #companionSettings{display:grid;place-items:center;flex:0 0 32px;min-height:34px;width:32px;padding:5px;border:0;background:transparent;color:var(--blue)}
+.calendar-companion #companionSettings svg{display:block;width:24px;height:24px}
+.calendar-companion #companionControls[hidden],.calendar-companion #companionSettings[hidden],.calendar-companion #companionEmployeeLabel[hidden]{display:none}
+.calendar-companion #companionEmployeeLabel{display:flex;justify-content:flex-end;margin-top:6px}
+.calendar-companion #companionEmployee{max-width:180px;height:32px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--navy);font-size:12px}
+.calendar-companion .calendar-toolbar,.calendar-companion .calendar-toolbar.week-mode{margin:14px 0 10px;min-height:34px;gap:6px;flex-wrap:nowrap}
+.calendar-companion .calendar-toolbar>div:first-child{min-width:0}
+.calendar-companion .calendar-toolbar h1,.calendar-companion .calendar-toolbar.week-mode h1{font-size:clamp(14px,4vw,21px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.05em}
+.calendar-companion .calendar-toolbar-actions{flex:none;gap:2px}
+.calendar-companion #viewButtons{gap:1px;padding:2px;margin:0 3px 0 0;border:1px solid var(--line);border-radius:9px}
+.calendar-companion #viewButtons button{width:26px;min-width:26px;height:30px;border-radius:6px;cursor:pointer}
+.calendar-companion #viewButtons svg{width:19px;height:19px;display:block}
+.calendar-companion #todayButton,.calendar-companion .calendar-toolbar .calendar-toolbar-actions>button{height:34px;min-width:23px;font-size:18px;padding:0 3px}
+.calendar-companion #todayButton{min-width:30px;font-size:12px}
+.calendar-companion #calendarBoard{min-height:0}
+.calendar-companion .calendar-weekdays{padding:9px 0;font-size:11px;border-radius:14px 14px 0 0}
+.calendar-companion .calendar-month{border-radius:0}
+.calendar-companion .calendar-day{min-height:64px;padding:3px 2px;box-shadow:none}
+.calendar-companion .calendar-day-number{width:24px;height:24px;margin:0 auto 2px;font-size:12px;font-weight:700;cursor:pointer}
+.calendar-companion .calendar-day.today:not(.companion-selected){background:#fff}
+.calendar-companion .calendar-day.today:not(.companion-selected) .calendar-day-number{background:#edf4ff;color:var(--blue)}
+.calendar-companion .calendar-day.companion-selected{background:#edf5ff;box-shadow:none}
+.calendar-companion .calendar-day.companion-selected .calendar-day-number{background:var(--blue);color:white}
+.calendar-companion .calendar-weekdays span:first-child{color:#bf5560}.calendar-companion .calendar-weekdays span:last-child{color:var(--blue)}
+.calendar-companion .calendar-item{padding:2px 3px;margin:1px 0;font-size:9px;font-weight:650;min-height:15px}
+.calendar-companion .calendar-more{display:block;font-size:9px;line-height:12px}
+.calendar-companion #companionVisibility{display:flex;justify-content:flex-end;gap:12px;padding:6px 10px;background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px}
+.calendar-companion #companionVisibility label{display:flex;align-items:center;gap:5px;font-size:11px;min-height:28px;cursor:pointer}
+.calendar-companion #companionVisibility input{appearance:auto;width:14px;height:14px;margin:0;accent-color:var(--blue)}
+.calendar-companion .calendar-legend{display:none}
+.calendar-companion #calendarCompanion{display:grid;gap:10px;margin:12px 0 0;padding:0;border:0;border-radius:0;background:transparent}
+.calendar-companion #calendarCompanion .companion-card{padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:white;min-width:0}
+.calendar-companion .companion-section-head{margin:0 0 4px;min-height:32px}
+.calendar-companion #calendarCompanion h3{display:flex;align-items:center;gap:6px;margin:0;font-size:17px;letter-spacing:-.03em}
+.calendar-companion #companionTodoLink{display:inline-flex;align-items:center;gap:7px;min-height:32px;color:var(--navy);text-decoration:none}
+.calendar-companion .companion-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:12px;background:#eef5ff;color:var(--blue);font-size:11px;font-weight:650}
+.calendar-companion #calendarCompanion .companion-pen{width:32px;height:32px;margin:0;border:0;border-radius:7px;background:transparent;font-size:24px;text-align:center;cursor:pointer}
+.calendar-companion #calendarCompanion .companion-entry{display:flex;align-items:center;gap:8px;width:100%;min-height:43px;padding:9px 0;margin:0;border:0;border-top:1px solid #edf1f6;border-radius:0;background:white;color:var(--navy);text-align:left;font-size:13px;font-weight:550;cursor:pointer}
+.calendar-companion .companion-entry time{flex:none;width:43px;border-left:3px solid #8bbcef;padding-left:6px;font-size:11px;font-variant-numeric:tabular-nums}
+.calendar-companion .companion-entry-copy{flex:1;min-width:0}.calendar-companion .companion-entry-copy>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calendar-companion .companion-entry-copy small{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+.calendar-companion .companion-task-icon{display:grid;place-items:center;width:20px;height:20px;border:1px solid #a8b8ce;border-radius:4px;color:#8b9db7;font-size:15px;flex:none}
+.calendar-companion .companion-priority{color:#e4a323;font-size:17px;flex:none}
+.calendar-companion .companion-entry-arrow{color:#8b9db7;font-size:19px}
+.calendar-companion .companion-overdue{background:#fff0f0;color:#b8434a;padding:2px 4px;border-radius:4px;font-size:9px;flex:none}
+.calendar-companion #calendarCompanion .calendar-empty{margin:8px 0 4px;color:var(--muted);font-size:12px}
+.calendar-companion .calendar-day-view{padding:10px;border:1px solid var(--line);border-radius:14px 14px 0 0;background:white}
+.calendar-companion .calendar-day-view .calendar-item{font-size:13px;padding:10px}
+.calendar-companion .calendar-day-view .calendar-empty{padding:20px;border:0}
+.calendar-companion .companion-week{overflow:hidden;border:1px solid var(--line);border-radius:14px 14px 0 0;background:white}
+.calendar-companion .companion-week-heading,.calendar-companion .companion-week-all,.calendar-companion .companion-week-times{display:grid;grid-template-columns:32px repeat(7,minmax(0,1fr))}
+.calendar-companion .companion-week-date{display:grid;justify-items:center;gap:3px;padding:7px 0 5px;border:0;border-left:1px solid #edf1f6;background:white;color:var(--muted);font:inherit;font-size:10px;cursor:pointer}
+.calendar-companion .companion-week-date b{display:grid;place-items:center;width:23px;height:23px;color:var(--navy);font-size:12px}.calendar-companion .companion-week-date.selected b{border-radius:50%;background:var(--blue);color:#fff}
+.calendar-companion .companion-week-all{border-top:1px solid var(--line);border-bottom:1px solid var(--line);min-height:36px}
+.calendar-companion .companion-week-all>span{padding:9px 0;color:var(--muted);font-size:9px;text-align:center}
+.calendar-companion .companion-week-all-day{padding:2px 1px;min-width:0;border-left:1px solid #edf1f6;cursor:pointer;box-shadow:none}
+.calendar-companion .companion-week-all-day small{font-size:9px;color:var(--muted)}
+.calendar-companion .companion-week-scroll{height:264px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.calendar-companion .companion-week-times{height:768px;position:relative}
+.calendar-companion .companion-hour-labels{position:relative;color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}
+.calendar-companion .companion-hour-labels span{position:absolute;right:3px;line-height:12px}
+.calendar-companion .companion-week-column{position:relative;min-width:0;border-left:1px solid #edf1f6;background:repeating-linear-gradient(to bottom,transparent 0,transparent 31px,#edf1f6 31px,#edf1f6 32px);cursor:pointer;box-shadow:none}
+.calendar-companion .companion-week-column.selected{background-color:#f5f9ff}
+.calendar-companion .companion-time-event{position:absolute;border:1px solid white;border-left:2px solid #5598e9;border-radius:4px;padding:2px;color:#255991;background:#e4f0ff;font-size:9px;text-align:left;overflow:hidden;overflow-wrap:anywhere;cursor:pointer}
+.calendar-companion button:focus-visible,.calendar-companion a:focus-visible{outline:2px solid #6ca2e3;outline-offset:2px}
+@media(max-width:350px){.calendar-companion main.calendar-shell{padding-left:9px!important;padding-right:9px!important}.calendar-companion .calendar-top{gap:4px}.calendar-companion #companionControls,.calendar-companion #calendarPropertyPicker{flex-basis:72px}.calendar-companion #viewButtons button{width:23px;min-width:23px}.calendar-companion #viewButtons svg{width:17px;height:17px}.calendar-companion .calendar-toolbar h1{font-size:13px}.calendar-companion .calendar-toolbar-actions{gap:0}}
+
+.calendar-companion #calendarBoard .companion-selected{box-shadow:none}

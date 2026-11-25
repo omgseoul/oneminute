@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#f4f7fc">
   <title>캘린더 · 게하관리</title>
   <link rel="stylesheet" href="page-transition.css">
-  <link rel="stylesheet" href="calendar.css?v=20261123-status-bar">
+  <link rel="stylesheet" href="calendar.css?v=20261125-clean-cards">
+  <link rel="stylesheet" href="calendar-companion.css?v=20261125-clean-cards">
   <script src="page-transition.js?v=20260929-chat-taps"></script>
 <link rel="stylesheet" href="top-layout.css?v=20261111-compact-alignment">
 <link rel="stylesheet" href="mission-property.css?v=20261020-tasks"><link rel="stylesheet" href="target-picker.css?v=20261109-safe-groups"><script src="target-picker.js?v=20261120-branch-label"></script></head>
@@ -31,10 +32,10 @@
     </div>
     <div id="calendarMessage" role="status"></div>
     <section id="calendarBoard" aria-label="일정"></section>
+    <div id="companionVisibility" hidden><label><input id="showCalendarEvents" type="checkbox" checked>일정</label><label><input id="showCalendarTasks" type="checkbox" checked>To do</label></div>
     <section id="calendarCompanion" hidden>
-      <h2 id="companionDate"></h2>
-      <div class="companion-section-head"><h3>To do</h3><button id="companionAddTask" class="companion-pen" type="button" aria-label="To do 추가" title="To do 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z"/></svg></button></div><div id="companionTasks"></div>
-      <div class="companion-section-head"><h3>일정</h3></div><div id="companionEvents"></div>
+      <section class="companion-card"><div class="companion-section-head"><h3>일정 <span id="companionEventCount" class="companion-count"></span></h3><button id="companionAddEvent" class="companion-pen" type="button" aria-label="일정 추가">＋</button></div><div id="companionEvents"></div></section>
+      <section class="companion-card"><div class="companion-section-head"><h3><a id="companionTodoLink" href="mission.html">To do <span aria-hidden="true">›</span></a><span id="companionTaskCount" class="companion-count"></span></h3><button id="companionAddTask" class="companion-pen" type="button" aria-label="To do 추가">＋</button></div><div id="companionTasks"></div></section>
     </section>
     <div class="calendar-legend"><span><i class="legend-event"></i>일정</span><span><i class="legend-task"></i>To do</span></div>
     <div class="calendar-floating-actions">
@@ -69,7 +70,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script>
-  <script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script><script src="worker-tasks.js?v=20261123-private"></script><script src="calendar-companion.js?v=1"></script><script src="calendar.js?v=20261123-due-window"></script>
+  <script src="work-config.js?v=20261012-report-thirds"></script><script src="property-selector.js?v=20261005e"></script><script src="worker-tasks.js?v=20261123-private"></script><script src="calendar-companion.js?v=1"></script><script src="calendar.js?v=20261125-clean-cards"></script>
 </body>
 </html>
 

@@ -1,7 +1,7 @@
 name: Verify administrator IDs and shared target picker
 on:
   pull_request:
-    paths: ['login.html', 'staff-management.html', 'target-picker.*', 'mission.html', 'calendar.*', 'messages.html', 'staff-chat-client.js', 'owner-settings.html', 'guest-icons.js', 'guest.html', 'guest-support-settings.html', 'supabase/migrations/*admin_target_picker.sql', 'tests/target-picker/**', '.github/workflows/admin-target-picker-checks.yml']
+    paths: ['login.html', 'staff-management.html', 'target-picker.*', 'mission.html', 'calendar.*', 'calendar-companion.*', 'mission-widget.js', 'tests/calendar-companion-browser.cjs', 'tests/mission-calendar-link.cjs', 'messages.html', 'staff-chat-client.js', 'owner-settings.html', 'guest-icons.js', 'guest.html', 'guest-support-settings.html', 'supabase/migrations/*admin_target_picker.sql', 'tests/target-picker/**', '.github/workflows/admin-target-picker-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,6 +22,9 @@ jobs:
         run: |
           node tests/target-picker/browser.cjs
           node tests/employee-login/mobile.cjs
+          node tests/calendar-companion-browser.cjs
+          node tests/mission-widget.cjs
+          node tests/mission-calendar-link.cjs
           node --test tests/settings-room-types.cjs tests/calendar-controls-ui.cjs tests/calendar-view-memory.cjs
           python -m http.server 8765 --bind 127.0.0.1 >/tmp/oms-http.log 2>&1 &
           node tests/notification-bot-ui.cjs
@@ -32,3 +35,5 @@ jobs:
           path: |
             /tmp/oms-target-picker-*.png
             /tmp/oms-housing-*.png
+            /tmp/calendar-clean-*.png
+            /tmp/calendar-week-*.png

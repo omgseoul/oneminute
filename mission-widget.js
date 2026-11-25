@@ -1,7 +1,8 @@
 /* Only the Calendar companion owns this navigation. Browser/OMS routes stay unchanged. */
 (() => {
   const bridge=window.OMSCalendarAndroid;
-  if(!bridge||new URLSearchParams(location.search).get('app')!=='todo')return;
+  const mode=new URLSearchParams(location.search).get('app');
+  if(mode!=='calendar-todo'&&(!bridge||mode!=='todo'))return;
   document.documentElement.classList.add('widget-todo');
   const style=document.createElement('style');
   style.textContent='html.widget-todo.omg-brand::after{content:"할 일을 여는 중…";background:none;animation:none;width:auto;height:auto;font-size:14px;color:#758094}';
@@ -15,16 +16,16 @@
     return false;
   }
   window.OMSWidgetNavigation={
-    back,changed(){bridge.refreshWidgets?.();},
+    privateOnly:mode==='todo',back,changed(){bridge?.refreshWidgets?.();},
     ready(session,items,open){
-      bridge.setSession(session.accessToken,session.sessionKind,session.ownerId||session.employeeId||'',session.propertyId||'',session.timezone||'Asia/Seoul');
+      bridge?.setSession(session.accessToken,session.sessionKind,session.ownerId||session.employeeId||'',session.propertyId||'',session.timezone||'Asia/Seoul');
       if(consumed)return;consumed=true;
       const id=new URLSearchParams(location.search).get('task');
       if(id){const item=items.find(item=>item.id===id);if(item)open(item);else document.getElementById('message').textContent='이 항목은 삭제되었거나 현재 계정에서 볼 수 없습니다.';clearTarget();}
     }
   };
   const home=document.querySelector('.back');
-  if(home){home.textContent='닫기';home.onclick=event=>{event.preventDefault();if(!back())bridge.exitToLauncher?.();};}
-  window.addEventListener('omg:session-changed',()=>{if(!window.omgSession?.get())bridge.clearSession();});
-  if(window.OMSMissionTasks){const original=OMSMissionTasks.privateAction;OMSMissionTasks.privateAction=async(...args)=>{const result=await original(...args);if(args[1]!=='list')bridge.refreshWidgets?.();return result;};}
+  if(home){home.textContent=bridge?'닫기':'← 캘린더';home.onclick=event=>{event.preventDefault();if(!back()){if(bridge)bridge.exitToLauncher?.();else location.href='calendar.html?app=calendar';}};}
+  window.addEventListener('omg:session-changed',()=>{if(!window.omgSession?.get())bridge?.clearSession();});
+  if(window.OMSMissionTasks){const original=OMSMissionTasks.privateAction;OMSMissionTasks.privateAction=async(...args)=>{const result=await original(...args);if(args[1]!=='list')bridge?.refreshWidgets?.();return result;};}
 })();

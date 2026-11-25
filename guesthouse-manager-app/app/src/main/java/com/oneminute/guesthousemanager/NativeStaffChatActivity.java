@@ -39,6 +39,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     private void onOutboxChanged(){if(destroyed||outbox==null)return;refreshList(true);enableComposer();int revision=outbox.sentRevision();if(revision!=outboxSentRevision){outboxSentRevision=revision;if(active)refreshNow();}}
     private void refreshNow(){if(busy){refreshAgain=true;return;}load(false,null);}
     private NativeStaffMediaViewer viewer;
+    private NativeStaffSchedule schedules;
     private LinearLayout root,composer;
     private ListView list;
     private EditText input,search;
@@ -82,7 +83,7 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         build();
     }
     private void build(){
-        generation++;receiptCursor=0;fetchedRoom=false;busy=false;searching=false;readThroughId="";readingRoom=false;state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
+        if(schedules!=null){schedules.close();schedules=null;}generation++;receiptCursor=0;fetchedRoom=false;busy=false;searching=false;readThroughId="";readingRoom=false;state.clear();complete=false;profile=null;profileLoading=false;query="";canSend=peer.isEmpty();emojis=null;keyboardVisible=false;
         WindowCompat.setDecorFitsSystemWindows(getWindow(),false);
         root=column(this);root.setBackgroundColor(BG);
         ViewCompat.setOnApplyWindowInsetsListener(root,(v,insets)->{applySafeArea(v,insets);return WindowInsetsCompat.CONSUMED;});
@@ -208,7 +209,8 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         FrameLayout wrap=new FrameLayout(this);wrap.setBackground(background(0xfff2f7fd,16,this));row.addView(wrap,new LinearLayout.LayoutParams(0,-2,1));
         input=new EditText(this);input.setTextSize(15);input.setTextColor(INK);input.setHintTextColor(0xff91a1b5);input.setHint("메세지 입력");input.setBackgroundColor(Color.TRANSPARENT);input.setMinLines(1);input.setMaxLines(4);input.setMinHeight(dp(this,44));input.setPadding(dp(this,12),dp(this,10),dp(this,38),dp(this,10));input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(2000)});input.setContentDescription("메세지 내용");wrap.addView(input,new FrameLayout.LayoutParams(-1,-2));
         emoji=new ImageButton(this);emoji.setImageDrawable(new Smile());emoji.setBackgroundColor(Color.TRANSPARENT);emoji.setPadding(dp(this,6),dp(this,6),dp(this,6),dp(this,6));emoji.setContentDescription("이모지 선택");FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(dp(this,36),dp(this,44),Gravity.RIGHT|Gravity.BOTTOM);wrap.addView(emoji,ep);
-        send=button(this,"➤","메세지 보내기");send.setTextColor(Color.WHITE);send.setBackground(background(BLUE,14,this));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(this,42),dp(this,44));sp.setMargins(dp(this,5),0,0,0);row.addView(send,sp);send.setOnClickListener(v->send());
+        send=button(this,"➤","메세지 보내기");send.setTextColor(Color.WHITE);send.setBackground(background(BLUE,14,this));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(this,42),dp(this,44));sp.setMargins(dp(this,5),0,0,0);row.addView(send,sp);send.setOnClickListener(v->send());send.setTooltipText("길게 눌러 예약 발송");send.setOnLongClickListener(v->{openSchedule();return true;});
+        TextView scheduled=button(this,"◷ 예약 메시지","예약 메시지 목록");scheduled.setTextSize(12);scheduled.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);composer.addView(scheduled,new LinearLayout.LayoutParams(-1,dp(this,30)));scheduled.setOnClickListener(v->{scheduleController();schedules.list();});
         emojis=new GridView(this);emojis.setNumColumns(7);emojis.setHorizontalSpacing(dp(this,2));emojis.setVerticalSpacing(dp(this,2));emojis.setBackground(background(0xfff8fbff,16,this));emojis.setVisibility(View.GONE);emojis.setAdapter(new BaseAdapter(){public int getCount(){return NativeShibaStickers.LABELS.length+EMOJIS.length;}public Object getItem(int p){return p<28?NativeShibaStickers.token(p):EMOJIS[p-28];}public long getItemId(int p){return p;}public View getView(int p,View recycled,ViewGroup parent){if(p<28){ImageView sticker=new ImageView(NativeStaffChatActivity.this);sticker.setImageDrawable(NativeShibaStickers.drawable(NativeStaffChatActivity.this,p,dp(NativeStaffChatActivity.this,40)));sticker.setPadding(2,2,2,2);sticker.setContentDescription(NativeShibaStickers.LABELS[p]+" 삽입");sticker.setLayoutParams(new AbsListView.LayoutParams(-1,dp(NativeStaffChatActivity.this,42)));return sticker;}TextView cell=text(NativeStaffChatActivity.this,EMOJIS[p-28],26,INK);cell.setGravity(Gravity.CENTER);cell.setLayoutParams(new AbsListView.LayoutParams(-1,dp(NativeStaffChatActivity.this,42)));cell.setContentDescription(EMOJIS[p-28]+" 삽입");return cell;}});composer.addView(emojis,new LinearLayout.LayoutParams(-1,Math.min(dp(this,220),getResources().getDisplayMetrics().heightPixels/3)));
         emojis.setOnItemClickListener((parent,view,position,id)->{int a=Math.max(0,input.getSelectionStart()),b=Math.max(a,input.getSelectionEnd());String value=position<28?NativeShibaStickers.token(position):EMOJIS[position-28];if(input.length()-(b-a)+value.length()<=2000)input.getText().replace(a,b,value);});
         emoji.setOnClickListener(v->{if(!canSend)return;boolean show=emojis.getVisibility()!=View.VISIBLE;if(show)((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(input.getWindowToken(),0);emojis.setVisibility(show?View.VISIBLE:View.GONE);emoji.setContentDescription(show?"이모지 선택 닫기":"이모지 선택");});input.setOnClickListener(v->emojis.setVisibility(View.GONE));
@@ -386,6 +388,16 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
         if(pages>=20){notice("더 이전의 미디어를 확인하려면 모아보기를 다시 눌러주세요.",false);return;}
         notice("이전 대화에서 미디어를 불러오는 중…",false);load(true,()->collectMedia(pages+1,request));
     }
+    private void scheduleController(){
+        if(schedules!=null)schedules.close();
+        final int version=generation;final String original=input.getText().toString(),type=mime;final File file=pendingFile;final boolean priorityUrgent=urgent;
+        schedules=new NativeStaffSchedule(this,api,peer,new NativeStaffSchedule.Draft(){
+            public JSONObject data()throws Exception{return new JSONObject().put("body",original.trim().isEmpty()&&file!=null?(type.startsWith("video/")?"동영상":"사진"):original.trim()).put("priority",priorityUrgent?"urgent":"normal");}
+            public File file(){return file;}public String mime(){return type;}
+            public void accepted(){if(destroyed||generation!=version)return;if(input.getText().toString().equals(original))input.setText("");if(pendingFile==file){pendingFile=null;mime="";if(file!=null)file.delete();}pendingId="";pendingSignature="";showAttachment();saveDraft();enableComposer();}
+        });
+    }
+    private void openSchedule(){if(!canSend||preparing)return;scheduleController();schedules.open();}
     private void send(){
         if(!canSend||preparing||!api.valid()||outbox==null)return;String body=input.getText().toString().trim();if(body.isEmpty()&&pendingFile==null)return;if(body.isEmpty())body=mime.startsWith("video/")?"동영상":"사진";
         try{outbox.enqueue(peer,body,urgent?"urgent":"normal",pendingFile,mime);input.setText("");pendingFile=null;mime="";pendingId="";pendingSignature="";showAttachment();saveDraft();enableComposer();refreshList(true);notice("",false);}
@@ -401,6 +413,6 @@ public final class NativeStaffChatActivity extends AppCompatActivity {
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)scheduleRead();}
     @Override protected void onPause(){active=false;if(live!=null)live.stop();main.removeCallbacks(poll);main.removeCallbacks(readVisible);if(viewer!=null)viewer.pause();saveDraft();super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state){state.putString("peer",peer);saveDraft();super.onSaveInstanceState(state);}
-    @Override protected void onDestroy(){destroyed=true;if(live!=null)live.destroy();if(outbox!=null)outbox.unobserve(outboxChanged);active=false;generation++;main.removeCallbacksAndMessages(null);if(memberProfileDialog!=null)memberProfileDialog.dismiss();if(groupMembersDialog!=null)groupMembersDialog.dismiss();if(peerProfileDialog!=null)peerProfileDialog.dismiss();if(viewer!=null)viewer.dismiss();if(upload!=null)upload.close();if(media!=null)media.close();api.cancelReads();worker.shutdownNow();profileWorker.shutdownNow();super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;if(schedules!=null)schedules.close();if(live!=null)live.destroy();if(outbox!=null)outbox.unobserve(outboxChanged);active=false;generation++;main.removeCallbacksAndMessages(null);if(memberProfileDialog!=null)memberProfileDialog.dismiss();if(groupMembersDialog!=null)groupMembersDialog.dismiss();if(peerProfileDialog!=null)peerProfileDialog.dismiss();if(viewer!=null)viewer.dismiss();if(upload!=null)upload.close();if(media!=null)media.close();api.cancelReads();worker.shutdownNow();profileWorker.shutdownNow();super.onDestroy();}
     private abstract static class SimpleWatcher implements TextWatcher{public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){}}
 }

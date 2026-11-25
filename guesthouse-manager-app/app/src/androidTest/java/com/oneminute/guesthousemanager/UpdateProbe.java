@@ -5,6 +5,7 @@ public class UpdateProbe extends Instrumentation {
  private String phase;
  @Override public void onCreate(Bundle args) { super.onCreate(args); phase=args.getString("phase", "verify"); start(); }
  @Override public void onStart() {
+  if("staff-schedule".equals(phase)){StaffScheduleProbe.run(this);return;}
   if("chat-queue".equals(phase)){ChatQueueProbe.run(this);return;}
   if("guest-design".equals(phase)){GuestMessageDesignProbe.run(this);return;}
   if("reminder-design".equals(phase)){ReminderDesignProbe.run(this);return;}

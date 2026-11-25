@@ -11,7 +11,7 @@ window.StaffChat={
  },
  async call(session,action,data={},transfer={}){
   const check=()=>{if(transfer.signal?.aborted)throw new DOMException("전송 중지","AbortError");};check();
-  if(action==='send'&&/^data:video\/(mp4|webm);base64,/.test(data.photo||'')){
+  if(['send','schedule_create'].includes(action)&&/^data:video\/(mp4|webm);base64,/.test(data.photo||'')){
    const mime=data.photo.slice(5,data.photo.indexOf(';')),binary=atob(data.photo.slice(data.photo.indexOf(',')+1));
    if(binary.length>20971520)throw new Error('동영상은 압축 후 20MB 이하만 보낼 수 있습니다.');
    const total=Math.ceil(binary.length/1048576),deadline=Date.now()+180000;
@@ -23,8 +23,8 @@ window.StaffChat={
    }
    data={...data,uploaded:true};delete data.photo;
   }
-  if(action==='send'&&data.photo?.startsWith('data:image/jpeg;')&&window.OMSChatMediaCache){const preview=await OMSChatMediaCache.preview(data.photo).catch(()=>null);if(preview)data={...data,preview};}
-  check();const {data:value,error}=await this.rpc(['messages','send'].includes(action)?'staff_chat_compact':'staff_chat_rpc',{p_access_token:session.accessToken,p_action:action,p_data:data},transfer.signal);if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
+  if(['send','schedule_create'].includes(action)&&data.photo?.startsWith('data:image/jpeg;')&&window.OMSChatMediaCache){const preview=await OMSChatMediaCache.preview(data.photo).catch(()=>null);if(preview)data={...data,preview};}
+  check();const {data:value,error}=await this.rpc(action.startsWith('schedule_')?'staff_chat_schedule':['messages','send'].includes(action)?'staff_chat_compact':'staff_chat_rpc',{p_access_token:session.accessToken,p_action:action.startsWith('schedule_')?action.slice(9):action,p_data:data},transfer.signal);if(error||!value?.ok){const failure=new Error(value?.message||error?.message||'대화를 불러오지 못했습니다. 다시 시도해주세요.');failure.retryable=!error?.code||!/^P0001|^22|^23|^42501/.test(error.code);throw failure;}return value;},
  async download(session,peer,id,{signal,onProgress}={}){
   if(signal?.aborted)throw new DOMException('불러오기 취소','AbortError');
   const cached=await window.OMSChatMediaCache?.get(session,id);if(cached){onProgress?.(cached.size,cached.size);return cached;}

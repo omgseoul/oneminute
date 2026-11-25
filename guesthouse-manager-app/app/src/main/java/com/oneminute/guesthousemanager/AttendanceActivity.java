@@ -320,7 +320,7 @@ public class AttendanceActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
-        public void checkForUpdate() { runOnUiThread(() -> AppUpdateChecker.check(AttendanceActivity.this, true)); }
+        public void checkForUpdate() { runOnUiThread(() -> AppUpdateInstaller.install(AttendanceActivity.this,"https://omgworks24.com/downloads/oms-update.json")); }
 
         @JavascriptInterface
         public void saveAttendanceExcel(String filename, String content) {
@@ -505,7 +505,7 @@ public class AttendanceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() { super.onResume();if(attendanceNfc!=null)attendanceNfc.resume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.omsNativeChatOpen=false;window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
+    protected void onResume() { super.onResume();AppUpdateInstaller.resume(this);if(attendanceNfc!=null)attendanceNfc.resume();NativeChatOutbox.resume(this);NativeMessageBadge.refresh(this);if(webView!=null)webView.evaluateJavascript("window.omsNativeChatOpen=false;window.dispatchEvent(new Event(\"omg:messages-changed\"))",null); if(workerProfiles!=null)workerProfiles.resume();if (recovery != null) recovery.resume(); }
 
     @Override
     protected void onPause() { if(attendanceNfc!=null)attendanceNfc.pause(); if (recovery != null) recovery.pause(); super.onPause(); }

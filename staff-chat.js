@@ -210,6 +210,12 @@
   catch(error){status('보낼 메시지를 보관하지 못했습니다. 저장 공간을 확인하고 다시 시도해주세요.',true);}
   finally{enqueueing=false;syncComposer();resizeComposer();}
  };
+
+ const scheduleList=document.createElement('button');scheduleList.type='button';scheduleList.className='staff-schedule-list';scheduleList.textContent='◷ 예약';scheduleList.setAttribute('aria-label','예약 메시지 목록');$('priority').after(scheduleList);
+ const schedules=OMSStaffSchedule.bind({send:$('send'),listButton:scheduleList,call,
+ draft:()=>canSend&&!preparing&&!enqueueing?{body:input.value.trim()||(photo?(photo.startsWith('data:video/')?'동영상':'사진'):''),original:input.value,photo,priority}:null,
+ accepted:snapshot=>{if(input.value===snapshot.original)input.value='';if(photo===snapshot.photo)photo=null;renderPhoto();keepDraft();resizeComposer();status('예약되었습니다. 예약 목록에서 수정하거나 취소할 수 있습니다.');},
+ members:()=>isGroup?(peerProfile?.members||[]).filter(p=>p.actor_key?.startsWith('employee:')&&!p.is_self).map(p=>({id:p.actor_key.slice(9),name:p.display_name||p.name||'근무자'})):peer?.startsWith('employee:')?[{id:peer.slice(9),name:peerProfile?.display_name||'상대 근무자'}]:[]});
  $('groupLeave').hidden=!isGroup;
  $('groupLeave').onclick=()=>$('groupLeaveDialog').showModal();
  $('groupLeaveCancel').onclick=()=>$('groupLeaveDialog').close();
@@ -238,6 +244,6 @@
   outboxChanged();live=window.OMSChatLive?.connect(session,()=>{refreshNow();outbox.pump();try{window.OMGNative?.refreshMessageBadge?.();}catch{}});
   addEventListener('pagehide',()=>{live?.close();outbox?.close();});
   addEventListener('pageshow',async event=>{if(!event.persisted)return;outbox=await OMSChatOutbox.open(scope,async(item,transfer)=>StaffChat.call(session,'send',{peer:item.peer,body:item.body,priority:item.priority,photo:item.photo,client_id:item.client_id},transfer),outboxChanged);outboxChanged();live=window.OMSChatLive?.connect(session,refreshNow);load();});
-  await Promise.all([loadPeerProfile(),load()]);
+  await Promise.all([loadPeerProfile(),load()]);schedules.refresh();
  }catch(err){line.classList.remove('chat-loading');status(err.message,true);$('send').disabled=true;}
 })();

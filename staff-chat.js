@@ -211,7 +211,7 @@
   finally{enqueueing=false;syncComposer();resizeComposer();}
  };
 
- const scheduleList=document.createElement('button');scheduleList.type='button';scheduleList.className='staff-schedule-list';scheduleList.textContent='◷ 예약';scheduleList.setAttribute('aria-label','예약 메시지 목록');$('priority').after(scheduleList);
+ const scheduleList=document.createElement('button');scheduleList.type='button';scheduleList.className='staff-schedule-list';scheduleList.hidden=true;scheduleList.setAttribute('aria-label','예약 메시지 목록');$('emojiToggle').before(scheduleList);
  const schedules=OMSStaffSchedule.bind({send:$('send'),listButton:scheduleList,call,
  draft:()=>canSend&&!preparing&&!enqueueing?{body:input.value.trim()||(photo?(photo.startsWith('data:video/')?'동영상':'사진'):''),original:input.value,photo,priority}:null,
  accepted:snapshot=>{if(input.value===snapshot.original)input.value='';if(photo===snapshot.photo)photo=null;renderPhoto();keepDraft();resizeComposer();status('예약되었습니다. 예약 목록에서 수정하거나 취소할 수 있습니다.');},

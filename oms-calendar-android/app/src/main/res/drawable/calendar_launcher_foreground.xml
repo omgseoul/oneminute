@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <!-- Approved concept 2: the OMS ring inside a calendar. Keep all artwork
+       within the adaptive icon safe area, including round launcher masks. -->
+  <group android:scaleX="0.68" android:scaleY="0.68" android:translateX="20" android:translateY="20">
+    <path android:fillColor="#142D46" android:pathData="M22,18H78A12,12 0,0 1,90 30V78A12,12 0,0 1,78 90H22A12,12 0,0 1,10 78V30A12,12 0,0 1,22 18Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M22,22H78A8,8 0,0 1,86 30V78A8,8 0,0 1,78 86H22A8,8 0,0 1,14 78V30A8,8 0,0 1,22 22Z"/>
+    <path android:fillColor="#2767D8" android:pathData="M22,22H78A8,8 0,0 1,86 30V36H14V30A8,8 0,0 1,22 22Z"/>
+    <path android:fillColor="#142D46" android:pathData="M29,14A4,4 0,0 1,37 14V24A4,4 0,0 1,29 24Z M63,14A4,4 0,0 1,71 14V24A4,4 0,0 1,63 24Z"/>
+    <path android:fillColor="#142D46" android:fillType="evenOdd" android:pathData="M50,41A21,21 0,1 1,50 83A21,21 0,1 1,50 41Z M50,51A11,11 0,1 0,50 73A11,11 0,1 0,50 51Z"/>
+    <path android:fillColor="#2767D8" android:pathData="M50,41A21,21 0,0 0,31.8135 72.5L40.4737,67.5A11,11 0,0 1,50 51Z"/>
+  </group>
+</vector>

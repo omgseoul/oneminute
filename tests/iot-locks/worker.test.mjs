@@ -40,3 +40,25 @@ test('ON requires owner authorization, boolean flag and secondary password',asyn
  const send=data=>handler(new Request('https://edge.test/iot-locks',{method:'POST',body:JSON.stringify({access_token:id,action:'toggle',data})}));
  assert.equal((await send({enabled:'true'})).status,400);assert.equal((await send({enabled:true})).status,400);assert.equal((await send({enabled:true,sensitive_password:'wrong'})).status,400);verified=true;assert.equal((await send({enabled:true,sensitive_password:'valid'})).status,200);assert(!actions.at(-1).p_data.sensitive_password);
 });
+
+test('ordered PIN methods use one length, separate mobile and force random on collision',()=>{
+ const settings={pin_strategy:'mobile',pin_strategy_secondary:'booking',pin_length:6};
+ assert.equal(choosePin({phone:'01011112222',mobile:'01034560056',apiReference:'R-8888123456'},new Set(),settings),'560056');
+ assert.equal(choosePin({mobile:'12',apiReference:'R-8888123456'},new Set(),settings),'123456');
+ assert.equal(choosePin({mobile:'000000',apiReference:'12'},new Set(),settings,()=>7),'777777');
+ assert.equal(choosePin({mobile:'01034560056',apiReference:'R-8888123456'},new Set(['560056']),settings,()=>7),'777777');
+ assert.equal(choosePin({mobile:'12',apiReference:'R-8888123456'},new Set(['123456']),settings,()=>7),'777777');
+ assert.equal(choosePin({phone:'',mobile:'01012345678'},new Set(),{pin_strategy:'phone',pin_strategy_secondary:'none'},()=>3),'3333');
+ assert.equal(choosePin({},new Set(),{...settings,pin_strategy_secondary:'random_1_6'},()=>4),'555555');
+ let n=0;assert.equal(choosePin({},new Set(['0000']),{pin_strategy:'random'},()=>n++<4?0:1),'1111');
+ assert.throws(()=>choosePin({},new Set(['0000']),{pin_strategy:'random'},()=>0),/사용 가능한 비밀번호/);
+ assert.throws(()=>choosePin({},new Set(),{pin_strategy:'mobile',pin_strategy_secondary:'unknown'}),/생성 방식/);
+});
+test('worker registers the secondary six-digit code on both locks and Beds24',async()=>{
+ const f=fixture({booking:{mobile:'12',apiReference:'REF-987654'}});Object.assign(f.settings,{pin_strategy:'mobile',pin_strategy_secondary:'booking',pin_length:6});await f.run();
+ assert.equal(f.book.infoItems.find(x=>x.code==='LOCK_PIN').text,'987654');for(const rows of f.locks.values())assert.equal(rows[0].keyboardPwd,'987654');
+});
+
+test('two-day schedule still issues for same-day and next-day arrivals',async()=>{
+ for(const arrival of ['2026-11-26','2026-11-27']){const f=fixture({booking:{arrival}});f.settings.days_before=2;await f.run();assert.equal(f.finishes.at(-1).status,'done');assert.equal(f.book.infoItems.filter(x=>x.code==='LOCK_PIN').length,1);}
+});

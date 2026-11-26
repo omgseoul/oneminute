@@ -5,7 +5,7 @@
 1. Operations center → TTLock: enter the **EU** Open Platform approved Client ID/Secret. Credentials go to Supabase Vault. Saving is not a live credential validation; the first property account connection validates them.
 2. Property → IOT 도어락 연동: connect the ordinary TTLock administrator account. Its password and mandated MD5 wire hash are never persisted. Only access/refresh tokens are stored in Vault.
 3. Map each OMS room to a Beds24 room type **and unit** and one TTLock lock. Optional common entrances receive the same booking PIN. Cross-property lock assignment is rejected.
-4. Choose phone/OTA reference/Beds24 ID suffix or random digits, length 4–9, creation day/time, and validity times. Missing/invalid/duplicate suffixes fall back to random.
+4. Choose primary and secondary methods: phone/mobile/OTA reference/Beds24 ID suffix or random digits. All methods use the primary length (4–9). Missing/short/placeholder primary values try the secondary; a duplicate on any mapped lock, or failure of both methods, falls back to random. Set creation day/time and validity times. Late bookings remain eligible.
 5. Stop Beds24 TTLock automatic issuance for these rooms, then turn OMS issuance ON. Enabling requires the existing owner secondary password. Reservations are refreshed before enabling.
 
 Existing hardware must support remote custom passcodes through a gateway or WiFi (`addType=2`). No Bluetooth SDK calls or physical unlock operations are exposed. Each property starts OFF.
@@ -29,6 +29,7 @@ Every attempted TTLock request reserves one count atomically before it is sent; 
 ## Deployment and validation
 
 - Migration: `supabase/migrations/20261126061127_iot_doorlocks.sql` (same content as `supabase/setup/iot_doorlocks.sql`). Uses existing Vault, pg_cron, pg_net, worker secret and bot dispatch.
+- PIN fallback upgrade: `supabase/migrations/20261126071040_iot_pin_fallback.sql` (same content as `supabase/setup/iot_pin_fallback.sql`). Existing phone settings retain mobile as the second method; other existing methods retain random fallback.
 - Edge function: `iot-locks`, `verify_jwt=false` because it separately verifies the worker secret, platform Supabase session/admin role, or owner custom session/property permissions. Service-only RPCs never accept direct browser calls.
 - Existing secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUSH_ADMIN_SECRET`; Vault `oms_guest_ai_worker_secret`. No app credentials in source/env/frontend.
 - `NODE_PATH=tests/attendance-nfc/node_modules node tests/iot-locks/database.cjs`

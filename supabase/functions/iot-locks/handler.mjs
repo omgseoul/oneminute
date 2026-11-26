@@ -17,10 +17,22 @@ export function pinUpdate(b,pin){
 }
 export function choosePin(booking,blocked,settings={},random=()=>crypto.getRandomValues(new Uint32Array(1))[0]){
  const length=Number(settings.pin_length||4),strategy=settings.pin_strategy||'phone';
- if(!Number.isInteger(length)||length<4||length>9||!['phone','random','booking','beds_booking','random_1_6'].includes(strategy))throw Error('비밀번호 생성 방식을 확인해주세요.');
- const values=strategy==='phone'?[booking.phone,booking.mobile]:strategy==='booking'?[booking.apiReference]:strategy==='beds_booking'?[booking.id]:[];
- for(const value of values){const n=String(value||'').replace(/\D/g,'');if(n.length>=length&&!/^(\d)\1+$/.test(n)&&!blocked.has(n.slice(-length)))return n.slice(-length);}
- const digits=strategy==='random_1_6'?'123456':'0123456789';
+ // Keep the former phone -> mobile fallback when older settings have no second method.
+ const secondary=settings.pin_strategy_secondary??(strategy==='phone'?'mobile':'none');
+ const allowed=['phone','mobile','random','booking','beds_booking','random_1_6'];
+ if(!Number.isInteger(length)||length<4||length>9||!allowed.includes(strategy)||!['none',...allowed].includes(secondary))throw Error('비밀번호 생성 방식을 확인해주세요.');
+ let digits='0123456789';
+ for(const method of [strategy,secondary]){
+  if(method==='none')continue;
+  if(method==='random'||method==='random_1_6'){digits=method==='random_1_6'?'123456':'0123456789';break;}
+  const value=({phone:booking.phone,mobile:booking.mobile,booking:booking.apiReference,beds_booking:booking.id})[method];
+  const n=String(value??'').replace(/\D/g,'');
+  if(n.length<length||/^(\d)\1+$/.test(n))continue;
+  const candidate=n.slice(-length);
+  // An existing code on any mapped lock always forces a fresh random PIN.
+  if(blocked.has(candidate))break;
+  return candidate;
+ }
  for(let i=0;i<1000;i++){let n='';for(let k=0;k<length;k++)n+=digits[random()%digits.length];if(!blocked.has(n))return n;}
  throw Error('사용 가능한 비밀번호가 없습니다. 도어락 비밀번호 목록을 확인해주세요.');
 }

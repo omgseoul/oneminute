@@ -109,7 +109,10 @@
   async function rpc(name, args) {
     const { data, error } = await window.omgSupabase.rpc(name, args);
     if (error || !data?.ok) {
-      throw new Error(data?.message || "설정을 불러오지 못했습니다. 연결을 확인해주세요.");
+      // Only expose the known, user-facing quota error; keep raw database details private.
+      const quotaMessage = error?.code === "23514" && /^요금제의 객실 수 한도\(\d+개\)를 초과했습니다\.$/.test(error.message || "") ? error.message : null;
+      const fallback = /(^|_)save_/.test(name) ? "설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." : "설정을 불러오지 못했습니다. 연결을 확인해주세요.";
+      throw new Error(data?.message || quotaMessage || fallback);
     }
     return data;
   }

@@ -19,21 +19,22 @@ export function choosePin(booking,blocked,settings={},random=()=>crypto.getRando
  const length=Number(settings.pin_length||4),strategy=settings.pin_strategy||'phone';
  // Keep the former phone -> mobile fallback when older settings have no second method.
  const secondary=settings.pin_strategy_secondary??(strategy==='phone'?'mobile':'none');
+ const secondaryLength=Number(settings.pin_length_secondary??length);
  const allowed=['phone','mobile','random','booking','beds_booking','random_1_6'];
- if(!Number.isInteger(length)||length<4||length>9||!allowed.includes(strategy)||!['none',...allowed].includes(secondary))throw Error('비밀번호 생성 방식을 확인해주세요.');
- let digits='0123456789';
- for(const method of [strategy,secondary]){
+ if(!Number.isInteger(length)||length<4||length>9||!Number.isInteger(secondaryLength)||secondaryLength<4||secondaryLength>9||!allowed.includes(strategy)||!['none',...allowed].includes(secondary))throw Error('비밀번호 생성 방식을 확인해주세요.');
+ let digits='0123456789',randomLength=length;
+ for(const [method,methodLength] of [[strategy,length],[secondary,secondaryLength]]){
   if(method==='none')continue;
-  if(method==='random'||method==='random_1_6'){digits=method==='random_1_6'?'123456':'0123456789';break;}
+  if(method==='random'||method==='random_1_6'){digits=method==='random_1_6'?'123456':'0123456789';randomLength=methodLength;break;}
   const value=({phone:booking.phone,mobile:booking.mobile,booking:booking.apiReference,beds_booking:booking.id})[method];
   const n=String(value??'').replace(/\D/g,'');
-  if(n.length<length||/^(\d)\1+$/.test(n))continue;
-  const candidate=n.slice(-length);
+  if(n.length<methodLength||/^(\d)\1+$/.test(n))continue;
+  const candidate=n.slice(-methodLength);
   // An existing code on any mapped lock always forces a fresh random PIN.
   if(blocked.has(candidate))break;
   return candidate;
  }
- for(let i=0;i<1000;i++){let n='';for(let k=0;k<length;k++)n+=digits[random()%digits.length];if(!blocked.has(n))return n;}
+ for(let i=0;i<1000;i++){let n='';for(let k=0;k<randomLength;k++)n+=digits[random()%digits.length];if(!blocked.has(n))return n;}
  throw Error('사용 가능한 비밀번호가 없습니다. 도어락 비밀번호 목록을 확인해주세요.');
 }
 function existingConflict(booking,state){

@@ -1,10 +1,10 @@
 name: IOT doorlock integration
 on:
   pull_request:
-    paths: ['iot-lock*', 'platform-iot.*', 'owner-settings.html', 'platform-admin.html', 'supabase/functions/iot-locks/**', 'supabase/setup/iot_doorlocks.sql', 'supabase/migrations/*iot_doorlocks.sql', 'tests/iot-locks/**', '.github/workflows/iot-lock-checks.yml']
+    paths: ['iot-lock*', 'platform-iot.*', 'owner-settings.html', 'platform-admin.html', 'supabase/functions/iot-locks/**', 'supabase/setup/iot*.sql', 'supabase/migrations/*iot*.sql', 'tests/iot-locks/**', '.github/workflows/iot-lock-checks.yml']
   push:
     branches: [main]
-    paths: ['iot-lock*', 'platform-iot.*', 'supabase/functions/iot-locks/**', 'supabase/setup/iot_doorlocks.sql', 'tests/iot-locks/**', '.github/workflows/iot-lock-checks.yml']
+    paths: ['iot-lock*', 'platform-iot.*', 'supabase/functions/iot-locks/**', 'supabase/setup/iot*.sql', 'tests/iot-locks/**', '.github/workflows/iot-lock-checks.yml']
 permissions:
   contents: read
 jobs:

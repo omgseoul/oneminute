@@ -48,7 +48,7 @@ window.omgSelectPicker.mount(select,{title:"근무자 선택",placeholder:"근�
 function esc(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);}
 function splitRooms(value){return[...new Set(String(value||"").split(/[\n,]+/).map(room=>room.trim()).filter(Boolean))];}
 function parseRoomTypes(){return [...roomTypesNode.querySelectorAll(".housing-entry")].map((row,index)=>{const name=row.querySelector(".type-name").value.trim(),rooms=row.classList.contains("entire-house-row")?[]:splitRooms(row.querySelector(".room-numbers").value);return {name:name||(rooms.length?`객실타입${index+1}`:""),rooms};}).filter(group=>group.name);}
-function validateRoomEntries(){for(const row of roomTypesNode.querySelectorAll(".room-row")){if(row.querySelector(".type-name").value.trim()&&!splitRooms(row.querySelector(".room-numbers").value).length)throw new Error("객실 Unit의 객실번호를 입력해주세요. 숙소 이름만 등록하려면 Entire house 추가를 이용해주세요.");}const groups=parseRoomTypes();if(!groups.length)throw new Error("Entire house 이름 또는 객실 Unit을 한 개 이상 입력해주세요.");return groups;}
+function validateRoomEntries(allowEmpty=false){for(const row of roomTypesNode.querySelectorAll(".room-row")){if(row.querySelector(".type-name").value.trim()&&!splitRooms(row.querySelector(".room-numbers").value).length)throw new Error("객실 Unit의 객실번호를 입력해주세요. 숙소 이름만 등록하려면 Entire house 추가를 이용해주세요.");}const groups=parseRoomTypes();if(!allowEmpty&&!groups.length)throw new Error("Entire house 이름 또는 객실 Unit을 한 개 이상 입력해주세요.");return groups;}
 function updateRoomCount(){const groups=parseRoomTypes(),houses=groups.filter(group=>!group.rooms.length).length,rooms=groups.flatMap(group=>group.rooms).length;document.getElementById("roomCount").textContent=`Entire house ${houses}개 · 총 ${rooms}개 객실`;}
 function canAddHousing(){if(roomTypesNode.querySelectorAll(".housing-entry").length<30)return true;alert("Entire house와 객실 Unit은 합쳐서 최대 30개까지 추가할 수 있습니다.");return false;}
 function addRoomType(group={name:"",rooms:[]}){if(!canAddHousing())return;const row=document.createElement("div");row.className="housing-entry room-row";row.innerHTML=`<div class="room-type-entry"><input class="type-name" type="text" maxlength="40" aria-label="객실 Unit 타입 이름" placeholder="객실타입 이름" value="${esc(group.name)}"><button class="room-type-remove remove" type="button" aria-label="객실 Unit 삭제">×</button></div><input class="room-numbers" type="text" maxlength="800" aria-label="객실번호" placeholder="객실번호: 101, 102, 103" value="${esc((group.rooms||[]).join(", "))}">`;row.querySelectorAll("input").forEach(input=>input.addEventListener("input",updateRoomCount));row.querySelector(".remove").onclick=()=>{row.remove();updateRoomCount();};document.getElementById("roomUnits").append(row);updateRoomCount();return row;}
@@ -104,8 +104,7 @@ async function savePropertySection(scope){
  const businessType=isLodging?"lodging":isBasic?selectedBusinessType():baseline.business_type;
  const actualType=scope==="all"?selectedBusinessType():businessType;
  let roomTypes=baseline.room_types||[];
- if(actualType==="lodging"&&(isLodging||(isBasic&&!roomTypes.length)))roomTypes=validateRoomEntries();
- if(actualType==="lodging"&&!roomTypes.length)throw new Error("숙소 정보에서 Entire house 또는 객실 Unit을 먼저 입력해주세요.");
+ if(actualType==="lodging"&&isLodging)roomTypes=validateRoomEntries(scope==="all");
  const next=await window.omgWorkConfig.save(session.accessToken,name,actualType,roomTypes,isReports?config.property.custom_report_fields:baseline.custom_report_fields,isReports?employeeConfigs:{},sharedPropertyId());
  persistedConfig=JSON.parse(JSON.stringify(next));
  config.property.name=next.property.name;

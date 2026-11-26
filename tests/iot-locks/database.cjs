@@ -39,6 +39,15 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await assert.rejects(()=>owner('save',{...draft,mappings:[{...draft.mappings[0],unit_id:3}]}),/유닛/);
  await assert.rejects(()=>owner('save',{...draft,mappings:[draft.mappings[0],draft.mappings[0]]}),/중복/);
  await owner('save',draft);const visible=JSON.stringify(await owner('get'));assert(!visible.includes('private-token'));assert(!visible.includes('vault_id'));assert(!visible.includes('tt_uid'));
+ // Apply upgrade over an existing saved strategy, then verify fallback persistence and validation.
+ await db.exec(fs.readFileSync('supabase/setup/iot_pin_fallback.sql','utf8'));
+ assert.equal((await owner('get')).settings.pin_strategy_secondary,'none');
+ await owner('save',{...draft,pin_strategy:'mobile',pin_strategy_secondary:'booking',pin_length:6});
+ let prefs=(await owner('get')).settings;assert.equal(prefs.pin_strategy,'mobile');assert.equal(prefs.pin_strategy_secondary,'booking');assert.equal(prefs.pin_length,6);
+ await owner('save',draft);assert.equal((await owner('get')).settings.pin_strategy_secondary,'booking','older clients preserve secondary');
+ for(const pin_strategy_secondary of ['bad',null])await assert.rejects(()=>owner('save',{...draft,pin_strategy_secondary}),/생성 방식/);
+ await assert.rejects(()=>owner('save',{...draft,pin_strategy:'bad'}),/생성 방식/);
+ await assert.rejects(()=>owner('save',{...draft,pin_length:3}),/check constraint/);
  await owner('get',{},id(20));await ctl('connect',{secret:{accessToken:'p2',uid:222},username:'other',locks:[{lockId:7}]},id(2));await assert.rejects(()=>owner('save',draft,id(20)),/다른 지점/);
  await assert.rejects(()=>owner('toggle',{enabled:true}),/Beds24.*중지/);await owner('toggle',{enabled:true,beds24_disabled:true});await assert.rejects(()=>owner('save',draft),/OFF/);
  await db.query("insert into omg_private.online_bookings(property_id,id,arrival,departure,status,guest_name,room_name,data) values($1,1001,current_date,current_date+2,'confirmed','Test Guest','201','{\"roomId\":200,\"unitId\":1,\"apiReference\":\"OTA-1001\"}')",[id(1)]);

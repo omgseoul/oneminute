@@ -1,0 +1,1 @@
+.iot-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.iot-stats small{display:block;color:#7b8999;margin-bottom:4px}.iot-stats b{font-size:22px}.iot-usage-row{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #e6edf4}@media(max-width:380px){.iot-stats b{font-size:18px}.iot-stats small{font-size:11px}}

@@ -113,5 +113,41 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  await db.exec(`create or replace function omg_private.guest_actor(uuid) returns jsonb language sql as $$select jsonb_build_object('kind','staff','property_id','${id(1)}')$$`);
  await assert.rejects(()=>retry({targets}),/관리자/);
  assert.equal((await db.query("select has_function_privilege('anon','omg_private.auto_message_scan()','execute') v")).rows[0].v,false);
+
+ // Latest migration: a newly received late booking sends once and alerts only after acceptance.
+ await db.exec('alter table omg_private.online_bookings add column channel text');
+ await db.exec(fs.readFileSync('supabase/setup/auto_message_late_booking_channel_alerts.sql','utf8'));
+ await db.exec(`create or replace function omg_private.guest_actor(uuid) returns jsonb language sql as $$select jsonb_build_object('kind','owner','property_id','${id(1)}')$$`);
+ await db.exec("truncate omg_private.auto_message_notices,omg_private.auto_message_deliveries,omg_private.auto_message_rules,omg_private.online_bookings cascade");
+ await owner({...draft,trigger:'checkin_before',days:1});
+ await db.exec("update omg_private.auto_message_rules set enabled_from=now()-interval '2 hours'");
+ const addLate=async(n,booked="now()-interval '1 minute'",channel='Booking.com')=>db.query(`insert into omg_private.online_bookings(property_id,id,booked_at,arrival,departure,status,guest_name,room_name,channel,data) values($1,$2,${booked},(now() at time zone 'Asia/Seoul')::date,(now() at time zone 'Asia/Seoul')::date+2,'confirmed','1234 Late Guest','201',$3,'{"apiReference":"OTA-LATE"}')`,[id(1),n,channel]);
+ await addLate(301);j=await ctl('claim');assert.equal(j.booking_id,301);assert.equal(j.status,'preparing');
+ assert.equal(await count('terminal'),0,'late booking is not a failure');assert.equal(await count('exception'),0,'never claim success before provider acceptance');
+ assert.equal((await ctl('prepare',j)).ok,true,'check-in day booking crosses old schedule but passes final gate');
+ await ctl('finish',{...j,status:'sent'});assert.equal(await count('exception'),1);
+ let exception=(await db.query("select m.message from property_messages m join omg_private.auto_message_notices n on n.message_id=m.id where n.delivery_id=$1 and n.kind='exception'",[j.id])).rows[0].message;
+ assert.match(exception,/자동메시지 예외 발송 완료/);assert.match(exception,/예약사이트: Booking.com/);assert.match(exception,/Late Guest/);assert.match(exception,/설정된 발송 시점 이후/);assert.match(exception,/예약 #301/);assert.match(exception,/추가로 보내지 않아도/);
+ let receipt=(await db.query('select late_booking,scheduled_at<due_at as original_earlier from omg_private.auto_message_deliveries where id=$1',[j.id])).rows[0];assert.deepEqual(receipt,{late_booking:true,original_earlier:true});
+ await ctl('finish',{...j,status:'sent'});await scan();assert.equal(await count('exception'),1,'one success notice per attempt');assert.equal((await ctl('claim')).empty,true,'no duplicate guest send');
+ let log=(await db.query("select public.auto_message_owner($1,'list',$2) v",[id(10),JSON.stringify({property_id:id(1)})])).rows[0].v.logs[0];assert.equal(log.late_booking,true);assert.equal(log.channel,'Booking.com');
+ // Already existing bookings before activation stay excluded; nothing is resurrected.
+ await addLate(302,"now()-interval '3 hours'");await scan();assert.equal((await db.query('select status from omg_private.auto_message_deliveries where booking_id=302')).rows[0].status,'skipped');assert.equal((await ctl('claim')).empty,true);
+ // Unsupported channels produce a guest-specific terminal failure, including on manual retry.
+ await addLate(303,"now()-interval '1 minute'",'Agoda');j=await ctl('claim');assert.equal(j.booking_id,303);await ctl('finish',{...j,status:'failed',error:'Beds24 메시지 연동을 지원하지 않는 예약사이트입니다.'});
+ let failedRow=(await db.query("select n.message_id,m.message from omg_private.auto_message_notices n join property_messages m on m.id=n.message_id where n.delivery_id=$1 and n.kind='terminal'",[j.id])).rows[0];assert.match(failedRow.message,/예약사이트: Agoda/);assert.match(failedRow.message,/예약 #303/);assert.match(failedRow.message,/수동으로 확인/);assert(!failedRow.message.includes('예약 #301'));assert.equal(await count('exception'),1);
+ assert.equal((await retry({notice_id:failedRow.message_id})).retry_queued,1);j=await ctl('claim');assert.equal(j.booking_id,303);await ctl('finish',{...j,status:'failed',error:'Beds24 메시지 연동을 지원하지 않는 예약사이트입니다.'});
+ assert.equal((await db.query("select count(*)::int n from omg_private.auto_message_notices where delivery_id=$1 and kind='terminal'",[j.id])).rows[0].n,2);
+ assert.equal((await retry({notice_id:failedRow.message_id})).retry_queued,0,'old notice never retries a new failure');
+ // Changed booking dates, cancellation and pause still win over the exception.
+ await addLate(304);j=await ctl('claim');await db.exec("update omg_private.online_bookings set arrival=arrival+5,departure=departure+5 where id=304");assert.equal((await ctl('prepare',j)).skip,true);assert.equal((await db.query('select status,due_at>now() future from omg_private.auto_message_deliveries where id=$1',[j.id])).rows[0].future,true);
+ await addLate(305);j=await ctl('claim');await db.exec("update omg_private.online_bookings set status='cancelled' where id=305");assert.equal((await ctl('prepare',j)).skip,true);
+ await addLate(306);j=await ctl('claim');await db.exec('update omg_private.auto_message_rules set enabled=false');assert.equal((await ctl('prepare',j)).skip,true);assert.equal(await count('exception'),1);
+ // Local-date calculation handles multiple lead days, midnight and bookings before the scheduled time.
+ const effective=async(trigger,days,booked,arrival,tz)=>(await db.query("select omg_private.auto_message_effective_due($1,$2,'09:00',$3,$4,$5) d",[trigger,days,booked,arrival,tz])).rows[0].d;
+ assert.equal(new Date(await effective('checkin_before',2,'2026-11-25T23:30Z','2026-11-26','Asia/Seoul')).toISOString(),'2026-11-25T23:30:00.000Z');
+ assert.equal(new Date(await effective('checkin_before',1,'2026-11-24T00:00Z','2026-11-27','Asia/Seoul')).toISOString(),'2026-11-26T00:00:00.000Z');
+ assert.equal((await db.query("select has_function_privilege('anon','omg_private.auto_message_effective_due(text,integer,time,timestamptz,date,text)','execute') v")).rows[0].v,false);
+ console.log('Late booking DB: receipt-time catch-up, final gate, original due audit, success-only deduped notice, OTA failure + scoped retry, activation boundary, date change, cancellation and pause passed');
  console.log('Auto alerts DB: min-day/time, missed deadline, deduped bot receipts, owner/shared access + revocation, strict missing-value failure, uncertain sends, failed lookup watchdog and pause exclusion passed');
  }finally{await db.close();}})().catch(e=>{console.error(e);process.exit(1)});

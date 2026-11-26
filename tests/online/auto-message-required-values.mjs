@@ -4,7 +4,7 @@ assert.throws(()=>renderAutoMessage('{{이름}} {{객실}} {{비밀번호}}',{'�
 for(const text of [undefined,'','{{unknown}}','{{}}','{{이름','이름}}'])assert.throws(()=>renderAutoMessage(text,{}));
 for(const date of [undefined,'','not a date','2026-02-31'])assert.throws(()=>renderAutoMessage('{{체크인}}',{'체크인':date}),/체크인/);
 assert.equal(renderAutoMessage('Hi {{이름}}',{'이름':'Guest'}),'Hi Guest','unused PIN/room are not required');
-const booking={id:11,propertyId:100,roomId:200,unitId:1,status:'confirmed',firstName:'Guest',arrival:'2099-01-01',departure:'2099-01-02',infoItems:[{code:'LOCK_PIN',text:'0658'}]};
+const booking={id:11,propertyId:100,roomId:200,unitId:1,status:'confirmed',apiSource:'Booking.com',firstName:'Guest',arrival:'2099-01-01',departure:'2099-01-02',infoItems:[{code:'LOCK_PIN',text:'0658'}]};
 const inventory={data:[{id:100,roomTypes:[{id:200,units:[{id:1,name:'201'}]}]}]};
 const job={id:'delivery',lease:'lease',property_id:'home',booking_id:11,timezone:'Asia/Seoul',rule:{enabled:true,messages:{common:'{{이름}} {{체크인}} {{체크아웃}} {{객실}} {{비밀번호}}'}}};
 async function run(options={}){

@@ -12,6 +12,14 @@ export function messageLanguage(booking,messages){
  return language&&messages[language]?.trim()?language:'common';
 }
 class MessageValidationError extends Error {}
+// Beds24 channel messaging support: https://wiki.beds24.com/index.php/Messages
+// Source IDs: https://wiki.beds24.com/index.php/API_V2.0_apisourceids
+export function supportsAutoMessageChannel(booking){
+ const sourceId=booking.apiSourceId;
+ if(sourceId!==undefined&&sourceId!==null&&String(sourceId).trim()!=='')return [14,19,30,46].includes(Number(sourceId));
+ const source=String(booking.apiSource||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+ return ['airbnb','airbnbxml','booking','bookingcom','expedia','vrbo','homeaway','homeawayxml','abritel','fewodirekt','stayz'].includes(source);
+}
 function templateVariables(template){
  if(typeof template!=='string'||!template.trim())throw new MessageValidationError('발송할 메시지 내용이 없습니다.');
  const keys=[...new Set([...template.matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]))];
@@ -47,6 +55,7 @@ export function createAutoMessages({rpc,credentials,api,saveBookings,messages,di
    if(!['new','confirmed'].includes(b.status))return await finish('skipped','확정·신규 예약이 아닙니다.');
    const today=new Intl.DateTimeFormat('en-CA',{timeZone:job.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
    if(b.departure<today)return await finish('skipped','체크아웃한 예약입니다.');
+   if(!supportsAutoMessageChannel(b))throw new MessageValidationError('Beds24 메시지 연동을 지원하지 않거나 확인할 수 없는 예약사이트입니다. 게스트에게 발송되지 않았습니다. 해당 예약사이트에서 수동으로 확인해주세요.');
    const language=messageLanguage(b,job.rule.messages||{}),template=job.rule.messages?.[language],keys=templateVariables(template);
    let room='',pin='';
    if(keys.includes('객실')||keys.includes('비밀번호')){
@@ -67,7 +76,7 @@ export function createAutoMessages({rpc,credentials,api,saveBookings,messages,di
    const rows=Array.isArray(response)?response:response.data;
    if(rows?.length===1&&rows[0].success===true){
     await finish('sent');try{await messages(job.property_id,c,job.booking_id,false);}catch{}
-   }else if(rows?.length&&rows.every(r=>r.success===false))await finish('failed','예약 채널에서 발송을 거절했습니다. 채널 지원·쓰기 권한을 확인해주세요.');
+   }else if(rows?.length&&rows.every(r=>r.success===false))await finish('failed','예약사이트에서 메시지 전송을 거절했습니다. Beds24 메시지 연동·쓰기 권한을 확인하고 해당 예약사이트에서 수동으로 확인해주세요.');
    else await finish('uncertain','발송 결과 확인 필요 · 게스트 대화를 확인해주세요.');
   }catch(e){
    // Provider errors may contain tokens, PINs or message bodies: record only controlled reasons.

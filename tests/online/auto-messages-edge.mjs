@@ -8,7 +8,7 @@ assert.equal(renderAutoMessage('{{이름}} {{비밀번호}}',{'이름':'Han','�
 assert.throws(()=>renderAutoMessage('{{비밀번호}}',{}),/필수 정보/);
 assert.throws(()=>renderAutoMessage('{{이름}}'.repeat(1000),{'이름':'Guest name'}),/4,000/);
 const job={id:'id',lease:'lease',property_id:'property',booking_id:11,timezone:'Asia/Seoul',rule:{enabled:true,messages:{common:'Hi {{이름}} {{객실}} {{비밀번호}}',ja:'こんにちは {{이름}} {{객실}} {{비밀번호}}'}}};
-let writes=[],finish=[],b={id:11,propertyId:100,roomId:200,unitId:1,status:'confirmed',country2:'JP',firstName:'1234 Han',lastName:'Mija',arrival:'2099-01-01',departure:'2099-01-02',infoItems:[{bookingId:11,code:'LOCK_PIN',text:'0658'}]},sendMode='ok',ready=true;
+let writes=[],finish=[],b={id:11,propertyId:100,roomId:200,unitId:1,status:'confirmed',apiSource:'Booking.com',country2:'JP',firstName:'1234 Han',lastName:'Mija',arrival:'2099-01-01',departure:'2099-01-02',infoItems:[{bookingId:11,code:'LOCK_PIN',text:'0658'}]},sendMode='ok',ready=true;
 const worker=createAutoMessages({credentials:async()=>({beds_property_id:100,secret:{token:'test'}}),saveBookings:async()=>{},messages:async()=>{},
  rpc:async(name,args)=>{if(args.p_action==='prepare')return ready?{ok:true}:{skip:true};finish.push(args.p_data);return {ok:true};},
  api:async(path,headers,body)=>{if(body){writes.push(body);if(sendMode==='timeout')throw Error('timeout');return sendMode==='rejected'?[{success:false}]:[{success:true}];}if(path.startsWith('/bookings?'))return {data:[b]};return {data:[{id:100,roomTypes:[{id:200,units:[{id:1,name:'201'}]}]}]};}});
@@ -29,3 +29,17 @@ const multilingual={common:'안'.repeat(4000),ja:'あ'.repeat(4000),'zh-CN':'好
 const response=await handler(new Request('https://fixture.test/beds24',{method:'POST',body:JSON.stringify({action:'auto_message_save',access_token:'00000000-0000-0000-0000-000000000001',data:{messages:multilingual}})}));
 assert.equal(response.status,200);assert.equal(savedAction,'save');
 console.log('Multilingual request budget accepts full-length CJK versions');
+
+// Unsupported OTA bookings must not create a Beds24-only local message or report success.
+const {supportsAutoMessageChannel}=await import('../../supabase/functions/beds24/auto-messages.mjs');
+for(const apiSource of ['Booking.com','booking','Airbnb','Expedia','VRBO','Abritel','FewoDirekt','Stayz'])assert.equal(supportsAutoMessageChannel({apiSource}),true,apiSource);
+for(const apiSource of ['Agoda','Hostelworld','Direct','Booking Page','Airbnb iCal','Homeaway iCal','unknown',''])assert.equal(supportsAutoMessageChannel({apiSource}),false,apiSource);
+for(const apiSourceId of [14,19,30,46])assert.equal(supportsAutoMessageChannel({apiSourceId}),true);
+assert.equal(supportsAutoMessageChannel({apiSourceId:10,apiSource:'Airbnb'}),false,'iCal cannot masquerade as Airbnb API');
+assert.equal(supportsAutoMessageChannel({apiSourceId:17,apiSource:'Booking.com'}),false,'source ID takes precedence');
+sendMode='ok';ready=true;
+for(const source of ['Agoda','Hostelworld','Direct','unknown']){
+ b.apiSource=source;writes=[];await worker.process(job);assert.equal(writes.length,0,source+' must not POST to unsupported messaging');assert.equal(finish.at(-1).status,'failed');assert.match(finish.at(-1).error,/메시지 연동/);assert.match(finish.at(-1).error,/수동으로 확인/);
+}
+b.apiSource='Booking.com';writes=[];await worker.process(job);assert.equal(writes.length,1,'supported OTA can initiate a conversation with no earlier message thread');assert.equal(finish.at(-1).status,'sent');
+console.log('Channel capability: supported OTA names/IDs, unsupported Agoda/other/direct, iCal distinction, no unsupported POST and supported first message passed');

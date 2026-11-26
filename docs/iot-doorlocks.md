@@ -28,7 +28,7 @@ Every attempted TTLock request reserves one count atomically before it is sent; 
 
 ## Deployment and validation
 
-- Migration: `supabase/migrations/20261126034723_iot_doorlocks.sql` (same content as `supabase/setup/iot_doorlocks.sql`). Uses existing Vault, pg_cron, pg_net, worker secret and bot dispatch.
+- Migration: `supabase/migrations/20261126061127_iot_doorlocks.sql` (same content as `supabase/setup/iot_doorlocks.sql`). Uses existing Vault, pg_cron, pg_net, worker secret and bot dispatch.
 - Edge function: `iot-locks`, `verify_jwt=false` because it separately verifies the worker secret, platform Supabase session/admin role, or owner custom session/property permissions. Service-only RPCs never accept direct browser calls.
 - Existing secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PUSH_ADMIN_SECRET`; Vault `oms_guest_ai_worker_secret`. No app credentials in source/env/frontend.
 - `NODE_PATH=tests/attendance-nfc/node_modules node tests/iot-locks/database.cjs`

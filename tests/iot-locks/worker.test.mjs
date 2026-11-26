@@ -55,10 +55,21 @@ test('ordered PIN methods use one length, separate mobile and force random on co
  assert.throws(()=>choosePin({},new Set(),{pin_strategy:'mobile',pin_strategy_secondary:'unknown'}),/생성 방식/);
 });
 test('worker registers the secondary six-digit code on both locks and Beds24',async()=>{
- const f=fixture({booking:{mobile:'12',apiReference:'REF-987654'}});Object.assign(f.settings,{pin_strategy:'mobile',pin_strategy_secondary:'booking',pin_length:6});await f.run();
+ const f=fixture({booking:{mobile:'12',apiReference:'REF-987654'}});Object.assign(f.settings,{pin_strategy:'mobile',pin_strategy_secondary:'booking',pin_length:4,pin_length_secondary:6});await f.run();
  assert.equal(f.book.infoItems.find(x=>x.code==='LOCK_PIN').text,'987654');for(const rows of f.locks.values())assert.equal(rows[0].keyboardPwd,'987654');
 });
 
 test('two-day schedule still issues for same-day and next-day arrivals',async()=>{
  for(const arrival of ['2026-11-26','2026-11-27']){const f=fixture({booking:{arrival}});f.settings.days_before=2;await f.run();assert.equal(f.finishes.at(-1).status,'done');assert.equal(f.book.infoItems.filter(x=>x.code==='LOCK_PIN').length,1);}
+});
+
+test('secondary digit length is independent; final random keeps primary length',()=>{
+ const s={pin_strategy:'phone',pin_length:4,pin_strategy_secondary:'mobile',pin_length_secondary:6};
+ assert.equal(choosePin({phone:'01012345678',mobile:'01087654321'},new Set(),s),'5678');
+ assert.equal(choosePin({phone:'12',mobile:'01087654321'},new Set(),s),'654321');
+ assert.equal(choosePin({phone:'12',mobile:'4321'},new Set(),s,()=>2),'2222');
+ assert.equal(choosePin({mobile:'01087654321'},new Set(['654321']),s,()=>3),'3333');
+ assert.equal(choosePin({},new Set(),{...s,pin_strategy_secondary:'random_1_6'},()=>2),'333333');
+ assert.throws(()=>choosePin({},new Set(),{...s,pin_length_secondary:3}),/생성 방식/);
+ assert.throws(()=>choosePin({},new Set(),{...s,pin_length_secondary:10}),/생성 방식/);
 });

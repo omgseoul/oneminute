@@ -1,0 +1,32 @@
+name: IOT doorlock integration
+on:
+  pull_request:
+    paths: ['iot-lock*', 'platform-iot.*', 'owner-settings.html', 'platform-admin.html', 'supabase/functions/iot-locks/**', 'supabase/setup/iot_doorlocks.sql', 'supabase/migrations/*iot_doorlocks.sql', 'tests/iot-locks/**', '.github/workflows/iot-lock-checks.yml']
+  push:
+    branches: [main]
+    paths: ['iot-lock*', 'platform-iot.*', 'supabase/functions/iot-locks/**', 'supabase/setup/iot_doorlocks.sql', 'tests/iot-locks/**', '.github/workflows/iot-lock-checks.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --prefix tests/attendance-nfc
+      - run: cd tests/attendance-nfc && npx playwright install --with-deps chromium
+      - name: Verify credentials, tenancy, existing Lock info, retries and mobile UI
+        env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
+        run: |
+          node --check iot-lock-settings.js
+          node --check platform-iot.js
+          cmp supabase/setup/iot_doorlocks.sql supabase/migrations/20261126061127_iot_doorlocks.sql
+          node --test tests/iot-locks/worker.test.mjs
+          node tests/iot-locks/database.cjs
+          node tests/iot-locks/ui.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iot-mobile-layouts
+          path: /tmp/iot-*.png

@@ -26,3 +26,7 @@ verify_jwt = false
 
 [functions.dispatch-briefing]
 verify_jwt = false
+
+[functions.iot-locks]
+# Owner sessions, platform JWTs and internal worker secrets are independently validated.
+verify_jwt = false

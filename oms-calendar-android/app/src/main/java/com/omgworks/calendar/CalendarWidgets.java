@@ -30,6 +30,7 @@ import java.util.Locale;
 
 public final class CalendarWidgets {
     static final String TASK_ACTION = "com.omgworks.calendar.TASK_WIDGET_ACTION";
+    private static final String TOGGLE_FILTER = "com.omgworks.calendar.TOGGLE_WIDGET_FILTER";
     private static final String CHANGE_MONTH = "com.omgworks.calendar.CHANGE_WIDGET_MONTH";
     private static final String[] WEEK = {"일", "월", "화", "수", "목", "금", "토"};
     private CalendarWidgets() {}
@@ -44,6 +45,16 @@ public final class CalendarWidgets {
         }
         @Override public void onReceive(Context context, Intent intent) {
             super.onReceive(context, intent);
+            if (TOGGLE_FILTER.equals(intent.getAction())) {
+                int widget = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
+                String filter = intent.getStringExtra("filter");
+                if (widget < 0 || !("events".equals(filter) || "tasks".equals(filter))) return;
+                SharedPreferences prefs = CalendarRefresh.preferences(context);
+                String key = filterKey(widget, filter);
+                prefs.edit().putBoolean(key, !prefs.getBoolean(key, true)).apply();
+                render(context, AppWidgetManager.getInstance(context), widget, false);
+                return;
+            }
             if (CHANGE_MONTH.equals(intent.getAction())) {
                 int widget = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
                 if (widget < 0) return;
@@ -64,7 +75,8 @@ public final class CalendarWidgets {
         }
         @Override public void onDeleted(Context context, int[] ids) {
             SharedPreferences.Editor prefs = CalendarRefresh.preferences(context).edit();
-            for (int id : ids) prefs.remove("widget_day_" + id).remove("widget_month_" + id);
+            for (int id : ids) prefs.remove("widget_day_" + id).remove("widget_month_" + id)
+                    .remove(filterKey(id, "events")).remove(filterKey(id, "tasks"));
             prefs.apply();
         }
     }
@@ -168,6 +180,7 @@ public final class CalendarWidgets {
         views.removeAllViews(R.id.widget_grid);
         views.removeAllViews(R.id.widget_entries);
         views.setViewVisibility(R.id.widget_grid, !tasks && (month || week) && prefs.contains("token") ? View.VISIBLE : View.GONE);
+        views.setViewVisibility(R.id.widget_filters, View.GONE);
         views.setViewVisibility(R.id.widget_action, tasks ? View.VISIBLE : View.GONE);
         views.setOnClickPendingIntent(R.id.widget_title, open(context, tasks, false));
         views.setViewVisibility(R.id.widget_previous, month ? View.VISIBLE : View.GONE);
@@ -209,8 +222,14 @@ public final class CalendarWidgets {
         } else if (!prefs.contains("token")) {
             entry(context, views, "", "앱에서 로그인하면 표시됩니다.", "", "");
         } else {
-            List<JSONObject> list = load(prefs, "widget_events");
-            grid(context, views, id, list, zone, today, selected, month, displayMonth, height);
+            boolean showEvents = prefs.getBoolean(filterKey(id, "events"), true);
+            boolean showTasks = prefs.getBoolean(filterKey(id, "tasks"), true);
+            views.setViewVisibility(R.id.widget_filters, View.VISIBLE);
+            bindFilter(context, views, id, fortnight, R.id.widget_filter_events, "events", "일정", showEvents);
+            bindFilter(context, views, id, fortnight, R.id.widget_filter_tasks, "tasks", "To do", showTasks);
+            List<JSONObject> list = showEvents ? load(prefs, "widget_events") : new ArrayList<>();
+            List<JSONObject> due = showTasks ? sortedTasks(prefs, now) : new ArrayList<>();
+            grid(context, views, id, list, due, zone, today, selected, month, displayMonth, height);
         }
         return views;
     }
@@ -242,45 +261,81 @@ public final class CalendarWidgets {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    private static String filterKey(int id, String filter) {
+        return "widget_filter_" + id + "_" + filter;
+    }
+
+    private static void bindFilter(Context context, RemoteViews views, int id, boolean fortnight,
+                                   int viewId, String filter, String label, boolean enabled) {
+        views.setTextViewText(viewId, (enabled ? "☑ " : "☐ ") + label);
+        views.setContentDescription(viewId, label + (enabled ? " 표시 중" : " 숨김"));
+        Intent toggle = new Intent(context, fortnight ? Fortnight.class : Events.class)
+                .setAction(TOGGLE_FILTER).setData(android.net.Uri.parse("oms-filter://" + id + "/" + filter))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id).putExtra("filter", filter);
+        views.setOnClickPendingIntent(viewId, PendingIntent.getBroadcast(context, 0, toggle, PendingIntent.FLAG_IMMUTABLE));
+    }
+
+    private static boolean taskOccurs(JSONObject item, LocalDate date, LocalDate today, ZoneId zone) {
+        Instant deadline = due(item);
+        return deadline.equals(Instant.MAX) ? date.equals(today) && "today".equals(item.optString("timing"))
+                : deadline.atZone(zone).toLocalDate().equals(date);
+    }
+
+    private static void addCalendarItem(Context context, RemoteViews day, JSONObject item, boolean task,
+                                        PendingIntent target) {
+        RemoteViews title = layout(context, R.layout.widget_cell_event);
+        title.setTextViewText(R.id.widget_cell_event, item.optString("title"));
+        if (task) {
+            title.setInt(R.id.widget_cell_event, "setBackgroundResource", R.drawable.widget_calendar_task);
+            title.setTextColor(R.id.widget_cell_event, 0xff35665a);
+        }
+        title.setOnClickPendingIntent(R.id.widget_cell_event, target);
+        day.addView(R.id.widget_cell_events, title);
+    }
+
     private static void grid(Context context, RemoteViews views, int id, List<JSONObject> events,
-                             ZoneId zone, LocalDate today, LocalDate selected, boolean month, LocalDate displayMonth, int height) {
+                             List<JSONObject> tasks, ZoneId zone, LocalDate today, LocalDate selected,
+                             boolean month, LocalDate displayMonth, int height) {
         RemoteViews labels = layout(context, R.layout.widget_weekday_row);
-        labels.removeAllViews(R.id.widget_dates);
         for (int n = 0; n < WEEK.length; n++) {
-            RemoteViews label = cell(context, WEEK[n], false, false, false);
+            RemoteViews label = layout(context, R.layout.widget_weekday_cell);
+            label.setTextViewText(R.id.widget_number, WEEK[n]);
             label.setTextColor(R.id.widget_number, dayColor(n));
             labels.addView(R.id.widget_dates, label);
         }
         views.addView(R.id.widget_grid, labels);
-        LocalDate first = month ? displayMonth : sunday(today);
-        LocalDate end = first.plusDays(weekLength(first, month));
-        int rows = (int)((java.time.temporal.ChronoUnit.DAYS.between(sunday(first), end) + 6) / 7);
-        int lines = Math.max(0, Math.min(month ? 2 : 6, ((height - 56) / rows - 16) / 12));
+        LocalDate first = month ? sunday(displayMonth) : sunday(today);
+        LocalDate end = month ? sunday(displayMonth.plusMonths(1).minusDays(1)).plusWeeks(1) : first.plusWeeks(2);
+        int rows = (int) java.time.temporal.ChronoUnit.WEEKS.between(first, end);
+        // Header 24, weekday strip 20, footer 18, and vertical padding 8 dp.
+        int lines = Math.max(0, Math.min(month ? 2 : 6, ((height - 70) / rows - 13) / 15));
         events.sort(Comparator.comparing(e -> CalendarRefresh.time(e, "start_at", Instant.MAX)));
-        for (LocalDate start = sunday(first); start.isBefore(end); start = start.plusDays(7)) {
+        for (LocalDate start = first; start.isBefore(end); start = start.plusWeeks(1)) {
             RemoteViews row = layout(context, R.layout.widget_date_row);
-            row.removeAllViews(R.id.widget_dates);
             for (int offset = 0; offset < 7; offset++) {
                 LocalDate date = start.plusDays(offset);
-                boolean shown = !date.isBefore(first) && date.isBefore(end);
-                RemoteViews day = cell(context, shown ? String.valueOf(date.getDayOfMonth()) : "",
+                boolean outside = month && date.getMonth() != displayMonth.getMonth();
+                RemoteViews day = cell(context, String.valueOf(date.getDayOfMonth()),
                         date.equals(today), date.equals(selected), false);
-                if (shown) {
-                    if (!date.equals(today)) day.setTextColor(R.id.widget_number, dayColor(offset));
-                    day.setContentDescription(R.id.widget_cell, format(date, "M월 d일 EEEE"));
-                    PendingIntent target = PendingIntent.getActivity(context, 0,
-                            CalendarActivity.dateIntent(context, date), PendingIntent.FLAG_IMMUTABLE);
-                    day.setOnClickPendingIntent(R.id.widget_cell, target);
-                    int count = 0;
-                    for (JSONObject event : events) {
-                        if (count >= lines) break;
-                        if (!occurs(event, date, zone)) continue;
-                        RemoteViews title = layout(context, R.layout.widget_cell_event);
-                        title.setTextViewText(R.id.widget_cell_event, event.optString("title"));
-                        title.setOnClickPendingIntent(R.id.widget_cell_event, target);
-                        day.addView(R.id.widget_cell_events, title);
-                        count++;
-                    }
+                if (!date.equals(today)) day.setTextColor(R.id.widget_number, outside ? 0xff687f99 : dayColor(offset));
+                day.setInt(R.id.widget_cell, "setBackgroundResource",
+                        outside ? R.drawable.widget_calendar_outside : R.drawable.widget_calendar_day);
+                day.setContentDescription(R.id.widget_cell, format(date, "M월 d일 EEEE"));
+                PendingIntent target = PendingIntent.getActivity(context, 0,
+                        CalendarActivity.dateIntent(context, date), PendingIntent.FLAG_IMMUTABLE);
+                day.setOnClickPendingIntent(R.id.widget_cell, target);
+                int count = 0;
+                for (JSONObject event : events) {
+                    if (count >= lines) break;
+                    if (!occurs(event, date, zone)) continue;
+                    addCalendarItem(context, day, event, false, target);
+                    count++;
+                }
+                for (JSONObject task : tasks) {
+                    if (count >= lines) break;
+                    if (!taskOccurs(task, date, today, zone)) continue;
+                    addCalendarItem(context, day, task, true, target);
+                    count++;
                 }
                 row.addView(R.id.widget_dates, day);
             }
@@ -320,8 +375,6 @@ public final class CalendarWidgets {
         row.setContentDescription(R.id.widget_complete, title + " 완료");
         return row;
     }
-
-    private static int weekLength(LocalDate first, boolean month) { return month ? first.lengthOfMonth() : 14; }
 
     private static RemoteViews cell(Context context, String value, boolean today, boolean selected, boolean dot) {
         RemoteViews cell = layout(context, R.layout.widget_date_cell);

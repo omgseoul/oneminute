@@ -1,4 +1,4 @@
 <TextView xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_cell_event"
- android:layout_width="match_parent" android:layout_height="12dp" android:layout_marginHorizontal="1dp"
- android:paddingHorizontal="2dp" android:background="#EAF2FF" android:textColor="#214F85"
+ android:layout_width="match_parent" android:layout_height="15dp" android:layout_marginHorizontal="1dp"
+ android:paddingHorizontal="2dp" android:background="@drawable/widget_calendar_event" android:gravity="center_vertical" android:textColor="#214F85"
  android:textSize="9sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end"/>

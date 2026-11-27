@@ -112,8 +112,35 @@ public class CalendarWidgetsTest {
     @Test public void monthFillsHeightAndSixWeekMonthFits() {
         for(int height:new int[]{240,300,400}){
             RemoteViews views=CalendarWidgets.buildViews(context,42,false,height,ZonedDateTime.parse("2026-05-10T12:00:00+09:00[Asia/Seoul]"));View root=apply(views);measure(root,320,height);
-            assertEquals(root.getHeight()-root.getPaddingBottom(),root.findViewById(R.id.widget_grid).getBottom());
+            assertEquals(root.getHeight()-root.getPaddingBottom(),root.findViewById(R.id.widget_filters).getBottom());
         }
+    }
+    @Test public void monthShowsAdjacentDaysAndFilteredItemsWithoutClipping() throws Exception {
+        android.content.SharedPreferences prefs = CalendarRefresh.preferences(context);
+        prefs.edit().putString("widget_month_42","2026-11-01")
+                .putString("widget_events",new JSONArray().put(new JSONObject()
+                        .put("title","사업자등록").put("start_at","2026-11-23T01:00:00Z")
+                        .put("end_at","2026-11-23T02:00:00Z")).toString()).commit();
+        tasks(task(1,"서류 준비","2026-11-23T14:00:00Z","normal"));
+        View root = apply(remote(false,300));
+        measure(root,320,300);
+        ViewGroup grid = group(root,R.id.widget_grid);
+        View november23 = ((ViewGroup)grid.getChildAt(4)).getChildAt(1);
+        assertEquals("사업자등록",text(november23,R.id.widget_cell_event));
+        View chip = november23.findViewById(R.id.widget_cell_event);
+        assertTrue(chip.getHeight() >= Math.ceil(((TextView)chip).getPaint().getFontSpacing()));
+        assertEquals("1",text(((ViewGroup)grid.getChildAt(5)).getChildAt(2),R.id.widget_number));
+        assertEquals("12월 1일 화요일",((ViewGroup)grid.getChildAt(5)).getChildAt(2).getContentDescription().toString());
+        assertEquals("☑ 일정",text(root,R.id.widget_filter_events));
+        prefs.edit().putBoolean("widget_filter_42_events",false).commit();
+        remote(false,300).reapply(context,root);
+        november23 = ((ViewGroup)group(root,R.id.widget_grid).getChildAt(4)).getChildAt(1);
+        assertEquals("서류 준비",text(november23,R.id.widget_cell_event));
+        assertEquals("☐ 일정",text(root,R.id.widget_filter_events));
+        prefs.edit().putBoolean("widget_filter_42_tasks",false).commit();
+        remote(false,300).reapply(context,root);
+        november23 = ((ViewGroup)group(root,R.id.widget_grid).getChildAt(4)).getChildAt(1);
+        assertEquals(0,group(november23,R.id.widget_cell_events).getChildCount());
     }
     private void bindPreviewRows(View root){
         TaskWidgetService.Factory f=factory();ListView list=root.findViewById(R.id.widget_task_list);

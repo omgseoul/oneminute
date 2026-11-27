@@ -1,11 +1,19 @@
 #homeStaffDisplay[hidden],#homeEventsDisplay[hidden],#homeEventCategories[hidden],#homeDisplayForm[hidden]{display:none!important}
-.home-events{display:flex;align-items:flex-start;gap:6px;margin:8px 0 0;padding:3px 6px;background:#fff;border:1px solid #e2e9f2;border-radius:10px}
-.home-events h2{flex:none;margin:0;padding-top:7px;font-size:10px;color:#64748b}
-.home-events-list{flex:1;min-width:0;height:52px;overflow:auto;color:#64748b;font-size:11px;overscroll-behavior:contain;scrollbar-width:thin}
-.home-events-list a{box-sizing:border-box;display:flex;align-items:center;gap:4px;height:26px;border-bottom:1px solid #edf1f6;color:#213c5a;text-decoration:none}
+#todayOverview[hidden],#homeTodayDescription[hidden]{display:none!important}
+.home-events{display:grid;grid-template-columns:39px minmax(0,1fr);align-items:center;gap:8px;margin:0 3px 8px;color:#183153}
+.home-event-picker{position:relative;min-width:0;z-index:5}
+.home-event-picker .property-picker{margin:0}
+.home-event-picker .home-cleaning-icon,.home-event-picker .property-picker-button{display:grid;place-items:center;width:39px;height:39px;min-width:0;padding:0;border:0;border-radius:50%;box-shadow:none;background:#eaf3ff;color:#183153;line-height:1;font-size:10px;font-weight:700;cursor:pointer}
+.home-event-picker .property-picker-button::after{content:none}
+.home-event-picker .property-picker-panel{left:0;right:auto;top:calc(100% + 4px);bottom:auto;width:min(230px,calc(100vw - 48px));max-height:230px}
+.home-events-list{min-width:0;height:52px;overflow:auto;color:#7b8799;font-size:11px;overscroll-behavior:contain;scrollbar-width:thin}
+.home-events-list a{box-sizing:border-box;display:flex;align-items:center;gap:4px;height:26px;color:#183153;text-decoration:none}
 .home-event-property,.home-event-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.home-event-property{flex:0 1 auto;max-width:7ch;font-weight:700}
-.home-event-name{flex:1}
+.home-event-property{flex:0 1 auto;font-weight:700}
+.home-event-name{flex:0 1 auto}
+@media(max-width:350px){.home-events{grid-template-columns:32px minmax(0,1fr);gap:6px}.home-event-picker .home-cleaning-icon,.home-event-picker .property-picker-button{width:32px;height:32px}}
+.home-today-option{display:flex;align-items:center;gap:7px}
+#homeTodayHelp{display:grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:#eaf3ff;color:#183153;cursor:pointer}
 .home-event-kind,.home-event-stay,.home-events-list time{flex:none;white-space:nowrap}
 .home-event-stay,.home-events-list time{font-size:10px;color:#64748b;font-variant-numeric:tabular-nums}
 .home-events-list time{margin-left:auto}

@@ -212,3 +212,18 @@
 @media(max-width:360px){.bot-booking-header{padding:9px 10px 8px}.bot-booking-notice .bot-booking-body{padding:8px 10px 4px}.bot-booking-property{font-size:13px}.bot-booking-channel{padding-left:5px;font-size:9px}.bot-booking-dates{gap:5px;font-size:13px}.bot-booking-notice .bot-chat-action{font-size:12px}}
 
 .auto-retry-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:1px solid #e7edf4}.auto-retry-actions small{flex-basis:100%;font-size:12px;color:#6b7d8e;line-height:1.5}.auto-retry-actions button:disabled{opacity:.55;cursor:default}
+
+/* Reserve scrollbar space and explicit tracks when switching between short/long mailboxes. */
+html{scrollbar-gutter:stable}
+html:has(body.bot-open){scrollbar-gutter:auto}
+.hub-tabs,.hub-tabs.owner-hub{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) 47px}
+.hub-tabs.owner-hub{grid-template-columns:repeat(3,minmax(0,1fr)) 47px}
+.hub-tabs>[data-hub],.hub-tabs.owner-hub>[data-hub]{width:100%;box-sizing:border-box;transform:none}
+.bot-failure-summary{display:grid;gap:3px;min-width:0}
+.bot-failure-summary p{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.6;color:#19334f}
+.bot-failure-summary p+p{color:#65758a}
+.bot-failure-identity{display:flex;align-items:baseline}
+.bot-failure-identity span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:pre}
+.bot-failure-property{flex:0 1 auto;max-width:30%}
+.bot-failure-guest{flex:1}
+.bot-failure-room,.bot-failure-dates{flex:none}

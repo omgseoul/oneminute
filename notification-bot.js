@@ -32,6 +32,7 @@ window.NotificationBot=(()=>{
  }
  function cardContent(i){
   const text=body(i),lines=text.split('\n');
+  const failure=failureSummary(i,lines);if(failure)return failure;
   if(bookingNotice(i))return {heading:'당일 예약 알림',meta:lines[1]||'',text:lines.slice(2).join('\n'),booking:bookingCard(i,lines)};
   if(onlineBooking(i))return {heading:'온라인 게스트 메세지',meta:lines[0],text:lines.slice(1).join('\n')};
   if(guestRoom(i)){
@@ -63,6 +64,22 @@ window.NotificationBot=(()=>{
   }
   return {heading:title(i),text,urgent:i.priority==='urgent'};
  }
+ // Summarize only system failure envelopes. Keep the original item for details/search/retry.
+ function failureSummary(i,lines){
+  if(i.sender_type!=='system')return null;
+  const lock=lines[0]==='[IOT 도어락 처리 실패]',auto=lines[0]?.match(/^\[(자동메시지 (?:미발송|발송실패|발송 지연|발송 확인))\]$/);
+  if(!lock&&!auto)return null;
+  const field=label=>lines.find(l=>l.startsWith(label+': '))?.slice(label.length+2).trim();
+  const identity=lines[1]?.match(/^(.+) · 객실 (.+)$/),guest=field('게스트'),stay=field('숙박');
+  // Incomplete/unknown legacy envelopes must remain readable rather than lose information.
+  if(!identity||!guest||(lock&&!stay))return null;
+  const reason=lock?lines[lines.findIndex(l=>l.startsWith('숙박: '))+1]:field('사유');
+  if(!reason)return null;
+  const dates=stay?.replace(/\b\d{4}-(\d{2})-(\d{2})\b/g,'$1.$2').replace(' ~ ','~');
+  const summary=[identity[1],identity[2],guest,dates].filter(Boolean).join(' · ');
+  const brief=reason.startsWith('기존 Lock info가 있어')?'기존 비밀번호가 있어 새 비밀번호 설정 실패':reason==='자동메시지 사용을 시작하기 전에 발송 시점이 지났습니다.'?'설정 시작 전에 발송 시점이 지나 미발송':reason.split(/(?<=[.!?])\s+/)[0];
+  return {heading:lock?'도어락 설정 실패':auto[1],failure:true,summary,property:identity[1],room:identity[2],guest,dates,reason:brief};
+ }
  function contentHTML(c){return `${c.fields?`<dl class="bot-notice-fields">${c.fields.map(f=>`<div><dt>${e(f.label)}</dt><dd>${e(f.value)}</dd></div>`).join('')}</dl>`:`<div class="bot-notice-quote"><p>${e(c.text)}</p></div>`}`;}
  function renderConversation(){if(!$('botConversation')||$('botConversation').hidden)return;const profile=homeProfile(),q=$('botSearch').value.trim().toLowerCase();$('botTitle').textContent=announcementMode?'공지':profile?.display_name||'OMS 알림';$('botProperty').textContent=announcementMode?'발송 내역':profile?.property_name||'';$('botNewAnnouncement').hidden=!announcementMode;$('botHeaderAvatar').innerHTML=avatar(profile);$('botHeaderAvatar').setAttribute('aria-label',(profile.display_name||'OMS 알림')+' 프로필 보기');
  const list=items().filter(i=>announcementMode?i.message_type==='announcement'&&i.is_sender:true).filter(i=>!q||`${branchName(i)} ${title(i)} ${body(i)}`.toLowerCase().includes(q)).slice().sort((a,b)=>a.created_at.localeCompare(b.created_at));
@@ -77,6 +94,7 @@ window.NotificationBot=(()=>{
  }
  function ordinary(i){
   const c=cardContent(i),action=bookingNotice(i)?(session.sessionKind==='owner'?'예약 상세':'내용 확인'):onlineBooking(i)?(session.sessionKind==='owner'?'대화 열기':'내용 확인'):guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
+  if(c.failure)return row(i,`<div class="bot-chat-bubble bot-notice bot-failure-notice"><div class="bot-chat-category bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-failure-summary"><p class="bot-failure-identity" title="${e(c.summary)}"><span class="bot-failure-property">${e(c.property)}</span><span class="bot-failure-room"> · ${e(c.room)}</span><span class="bot-failure-guest"> · ${e(c.guest)}</span>${c.dates?`<span class="bot-failure-dates" title="체크인~체크아웃"> · ${e(c.dates)}</span>`:''}</p><p title="${e(c.reason)}">${e(c.reason)}</p></div>${footer(i,'상세보기')}</div>`);
   if(c.booking){const b=c.booking;return row(i,`<div class="bot-chat-bubble bot-notice bot-booking-notice"><div class="bot-booking-header"><div class="bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-booking-summary"><strong class="bot-booking-room">${e(b.room)}</strong>${b.property?`<strong class="bot-booking-property" title="${e(b.property)}">· ${e(b.property)}</strong>`:''}<span class="bot-booking-channel" title="${e(b.channel)}">${window.OMSGuestMessageCard?.channelIcon(b.channel)?.outerHTML||''}${e(b.channel)}</span></div></div><div class="bot-notice-body bot-booking-body"><p class="bot-booking-guest">${e(b.guest)}</p><div class="bot-notice-footer"><span class="bot-booking-dates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>${e(b.dates)}</span><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}">${e(action)} ›</button></div></div></div>`);}
   if(onlineBooking(i)&&window.OMSGuestMessageCard?.read(i)?.kind==='online')return row(i,`<div class="bot-chat-bubble bot-notice bot-online-notice"><div class="bot-chat-category bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div data-bot-online-card="${e(i.message_id)}"></div>${footer(i,action)}</div>`);
   const heading=c.urgent?`<span class="bot-notice-badge">긴급</span><span>${e(c.heading.replace(/^긴급 · /,''))}</span>`:`<span class="bot-notice-badge">${e(c.heading)}</span>`;
@@ -89,7 +107,7 @@ window.NotificationBot=(()=>{
  $('botTimeline').innerHTML=(hasOlder?'<button type="button" id="botOlder" class="bot-older">이전 대화 더 보기</button>':'')+(list.map(i=>{const date=new Date(i.created_at),key=date.toLocaleDateString('ko-KR'),divider=key!==day?`<div class="bot-date"><span>${e(date.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'}))}</span></div>`:'';day=key;return divider+(reminder(i)?reminderCard(i):ordinary(i));}).join('')||'<div class="bot-empty">'+(q?'검색 결과가 없습니다.':announcementMode?'발송한 공지가 없습니다.':'아직 받은 알림이 없습니다.')+'</div>');$('botOlder')?.addEventListener('click',()=>loadAlerts(true));
  $('botTimeline').querySelectorAll('[data-bot-online-card]').forEach(host=>{const item=list.find(i=>i.message_id===host.dataset.botOnlineCard),card=window.OMSGuestMessageCard.render(item);if(card){card.querySelector('.guest-popup-time')?.remove();host.append(card);}});
  $('botTimeline').querySelectorAll('[data-bot-message]').forEach(b=>b.onclick=()=>{const item=list.find(i=>i.message_id===b.dataset.botMessage);if(bookingNotice(item)){if(session.sessionKind!=='owner'){callbacks.openDetail(item);return;}location.href='online.html#booking-data?property='+encodeURIComponent(item.property_id||session.propertyId)+'&booking='+encodeURIComponent(bookingNotice(item));return;}if(onlineBooking(item)){if(session.sessionKind!=='owner'){callbacks.openDetail(item);return;}location.href='guest-messages.html#thread/'+encodeURIComponent(onlineBooking(item))+'?property='+encodeURIComponent(item.property_id||session.propertyId);return;}if(guestRoom(item)){location.href='guest-chat.html?room='+encodeURIComponent(guestRoom(item));return;}callbacks.openDetail(item);});
- for(const item of list){const row=$('botTimeline').querySelector('[data-bot-row="'+item.message_id+'"] .bot-notice');window.OMSAutoMessageRetry?.mount(row,item,session,()=>loadAlerts());}
+ for(const item of list){const row=$('botTimeline').querySelector('[data-bot-row="'+item.message_id+'"] .bot-notice');if(!row?.classList.contains('bot-failure-notice'))window.OMSAutoMessageRetry?.mount(row,item,session,()=>loadAlerts());}
  scroller.scrollTop=near?scroller.scrollHeight:oldTop;scheduleRead();
  }
  function scheduleRead(){clearTimeout(readTimer);readTimer=setTimeout(markVisibleRead,300);}

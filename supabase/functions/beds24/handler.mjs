@@ -151,6 +151,9 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     if(!Array.isArray(v.data)||v.data.length!==1)throw Error('예약 상세정보를 찾지 못했습니다.');
     const b=v.data[0];if(Number(b.id)!==id||Number(b.propertyId)!==Number(c.beds_property_id))throw Error('예약의 지점 또는 번호가 일치하지 않습니다.');
     const detail={id};for(const [key,field] of [['reference','apiReference'],['phone','phone'],['mobile','mobile']]){if(typeof b[field]==='string'&&b[field].trim())detail[key]=b[field].trim();}
+    // Expose the same provider country used by automatic-message language selection.
+    // Keep this live, owner-authorized detail out of the shared booking cache.
+    const country=b.country2||b.country;if(typeof country==='string'&&country.trim())detail.country=country.trim();
     // Reservation-level PINs do not depend on the optional room inventory API.
     const source=c.password_source||'info:LOCK_PIN';
     const sources=[...new Set([source,'info:LOCK_PIN'])];

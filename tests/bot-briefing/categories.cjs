@@ -6,6 +6,7 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
  }
  await db.exec("create function omg_private.pin_delivery_state(uuid,bigint) returns jsonb language sql as $$select '{\"active\":true,\"state\":\"scheduled\",\"configured\":true}'::jsonb$$");
  await db.exec(fs.readFileSync('supabase/setup/briefing_categories.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/briefing_pending_category_filter.sql','utf8'));
  const p=id(1),other=id(2),owner=id(3),token=id(4),cleaner=id(5),multi=id(6);
  await db.query("insert into properties(id,name,management_number,timezone)values($1,'Nest',1,'Asia/Seoul'),($2,'Other',2,'Asia/Seoul')",[p,other]);
  await db.query("insert into owners(id,property_id,display_name)values($1,$2,'Manager')",[owner,p]);
@@ -29,8 +30,14 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
  await db.query("insert into omg_private.briefing_runs(id,property_id,mode,status,period_start,period_end,timezone,settings,finished_at,issues) values($1,$2,'auto','completed',now()-interval '3 hours',now()-interval '1 hour','Asia/Seoul',$3,now(),'[{\"category\":\"cleaning\",\"issue\":\"linen\",\"action\":\"replace\",\"status\":\"unresolved\"}]')",[id(30),p,JSON.stringify({...save,notify_kind:'time',notify_time:'00:00'})]);
  await db.query('select omg_private.briefing_enqueue_delivery(r) from omg_private.briefing_runs r where id=$1',[id(30)]);
  await db.query("update omg_private.briefing_deliveries set due_at=now()-interval '1 minute' where run_id=$1",[id(30)]);
+ await db.query('update omg_private.briefing_deliveries set categories=null where run_id=$1',[id(30)]);
  await call('save',{...save,categories:{...cfg.categories,cleaning:{enabled:false,targets:['manager','cleaning']}}});await worker('pushes');
  assert.equal((await db.query('select cardinality(message_ids) n from omg_private.briefing_deliveries where run_id=$1 and employee_id=$2',[id(30),cleaner])).rows[0].n,0,'disabled category is not delivered');
  await db.exec('set role anon');await assert.rejects(()=>db.query("select omg_private.briefing_render($1,'[]','{checkin}',current_date)",[p]),/permission/);await db.exec('reset role');
+ // Even when there are incoming conversations, a roster-only briefing makes no AI reservation.
+ await db.exec(`create or replace function omg_private.briefing_inputs(uuid,timestamptz,timestamptz) returns jsonb language sql as $$select '[{"messages":[{"sender":"guest","in_period":true,"body":"help"}]}]'::jsonb$$`);
+ const rosterOnly=Object.fromEntries(Object.entries(cfg.categories).map(([k,v])=>[k,{...v,enabled:k==='checkin'}]));
+ const only=await call('preview',{...save,categories:rosterOnly});await call('run',{id:only.run.id});assert.equal((await worker('claim')).skip,true);
+ const cost=(await db.query('select status,reserved_micro,charged_micro from omg_private.briefing_runs where id=$1',[only.run.id])).rows[0];assert.equal(cost.status,'empty');assert.equal(Number(cost.reserved_micro),0);assert.equal(Number(cost.charged_micro),0);
  console.log('Briefing categories: server filtering, multi-role dedup, zero-AI roster, tenant auth, disabled category recheck passed');
  }finally{await db.close();}})().catch(e=>{console.error(e);process.exitCode=1});

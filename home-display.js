@@ -6,7 +6,7 @@
     attendance: '직원 근태 (출퇴근)'
   };
   const eventLabels = {
-    online_ai: 'AI 자동답변', qr_ai: 'AI 자동답변',
+    online_ai: '자동응답', qr_ai: '자동응답',
     booking: '예약', cancel: '취소', checkin: '출근', checkout: '퇴근'
   };
   const byId = id => document.getElementById(id);
@@ -102,8 +102,23 @@
     const kind = eventLabels[item.kind] || '이벤트';
     const time = document.createElement('time');
     time.dateTime = item.at_time;
-    time.textContent = clock.format(new Date(item.at_time));
+    const {month, day, hour, minute} = Object.fromEntries(
+      clock.formatToParts(new Date(item.at_time)).map(part => [part.type, part.value])
+    );
+    time.textContent = hour + ':' + minute;
+    const date = month + '/' + day;
+    const isReply = item.kind === 'online_ai' || item.kind === 'qr_ai';
     link.href = eventLink(item, property);
+    if (isReply) {
+      const channel = item.kind === 'online_ai' ? '온라인' : '현장';
+      const topic = item.reply_topic || '—';
+      link.className = 'home-event-reply';
+      link.title = [item.property_name, kind, channel, topic, date, time.textContent].filter(Boolean).join(' · ');
+      link.append(field('home-event-property', item.property_name || ''), field('home-event-kind', kind),
+        field('home-event-reply-channel', channel), field('home-event-name', topic),
+        field('home-event-stay', date), time);
+      return link;
+    }
     link.title = [item.property_name, kind, name, dates, item.channel, time.textContent].filter(Boolean).join(' · ');
     link.append(field('home-event-property', item.property_name || ''), field('home-event-kind', kind), field('home-event-name', name));
     link.append(field('home-event-stay', dates));
@@ -226,7 +241,7 @@
         const rows = data.events.map(item => {
           const zone = item.timezone || session.timezone || 'Asia/Seoul';
           if (!clocks.has(zone)) clocks.set(zone, new Intl.DateTimeFormat('ko-KR', {
-            timeZone:zone, hour:'2-digit', minute:'2-digit', hourCycle:'h23'
+            timeZone:zone, month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'
           }));
           return eventRow(item, item.property_id || data.property_id, clocks.get(zone));
         });

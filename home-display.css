@@ -7,7 +7,7 @@
 .home-event-picker .property-picker-button::after{content:none}
 .home-event-picker .home-event-dropdown{position:fixed;inset:auto;box-sizing:border-box;margin:0;padding:8px;border:1px solid #dce6f2;border-radius:14px;background:#fff;opacity:1;color:#183153;z-index:1000;isolation:isolate;overflow:auto}
 .home-events-list{min-width:0;height:52px;overflow:auto;color:#7b8799;font-size:11px;overscroll-behavior:contain;scrollbar-width:thin}
-.home-events-list a{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) 2.9em minmax(0,1.4fr) 6.15em 13px 2.75em;align-items:center;gap:4px;height:26px;color:#183153;text-decoration:none}
+.home-events-list a{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) 2.9em minmax(0,1.4fr) 6.15em 13px 34px;align-items:center;gap:4px;height:26px;color:#183153;text-decoration:none}
 .home-event-property,.home-event-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .home-event-property{font-weight:700}
 @media(max-width:350px){.home-events{grid-template-columns:32px minmax(0,1fr);gap:6px}.home-event-picker .home-cleaning-icon,.home-event-picker .property-picker-button{width:32px;height:32px}}
@@ -15,7 +15,7 @@
 #homeTodayHelp{display:grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:#eaf3ff;color:#183153;cursor:pointer}
 .home-event-kind,.home-event-stay,.home-events-list time{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .home-event-stay,.home-events-list time{font-size:10px;color:#64748b;font-variant-numeric:tabular-nums}
-.home-events-list time{text-align:right}
+.home-events-list time{text-align:right;overflow:visible}
 .home-event-source{display:grid;place-items:center;min-width:0}
 .home-events-list .guest-popup-channel-icon{display:grid;place-items:center;flex:0 0 13px;width:13px;height:13px;overflow:hidden;font-size:9px}
 .home-events-list .guest-popup-channel-icon img{display:block;width:100%;height:100%;object-fit:contain}
@@ -25,3 +25,8 @@
 #homeEventCategories{margin:6px 0 10px;padding:4px 10px;border:1px solid #e2e9f2;border-radius:12px}
 #homeEventCategories legend{font-size:12px;color:#64748b}
 #homeDisplayStatus{font-size:12px;color:#44627e}
+
+.home-events-list .home-event-reply {
+  grid-template-columns:minmax(0,1fr) 4.15em 3.1em minmax(0,1.4fr) 29px 34px;
+}
+.home-event-reply-channel{white-space:nowrap}

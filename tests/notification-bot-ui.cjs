@@ -12,6 +12,7 @@ window.__config={can_manage:true,property:{property_id:pid},employees,administra
 window.omgSession={require:async()=>window.__session};
 window.omgTransition={ready:()=>{document.documentElement.classList.remove('omg-booting');}};
 window.omgSupabase={rpc:async(name,args)=>{__calls.push({name,args});let v={ok:true};
+if(name==='manage_owner_sensitive_password'){if(args.p_new_password)window.__sensitiveConfigured=true;v.configured=!!window.__sensitiveConfigured;}
 if(name==='list_property_messages')v={ok:true,can_manage:__owner,messages:__items,recipients:employees.map(x=>({...x,property_id:pid,recipient_key:'employee:'+x.employee_id,recipient_type:'staff'})),unread_count:2};
 if(name==='list_notification_bot_messages')v={ok:true,messages:__items,unread_by_property:Object.fromEntries([pid,pid2].map(p=>[p,__items.filter(i=>i.property_id===p&&!i.is_sender&&!i.read_at).length]))};if(name==='notification_bot_settings'){if(args.p_action==='list')v={ok:true,bots:__bots};else{let b=__bots.find(x=>x.property_id===args.p_property_id)||__bots[0];if(args.p_action==='save')Object.assign(b,args.p_data);v={ok:true,bot:b};}}
 if(name==='acknowledge_announcement'){if(args.p_understood&&args.p_employee_name==='문정국'){const item=__items.find(x=>x.message_id===args.p_message_id);item.acknowledged_at=new Date().toISOString();item.read_at=item.acknowledged_at;item.acknowledged_name='문정국';}else v={ok:false,message:'본인 이름과 체크를 확인해주세요.'};}
@@ -62,7 +63,22 @@ await page.locator('#botHeaderAvatar').focus();await page.keyboard.press('Enter'
 await page.locator('#botSearchToggle').click();await page.locator('#botSearch').fill('근태관리');assert.match(await page.locator('#botTimeline').innerText(),/늦었습니다/);await page.locator('#botSearchClose').click();await page.locator('[data-bot-message=m1]').click();assert.equal(await page.locator('#close').isVisible(),false);assert.equal(await page.locator('#understood').isVisible(),false);assert.equal(await page.locator('#ack').isDisabled(),true);await page.locator('[data-agreed="no"]').click();await page.locator('.awr-reason textarea').fill('교통 지연');await page.locator('#ack').click();await page.waitForFunction(()=>document.getElementById('detail').hidden);assert.match(await page.locator('#botTimeline').innerText(),/확인 완료/);await page.screenshot({path:dir+'/bot-thread.png'});await page.locator('#botBack').click();await page.waitForFunction(()=>document.getElementById('botConversation').hidden);
 await page.evaluate(()=>__setProperties(['22222222-2222-4222-8222-222222222222']));assert.equal(await page.locator('.bot-room').count(),1);assert.match(await page.locator('.bot-room').innerText(),/OMS 알림/);
 await page.locator('.bot-room').click();assert.match(await page.locator('#botTimeline').innerText(),/Seoulnest/);await page.locator('#botBack').click();await page.waitForFunction(()=>document.getElementById('botConversation').hidden);assert.equal(await page.locator('[data-hub=guest]').count(),0,'guest conversations moved to the unified inbox');
-await page.goto(base+'staff-management.html');await page.waitForSelector('.bot-settings-card',{state:'attached'});assert.equal(await page.locator('.employee-account:visible').count(),5);assert.equal(await page.locator('#botSettingsHost').isVisible(),true);assert.equal(await page.locator('#employeeMore').isVisible(),true);await page.locator('#addEmployee').click();assert.equal(await page.locator('.employee-account:visible').count(),6);
+await page.goto(base+'staff-management.html');await page.waitForSelector('.bot-settings-card',{state:'attached'});assert.equal(await page.locator('.employee-account:visible').count(),5);assert.equal(await page.locator('#botSettingsHost').isVisible(),true);assert.equal(await page.locator('#employeeMore').isVisible(),true);
+assert(await page.locator('#botSettingsHost').evaluate(el=>el.nextElementSibling.id==='employeeMore'));
+await page.waitForFunction(()=>document.querySelector('.sensitive-status')?.textContent==='미설정');
+await page.locator('.sensitive-trigger').click();
+assert(await page.locator('#currentSensitivePasswordField').isHidden());
+const passwordForm=page.locator('#sensitivePasswordForm');
+await passwordForm.locator('[name=loginPin]').fill('123456');
+await passwordForm.locator('[name=newPassword]').fill('fixture-password');
+await passwordForm.locator('[name=repeatPassword]').fill('fixture-password');
+await passwordForm.locator('button[type=submit]').click();
+await page.waitForFunction(()=>document.querySelector('.sensitive-status')?.textContent==='설정됨');
+await page.locator('.sensitive-trigger').click();
+assert(await page.locator('#currentSensitivePasswordField').isVisible());
+assert.equal(await page.locator('#sensitivePasswordTitle').textContent(),'2차 비밀번호 변경');
+await page.locator('#closeSensitivePassword').click();
+await page.locator('#addEmployee').click();assert.equal(await page.locator('.employee-account:visible').count(),6);
 await page.goto(base+'staff-management.html?view=employees');await page.waitForSelector('.bot-settings-card');assert.equal(await page.locator('#botSettingsHost').isVisible(),true);assert.deepEqual(await page.locator('.bot-settings-card .profile-preview').evaluate(el=>[el.getBoundingClientRect().width,el.getBoundingClientRect().height]),await page.locator('.employee-account .profile-preview').first().evaluate(el=>[el.getBoundingClientRect().width,el.getBoundingClientRect().height]));assert.match(await page.locator('.bot-settings-card .profile-preview img').getAttribute('src'),/bot-avatar-helper\.webp/);await page.locator('.bot-settings-card .profile-change').click();await page.waitForSelector('#profileModal:visible');assert.equal(await page.locator('[data-avatar="__oms_bot__"]').isVisible(),true);assert.equal(await page.locator('[data-avatar="__oms_bot__"]').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.avatar-choice-none').isVisible(),false);
 assert.deepEqual(await page.locator('#profileAvatarPicker .avatar-choice:visible').evaluateAll(buttons=>buttons.slice(0,2).map(b=>b.dataset.avatar)),['__oms_bot__','bot-avatar-butler.webp?v=20261021-logo']);
 await page.locator('.avatar-choice-butler img').evaluate(async img=>{await img.decode();if(img.naturalWidth!==320)throw Error('Butler portrait did not decode');});

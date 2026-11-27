@@ -31,5 +31,28 @@ const {setup,id}=require('../bot-briefing/setup.cjs'),assert=require('node:asser
  const expired=await call('status',{id:id(21)});assert.equal(expired.status,'failed');assert(expired.credits>0);assert.equal(expired.usage.reserved,0);assert.equal((await call('finish',{id:id(21),result})).credits,expired.credits);
  // Both production claim paths carry the canonical room and use the same selector.
  for(const name of ['omg_private.ai_claim()','omg_private.online_internal(text,uuid,jsonb)']){const def=(await q('select pg_get_functiondef($1::regprocedure) d',[name])).d;assert(def.includes('ai_manual_data(s.data'));assert(def.includes("'room_number'"));assert(def.includes("'room_topics'"));}
+ await db.exec(fs.readFileSync('supabase/migrations/20261127034904_beds24_ai_auto_reply.sql','utf8'));
+ const saveAI=async extra=>(await q("select public.guest_ai_owner($1,'save',$2) v",[token,JSON.stringify({property_id:p,enabled:false,mode:'always',prompt:'숙소 안내',data:rows,...extra})])).v;
+ const online=async(action,data)=>(await q('select public.online_internal($1,$2,$3) v',[action,p,JSON.stringify(data)])).v;
+ const onlineMode=async ai_mode=>(await q("select public.online_owner($1,'save_settings',$2) v",[token,JSON.stringify({property_id:p,beds_property_id:100,ai_mode})])).v;
+ await db.query(`insert into omg_private.online_connections(property_id,beds_property_id,properties,vault_id) values($1,100,'[{"id":100}]',vault.create_secret('test','auto-test',''))`,[p]);
+ await db.query("insert into omg_private.online_bookings(property_id,id,guest_name,room_name,status,data) values($1,10,'Guest','401','confirmed','{}')",[p]);
+ const message=async(n,source='guest',old=false)=>db.query("insert into omg_private.online_messages(property_id,id,booking_id,source,body,sent_at) values($1,$2,10,$3,'난방?',clock_timestamp()-case when $4::boolean then interval '5 minutes' else interval '0' end)",[p,n,source,old]);
+ const claim=()=>online('draft_claim',{booking_id:10,actor:'ai:automatic'});
+ const prepare=id=>online('prepare_auto_reply',{booking_id:10,id});
+ const finishDraft=(job,disposition='answer')=>online('draft_finish',{id:job.id,data_revision:job.data_revision,disposition,alert_kind:disposition==='answer'?'none':'handoff',reply:'TV 왼쪽'});
+ await onlineMode('automatic');
+ await message(1,'guest',true);assert((await claim()).skip,'channel checkbox is required');
+ const optedIn=await saveAI({online_enabled:true});assert.equal(optedIn.settings.enabled,false);assert.equal(optedIn.settings.online_enabled,true);
+ assert((await claim()).skip,'old inquiries are not replayed');
+ await message(2);const first=await claim();assert(first.id);assert.deepEqual(first.data.map(r=>r.id),['2','3']);
+ await finishDraft(first);assert.equal((await prepare(first.id)).body,'TV 왼쪽');assert((await prepare(first.id)).skip);
+ await online('finish_send',{id:first.id,status:'sent'});
+ await message(3);const handoff=await claim();await finishDraft(handoff,'handoff');assert((await prepare(handoff.id)).skip);
+ await message(4);const stale=await claim();await finishDraft(stale);await message(5,'host');assert((await prepare(stale.id)).skip);
+ await message(6);const disabled=await claim();await finishDraft(disabled);await saveAI({online_enabled:false});assert((await prepare(disabled.id)).skip);
+ await saveAI({online_enabled:true});await onlineMode('approval');await message(7);assert((await claim()).skip);
+ const approval=await online('draft_claim',{booking_id:10,actor:'webhook'});assert(approval.id);await finishDraft(approval);assert((await prepare(approval.id)).skip);
+ console.log('PASS: OTA auto-reply requires both settings, ignores prior messages, preserves room scoping and approval, rechecks fresh messages, staff replies, handoff and opt-out');
  await db.close();console.log('PASS: five-column save, exact room selection/unknown/common overrides, isolated owner previews, metered idempotent billing, expiry recovery, production room context');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -5,7 +5,9 @@
   <TextView android:id="@+id/widget_task_heading" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="OMS To do" android:textColor="#17243A" android:textSize="15sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" android:visibility="gone"/>
   <TextView android:id="@+id/widget_count" android:layout_width="wrap_content" android:layout_height="24dp" android:minWidth="25dp" android:paddingHorizontal="6dp" android:gravity="center" android:background="@drawable/widget_count" android:textColor="#2563EB" android:textSize="12sp" android:textStyle="bold" android:visibility="gone"/>
   <TextView android:id="@+id/widget_next" android:layout_width="28dp" android:layout_height="match_parent" android:gravity="center" android:text="›" android:textSize="18sp" android:textColor="#17243A" android:contentDescription="다음 달"/>
-  <TextView android:id="@+id/widget_action" android:layout_width="30dp" android:layout_height="30dp" android:layout_marginStart="10dp" android:gravity="center" android:background="@drawable/widget_today" android:textSize="24sp" android:textColor="#FFFFFF" android:visibility="gone"/>
+  <ImageView android:id="@+id/widget_action" android:layout_width="24dp" android:layout_height="24dp"
+   android:layout_marginStart="8dp" android:scaleType="center" android:src="@drawable/widget_compose"
+   android:background="@drawable/widget_today" android:visibility="gone"/>
  </LinearLayout>
  <LinearLayout android:id="@+id/widget_grid" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical"/>
  <LinearLayout android:id="@+id/widget_filters" android:layout_width="match_parent" android:layout_height="18dp" android:gravity="end|center_vertical" android:visibility="gone">

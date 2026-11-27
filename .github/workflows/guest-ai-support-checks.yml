@@ -1,7 +1,7 @@
 name: Verify guest AI support handoff
 on:
   pull_request:
-    paths: ['supabase/functions/guest-ai/**', 'supabase/setup/guest_ai*.sql', 'guest-ai-settings.*', 'guest-ai.css', 'notification-bot.js', 'messages.html', 'tests/guest-ai/**', '.github/workflows/guest-ai-support-checks.yml']
+    paths: ['supabase/functions/guest-ai/**', 'supabase/setup/guest_ai*.sql', 'guest-ai*.js', 'guest-ai-settings.*', 'guest-ai.css', 'notification-bot.js', 'messages.html', 'tests/guest-ai/**', '.github/workflows/guest-ai-support-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,6 +22,9 @@ jobs:
           node tests/guest-ai/property-policy.mjs
           node tests/guest-ai/support-browser.cjs
           node tests/guest-ai/settings-mobile.cjs
+          node tests/guest-ai/manual-rooms.cjs
+          node tests/guest-ai/manual-test.mjs
+          node tests/guest-ai/excel-chat.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,0 +1,7 @@
+(function(root){
+ const headers=['번호','분류','제목','객실번호','답변 내용'];
+ const clean=v=>String(v??'').replace(/\r\n?/g,'\n').trim();
+ function row(c,index,legacy=false){const r=legacy?{title:clean(c[0]),answer:clean(c[1])}:{number:clean(c[0]),category:clean(c[1]),title:clean(c[2]),rooms:clean(c[3])||'전체',answer:clean(c[4])};if(!r.title)throw Error(`${index}행의 제목을 입력해주세요.`);if(r.title.length>120||r.answer.length>4000||String(r.number||'').length>40||String(r.category||'').length>80||String(r.rooms||'').length>1000)throw Error(`${index}행: 제목 120자, 답변 4,000자, 객실번호 1,000자 이내로 입력해주세요.`);return r;}
+ function parse(values){const rows=values.filter(r=>r.some(c=>clean(c)));if(!rows.length)throw Error('불러올 DATA가 없습니다.');const h=rows[0].map(clean),legacy=h[0]==='제목'&&h[1]==='답변 내용'&&h.slice(2).every(v=>!v),modern=headers.every((v,i)=>h[i]===v)&&h.slice(5).every(v=>!v);if(!legacy&&!modern)throw Error('첫 행은 번호·분류·제목·객실번호·답변 내용으로 입력해주세요. 기존 제목·답변 내용 두 열도 사용할 수 있습니다.');const data=rows.slice(1).map((r,i)=>{if(r.slice(legacy?2:5).some(v=>clean(v)))throw Error(`${i+2}행에 양식 밖의 값이 있습니다.`);return row(r,i+2,legacy);});if(!data.length||data.length>200)throw Error('DATA는 1~200행까지 등록할 수 있습니다.');if(new TextEncoder().encode(JSON.stringify(data)).length+data.length*50>60000)throw Error('DATA 총 용량은 60KB 이내로 입력해주세요.');return data;}
+ const api={headers,row,parse};if(typeof module!=='undefined')module.exports=api;else root.GuestAIManual=api;
+})(typeof self!=='undefined'?self:window);

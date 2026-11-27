@@ -44,7 +44,7 @@
 .calendar-companion #calendarCompanion h3{display:flex;align-items:center;gap:6px;margin:0;font-size:17px;letter-spacing:-.03em}
 .calendar-companion #companionTodoLink{display:inline-flex;align-items:center;gap:7px;min-height:32px;color:var(--navy);text-decoration:none}
 .calendar-companion .companion-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:12px;background:#eef5ff;color:var(--blue);font-size:11px;font-weight:650}
-.calendar-companion #calendarCompanion .companion-pen{width:32px;height:32px;margin:0;border:0;border-radius:7px;background:transparent;font-size:24px;text-align:center;cursor:pointer}
+.calendar-companion #calendarCompanion .companion-pen{width:32px;height:32px;margin:0;border:0;border-radius:7px;background:transparent;flex:0 0 32px;padding:0;cursor:pointer}
 .calendar-companion #calendarCompanion .companion-entry{display:flex;align-items:center;gap:8px;width:100%;min-height:43px;padding:9px 0;margin:0;border:0;border-top:1px solid #edf1f6;border-radius:0;background:white;color:var(--navy);text-align:left;font-size:13px;font-weight:550;cursor:pointer}
 .calendar-companion .companion-entry time{flex:none;width:43px;border-left:3px solid #8bbcef;padding-left:6px;font-size:11px;font-variant-numeric:tabular-nums}
 .calendar-companion .companion-entry-copy{flex:1;min-width:0}.calendar-companion .companion-entry-copy>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calendar-companion .companion-entry-copy small{display:block;font-size:10px;color:var(--muted);margin-top:3px}
@@ -87,7 +87,7 @@
 
 .calendar-companion #calendarPropertyPicker .property-picker-button span{color:inherit;font-size:inherit;letter-spacing:inherit}
 
-.calendar-companion #calendarUpdate{flex:none;min-height:28px;padding:2px 4px;margin:0;border:1px solid #d7e5f6;border-radius:6px;background:#edf5ff;color:#2869bb;font-size:10px;line-height:1;white-space:nowrap}.calendar-companion #calendarUpdate[hidden]{display:none}
+.calendar-companion #calendarUpdate{flex:none;min-height:28px;padding:2px 4px;margin:0;border:1px solid #d7e5f6;border-radius:6px;background:#edf5ff;color:#2869bb;font-size:10px;line-height:1;white-space:nowrap}#calendarUpdate[hidden]{display:none!important}
 
 .calendar-date-page #calendarBoard,.calendar-date-page #companionVisibility,.calendar-date-page .calendar-floating-actions,.calendar-date-page .calendar-legend,.calendar-date-page #companionAddTask{display:none!important}
 .calendar-date-page #calendarCompanion{display:grid;grid-template-rows:repeat(2,minmax(0,1fr));height:calc(100dvh - 215px);min-height:280px}
@@ -98,3 +98,5 @@
 #calendarDateMenu{display:grid;gap:5px;padding:6px;background:#fff;border:1px solid #dbe5f1;border-radius:14px;box-shadow:0 4px 14px #23466522}
 #calendarDateMenu button{padding:10px 14px;border:0;border-radius:9px;background:#eff5fc;color:#19334f}
 .calendar-companion #addEvent{display:none!important}
+
+#companionAddTask svg{display:block;width:19px;height:19px}

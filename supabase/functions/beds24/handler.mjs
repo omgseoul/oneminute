@@ -1,4 +1,4 @@
-import {createAutoMessages} from './auto-messages.mjs';
+import {createAutoMessages,includesPin} from './auto-messages.mjs';
 import {createWebCheckin,accessCode,assignedUnit} from './web-checkin.mjs';
 import {createDocumentReader} from './web-checkin-document.mjs';
 import {createTranslation} from './translation.mjs';
@@ -18,6 +18,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  const autoMessages=createAutoMessages({rpc,credentials,api,saveBookings,messages,dispatchNotice:async id=>{const r=await fetcher(url()+'/functions/v1/dispatch-briefing',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:id}),signal:AbortSignal.timeout(20000)});return r.ok&&(await r.json()).ok===true;}});
  const webCheckin=createWebCheckin({rpc,credentials,api,readDocument:createDocumentReader({rpc,fetcher})});
  const internal=(action,property,data={})=>rpc('online_internal',{p_action:action,p_property:property,p_data:data});
+ const pinCtl=(action,property,data={})=>rpc('pin_delivery_internal',{p_action:action,p_property:property,p_data:data});
  const tokenProperties=new Map();
  const control=(action,property,data={})=>rpc('online_sync_control',{p_action:action,p_property:property,p_data:data});
  const owner=(token,action,data={})=>rpc('online_owner',{p_token:token,p_action:action,p_data:data});
@@ -59,8 +60,10 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    });}catch{/* Keep the booking available even when currency metadata is unavailable. */}
   }
   await internal('bookings',property,{items:items.map(b=>({...b,currency:b.price!==null?c.bookingCurrency||null:null}))});
+  const pins=rows.filter(b=>Array.isArray(b.infoItems)&&(c.password_source||'info:LOCK_PIN').startsWith('info:')&&(!b.infoItems.some(x=>x.code===(c.password_source||'info:LOCK_PIN').slice(5))||accessCode(b,{unit:{}},c.password_source||'info:LOCK_PIN'))).map(b=>({booking_id:b.id,pin:accessCode(b,{unit:{}},c.password_source||'info:LOCK_PIN')||null}));
+  if(pins.length)await pinCtl('observe_batch',property,{items:pins});
  }
- async function booking(property,c,id){let found=false;const path='/bookings?id='+positive(id)+'&propertyId='+positive(c.beds_property_id);const save=async rows=>{if(rows.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)||Number(b.id)!==Number(id)))throw Error('숙소가 일치하지 않습니다.');if(rows.length){found=true;await saveBookings(property,c,rows);}};await pages(path,{token:c.secret.token},save);if(!found)await pages(path+'&status=cancelled',{token:c.secret.token},save);if(!found)throw Error('해당 숙소에서 예약을 찾지 못했습니다.');}
+ async function booking(property,c,id){let found=false;const path='/bookings?id='+positive(id)+'&propertyId='+positive(c.beds_property_id)+'&includeInfoItems=true';const save=async rows=>{if(rows.some(b=>Number(b.propertyId)!==Number(c.beds_property_id)||Number(b.id)!==Number(id)))throw Error('숙소가 일치하지 않습니다.');if(rows.length){found=true;await saveBookings(property,c,rows);}};await pages(path,{token:c.secret.token},save);if(!found)await pages(path+'&status=cancelled',{token:c.secret.token},save);if(!found)throw Error('해당 숙소에서 예약을 찾지 못했습니다.');}
  async function messages(property,c,id,notify=false,maxAge=30){
   const bookingIds=new Set();
   await pages('/bookings/messages?propertyId='+positive(c.beds_property_id)+(id?'&bookingId='+positive(id):'&maxAge='+maxAge),{token:c.secret.token},async rows=>{
@@ -141,9 +144,10 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
    if(['auto_message_list','auto_message_save','auto_message_toggle','auto_message_retry'].includes(b.action))return reply(await rpc('auto_message_owner',{p_token:b.access_token,p_action:b.action.slice(13),p_data:d}));
-   const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action==='booking_detail'?'booking_data':b.action}),p=a.property_id;
+   const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action==='booking_detail'?'booking_data':b.action==='pin_external'?'send':b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});
-   if(b.action==='booking_detail'){
+   const requestedAction=b.action;
+   if(b.action==='booking_detail'||b.action==='pin_external'){
     const id=positive(d.booking_id),c=await credentials(p);
     const path='/bookings?id='+id+'&propertyId='+positive(c.beds_property_id)+'&includeInfoItems=true';
     let v=await api(path,{token:c.secret.token});
@@ -176,6 +180,12 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     // Refresh only the existing booking allowlist; PINs and contact fields never enter the cache.
     await saveBookings(p,c,[b]);
     detail.price=selectBooking(b).price;detail.currency=detail.price!==null?c.bookingCurrency||null:null;
+    if(requestedAction==='pin_external'&&(!detail.password||detail.password!==d.expected_password))throw Error('비밀번호가 변경되었거나 확인되지 않았습니다. 새로고침 후 전달한 번호를 확인해주세요.');
+    if(!detail.warning){
+     const tracked=await pinCtl(requestedAction==='pin_external'?'external':'observe',p,{booking_id:id,pin:detail.password||null,id:d.id,actor:a.actor,title:'직접 전달 완료'});
+     detail.pin_delivery=tracked.pin_delivery;
+    }else detail.pin_delivery=(await pinCtl('state',p,{booking_id:id})).pin_delivery;
+    if(requestedAction==='pin_external'&&detail.warning)throw Error('비밀번호를 확인한 뒤 직접 전달 완료로 기록해주세요.');
     return reply({ok:true,detail});
    }
    if(b.action==='guest_settings')return reply(await scoped('guest_settings'));
@@ -207,7 +217,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
      if(bookingsSync){
       let q='propertyId='+c.beds_property_id;const before=new Date(Date.parse(d.from)-86400000).toISOString().slice(0,10),after=new Date(Date.parse(d.to)+86400000).toISOString().slice(0,10);
       if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;else if(d.basis==='departure')q+='&departureFrom='+before+'&departureTo='+after;else q+='&arrivalFrom='+before+'&arrivalTo='+after;
-      for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix,{token:c.secret.token},rows=>saveBookings(p,c,rows));
+      for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix+'&includeInfoItems=true',{token:c.secret.token},rows=>saveBookings(p,c,rows));
      }else{if(id)await booking(p,c,id);const age=claim.last_success?Math.min(30,Math.max(2,Math.ceil((Date.now()-Date.parse(claim.last_success))/86400000)+1)):30;await messages(p,c,id,true,age);}
      await push(p);await internal('synced',p);success=true;
     }catch(e){warning=e.message+' · 저장된 내역을 표시합니다.';}
@@ -221,13 +231,25 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    if(b.action==='send'){
     const id=positive(d.booking_id);if(!UUID.test(d.id||''))throw Error('발송 식별자가 올바르지 않습니다.');
     await booking(p,c,id);await messages(p,c,id,true);
+    let sentPin;
+    if(d.pin_notice){
+     const live=await api('/bookings?id='+id+'&propertyId='+c.beds_property_id+'&includeInfoItems=true',{token:c.secret.token});
+     const lb=live.data?.length===1&&live.data[0];if(!lb||Number(lb.id)!==id||Number(lb.propertyId)!==Number(c.beds_property_id))throw Error('예약정보를 확인하지 못했습니다.');
+     const inv=await api('/properties?id='+c.beds_property_id+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
+     const prop=inv.data?.find(x=>Number(x.id)===Number(c.beds_property_id));
+     sentPin=accessCode(lb,prop&&assignedUnit(lb,prop),c.password_source||'info:LOCK_PIN');
+     if(!includesPin(d.body||'',sentPin))throw Error('현재 비밀번호와 메시지 내용이 다릅니다. 예약정보를 새로고침해주세요.');
+     await saveBookings(p,c,[lb]);
+    }
     const prepared=await scoped('prepare_send');if(prepared.skip)return reply(prepared);
+    if(sentPin)await pinCtl('begin',p,{booking_id:id,id:d.id,pin:sentPin,actor:a.actor,title:'비밀번호 보내기'});
     let status='uncertain',error,result={};
     try{const v=await api('/bookings/messages',{token:c.secret.token},[{bookingId:id,message:d.body.trim()}]);const rows=Array.isArray(v)?v:Array.isArray(v.data)?v.data:[];
      if(rows.length===1&&rows[0].success===true){status='sent';result={remote:rows[0].new||{}};}
      else if(rows.length&&rows.every(x=>x.success===false)){status='failed';error='Beds24에서 발송을 거절했습니다. 채널 지원 여부와 쓰기 권한을 확인해주세요.';}
      else error='발송 결과를 확정하지 못했습니다. 대화내역을 확인해주세요.';
     }catch(e){error=e.message;if(e.status>=400&&e.status<500)status='failed';}
+    if(sentPin)await pinCtl('finish',p,{booking_id:id,id:d.id,status,error:status==='sent'?null:'발송 결과를 확인해주세요.'});
     await internal('finish_send',p,{id:d.id,status,error,result});if(status==='sent'){try{await messages(p,c,id,true);}catch{}}
     return reply({ok:true,status,error});
    }

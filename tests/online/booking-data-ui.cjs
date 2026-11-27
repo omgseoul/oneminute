@@ -5,7 +5,7 @@ function fixture(){
   if(b.action==='settings')v={ok:true,property_id:p,property_name:p==='home'?'One Minute':'Omghouse',timezone:'Asia/Seoul',branches:[{id:'home',name:'One Minute'},{id:'other',name:'Omghouse'}],properties:[],beds_property_id:p==='home'?100:200,synced_at:new Date().toISOString()};
   if(['booking_data','sync_booking_data','bookings','sync_bookings'].includes(b.action))v={ok:true,synced_at:new Date().toISOString(),bookings:[{id:101,guest_name:'Long Guest Name <img src=x>',room_name:'R3',arrival:'2026-11-13',departure:'2026-11-15',booked_at:'2026-11-13T03:00:00Z',status:'confirmed',channel:'Booking.com',same_day:true,data:{numAdult:2,price:128000,currency:'KRW'}},{id:102,guest_name:'Tomorrow Guest',room_name:'405',arrival:'2026-11-14',departure:'2026-11-16',booked_at:'2026-11-13T01:00:00Z',status:'confirmed',channel:'Airbnb',next_day:true,data:{numAdult:1,price:0,currency:'KRW'}}]};
   if(b.action==='booking_detail')v={ok:true,detail:b.data.booking_id===101?{id:101,country:'KR',reference:'5228222557',password:p==='home'?'0473':'9281',price:288000,currency:'KRW',phone:'+82 2-123-4567',mobile:'+82 10-1234-5678'}:{id:102,password:'  ',phone:null,mobile:''}};
-  if(b.action==='booking_data_count')v={ok:true,count:p==='home'?2:3};if(b.action==='inbox')v={ok:true,threads:[]};if(['thread','sync_messages'].includes(b.action))v={ok:true,booking:{guest_name:'Fixture'},messages:[],outbox:[]};if(b.action==='save_booking_alert')v={ok:true,same_day_alert:b.data.config};return {ok:true,json:async()=>v};
+  if(b.action==='booking_data_count')v={ok:true,count:p==='home'?2:3};if(b.action==='inbox')v={ok:true,threads:[]};if(['thread','sync_messages'].includes(b.action))v={ok:true,booking:{guest_name:'Fixture'},messages:[],outbox:[]};if(b.action==='save_booking_alert')v={ok:true,same_day_alert:b.data.config};if(v.bookings)v.bookings.forEach(x=>x.pin_delivery={active:p==='home',state:'scheduled'});if(v.detail)v.detail.pin_delivery={active:p==='home',state:'scheduled'};return {ok:true,json:async()=>v};
  };
 }
 (async()=>{
@@ -22,7 +22,7 @@ function fixture(){
  assert.equal(home.querySelector('.booking-data-details').textContent,expected.get('home:101'),'same booking has identical details in both views');
  assert.equal(home.querySelector('.booking-data-price strong').textContent,'288,000원');
  const otherBooking=$('#bookingList [data-booking="other:101"]');otherBooking.open=true;await tick();
- assert.match(otherBooking.querySelector('.booking-contact-details').textContent,/비밀번호 : 9281/);
+ assert.match(otherBooking.querySelector('.booking-contact-details').textContent,/비밀번호 : 9281/);assert(!otherBooking.querySelector('.booking-pin-field'));assert(otherBooking.querySelector('.pin-send').hidden);assert(home.querySelector('.booking-pin-field'));assert(!home.querySelector('.pin-send').hidden);
  assert(w.calls.some(c=>c.action==='booking_detail'&&c.data.property_id==='other'&&c.data.booking_id===101));
  const missing=$('#bookingList [data-booking="home:102"]');missing.open=true;await tick();
  assert.equal(missing.querySelector('.booking-data-details').textContent,expected.get('home:102'));

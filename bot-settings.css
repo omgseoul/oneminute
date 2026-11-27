@@ -28,3 +28,4 @@
 .briefing-heading .briefing-help-button{flex:0 0 auto}
 .briefing-heading label{white-space:nowrap}
 .briefing-role-options+ .briefing-role-options{border-top:1px solid #e3eaf4;display:grid;gap:7px}
+.briefing-category{border:1px solid #e2e8ef;border-radius:9px;padding:8px 10px;margin:8px 0}.briefing-category>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:#637a92;cursor:pointer}.briefing-category>summary label{display:flex;align-items:center;gap:7px;font-size:13px;color:#243b55}.briefing-category>summary input{width:16px;height:16px;margin:0}.briefing-category .briefing-role-options{margin-top:10px}

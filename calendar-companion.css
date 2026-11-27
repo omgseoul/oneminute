@@ -88,3 +88,13 @@
 .calendar-companion #calendarPropertyPicker .property-picker-button span{color:inherit;font-size:inherit;letter-spacing:inherit}
 
 .calendar-companion #calendarUpdate{flex:none;min-height:28px;padding:2px 4px;margin:0;border:1px solid #d7e5f6;border-radius:6px;background:#edf5ff;color:#2869bb;font-size:10px;line-height:1;white-space:nowrap}.calendar-companion #calendarUpdate[hidden]{display:none}
+
+.calendar-date-page #calendarBoard,.calendar-date-page #companionVisibility,.calendar-date-page .calendar-floating-actions,.calendar-date-page .calendar-legend,.calendar-date-page #companionAddTask{display:none!important}
+.calendar-date-page #calendarCompanion{display:grid;grid-template-rows:repeat(2,minmax(0,1fr));height:calc(100dvh - 215px);min-height:280px}
+.calendar-date-page .companion-card{overflow:auto;min-height:0}
+#calendarDateActions{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5;display:grid;justify-items:end;gap:8px}
+#calendarDateActions[hidden],#calendarDateMenu[hidden]{display:none}
+#calendarDateAdd{width:50px;height:50px;border:0;border-radius:16px;background:#2467bd;color:#fff;font-size:25px;box-shadow:0 4px 14px #23466533}
+#calendarDateMenu{display:grid;gap:5px;padding:6px;background:#fff;border:1px solid #dbe5f1;border-radius:14px;box-shadow:0 4px 14px #23466522}
+#calendarDateMenu button{padding:10px 14px;border:0;border-radius:9px;background:#eff5fc;color:#19334f}
+.calendar-companion #addEvent{display:none!important}

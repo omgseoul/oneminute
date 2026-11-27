@@ -31,8 +31,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');
    assert.equal(await page.locator('#viewButtons svg').count(),3);assert.equal(await page.locator('#companionDate').count(),0);
    assert.equal(await page.locator('#companionTasks [data-id=task-a]').count(),1);assert.equal(await page.locator('#companionTasks .companion-priority').count(),1);
-   await page.locator('.calendar-day[data-date="2026-11-26"] .calendar-day-number').click();assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('#companionEventCount').textContent(),'0');
+   await page.locator('.calendar-day[data-date="2026-11-26"] .calendar-day-number').click();await page.waitForSelector('#eventDialog[open]');assert.equal(await page.locator('#eventDate').inputValue(),'2026-11-26');await page.keyboard.press('Escape');assert.equal(await page.locator('#companionEventCount').textContent(),'0');
    await page.locator('.calendar-day[data-date="2026-11-25"] .calendar-day-number').click();
+   await page.waitForSelector('#eventDialog[open]');await page.keyboard.press('Escape');
    assert.equal(await page.locator('#companionEventCount').textContent(),'3');
    const positions=await page.locator('#calendarCompanion').evaluate(el=>[el.querySelector('#companionEvents').getBoundingClientRect().top,el.querySelector('#companionTasks').getBoundingClientRect().top]);assert(positions[0]<positions[1]);
    await page.locator('#showCalendarTasks').uncheck();assert.equal(await page.locator('#calendarBoard [data-kind=task]').count(),0);assert.equal(await page.locator('#companionTasks [data-kind=task]').count(),2);

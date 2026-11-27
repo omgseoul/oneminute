@@ -104,15 +104,15 @@ public class CalendarWidgetsTest {
     @Test public void resizingReplacesCalendarAndPreservesSelectedMonth() {
         View root=apply(remote(false,300));
         for(int cycle=0;cycle<8;cycle++)for(int h:new int[]{300,200,120,200,300}){
-            remote(false,h).reapply(context,root);assertEquals(h==300?6:h==200?2:0,group(root,R.id.widget_grid).getChildCount());
+            remote(false,h).reapply(context,root);assertEquals(h==300?6:3,group(root,R.id.widget_grid).getChildCount());
         }
-        CalendarRefresh.preferences(context).edit().putString("widget_month_42","2026-12-01").commit();remote(false,300).reapply(context,root);assertEquals("2026년 12월",text(root,R.id.widget_title));assertEquals("12월 1일 · 일정 없음",text(root,R.id.widget_entry_title));
+        CalendarRefresh.preferences(context).edit().putString("widget_month_42","2026-12-01").commit();remote(false,300).reapply(context,root);assertEquals("2026년 12월",text(root,R.id.widget_title));assertEquals(0,group(root,R.id.widget_entries).getChildCount());
         CalendarRefresh.preferences(context).edit().remove("token").commit();remote(false,300).reapply(context,root);assertEquals(0,group(root,R.id.widget_grid).getChildCount());assertEquals("앱에서 로그인하면 표시됩니다.",text(root,R.id.widget_entry_title));
     }
     @Test public void monthFillsHeightAndSixWeekMonthFits() {
         for(int height:new int[]{240,300,400}){
             RemoteViews views=CalendarWidgets.buildViews(context,42,false,height,ZonedDateTime.parse("2026-05-10T12:00:00+09:00[Asia/Seoul]"));View root=apply(views);measure(root,320,height);
-            assertEquals(root.getHeight()-root.getPaddingBottom(),root.findViewById(R.id.widget_entries).getBottom());
+            assertEquals(root.getHeight()-root.getPaddingBottom(),root.findViewById(R.id.widget_grid).getBottom());
         }
     }
     private void bindPreviewRows(View root){

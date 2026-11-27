@@ -47,7 +47,7 @@ public final class CalendarActivity extends Activity {
                 }
                 if ("/app.html".equals(url.getPath())) {
                     if (taskEntry && web.getUrl() != null && "/mission.html".equals(Uri.parse(web.getUrl()).getPath())) onBackPressed();
-                    else view.loadUrl(taskEntry ? launchUrl : HOME);
+                    else view.loadUrl(launchUrl);
                     return true;
                 }
                 return false;
@@ -75,9 +75,25 @@ public final class CalendarActivity extends Activity {
         if (intent.getBooleanExtra("create", false)) url.appendQueryParameter("create", "1");
         return url.build().toString();
     }
+    static Intent dateIntent(Context context, java.time.LocalDate date) {
+        return new Intent(context, CalendarActivity.class)
+                .setData(Uri.parse("oms-calendar://day/" + date))
+                .putExtra("calendar_date", date.toString())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    }
+
+    static String calendarUrl(Intent intent) {
+        String date = intent.getStringExtra("calendar_date");
+        if (date != null && date.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+            try { return HOME + "&date=" + java.time.LocalDate.parse(date); }
+            catch (java.time.DateTimeException ignored) { /* Open the main calendar. */ }
+        }
+        return HOME;
+    }
+
     private void launch(Intent intent) {
         taskEntry = intent.getBooleanExtra("tasks", false);
-        launchUrl = taskEntry ? taskUrl(intent) : HOME;
+        launchUrl = taskEntry ? taskUrl(intent) : calendarUrl(intent);
         resetHistory = true;
         web.loadUrl(launchUrl);
     }

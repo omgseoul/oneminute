@@ -221,7 +221,11 @@ html:has(body.bot-open){scrollbar-gutter:auto}
 .hub-tabs>[data-hub],.hub-tabs.owner-hub>[data-hub]{width:100%;box-sizing:border-box;transform:none}
 .bot-failure-summary{display:grid;gap:3px;min-width:0}
 .bot-failure-summary p{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.6;color:#19334f}
-.bot-failure-summary p+p{color:#65758a}
+.bot-failure-reason{display:flex;align-items:center;gap:6px;min-width:0}
+.bot-failure-reason p{flex:1;color:#65758a}
+.bot-failure-notice .bot-failure-details{flex:none;min-height:0;margin:0;padding:0;font-size:11px;line-height:1.6}
+.bot-chat-bubble.bot-failure-notice{padding:8px 10px}
+.bot-failure-notice .bot-notice-heading{margin-bottom:4px}
 .bot-failure-identity{display:flex;align-items:baseline}
 .bot-failure-identity span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:pre}
 .bot-failure-property{flex:0 1 auto;max-width:30%}

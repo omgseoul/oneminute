@@ -24,6 +24,7 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  create function public.list_property_messages(uuid) returns jsonb language plpgsql as $$declare v_is_owner boolean:=true;begin return (select jsonb_build_object('message_id',m.id,'property_id',m.property_id,'message',m.message) from public.property_messages m limit 1);end$$;
  create function public.list_notification_bot_messages(uuid,timestamptz,uuid) returns jsonb language plpgsql as $$declare v_is_owner boolean:=true;begin return (select jsonb_build_object('message_id',m.id,'property_id',m.property_id,'message',m.message) from public.property_messages m limit 1);end$$;`);
  await db.exec(fs.readFileSync('supabase/setup/auto_message_targeted_retry.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/setup/auto_message_notice_stay.sql','utf8'));
 
  await db.query("insert into properties(id,name,management_number) values($1,'Nest',1),($2,'OMG',2),($3,'Other',3)",[id(1),id(2),id(3)]);
  await db.query('insert into owners(id,property_id) values($1,$2),($3,$4),($5,$6)',[id(10),id(1),id(20),id(2),id(30),id(3)]);
@@ -94,6 +95,13 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  const targets=[202,203].map(n=>({id:deliveries[n].id,retry_count:0}));
  const oldNotice=(await db.query("select message_id from omg_private.auto_message_notices where delivery_id=$1 and kind='terminal'",[deliveries[203].id])).rows[0].message_id;
  assert.equal((await db.query('select omg_private.auto_message_notice_context($1,$2) v',[oldNotice,id(1)])).rows[0].v.can_retry,true);
+ const stay=(await db.query('select arrival::text,departure::text from omg_private.online_bookings where property_id=$1 and id=203',[id(1)])).rows[0];
+ await db.query("insert into omg_private.online_bookings(property_id,id,arrival,departure,status) values($1,203,'1999-01-01','1999-01-02','confirmed')",[id(2)]);
+ const noticeContext=(await db.query('select omg_private.auto_message_notice_context($1,$2) v',[oldNotice,id(1)])).rows[0].v;
+ assert.equal(noticeContext.arrival,stay.arrival);assert.equal(noticeContext.departure,stay.departure,'historical notice receives dates from its own property');
+ await db.query('delete from omg_private.online_bookings where property_id=$1 and id=203',[id(2)]);
+ assert.equal((await db.query("select has_function_privilege('anon','omg_private.auto_message_notice_context(uuid,uuid)','execute') v")).rows[0].v,false);
+
  assert.equal((await db.query('select omg_private.auto_message_notice_context($1,$2) v',[oldNotice,id(2)])).rows[0].v,null,'notice metadata respects property');
  await assert.rejects(()=>retry({targets:[{id:id(999),retry_count:0}]}),/이 지점/);
  await db.exec("update omg_private.auto_message_deliveries set due_at=now()-interval '2 days' where booking_id in(202,203)");

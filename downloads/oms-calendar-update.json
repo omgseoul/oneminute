@@ -1,9 +1,9 @@
 {
-  "version_code": 10,
-  "version_name": "1.4.1",
-  "apk_url": "https://omgworks24.com/downloads/OMS-Calendar-1.4.1.apk",
+  "version_code": 11,
+  "version_name": "1.4.2",
+  "apk_url": "https://omgworks24.com/downloads/OMS-Calendar-1.4.2.apk",
   "certificate_sha256": "178af6048f210dda0fad77fcbca7aabe99af797f43657104aa7d377b798104eb",
-  "sha256": "8262cff638099617c3876f84d77503df886b510c659340a93e59107f0a3d746d",
-  "published_at": "2026-11-27T07:52:59.384769+00:00",
+  "sha256": "486c6dcec94620c2ffd06364bf92c58c0d010bafd19784c3cebeac7980bc1dc5",
+  "published_at": "2026-11-27T08:05:11.964976+00:00",
   "bootstrap_required": false
 }

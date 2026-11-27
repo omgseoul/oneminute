@@ -56,6 +56,15 @@ export function validateAnswer(value,job){
  routed=ordinaryEscalation(routed,job);
  return {reply:routed.reply.trim(),disposition:routed.disposition,reason:String(routed.reason||'').slice(0,500),...(job.alert_rules?{alert_kind:routed.alert_kind}:{})};
 }
+export function replyTopic(value, job) {
+ const rows = new Map(scopedData(job).map(row => [String(row.id), row]));
+ for (const id of value.parts.flatMap(part => part.sources)) {
+  const row = rows.get(id);
+  const title = row?.title?.trim() || row?.category?.trim();
+  if (title) return title.slice(0, 120);
+ }
+ return '일반 대화';
+}
 export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})}){
  const base=()=>env('SUPABASE_URL'),key=()=>env('SUPABASE_SERVICE_ROLE_KEY');
  const heads=()=>({apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'});
@@ -82,7 +91,9 @@ export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
      result.estimated=![output.usage?.input_tokens,output.usage?.output_tokens].every(n=>Number.isSafeInteger(n)&&n>=0);
      if(output.status!=='completed')throw Error('incomplete');
      const text=output.output?.filter(i=>i.type==='message').flatMap(i=>i.content||[]).filter(i=>i.type==='output_text').map(i=>i.text).join('');
-     result={...result,...validateAnswer(JSON.parse(text),job)};
+     const parsed=JSON.parse(text);
+     const validated=validateAnswer(parsed,job);
+     result={...result,...validated,reply_topic:validated.disposition==='answer'?replyTopic(parsed,job):null};
     }
    }catch{result.reason='자동답변 검증 또는 연결 실패 · 직원 확인 필요';if(attempted&&!received)result.estimated=true;}
   }

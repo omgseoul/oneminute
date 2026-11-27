@@ -203,7 +203,9 @@
  }
  function bookingDetailMarkup(b,d={}){
   const value=(v,fallback)=>v!==null&&v!==undefined&&String(v).trim()?v:fallback;
-  const fields=[['예약번호',d.reference||b.data?.apiReference],['Beds24 예약번호',d.id||b.id],['비밀번호',value(d.password,'미설정')],['전화번호',value(d.phone,'없음')],['모바일',value(d.mobile,'없음')]];
+  const rawCountry=String(value(d.country,'')).trim();let country=rawCountry||'-';
+  if(/^[a-z]{2}$/i.test(rawCountry)){try{country=new Intl.DisplayNames(['ko'],{type:'region'}).of(rawCountry.toUpperCase())+' ('+rawCountry.toUpperCase()+')';}catch{}}
+  const fields=[['예약번호',d.reference||b.data?.apiReference],['Beds24 예약번호',d.id||b.id],['국적',country],['비밀번호',value(d.password,'미설정')],['전화번호',value(d.phone,'없음')],['모바일',value(d.mobile,'없음')]];
   return fields.filter(([,v])=>v!==null&&v!==undefined&&String(v).trim()).map(([label,v])=>`<p class="booking-detail-field"><span>${label} :</span> <strong>${escape(v)}</strong></p>`).join('')+(d.warning?`<p class="error">${escape(d.warning)}</p>`:'');
  }
  function reservationDetailsMarkup(b){

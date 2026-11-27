@@ -9,8 +9,8 @@
 .employee-profile-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:9px}.employee-profile-row .profile-editor{grid-column:auto;min-width:0;gap:7px;padding:7px}.employee-profile-row .profile-preview{width:38px;height:38px;flex-basis:38px;font-size:15px}.employee-profile-row .profile-change{min-width:0;padding:0 8px;white-space:nowrap}.employee-job{display:grid;min-width:0;gap:4px;color:#7b889a;font-size:11px;font-weight:900}.employee-job input{min-width:0;height:52px;padding:8px 10px;font-size:13px}.employee-profile-row .profile-actions{min-width:0}
 
 #botSettingsHost:not(:empty){margin-top:8px}
-.sensitive-trigger{grid-column:1/-1;display:flex;align-items:center;gap:7px;min-height:38px;padding:6px 12px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--navy);font-size:13px;font-weight:700;text-align:left;cursor:pointer}
-.sensitive-status{margin-left:auto;color:var(--muted);font-size:11px}.sensitive-status.configured{color:#287858}
+.sensitive-trigger{grid-column:2;display:flex;align-items:center;gap:4px;min-width:0;min-height:38px;padding:6px 7px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--navy);font-size:11px;font-weight:700;text-align:left;cursor:pointer}
+.sensitive-trigger span{white-space:nowrap}.sensitive-status{margin-left:auto;color:var(--muted);font-size:11px}.sensitive-status.configured{color:#287858}
 .oms-action-dialog.sensitive-dialog{width:min(358px,calc(100vw - 32px));padding:16px}
 .sensitive-dialog .oms-action-head{margin-bottom:5px}.sensitive-dialog .oms-action-head h2{font-size:17px}
 .sensitive-dialog .oms-action-note{margin-bottom:10px;font-size:12px}
@@ -131,7 +131,7 @@ sensitiveForm.onsubmit=async event=>{
 };
 function adminRow(admin=null){const row=document.createElement("div");row.className="account-row";row.dataset.ownerId=admin?.owner_id||"";row.innerHTML=`<div class="account-head"><span class="account-label">관리자 ${admin?.is_current?'<span class="current">현재 계정</span>':""}</span>${admin?.is_current?"":'<button class="delete-account" type="button" aria-label="계정 삭제">Del</button>'}</div>${profileEditor(admin?.display_name||admin?.login_id,admin?.profile_image)}<label>이름<input class="admin-name" type="text" maxlength="50" placeholder="관리자 이름" value="${esc(admin?.display_name||"")}"></label><label>아이디<input class="admin-login-id" type="text" maxlength="50" autocomplete="off" placeholder="관리자 아이디" value="${esc(admin?.login_id||"admin")}"></label><input class="admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6,8}" maxlength="8" placeholder="${admin?"PIN 변경 시 입력":"PIN 6~8자리"}">`;bindProfileEditor(row,".admin-name");row.querySelector(".delete-account")?.addEventListener("click",async()=>{if(!admin){row.remove();renumber();return;}if(!confirm(`‘${admin.display_name}’ 관리자 계정을 삭제할까요?`))return;try{config=await window.omgWorkConfig.deleteAdministrator(session.accessToken,admin.owner_id,selectedPropertyId!==ownPropertyId?selectedPropertyId:null);load(config);show("관리자 계정이 삭제되었습니다.");}catch(error){show(error.message,false);}});if(admin?.is_current&&!employeeOnly){
  const button=document.createElement("button");button.type="button";button.className="sensitive-trigger";
- button.innerHTML='<span>2차 비밀번호</span><span class="sensitive-status">확인 중</span><span aria-hidden="true">›</span>';
+ button.innerHTML='<span>2차 비번</span><span class="sensitive-status">확인 중</span><span aria-hidden="true">›</span>';
  button.onclick=()=>openSensitivePassword(button);
  row.append(button);
  button.disabled=true;

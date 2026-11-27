@@ -94,9 +94,11 @@
 .calendar-date-page .companion-card{overflow:auto;min-height:0}
 #calendarDateActions{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5;display:grid;justify-items:end;gap:8px}
 #calendarDateActions[hidden],#calendarDateMenu[hidden]{display:none}
-#calendarDateAdd{width:50px;height:50px;border:0;border-radius:16px;background:#2467bd;color:#fff;font-size:25px;box-shadow:0 4px 14px #23466533}
+#calendarDateAdd{display:grid;place-items:center;padding:0;width:50px;height:50px;border:0;border-radius:16px;background:#2467bd;color:#fff;box-shadow:0 4px 14px #23466533}
 #calendarDateMenu{display:grid;gap:5px;padding:6px;background:#fff;border:1px solid #dbe5f1;border-radius:14px;box-shadow:0 4px 14px #23466522}
 #calendarDateMenu button{padding:10px 14px;border:0;border-radius:9px;background:#eff5fc;color:#19334f}
 .calendar-companion #addEvent{display:none!important}
 
 #companionAddTask svg{display:block;width:19px;height:19px}
+
+#calendarDateAdd svg{display:block;width:24px;height:24px}

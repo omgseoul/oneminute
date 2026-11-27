@@ -203,8 +203,7 @@ public final class CalendarWidgets {
 
         if (tasks) {
             views.setViewVisibility(R.id.widget_action, View.VISIBLE);
-            views.setTextViewText(R.id.widget_action, "+");
-            views.setContentDescription(R.id.widget_action, "To do 추가");
+            views.setContentDescription(R.id.widget_action, "새 To do 작성");
             views.setOnClickPendingIntent(R.id.widget_action, open(context, true, true));
         }
 

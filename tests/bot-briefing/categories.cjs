@@ -35,7 +35,7 @@ const {setup,id}=require('./setup.cjs'),assert=require('node:assert/strict'),fs=
  assert.equal((await db.query('select cardinality(message_ids) n from omg_private.briefing_deliveries where run_id=$1 and employee_id=$2',[id(30),cleaner])).rows[0].n,0,'disabled category is not delivered');
  await db.exec('set role anon');await assert.rejects(()=>db.query("select omg_private.briefing_render($1,'[]','{checkin}',current_date)",[p]),/permission/);await db.exec('reset role');
  // Even when there are incoming conversations, a roster-only briefing makes no AI reservation.
- await db.exec(`create or replace function omg_private.briefing_inputs(uuid,timestamptz,timestamptz) returns jsonb language sql as $$select '[{"messages":[{"sender":"guest","in_period":true,"body":"help"}]}]'::jsonb$$`);
+ await db.exec(`create or replace function omg_private.briefing_inputs(prop uuid,st timestamptz,et timestamptz) returns jsonb language sql as $$select '[{"messages":[{"sender":"guest","in_period":true,"body":"help"}]}]'::jsonb$$`);
  const rosterOnly=Object.fromEntries(Object.entries(cfg.categories).map(([k,v])=>[k,{...v,enabled:k==='checkin'}]));
  const only=await call('preview',{...save,categories:rosterOnly});await call('run',{id:only.run.id});assert.equal((await worker('claim')).skip,true);
  const cost=(await db.query('select status,reserved_micro,charged_micro from omg_private.briefing_runs where id=$1',[only.run.id])).rows[0];assert.equal(cost.status,'empty');assert.equal(Number(cost.reserved_micro),0);assert.equal(Number(cost.charged_micro),0);

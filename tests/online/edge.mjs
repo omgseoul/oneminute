@@ -68,3 +68,50 @@ const inventory=selectProperty({id:100,name:'A',token:'never-cache',roomTypes:[{
 assert.equal(inventory.roomTypes[0].qty,2);assert.equal(inventory.roomTypes[0].units[0].name2,'Terrace');assert(!JSON.stringify(inventory).includes('private'));assert(!JSON.stringify(inventory).includes('never-cache'));
 let inventoryCalls=[];const inventoryHandler=createBedsHandler({env,waitUntil:()=>{},fetcher:async(url,o={})=>{const b=o.body?JSON.parse(o.body):{};inventoryCalls.push({url,b});if(url.endsWith('/rpc/online_owner'))return res(b.p_action==='auth'?{property_id:p,actor:'owner'}:{ok:true,properties:[inventory]});if(url.endsWith('/rpc/online_sync_control'))return res({});if(url.endsWith('/rpc/online_internal'))return res(b.p_action==='credentials'?{secret:{token:'fixture',refreshToken:'fixture',expiresAt:Date.now()+3600000}}:{ok:true});if(url.startsWith('https://beds24.com/api/v2/properties?'))return res({data:[{id:100,name:'A',roomTypes:[{id:10,name:'Double',qty:1,units:[{id:1,name:'501',name2:'Terrace',note:'private'}]}]}],pages:{nextPageExists:false}});throw Error('Unexpected inventory call');}});
 const inventoryResponse=await inventoryHandler(new Request('https://test.supabase.co/functions/v1/beds24',{method:'POST',body:JSON.stringify({action:'properties',access_token:token,data:{property_id:p}})}));assert.equal(inventoryResponse.status,200);assert(inventoryCalls.some(c=>c.url.includes('includeAllRooms=true&includeUnitDetails=true')));assert(!JSON.stringify(inventoryCalls.find(c=>c.b.p_action==='inventory').b.p_data.properties).includes('note'));console.log('Inventory edge: explicit full-unit read, minimal retained display metadata and scoped settings response passed');
+
+async function testWebhookReply({mode='automatic', disposition='answer', skipClaim=false, stale=false, timeout=false}={}){
+ const pending=[], writes=[], events=[];
+ let claimed=false;
+ const webhook=createBedsHandler({env,waitUntil:work=>pending.push(work),fetcher:async(url,options={})=>{
+  const body=options.body?JSON.parse(options.body):{}, action=body.p_action;
+  if(url.includes('/rpc/online_sync_control'))return res({skip:false});
+  if(url.includes('/rpc/online_internal')){
+   events.push(action);
+   if(['booking_push_properties','maintenance','push_pending'].includes(action))return res([]);
+   if(action==='claim'){if(claimed)return res({empty:true});claimed=true;return res({property_id:p,booking_id:10});}
+   if(action==='credentials')return res({ai_mode:mode,beds_property_id:100,secret:{token:'access',refreshToken:'refresh',expiresAt:Date.now()+600000}});
+   if(action==='draft_claim'){
+    assert.equal(body.p_data.actor,mode==='automatic'?'ai:automatic':'webhook');
+    if(skipClaim)return res({skip:true});
+    return res({id,data_revision:5,history:[{role:'user',content:'Check-in time?'}],data:[{id:'1',title:'Check-in',answer:'3 PM'}],alert_rules:{}});
+   }
+   if(action==='prepare_auto_reply')return res(stale?{skip:true}:{body:'Check-in starts at 3 PM.'});
+   if(action==='finish_send')events.push(body.p_data.status);
+   return res({ok:true});
+  }
+  if(url.includes('/rpc/guest_ai_credentials'))return res({enabled:true,key:'fixture'});
+  if(url.includes('/v1/responses'))return res({status:'completed',usage:{input_tokens:10,output_tokens:10},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Check-in starts at 3 PM.',disposition,reason:'',alert_kind:disposition==='answer'?'none':'handoff',parts:[{question:'Check-in time?',sources:['1'],needs_human:disposition!=='answer'}]})}]}]});
+  if(url.includes('/bookings/messages')&&options.method==='POST'){
+   writes.push(body);
+   if(timeout)throw Error('timeout');
+   return res([{success:true,new:{id:22}}]);
+  }
+  if(url.includes('/bookings/messages'))return res({data:[]});
+  if(url.includes('/bookings?'))return res({data:[{id:10,propertyId:100,status:'confirmed'}]});
+  throw Error('Unexpected fixture request '+url);
+ }});
+ const response=await webhook(new Request(`https://test.supabase.co/functions/v1/beds24/webhook?property=${p}&key=${'a'.repeat(64)}`,{method:'POST',body:JSON.stringify({booking:{id:10},message:{id:20}})}));
+ assert.equal(response.status,200);
+ await Promise.all(pending);
+ return {writes,events};
+}
+const automatic=await testWebhookReply();
+assert.deepEqual(automatic.writes,[[{bookingId:10,message:'Check-in starts at 3 PM.'}]]);
+assert(automatic.events.includes('sent'));
+assert(automatic.events.indexOf('prepare_auto_reply')>automatic.events.lastIndexOf('draft_finish'));
+for(const options of [{mode:'off'},{mode:'approval'},{skipClaim:true},{stale:true},{disposition:'handoff'}]){
+ const result=await testWebhookReply(options);
+ assert(result.events.includes('ack'));assert.equal(result.writes.length,0);
+}
+const ambiguous=await testWebhookReply({timeout:true});assert.equal(ambiguous.writes.length,1);assert(ambiguous.events.includes('uncertain'));
+console.log('Webhook AI auto-send: guarded send, manual approval, stale/handoff suppression and ambiguous provider results passed');

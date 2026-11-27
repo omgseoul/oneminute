@@ -93,6 +93,28 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
   }
  }
 
+ async function deliverMessage(connection,bookingId,body){
+  let status='uncertain',error,result={};
+    try{const v=await api('/bookings/messages',{token:connection.secret.token},[{bookingId,message:body}]);const rows=Array.isArray(v)?v:Array.isArray(v.data)?v.data:[];
+     if(rows.length===1&&rows[0].success===true){status='sent';result={remote:rows[0].new||{}};}
+     else if(rows.length&&rows.every(x=>x.success===false)){status='failed';error='Beds24에서 발송을 거절했습니다. 채널 지원 여부와 쓰기 권한을 확인해주세요.';}
+     else error='발송 결과를 확정하지 못했습니다. 대화내역을 확인해주세요.';
+    }catch(e){error=e.message;if(e.status>=400&&e.status<500)status='failed';}
+  return {status,error,result};
+ }
+ async function autoReply(property,connection,bookingId){
+  const generated=await draft(property,bookingId,'ai:automatic');
+  if(!generated.automaticDraft)return;
+  // Check the upstream conversation again after inference, in case a host or guest replied.
+  await messages(property,connection,bookingId,true);
+  const id=generated.automaticDraft;
+  const prepared=await internal('prepare_auto_reply',property,{booking_id:bookingId,id});
+  if(prepared.skip)return;
+  const outcome=await deliverMessage(connection,bookingId,prepared.body);
+  await internal('finish_send',property,{id,...outcome});
+  if(outcome.status==='sent'){try{await messages(property,connection,bookingId,true);}catch{/* delivery was already recorded */}}
+ }
+
  async function draft(property,id,actor){
   const job=await internal('draft_claim',property,{booking_id:positive(id),actor});if(job.skip)return {ok:true,skip:true};let result={id:job.id},attempted=false,received=false;
   try{
@@ -106,9 +128,13 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
    const t=output.output?.filter(i=>i.type==='message').flatMap(i=>i.content||[]).filter(i=>i.type==='output_text').map(i=>i.text).join('');
    const parsed=JSON.parse(t);result={...result,...validateAnswer(parsed,job),parts:parsed.parts,data_revision:job.data_revision,sources:job.data.map(x=>({id:x.id,title:x.title})),model:'gpt-6-luna'};
   }catch(e){result.error=attempted?'AI 초안 생성 또는 검증 실패 · 직접 답변해주세요.':e.message;if(attempted&&!received)result.estimated=true;}
-  await internal('draft_finish',property,result);return {ok:true};
+  const finished=await internal('draft_finish',property,result);
+  if(actor==='ai:automatic'&&!finished.skip&&result.disposition==='answer'&&result.alert_kind==='none'){
+   return {ok:true,automaticDraft:job.id};
+  }
+  return {ok:true};
  }
- async function handleJob(job){const p=job.property_id;try{const c=await credentials(p);await booking(p,c,job.booking_id);await messages(p,c,job.booking_id,true);await push(p);if(c.ai_mode==='approval')await draft(p,job.booking_id,'webhook');await internal('synced',p);await internal('ack',p,job);}catch(e){await internal('ack',p,{...job,error:e.message});}}
+ async function handleJob(job){const p=job.property_id;try{const c=await credentials(p);await booking(p,c,job.booking_id);await messages(p,c,job.booking_id,true);await push(p);if(c.ai_mode==='approval')await draft(p,job.booking_id,'webhook');else if(c.ai_mode==='automatic')await autoReply(p,c,job.booking_id);await internal('synced',p);await internal('ack',p,job);}catch(e){await internal('ack',p,{...job,error:e.message});}}
  async function drain(){let bookingProperties=[];try{const v=await internal('booking_push_properties',null);if(Array.isArray(v))bookingProperties=v;}catch{}for(const p of new Set([...await internal('maintenance',null),...bookingProperties])){try{await credentials(p);await push(p);}catch{}}for(let i=0;i<4;i++){const job=await internal('claim',null);if(job.empty)break;await handleJob(job);}}
  return async req=>{
   const origin=req.headers.get('origin'),allowed=['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io'];
@@ -243,12 +269,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     }
     const prepared=await scoped('prepare_send');if(prepared.skip)return reply(prepared);
     if(sentPin)await pinCtl('begin',p,{booking_id:id,id:d.id,pin:sentPin,actor:a.actor,title:'비밀번호 보내기'});
-    let status='uncertain',error,result={};
-    try{const v=await api('/bookings/messages',{token:c.secret.token},[{bookingId:id,message:d.body.trim()}]);const rows=Array.isArray(v)?v:Array.isArray(v.data)?v.data:[];
-     if(rows.length===1&&rows[0].success===true){status='sent';result={remote:rows[0].new||{}};}
-     else if(rows.length&&rows.every(x=>x.success===false)){status='failed';error='Beds24에서 발송을 거절했습니다. 채널 지원 여부와 쓰기 권한을 확인해주세요.';}
-     else error='발송 결과를 확정하지 못했습니다. 대화내역을 확인해주세요.';
-    }catch(e){error=e.message;if(e.status>=400&&e.status<500)status='failed';}
+    const {status,error,result}=await deliverMessage(c,id,d.body.trim());
     if(sentPin)await pinCtl('finish',p,{booking_id:id,id:d.id,status,error:status==='sent'?null:'발송 결과를 확인해주세요.'});
     await internal('finish_send',p,{id:d.id,status,error,result});if(status==='sent'){try{await messages(p,c,id,true);}catch{}}
     return reply({ok:true,status,error});

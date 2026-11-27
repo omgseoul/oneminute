@@ -8,3 +8,22 @@
 .ai-sheet{min-width:900px}.ai-sheet th:first-child{width:56px}.ai-sheet th:nth-child(2){width:100px}.ai-sheet th:nth-child(3){width:160px}.ai-sheet th:nth-child(4){width:180px}.ai-test-answer{white-space:pre-wrap;overflow-wrap:anywhere;background:#f0f5fc;padding:16px;border-radius:12px;line-height:1.65}#testSources details{padding:10px 0;border-bottom:1px solid #e0e8f0}#testSources summary{cursor:pointer;font-size:14px}#testSources p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}#manualTestForm label{display:block;margin:14px 0 8px}#manualTestForm .input{box-sizing:border-box;width:100%}#testContext{overflow-wrap:anywhere}
 
 .ai-online-channel{display:inline-flex;align-items:center;gap:6px}.ai-online-channel .check{margin:0}.ai-online-channel>a{font-size:11px;color:#2c6dbb;white-space:nowrap}
+
+#dataDialog .top{margin-bottom:6px}
+.ai-data-heading{display:flex;align-items:center;gap:6px}
+#dataDialog h2{margin:0;font-size:18px}
+#dataDialog>.help{margin:4px 0 6px;font-size:12px;line-height:1.35;white-space:nowrap}
+#dataDialog .ai-excel-actions{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;margin:0}
+#dataDialog .ai-excel-actions .btn{margin:0;padding:5px 7px;min-height:32px;font-size:12px;white-space:nowrap}
+#dataDialog .ai-prompt-help{flex:0 0 24px;width:24px;height:24px;min-height:0;padding:0;font-size:12px}
+#dataDialog .ai-sheet-wrap{margin:6px 0;max-height:55dvh}
+#dataDialog .ai-sheet{min-width:530px;font-size:12px;line-height:1.35}
+#dataDialog .ai-sheet th{padding:4px 5px;font-size:inherit;font-weight:700;white-space:nowrap;background:#f1f5fa;color:#264563}
+#dataDialog .ai-sheet th:nth-child(1){width:31px}
+#dataDialog .ai-sheet th:nth-child(2){width:62px}
+#dataDialog .ai-sheet th:nth-child(3){width:103px}
+#dataDialog .ai-sheet th:nth-child(4){width:74px}
+#dataDialog .ai-sheet th:last-child{width:23px;padding:0}
+#dataDialog .ai-sheet textarea{field-sizing:content;min-height:24px;max-height:64px;height:auto;padding:3px 5px;font:inherit;resize:none;overflow:auto}
+@supports not (field-sizing:content){#dataDialog .ai-sheet textarea{height:28px;resize:vertical}}
+#dataDialog .ai-sheet .icon-btn{width:23px;height:24px;min-height:0;padding:0;font-size:15px}

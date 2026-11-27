@@ -106,10 +106,62 @@
     link.href = eventLink(item, property);
     link.title = [item.property_name, kind, name, dates, item.channel, time.textContent].filter(Boolean).join(' · ');
     link.append(field('home-event-property', item.property_name || ''), field('home-event-kind', kind), field('home-event-name', name));
-    if (dates) link.append(field('home-event-stay', dates));
-    if (item.channel && window.OMSGuestMessageCard) link.append(OMSGuestMessageCard.channelIcon(item.channel));
+    link.append(field('home-event-stay', dates));
+    const source = field('home-event-source', '');
+    if (item.channel && window.OMSGuestMessageCard) source.append(OMSGuestMessageCard.channelIcon(item.channel));
+    link.append(source);
     link.append(time);
     return link;
+  }
+
+  function keepPickerInView(picker) {
+    const button = picker.root.querySelector('button');
+    const panel = picker.root.querySelector('.property-picker-panel');
+    panel.classList.add('home-event-dropdown');
+    if (typeof panel.showPopover === 'function') panel.setAttribute('popover', 'manual');
+    let visible = false;
+    function position() {
+      if (!visible) return;
+      const bounds = button.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+      const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+      const menuWidth = Math.min(230, width - 16);
+      const below = top + height - bounds.bottom - 12, above = bounds.top - top - 12;
+      const upward = below < Math.min(panel.scrollHeight, 230) && above > below;
+      const maxHeight = Math.max(0, Math.min(230, upward ? above : below));
+      panel.style.width = menuWidth + 'px';
+      panel.style.left = Math.max(left + 8, Math.min(bounds.left, left + width - menuWidth - 8)) + 'px';
+      panel.style.maxHeight = maxHeight + 'px';
+      panel.style.top = (upward ? bounds.top - 4 - Math.min(panel.scrollHeight, maxHeight) : bounds.bottom + 4) + 'px';
+    }
+    const observer = new MutationObserver(() => {
+      const open = !panel.hidden;
+      if (visible === open) return;
+      visible = open;
+      if (panel.hasAttribute('popover')) {
+        if (open && !panel.matches(':popover-open')) panel.showPopover();
+        if (!open && panel.matches(':popover-open')) panel.hidePopover();
+      }
+      position();
+    });
+    observer.observe(panel, {attributes:true, attributeFilter:['hidden']});
+    const escape = event => {
+      if (visible && event.key === 'Escape') { event.preventDefault(); picker.close(); button.focus(); }
+    };
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    window.visualViewport?.addEventListener('resize', position);
+    window.visualViewport?.addEventListener('scroll', position);
+    document.addEventListener('keydown', escape);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+      window.visualViewport?.removeEventListener('resize', position);
+      window.visualViewport?.removeEventListener('scroll', position);
+      document.removeEventListener('keydown', escape);
+    };
   }
 
   async function mount(session) {
@@ -122,12 +174,13 @@
       const saved = JSON.parse(localStorage.getItem(selectionKey));
       if (Array.isArray(saved) && saved.every(id => typeof id === 'string')) selected = saved;
     } catch { /* User may block local storage. */ }
-    let busy = false, queued = false, signature = '', picker = null, branchSignature = '';
+    let busy = false, queued = false, signature = '', picker = null, stopPickerPositioning = null, branchSignature = '';
     function renderPicker(branches, ownProperty) {
       if (!pickerHost || !window.omgPropertySelector?.mountMulti || !branches?.length) return;
       const next = JSON.stringify(branches);
       if (next === branchSignature) return;
       branchSignature = next;
+      stopPickerPositioning?.();
       picker?.destroy();
       const paintBadge = () => {
         const button = picker.root.querySelector('button');
@@ -147,6 +200,7 @@
           update();
         }
       });
+      stopPickerPositioning = keepPickerInView(picker);
       paintBadge();
     }
     async function refresh() {
@@ -164,6 +218,7 @@
         if (desiredOrder.some((panel,index) => panel !== currentOrder[index])) parent.append(...desiredOrder);
         staff.hidden = !data.sections.includes('staff');
         events.hidden = !data.sections.includes('events');
+        if (events.hidden) picker?.close();
         const next = JSON.stringify(data.events);
         if (next === signature) return;
         signature = next;

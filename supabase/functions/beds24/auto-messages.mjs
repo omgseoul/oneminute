@@ -20,6 +20,7 @@ export function supportsAutoMessageChannel(booking){
  const source=String(booking.apiSource||'').toLowerCase().replace(/[^a-z0-9]/g,'');
  return ['airbnb','airbnbxml','booking','bookingcom','expedia','vrbo','homeaway','homeawayxml','abritel','fewodirekt','stayz'].includes(source);
 }
+export function includesPin(body,pin){return !!pin&&new RegExp('(^|[^A-Za-z0-9*#-])'+pin.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^A-Za-z0-9*#-])').test(body.replace(/https?:\/\/\S+/gi,''));}
 function templateVariables(template){
  if(typeof template!=='string'||!template.trim())throw new MessageValidationError('발송할 메시지 내용이 없습니다.');
  const keys=[...new Set([...template.matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]))];
@@ -58,18 +59,18 @@ export function createAutoMessages({rpc,credentials,api,saveBookings,messages,di
    if(!supportsAutoMessageChannel(b))throw new MessageValidationError('Beds24 메시지 연동을 지원하지 않거나 확인할 수 없는 예약사이트입니다. 게스트에게 발송되지 않았습니다. 해당 예약사이트에서 수동으로 확인해주세요.');
    const language=messageLanguage(b,job.rule.messages||{}),template=job.rule.messages?.[language],keys=templateVariables(template);
    let room='',pin='';
-   if(keys.includes('객실')||keys.includes('비밀번호')){
+   if(keys.includes('객실')||keys.includes('비밀번호')||job.rule.pin_notice){
     stage='객실·비밀번호 조회';
     const inventory=await api('/properties?id='+c.beds_property_id+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
     const property=Array.isArray(inventory.data)&&inventory.data.find(p=>Number(p.id)===Number(c.beds_property_id));
     if(!property)throw new MessageValidationError('객실·비밀번호 조회 실패: 숙소정보를 확인하지 못했습니다.');
     const assigned=property&&assignedUnit(b,property);
-    room=assigned?.unit?.name||'';pin=accessCode(b,assigned,'info:LOCK_PIN')||'';
+    room=assigned?.unit?.name||'';pin=accessCode(b,assigned,c.password_source||'info:LOCK_PIN')||'';
    }
    const body=renderAutoMessage(template,{'이름':[b.firstName,b.lastName].filter(v=>typeof v==='string').join(' ').replace(/[\d\uFF10-\uFF19]/g,'').replace(/\s+/g,' ').trim(),
     '체크인':b.arrival,'체크아웃':b.departure,'객실':room,'비밀번호':pin});
    stage='발송 조건 재확인';
-   const ready=await ctl('prepare',{id:job.id,lease:job.lease,language});if(ready?.skip)return;
+   const ready=await ctl('prepare',{id:job.id,lease:job.lease,language,...((job.rule.pin_notice||keys.includes('비밀번호'))&&includesPin(body,pin)?{pin}:{})});if(ready?.skip)return;
    if(ready?.ok!==true)throw new MessageValidationError('최종 발송 조건을 확인하지 못해 발송하지 않았습니다.');
    attempted=true;
    const response=await api('/bookings/messages',{token:c.secret.token},[{bookingId:job.booking_id,message:body}]);

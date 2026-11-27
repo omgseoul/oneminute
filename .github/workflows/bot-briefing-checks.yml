@@ -17,6 +17,7 @@ jobs:
       - name: Check periods, permissions, credits and mobile settings
         env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
         run: |
+          node tests/bot-briefing/categories.cjs
           node tests/bot-briefing/database.cjs
           node tests/bot-briefing/monthly.cjs
           node --test tests/bot-briefing/edge.mjs

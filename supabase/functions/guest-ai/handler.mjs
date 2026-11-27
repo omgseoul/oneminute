@@ -1,3 +1,5 @@
+import {runManualTest} from './manual-test.mjs';
+import {scopedData,ROOM_RULES} from './room-policy.mjs';
 import {combinedInstructions,deliveryEnabled,unavailableReply} from './alert-rules.mjs';
 import {propertyRules,enforcePropertyRouting,fallbackReply} from './property-policy.mjs';
 // No credentials or guest text are logged. Workers use server credentials only.
@@ -34,17 +36,17 @@ export function ordinaryEscalation(value,job){
 // write boundary, so each new question does not rewrite the whole cached prompt.
 // Content matching invalidates changed prompts/DATA automatically; never key by room.
 export function buildRequest(job){
- const data=job.data.map(row=>({id:String(row.id),title:row.title,answer:row.answer}));
+ const data=scopedData(job).map(row=>({id:String(row.id),number:row.number,category:row.category,rooms:row.rooms||'전체',title:row.title,answer:row.answer}));
  return {model:MODEL,store:false,service_tier:'default',reasoning:{effort:'low'},max_output_tokens:2048,
   prompt_cache_options:{mode:'explicit',ttl:'30m'},
-  input:[{role:'developer',content:combinedInstructions(job,RULES,propertyRules(job))},{role:'user',content:[
+  input:[{role:'developer',content:combinedInstructions(job,RULES+'\n'+ROOM_RULES,propertyRules(job))},{role:'user',content:[
    {type:'input_text',text:JSON.stringify({DATA:data}),prompt_cache_breakpoint:{mode:'explicit'}},
-   {type:'input_text',text:JSON.stringify({conversation:job.history,attachment_requires_staff:!!job.has_attachment})}
+   {type:'input_text',text:JSON.stringify({room_number:job.room_number||null,room_topics:job.room_topics||[],conversation:job.history,attachment_requires_staff:!!job.has_attachment})}
   ]}],text:{format:FORMAT}};
 }
 export function validateAnswer(value,job){
  if(!value||!['answer','handoff','urgent'].includes(value.disposition)||typeof value.reply!=='string'||!value.reply.trim()||value.reply.length>4000||!Array.isArray(value.parts)||!value.parts.length)throw Error('invalid_output');
- const ids=new Set([...job.data,...SERVICE_DATA].map(r=>String(r.id)));let unknown=false;
+ const ids=new Set([...scopedData(job),...SERVICE_DATA].map(r=>String(r.id)));let unknown=false;
  for(const part of value.parts){if(typeof part.question!=='string'||!part.question.trim()||typeof part.needs_human!=='boolean'||!Array.isArray(part.sources)||part.sources.some(id=>!ids.has(id)))throw Error('invalid_source');if(part.needs_human)unknown=true;if(value.disposition==='answer'&&!part.sources.length)throw Error('ungrounded_answer');}
  if(value.disposition==='answer'&&unknown)throw Error('unsupported_answer');
  if(job.has_attachment&&value.disposition==='answer')throw Error('unread_attachment');
@@ -123,6 +125,11 @@ export function createGuestAIHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=
     return reply(await rpc('guest_ai_platform',{p_user:user.id,p_action:b.action,p_data:data}));
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
+   if(['test','test_status'].includes(b.action)){
+    const test=await rpc('guest_ai_manual_test',{p_token:b.access_token,p_action:b.action==='test'?'prepare':'status',p_data:data});
+    if(test.start)waitUntil(runManualTest({id:test.id,job:test.job,rpc,fetcher,buildRequest,validateAnswer}).catch(()=>{}));
+    const {job,start,...publicResult}=test;return reply(publicResult);
+   }
    return reply(await rpc('guest_ai_owner',{p_token:b.access_token,p_action:b.action,p_data:data}));
   }catch(e){return reply({ok:false,message:e instanceof SyntaxError?'요청 형식을 확인해주세요.':e.message||'처리하지 못했습니다.'},400);}
  };

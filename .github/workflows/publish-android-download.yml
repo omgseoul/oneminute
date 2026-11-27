@@ -1,7 +1,7 @@
 name: Publish verified Android download
 on:
   workflow_run:
-    workflows: ['Build and verify OMS Android update']
+    workflows: ['Build and verify OMS Android update', 'Build OMS Calendar APK']
     types: [completed]
 permissions:
   contents: read

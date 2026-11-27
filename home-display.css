@@ -1,0 +1,13 @@
+#homeStaffDisplay[hidden],#homeEventsDisplay[hidden],#homeEventCategories[hidden],#homeDisplayForm[hidden]{display:none!important}
+.home-events{margin:10px 0 0;padding:8px 12px;background:#fff;border:1px solid #e2e9f2;border-radius:15px}
+.home-events h2{margin:0 0 4px;font-size:14px;color:#19334f}
+.home-events-list{height:64px;overflow-y:auto;color:#718198;font-size:12px;overscroll-behavior:contain}
+.home-events-list a{box-sizing:border-box;display:flex;align-items:center;gap:8px;height:32px;border-bottom:1px solid #edf1f6;color:#213c5a;text-decoration:none}
+.home-events-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-events-list time{margin-left:auto;font-size:10px;color:#64748b;white-space:nowrap}
+#homeDisplayForm label{display:flex;align-items:center;gap:9px;min-height:38px;color:#19334f;font-size:14px}
+#homeDisplayForm input{width:17px;height:17px;accent-color:#2467bd}
+#homeDisplayForm output{margin-left:auto;color:#2467bd;font-size:12px}
+#homeEventCategories{margin:6px 0 10px;padding:4px 10px;border:1px solid #e2e9f2;border-radius:12px}
+#homeEventCategories legend{font-size:12px;color:#64748b}
+#homeDisplayStatus{font-size:12px;color:#44627e}

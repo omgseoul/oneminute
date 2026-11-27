@@ -31,11 +31,10 @@ import java.util.Locale;
 public final class CalendarWidgets {
     static final String TASK_ACTION = "com.omgworks.calendar.TASK_WIDGET_ACTION";
     private static final String CHANGE_MONTH = "com.omgworks.calendar.CHANGE_WIDGET_MONTH";
-    private static final String PICK_DATE = "com.omgworks.calendar.PICK_WIDGET_DATE";
     private static final String[] WEEK = {"일", "월", "화", "수", "목", "금", "토"};
     private CalendarWidgets() {}
 
-    public static final class Events extends AppWidgetProvider {
+    public static class Events extends AppWidgetProvider {
         @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
             refresh(context, false);
             CalendarRefresh.schedule(context, true);
@@ -61,11 +60,7 @@ public final class CalendarWidgets {
                 CalendarRefresh.schedule(context, true);
                 return;
             }
-            if (!PICK_DATE.equals(intent.getAction())) return;
-            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
-            if (id < 0) return;
-            CalendarRefresh.preferences(context).edit().putString("widget_day_" + id, intent.getStringExtra("date")).apply();
-            render(context, AppWidgetManager.getInstance(context), id, false);
+
         }
         @Override public void onDeleted(Context context, int[] ids) {
             SharedPreferences.Editor prefs = CalendarRefresh.preferences(context).edit();
@@ -73,6 +68,8 @@ public final class CalendarWidgets {
             prefs.apply();
         }
     }
+
+    public static final class Fortnight extends Events {}
 
     public static final class Tasks extends AppWidgetProvider {
         @Override public void onReceive(Context context, Intent intent) {
@@ -104,6 +101,7 @@ public final class CalendarWidgets {
         int[] ids = manager.getAppWidgetIds(new ComponentName(context, tasks ? Tasks.class : Events.class));
         for (int id : ids) render(context, manager, id, tasks);
         if (tasks) manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_task_list);
+        else for (int id : manager.getAppWidgetIds(new ComponentName(context, Fortnight.class))) render(context, manager, id, false);
     }
 
     private static RemoteViews layout(Context context, int id) { return new RemoteViews(context.getPackageName(), id); }
@@ -157,8 +155,10 @@ public final class CalendarWidgets {
         LocalDate displayMonth = today.withDayOfMonth(1);
         try { displayMonth = LocalDate.parse(prefs.getString("widget_month_" + id, displayMonth.toString())); }
         catch (Exception ignored) {}
-        boolean month = !tasks && height >= 240;
-        boolean week = !tasks && height >= 166 && !month;
+        android.appwidget.AppWidgetProviderInfo info = AppWidgetManager.getInstance(context).getAppWidgetInfo(id);
+        boolean fortnight = info != null && Fortnight.class.getName().equals(info.provider.getClassName());
+        boolean month = !tasks && !fortnight && height >= 225;
+        boolean week = !tasks && !month;
         if (!(month || week) || (week && !sunday(selected).equals(sunday(today)))) selected = today;
         if (month && !selected.withDayOfMonth(1).equals(displayMonth)) selected = displayMonth.equals(today.withDayOfMonth(1)) ? today : displayMonth;
 
@@ -174,7 +174,7 @@ public final class CalendarWidgets {
         views.setViewVisibility(R.id.widget_next, month ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.widget_task_list, tasks ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.widget_task_empty, View.GONE);
-        views.setViewVisibility(R.id.widget_entries, tasks ? View.GONE : View.VISIBLE);
+        views.setViewVisibility(R.id.widget_entries, tasks || prefs.contains("token") ? View.GONE : View.VISIBLE);
         views.setViewVisibility(R.id.widget_count, tasks ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.widget_title, tasks ? View.GONE : View.VISIBLE);
         views.setViewVisibility(R.id.widget_task_heading, tasks ? View.VISIBLE : View.GONE);
@@ -185,7 +185,7 @@ public final class CalendarWidgets {
         }
         views.setTextViewText(R.id.widget_title, tasks ? "OMS To do"
                 : month ? format(displayMonth, "yyyy년 M월")
-                : week ? format(sunday(today), "M월 d일") + " – " + format(sunday(today).plusDays(6), "M월 d일")
+                : week ? format(sunday(today), "M월 d일") + " – " + format(sunday(today).plusDays(13), "M월 d일")
                 : format(today, "M월 d일 EEEE"));
 
         if (tasks) {
@@ -210,22 +210,7 @@ public final class CalendarWidgets {
             entry(context, views, "", "앱에서 로그인하면 표시됩니다.", "", "");
         } else {
             List<JSONObject> list = load(prefs, "widget_events");
-            if (month || week) grid(context, views, id, list, zone, today, selected, month, displayMonth);
-            int weeks = (displayMonth.getDayOfWeek().getValue() % 7 + displayMonth.lengthOfMonth() + 6) / 7;
-            int gridMinimum = month ? (weeks + 1) * 24 : week ? 48 : 0;
-            int limit = Math.max(1, (height - 52 - gridMinimum) / 28);
-            if (month) limit = Math.min(3, limit);
-            int count = 0;
-            for (JSONObject item : list) {
-                if (!occurs(item, selected, zone)) continue;
-                if (count >= limit) break;
-                count++;
-                String when = item.optBoolean("all_day") ? "종일" : DateTimeFormatter.ofPattern("HH:mm")
-                        .withZone(zone).format(CalendarRefresh.time(item, "start_at", Instant.EPOCH));
-                entry(context, views, "•", when + "   " + item.optString("title"), "", "");
-            }
-            if (count == 0) entry(context, views, "", format(selected, "M월 d일") + " · 일정 없음", "", "");
-            views.setOnClickPendingIntent(R.id.widget_entries, open(context, false, false));
+            grid(context, views, id, list, zone, today, selected, month, displayMonth, height);
         }
         return views;
     }
@@ -258,7 +243,7 @@ public final class CalendarWidgets {
     }
 
     private static void grid(Context context, RemoteViews views, int id, List<JSONObject> events,
-                             ZoneId zone, LocalDate today, LocalDate selected, boolean month, LocalDate displayMonth) {
+                             ZoneId zone, LocalDate today, LocalDate selected, boolean month, LocalDate displayMonth, int height) {
         RemoteViews labels = layout(context, R.layout.widget_weekday_row);
         labels.removeAllViews(R.id.widget_dates);
         for (int n = 0; n < WEEK.length; n++) {
@@ -269,6 +254,9 @@ public final class CalendarWidgets {
         views.addView(R.id.widget_grid, labels);
         LocalDate first = month ? displayMonth : sunday(today);
         LocalDate end = first.plusDays(weekLength(first, month));
+        int rows = (int)((java.time.temporal.ChronoUnit.DAYS.between(sunday(first), end) + 6) / 7);
+        int lines = Math.max(0, Math.min(month ? 2 : 6, ((height - 56) / rows - 16) / 12));
+        events.sort(Comparator.comparing(e -> CalendarRefresh.time(e, "start_at", Instant.MAX)));
         for (LocalDate start = sunday(first); start.isBefore(end); start = start.plusDays(7)) {
             RemoteViews row = layout(context, R.layout.widget_date_row);
             row.removeAllViews(R.id.widget_dates);
@@ -276,14 +264,23 @@ public final class CalendarWidgets {
                 LocalDate date = start.plusDays(offset);
                 boolean shown = !date.isBefore(first) && date.isBefore(end);
                 RemoteViews day = cell(context, shown ? String.valueOf(date.getDayOfMonth()) : "",
-                        date.equals(today), date.equals(selected), shown && events.stream().anyMatch(event -> occurs(event, date, zone)));
+                        date.equals(today), date.equals(selected), false);
                 if (shown) {
                     if (!date.equals(today)) day.setTextColor(R.id.widget_number, dayColor(offset));
                     day.setContentDescription(R.id.widget_cell, format(date, "M월 d일 EEEE"));
-                    Intent pick = new Intent(context, Events.class).setAction(PICK_DATE)
-                            .setData(android.net.Uri.parse("oms-widget:" + id + "/" + date))
-                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id).putExtra("date", date.toString());
-                    day.setOnClickPendingIntent(R.id.widget_cell, PendingIntent.getBroadcast(context, 0, pick, PendingIntent.FLAG_IMMUTABLE));
+                    PendingIntent target = PendingIntent.getActivity(context, 0,
+                            CalendarActivity.dateIntent(context, date), PendingIntent.FLAG_IMMUTABLE);
+                    day.setOnClickPendingIntent(R.id.widget_cell, target);
+                    int count = 0;
+                    for (JSONObject event : events) {
+                        if (count >= lines) break;
+                        if (!occurs(event, date, zone)) continue;
+                        RemoteViews title = layout(context, R.layout.widget_cell_event);
+                        title.setTextViewText(R.id.widget_cell_event, event.optString("title"));
+                        title.setOnClickPendingIntent(R.id.widget_cell_event, target);
+                        day.addView(R.id.widget_cell_events, title);
+                        count++;
+                    }
                 }
                 row.addView(R.id.widget_dates, day);
             }
@@ -324,12 +321,12 @@ public final class CalendarWidgets {
         return row;
     }
 
-    private static int weekLength(LocalDate first, boolean month) { return month ? first.lengthOfMonth() : 7; }
+    private static int weekLength(LocalDate first, boolean month) { return month ? first.lengthOfMonth() : 14; }
 
     private static RemoteViews cell(Context context, String value, boolean today, boolean selected, boolean dot) {
         RemoteViews cell = layout(context, R.layout.widget_date_cell);
         cell.setTextViewText(R.id.widget_number, value);
-        cell.setViewVisibility(R.id.widget_dot, dot ? View.VISIBLE : View.INVISIBLE);
+        cell.setViewVisibility(R.id.widget_dot, View.GONE);
         cell.setInt(R.id.widget_number, "setBackgroundResource", today ? R.drawable.widget_today : selected ? R.drawable.widget_selected : 0);
         cell.setTextColor(R.id.widget_number, today ? 0xffffffff : 0xff17254b);
         return cell;

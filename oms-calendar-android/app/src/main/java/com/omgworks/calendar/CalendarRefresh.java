@@ -148,7 +148,7 @@ public final class CalendarRefresh extends JobService {
                 owner ? new JSONObject().put("p_access_token", token).put("p_action", "list")
                         : new JSONObject().put("p_access_token", token).put("p_action", "list").put("p_event", new JSONObject()
                         .put("range_start", rangeFirst.minusDays(7).atStartOfDay(zone).toInstant().toString())
-                        .put("range_end", rangeLast.plusMonths(1).plusDays(7).atStartOfDay(zone).toInstant().toString())));
+                        .put("range_end", rangeLast.plusMonths(1).plusDays(14).atStartOfDay(zone).toInstant().toString())));
         if (!items.optBoolean("ok")) return;
         if (owner) for (JSONObject item : rows(items.optJSONArray("items"))) {
             if ("event".equals(item.optString("kind"))) events.add(item); else tasks.add(item);

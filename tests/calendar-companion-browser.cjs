@@ -6,7 +6,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    const page=await browser.newPage({viewport:{width,height:840}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('https://oms.test/**',r=>{const url=new URL(r.request().url()),name=url.pathname.slice(1);try{let body=fs.readFileSync(name);if(name.endsWith('.html'))body=body.toString().replace(/<script[\s\S]*?<\/script>/g,'');return r.fulfill({body,contentType:name.endsWith('.css')?'text/css':'text/html'});}catch{return r.fulfill({status:404,body:''});}});
    await page.goto('https://oms.test/calendar.html?app=calendar');
-   await page.evaluate(()=>{
+   const fixture=()=>{
     Date.now=()=>Date.parse('2026-11-25T01:00:00Z');
     const owner='owner',home='one';window.calendarCalls=[];
     const events=[{id:'event-a',title:'객실 점검',all_day:false,start_at:'2026-11-25T01:00:00Z',end_at:'2026-11-25T02:00:00Z',owner_target:true,property_id:home,can_edit:true},{id:'event-b',title:'직원 미팅',start_at:'2026-11-25T05:00:00Z',end_at:'2026-11-25T06:00:00Z',owner_target:true,property_id:home,can_edit:true},{id:'overnight',title:'야간 점검',start_at:'2026-11-24T14:00:00Z',end_at:'2026-11-24T16:00:00Z',owner_target:true,property_id:home,can_edit:true}];
@@ -18,7 +18,8 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     window.omgWorkConfig={load:async()=>({property:{property_id:home}})};
     window.OMSWorkerTasks={events:x=>x};window.OMSMissionTasks={load:async()=>({missions:tasks.filter(t=>!t.private_owner_id)}),pending:x=>x,privateAction:async()=>({items:tasks.filter(t=>t.private_owner_id)}),section:()=>'',propertyTag:()=>''};
     window.omgSupabase={rpc:async(name,args)=>{calendarCalls.push({name,args});return {data:name==='list_property_shares'?{ok:true,properties:[{property_id:home,property_name:'One Minute',is_own:true},{property_id:'two',property_name:'OMG House',permissions:['missions']}]}:{ok:true,events,tasks:[],employees:[]}};}};
-   });
+   };
+   await page.evaluate(fixture);
    await page.addScriptTag({path:'property-selector.js'});await page.addScriptTag({path:'calendar.js'});
    await page.waitForSelector('.calendar-month');
    const top=await page.locator('.calendar-top').evaluate(el=>[...el.children].filter(x=>!x.hidden).map(x=>({top:x.getBoundingClientRect().top,bottom:x.getBoundingClientRect().bottom,right:x.getBoundingClientRect().right})));
@@ -51,7 +52,18 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.locator('[data-view=day]').click();await page.waitForSelector('.calendar-day-view');
    await page.locator('#companionSettings').click();assert(await page.evaluate(()=>settingsOpened));
    assert((await page.locator('#companionTodoLink').getAttribute('href')).includes('app=calendar-todo'));
-   await page.locator('#companionTasks [data-id=task-a]').click();await page.waitForURL('**/mission.html?**task=task-a');assert(page.url().includes('scope=mine'));assert.deepEqual(errors,[]);await page.close();
+   await page.locator('#companionTasks [data-id=task-a]').click();await page.waitForURL('**/mission.html?**task=task-a');assert(page.url().includes('scope=mine'));
+   await page.goto('https://oms.test/calendar.html?app=calendar&date=2026-11-25');
+   await page.evaluate(fixture);
+   await page.addScriptTag({path:'property-selector.js'});await page.addScriptTag({path:'calendar.js'});
+   await page.waitForSelector('#companionEvents [data-id=event-a]');
+   assert(await page.locator('#calendarBoard').isHidden());
+   assert.equal(await page.locator('#companionTasks [data-id=task-a]').count(),1);
+   await page.locator('#calendarDateAdd').click();await page.locator('#calendarDateEvent').click();
+   assert.equal(await page.locator('#eventDate').inputValue(),'2026-11-25');await page.keyboard.press('Escape');
+   await page.locator('#calendarDateAdd').click();await page.locator('#calendarDateTask').click();
+   await page.waitForURL('**/mission.html?**date=2026-11-25**');
+   assert.deepEqual(errors,[]);await page.close();
   }
   console.log('PASS companion 320–800px header, icons, selected-day cards, display toggles, 7-day timeline, overnight events, 24h scroll, navigation, settings and direct To do links');
  }finally{await browser.close();}

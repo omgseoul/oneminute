@@ -255,7 +255,7 @@ public final class CalendarWidgets {
         LocalDate first = month ? displayMonth : sunday(today);
         LocalDate end = first.plusDays(weekLength(first, month));
         int rows = (int)((java.time.temporal.ChronoUnit.DAYS.between(sunday(first), end) + 6) / 7);
-        int lines = Math.max(0, Math.min(month ? 2 : 6, ((height - 60) / rows - 16) / 12));
+        int lines = Math.max(0, Math.min(month ? 2 : 6, ((height - 56) / rows - 16) / 12));
         events.sort(Comparator.comparing(e -> CalendarRefresh.time(e, "start_at", Instant.MAX)));
         for (LocalDate start = sunday(first); start.isBefore(end); start = start.plusDays(7)) {
             RemoteViews row = layout(context, R.layout.widget_date_row);

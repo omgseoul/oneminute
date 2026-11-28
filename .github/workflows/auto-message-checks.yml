@@ -19,6 +19,8 @@ jobs:
       - name: Validate scheduling, authorization, delivery and mobile editor
         env: {NODE_PATH: '${{ github.workspace }}/tests/attendance-nfc/node_modules'}
         run: |
+          node tests/online/auto-message-direct-database.cjs
+          node tests/online/auto-message-direct-edge.mjs
           node tests/online/auto-message-followups-database.cjs
           node tests/online/auto-message-followups-edge.mjs
           node tests/online/auto-message-followups-ui.cjs

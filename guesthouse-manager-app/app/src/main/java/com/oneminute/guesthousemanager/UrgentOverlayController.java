@@ -43,7 +43,8 @@ final class UrgentOverlayController {
     }
 
     boolean show(String alertId, String message, String mode, String senderLabel,
-                 long deadlineEpochMs) {
+                 long deadlineEpochMs) {return show(alertId,message,mode,senderLabel,deadlineEpochMs,null);}
+    boolean show(String alertId,String message,String mode,String senderLabel,long deadlineEpochMs,String guestContext) {
         if (!Settings.canDrawOverlays(context) || windowManager == null) return false;
         dismiss();
 
@@ -88,12 +89,15 @@ final class UrgentOverlayController {
         senderParams.setMargins(0, 0, 0, dp(16));
         card.addView(senderCopy, senderParams);
 
+        GuestMessageCard guest=GuestMessageCard.parse(guestContext,message);
+        if(guest!=null){title.setText(guest.title());senderCopy.setVisibility(View.GONE);card.addView(guest.view(context),new LinearLayout.LayoutParams(-1,-2));}else{
         TextView messageBox = label(message, 20, Color.rgb(32, 50, 76), true);
         messageBox.setMinHeight(dp(82));
         messageBox.setPadding(dp(16), dp(15), dp(16), dp(15));
         messageBox.setGravity(Gravity.CENTER);
         messageBox.setBackground(rounded(Color.rgb(247, 249, 253), 18));
         card.addView(messageBox, new LinearLayout.LayoutParams(-1, -2));
+        }
 
         CountdownCircle counter = new CountdownCircle(context);
         LinearLayout.LayoutParams counterParams = new LinearLayout.LayoutParams(dp(102), dp(102));

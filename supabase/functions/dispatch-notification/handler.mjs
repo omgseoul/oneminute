@@ -20,7 +20,7 @@ export function onlineNoticeBody(dispatch){
 
 function guestPresentation(value){
  if(!value||!['online','onsite','same_day'].includes(value.kind))return {};
- const limits={kind:8,guest:120,room:60,arrival:10,departure:10,property:value.kind==='same_day'?80:3,channel:80,sent:14},safe={};
+ const limits={kind:8,guest:120,room:60,arrival:10,departure:10,property:value.kind==='same_day'?80:3,channel:80,sent:14,ai_status:12,ai_reply:650},safe={};
  for(const [key,max]of Object.entries(limits))safe[key]=[...String(value[key]??'')].slice(0,max).join('');
  if(safe.kind==='onsite')safe.channel='';
  return {guestContext:JSON.stringify(safe)};
@@ -146,7 +146,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
         if(!dispatch.ok)return reply({ok:false,code:'not_found'},404);
         if(env('PUSH_DELIVERY_ENABLED')!=='true')return reply({ok:false,code:'not_enabled'},503);
         deliveryId=dispatch.message_id;topics=dispatch.recipient_topics;recipientModes=dispatch.recipient_modes||{};
-        payload={alertId:String(deliveryId),message:onlineNoticeBody(dispatch),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:dispatch.sender_label||'온라인 게스트',route:dispatch.route?.replace(/^online\.html#thread\//,'guest-messages.html#thread/'),...guestPresentation(dispatch.guest_context)};
+        payload={alertId:String(deliveryId),message:onlineNoticeBody(dispatch),mode:'message',priority:dispatch.priority||'normal',messageType:'general',senderLabel:(dispatch.sender_label||'온라인 게스트')+(dispatch.guest_context?.ai_status==='completed'?' · 자동답변 완료':dispatch.guest_context?.ai_status==='unavailable'?' · 자동답변 불가':''),route:dispatch.route?.replace(/^online\.html#thread\//,'guest-messages.html#thread/'),...guestPresentation(dispatch.guest_context)};
       } else if (path.endsWith('/reminder')) {
         if (!await authorizedWorker(req)) return reply({ok:false,code:'unauthorized'},401);
         if (!uuid.test(body.message_id || '')) return reply({ok:false,code:'invalid_request'},400);
@@ -223,7 +223,7 @@ export function createNotificationHandler({ env, fetcher = fetch, cryptoApi = cr
       }
       if (!Array.isArray(topics) || topics.some(t=>typeof t!=='string'||!topicPattern.test(t))) throw new Error('invalid_routing');
       // Leave room for recipient binding and transport fields within FCM's data limit.
-      if(payload.guestContext){let chars=[...payload.message];while(encoder.encode(JSON.stringify(payload)).length>3300&&chars.length){chars=chars.slice(0,-30);payload.message=chars.join('')+'…';}}
+      if(payload.guestContext){let context=JSON.parse(payload.guestContext);while(encoder.encode(JSON.stringify(payload)).length>3300&&[...String(context.ai_reply||'')].length>50){context.ai_reply=[...context.ai_reply].slice(0,-40).join('')+'…';payload.guestContext=JSON.stringify(context);}let chars=[...payload.message];while(encoder.encode(JSON.stringify(payload)).length>3300&&chars.length){chars=chars.slice(0,-30);payload.message=chars.join('')+'…';}}
       const uniqueTopics = [...new Set(topics)];
       const devices = uniqueTopics.length ? await rpc('resolve_native_push_targets',{p_topics:uniqueTopics}) : [];
       if (!Array.isArray(devices)) throw new Error('invalid_routing');

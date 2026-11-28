@@ -1,0 +1,34 @@
+const fs=require('fs'),assert=require('assert/strict');
+module.exports=async({db,p1,p2,t1,id})=>{
+ await db.exec("alter table omg_private.ai_settings add column online_enabled boolean default false,add column online_enabled_at timestamptz;alter table omg_private.online_connections drop constraint online_connections_ai_mode_check,add column ai_automatic_at timestamptz;alter table omg_private.ai_jobs add column reply_topic text;");
+ await db.exec(fs.readFileSync('supabase/setup/guest_ai_manual_rooms.sql','utf8'));
+ const auto=fs.readFileSync('supabase/migrations/20261127034904_beds24_ai_auto_reply.sql','utf8');const start=auto.indexOf('create function omg_private.online_ai_eligible');await db.exec(auto.slice(start,auto.indexOf('$$;',start)+3));
+ const sql=fs.readFileSync('supabase/setup/guest_ai_silent_notifications.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const q=async(s,a=[])=>(await db.query(s,a)).rows[0];
+ const rows=[{title:'난방',rooms:'전체',answer:'공통 난방'},{title:'난방',rooms:'401',answer:'  '},{title:'짐 보관',rooms:'전체',answer:'로비'}];
+ assert.deepEqual((await q('select omg_private.ai_manual_data($1,$2) v',[JSON.stringify(rows),'401'])).v.map(r=>r.title),['짐 보관']);
+ assert.equal((await q('select omg_private.ai_manual_data($1,$2) v',[JSON.stringify(rows),'101'])).v.length,2);
+ const m=await q("select om.* from omg_private.online_messages om join public.property_messages pm on pm.id=om.notice_id where om.property_id=$1 and pm.source='beds24' limit 1",[p1]);
+ await db.query("update omg_private.ai_settings set online_enabled=true,online_enabled_at=now()-interval '1 day',mode='always' where property_id=$1",[p1]);
+ await db.query("update omg_private.online_connections set ai_mode='automatic',ai_automatic_at=now()-interval '1 day' where property_id=$1",[p1]);
+ await db.query("update omg_private.online_messages set sent_at=now(),created_at=now(),attachment_name=null,source='guest',body='짐 보관?' where property_id=$1 and id=$2",[p1,m.id]);
+ await db.query("update omg_private.online_bookings set status='confirmed' where property_id=$1 and id=$2",[p1,m.booking_id]);
+ await db.query('delete from omg_private.online_outbox where property_id=$1 and based_on=$2',[p1,m.id]);
+ const outcome=async(prop=p1)=>(await q('select omg_private.online_ai_notice($1,$2) v',[prop,m.notice_id])).v;
+ assert.equal((await outcome()).ai_status,'pending');assert.deepEqual(await outcome(p2),{});
+ assert.equal((await q('select public.get_online_push_dispatch($1) v',[m.notice_id])).v.pending,true);
+ const oid=id(99001);await db.query("insert into omg_private.online_outbox(id,property_id,booking_id,body,kind,status,based_on,actor) values($1,$2,$3,'생성된 초안','ai','draft',$4,'ai:automatic')",[oid,p1,m.booking_id,m.id]);
+ assert.equal((await outcome()).ai_status,'unavailable','draft is not delivery');
+ for(const status of ['failed','uncertain']){await db.query('update omg_private.online_outbox set status=$1 where id=$2',[status,oid]);assert.equal((await outcome()).ai_status,'unavailable');}
+ await db.query("update omg_private.online_outbox set status='sent',body='로비에 맡기실 수 있습니다.' where id=$1",[oid]);assert.equal((await outcome()).ai_status,'completed');assert.equal((await outcome()).ai_reply,'로비에 맡기실 수 있습니다.');
+ const owner=await q('select id from owners where property_id=$1 and active order by created_at limit 1',[p1]),actor='owner:'+owner.id;
+ const rule={id:id(99002),enabled:true,alert_mode:'strong',property_ids:[p1],days:[0,1,2,3,4,5,6],start_time:'',end_time:'',lower_ai_reply:true};
+ let save=(await q('select public.save_guest_chat_alert_schedules($1,$2,$3) v',[t1,actor,JSON.stringify([rule])])).v;assert.equal(save.schedules[0].lower_ai_reply,true);
+ delete rule.lower_ai_reply;save=(await q('select public.save_guest_chat_alert_schedules($1,$2,$3) v',[t1,actor,JSON.stringify([rule])])).v;assert.equal(save.schedules[0].lower_ai_reply,true,'legacy clients preserve setting');
+ const mode=async(level,status='completed',prop=p1)=>(await q('select omg_private.ai_completed_alert_mode($1,$2,$3,$4) v',[actor,prop,level,status])).v;
+ for(const [from,to] of [['urgent','strong'],['strong','normal'],['normal','weak'],['weak','weak']])assert.equal(await mode(from),to);
+ assert.equal(await mode('strong','unavailable'),'strong');assert.equal(await mode('strong','pending'),'strong');assert.equal(await mode('strong','completed',p2),'strong');
+ const popup=(await q('select omg_private.guest_popup_online($1,$2) v',[p1,m.notice_id])).v;assert.equal(popup.ai_status,'completed');assert.equal(popup.ai_reply,'로비에 맡기실 수 있습니다.');
+ for(const role of ['anon','authenticated'])assert.equal((await q("select has_function_privilege($1,'omg_private.online_ai_notice(uuid,uuid)','execute') v",[role])).v,false);
+ console.log('AI outcome DB: blank overrides, no premature success, failed/uncertain handling, delayed single notice, tenant scope, account option persistence and one-step reduction passed');
+};

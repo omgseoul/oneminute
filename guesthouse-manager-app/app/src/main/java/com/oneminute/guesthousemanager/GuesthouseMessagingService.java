@@ -21,6 +21,9 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 public class GuesthouseMessagingService extends FirebaseMessagingService {
+    private static String notificationBody(RemoteMessage remote,String body){
+        try{org.json.JSONObject c=new org.json.JSONObject(remote.getData().getOrDefault("guestContext","{}"));String status=c.optString("ai_status");return body+(status.equals("completed")?"\n자동답변 완료":status.equals("unavailable")?"\n자동답변 불가":"");}catch(Exception e){return body;}
+    }
     private static final String MESSAGE_CHANNEL_ID = "property_messages_strong_v5";
     private static final String NORMAL_MESSAGE_CHANNEL_ID = "property_messages_normal_popup_v3";
     static final String WEAK_MESSAGE_CHANNEL_ID = "property_messages_weak_status_v4";
@@ -93,6 +96,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             service.putExtra("message", message.getData().get("message"));
             service.putExtra("mode", mode == null ? "urgent" : mode);
             service.putExtra("senderLabel", message.getData().get("senderLabel"));
+            service.putExtra("guestContext", message.getData().get("guestContext"));
             service.putExtra("guestNotification",NativeMessageBadge.guest(message.getData()));
             service.putExtra("botNotification",NativeMessageBadge.bot(message.getData().get("route")));
         }
@@ -149,7 +153,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
                 .setContentText(reminder!=null?reminder.title:sender + " · " + body)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):notificationBody(remote,body)))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -201,7 +205,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setSmallIcon(R.drawable.ic_oms_notification).setNumber(continuation?0:NativeMessageBadge.currentCount(this,NativeMessageBadge.guest(remote.getData()))).setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:continuation?"근무 12시간 초과 알림":isApproval(messageType) ? "결재 요청"
                         : "guest_chat".equals(messageType) ? "현장 게스트 메세지" : "새 메세지 도착")
-                .setContentText(reminder!=null?reminder.title:sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
+                .setContentText(reminder!=null?reminder.title:sender + " · " + body).setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):notificationBody(remote,body)))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true).setFullScreenIntent(fullScreen, true).setContentIntent(continuation?fullScreen:content).build();
@@ -265,7 +269,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
                 .setColor(Color.rgb(36, 103, 189))
                 .setContentTitle(reminder!=null?reminder.heading+" "+reminder.timing:isApproval(messageType) ? "결재 요청" : "새 메세지 도착")
                 .setContentText(reminder!=null?reminder.title:sender + " · " + body)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):body))
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(reminder!=null?reminder.title+(reminder.dateLine.isEmpty()?"":"\n"+reminder.dateLine):notificationBody(remote,body)))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

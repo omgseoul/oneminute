@@ -134,7 +134,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
   }
   return {ok:true};
  }
- async function handleJob(job){const p=job.property_id;try{const c=await credentials(p);await booking(p,c,job.booking_id);await messages(p,c,job.booking_id,true);await push(p);if(c.ai_mode==='approval')await draft(p,job.booking_id,'webhook');else if(c.ai_mode==='automatic')await autoReply(p,c,job.booking_id);await internal('synced',p);await internal('ack',p,job);}catch(e){await internal('ack',p,{...job,error:e.message});}}
+ async function handleJob(job){const p=job.property_id;try{const c=await credentials(p);await booking(p,c,job.booking_id);await messages(p,c,job.booking_id,true);if(c.ai_mode==='approval')await draft(p,job.booking_id,'webhook');else if(c.ai_mode==='automatic')await autoReply(p,c,job.booking_id);await push(p);await internal('synced',p);await internal('ack',p,job);}catch(e){await internal('ack',p,{...job,error:e.message});}}
  async function drain(){let bookingProperties=[];try{const v=await internal('booking_push_properties',null);if(Array.isArray(v))bookingProperties=v;}catch{}for(const p of new Set([...await internal('maintenance',null),...bookingProperties])){try{await credentials(p);await push(p);}catch{}}for(let i=0;i<4;i++){const job=await internal('claim',null);if(job.empty)break;await handleJob(job);}}
  return async req=>{
   const origin=req.headers.get('origin'),allowed=['https://omgworks24.com','https://www.omgworks24.com','https://omgseoul.github.io'];

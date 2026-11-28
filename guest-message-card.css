@@ -54,3 +54,5 @@
 .guest-popup-channel-initial{border-radius:5px;background:#e7eef8;color:#254b75;font-size:13px;font-weight:700}
 #messageArrival .guest-popup-channel-icon img,.guest-popup-channel-icon img{width:100%;height:100%}
 .booking-popup-summary .guest-popup-channel-icon{margin-inline-end:5px}
+
+.guest-popup-ai{border-top:1px solid #dce5f0;margin-top:12px;padding-top:9px;text-align:left}.guest-popup-ai-state{display:inline-block;color:#28785f;font-size:11px;line-height:1.6}.guest-popup-ai.is-unavailable .guest-popup-ai-state{color:#a26531}.guest-popup-ai-answer{margin-top:4px;font-size:12px;line-height:1.55;color:#60748b;white-space:pre-wrap;overflow-wrap:anywhere}

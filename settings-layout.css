@@ -3,9 +3,9 @@
 .oms-native{--settings-safe-top:max(28px,env(safe-area-inset-top,0px));--settings-safe-bottom:max(48px,env(safe-area-inset-bottom,0px))}
 .ai-settings-page main,.property-settings-page main.shell{padding-bottom:calc(20px + var(--settings-safe-bottom));scroll-padding-bottom:calc(20px + var(--settings-safe-bottom))}
 .ai-settings-page main{padding-top:calc(6px + var(--settings-safe-top))!important}
-.property-settings-page .card{margin-top:10px;padding:14px 18px}
+.property-settings-page .card{margin-top:8px;padding:10px 16px}
 .property-settings-page .card>summary h2,.property-settings-page .card>a h2{margin:0;font-size:18px}
-.property-settings-page .card>summary .help,.property-settings-page .card>a .help{margin:5px 0 0;line-height:1.5}
+.property-settings-page .card>summary .help,.property-settings-page .card>a .help{margin:3px 0 0;line-height:1.4}
 .property-settings-page .card>summary,.property-settings-page .card>a{min-height:44px;gap:10px}
 .property-settings-page .card>summary>div,.property-settings-page .card>a>div{min-width:0}
 .property-settings-page .card>summary>span,.property-settings-page .card>a>span{flex-shrink:0}

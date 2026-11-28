@@ -2,19 +2,40 @@ const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const colors=['#a8ccfa','#609eea','#246cc6'];
 const monthLabel=m=>m.replace('-','.');
 const currencyLabel=c=>c==='UNKNOWN'?'통화 미확인':c;
-const fitText=value=>`<span>${escape(value)}</span>`;
-// Measure the actual glyphs after layout, so currency signs, decimals and device fonts all fit.
+export const revenueAmountText=value=>`<span style="--amount-chars:${Math.max(1,Array.from(String(value)).length)}">${escape(value)}</span>`;
+const fitText=revenueAmountText;
+// Observe each amount as well as the page: WebView font inflation can change glyph
+// widths after first layout without changing the width of the results section.
 export function fitRevenueAmounts(root){
- let frame=0,lastWidth=-1;
- const fit=()=>{frame=0;root.querySelectorAll('[data-fit-amount]').forEach(el=>{
-  el.style.removeProperty('font-size');const text=el.firstElementChild,available=el.clientWidth;
-  if(!text||!available)return;const size=parseFloat(getComputedStyle(el).fontSize),width=text.getBoundingClientRect().width;
-  if(width>available){el.style.fontSize=(Math.floor(size*(available-1)/width*10)/10)+'px';}
- });};
- const schedule=()=>{if(!frame)frame=requestAnimationFrame(fit);};
- const observer=typeof ResizeObserver==='function'?new ResizeObserver(entries=>{const width=entries[0].contentRect.width;if(width!==lastWidth){lastWidth=width;schedule();}}):null;
- observer?.observe(root);window.addEventListener('resize',schedule);document.fonts?.ready.then(schedule);
- return {schedule,destroy(){observer?.disconnect();window.removeEventListener('resize',schedule);cancelAnimationFrame(frame);}};
+ let frame=0,stopped=false;const watched=new Map();
+ const metrics=node=>{const r=node.getBoundingClientRect();return {width:r.width,height:r.height};};
+ const record=node=>watched.set(node,metrics(node));
+ const fit=()=>{
+  frame=0;if(stopped)return;const amounts=[...root.querySelectorAll('[data-fit-amount]')],nodes=new Set([root]);
+  for(const el of amounts){
+   const text=el.firstElementChild;if(!text)continue;nodes.add(el);nodes.add(text);
+   el.style.removeProperty('font-size');text.style.removeProperty('font-size');
+   const style=getComputedStyle(el),available=el.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-2;
+   if(available<=0)continue;
+   let size=parseFloat(getComputedStyle(text).fontSize);
+   for(let attempt=0;attempt<4;attempt++){
+    const width=text.getBoundingClientRect().width;if(width<=available)break;
+    size=Math.max(.1,Math.floor(size*available/width*10)/10);
+    text.style.setProperty('font-size',size+'px','important');
+   }
+   el.style.setProperty('font-size',size+'px');
+  }
+  for(const node of watched.keys())if(!nodes.has(node)){observer?.unobserve(node);watched.delete(node);}
+  for(const node of nodes){if(!watched.has(node))observer?.observe(node);record(node);}
+ };
+ const schedule=()=>{if(!stopped&&!frame)frame=requestAnimationFrame(fit);};
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(entries=>{
+  // Ignore our own measured changes, preventing resize/fit feedback loops.
+  if(entries.some(({target})=>{const before=watched.get(target),now=metrics(target);return !before||Math.abs(before.width-now.width)>.25||(target.matches('[data-fit-amount]>span')&&Math.abs(before.height-now.height)>.25);}))schedule();
+ }):null;
+ const mutations=new MutationObserver(schedule);mutations.observe(root,{childList:true,subtree:true,characterData:true});
+ record(root);observer?.observe(root);window.addEventListener('resize',schedule);window.addEventListener('pageshow',schedule);window.visualViewport?.addEventListener('resize',schedule);document.fonts?.ready.then(schedule);document.fonts?.addEventListener('loadingdone',schedule);
+ return {schedule,destroy(){stopped=true;observer?.disconnect();mutations.disconnect();window.removeEventListener('resize',schedule);window.removeEventListener('pageshow',schedule);window.visualViewport?.removeEventListener('resize',schedule);document.fonts?.removeEventListener('loadingdone',schedule);cancelAnimationFrame(frame);}};
 }
 export function createPropertyRevenueChart(host,{name,money,compact,covered,onDrilldown,onLayout,isBusy=()=>false}){
  let state=null,currency=null,page=0,selection=null,entries=[];
@@ -25,11 +46,11 @@ export function createPropertyRevenueChart(host,{name,money,compact,covered,onDr
  }
  function render(){
   if(!state)return;const r=state.reports.find(r=>r.currency===currency);entries=[];
-  if(!r){host.innerHTML='<p class="note">해당 예약이 없습니다.</p>';renderEmpty();return;}
+  if(!r){host.innerHTML='<h2>지점별 매출</h2><p class="note">해당 예약이 없습니다.</p>';renderEmpty();return;}
   const known=currency!=='UNKNOWN',grouped=state.months.length>1,visible=grouped?state.months.slice(page*3,page*3+3):[null];
   const groups=[...r.properties].sort((a,b)=>b.amount-a.amount),pages=Math.ceil(state.months.length/3);
   const tabButtons=state.reports.map(report=>`<button type="button" role="tab" id="revenue-tab-${escape(report.currency)}" aria-controls="revenue-property-panel" aria-selected="${report.currency===currency}" tabindex="${report.currency===currency?0:-1}" data-property-currency="${escape(report.currency)}">${escape(currencyLabel(report.currency))}</button>`).join('');
-  host.innerHTML=`<div class="revenue-property-tools"><div class="revenue-currency-tabs" role="tablist" aria-label="지점별 매출 통화">${tabButtons}</div><small>${currency==='KRW'?'단위: 만원':known?'단위: '+escape(currency):'금액 합산 제외'}</small></div><div id="revenue-property-panel" role="tabpanel" aria-labelledby="revenue-tab-${escape(currency)}"></div>`;
+  host.innerHTML=`<div class="revenue-property-tools"><h2>지점별 매출</h2><div class="revenue-currency-tabs" role="tablist" aria-label="지점별 매출 통화">${tabButtons}</div><small>${currency==='KRW'?'단위: 만원':known?'단위: '+escape(currency):'금액 합산 제외'}</small></div><div id="revenue-property-panel" role="tabpanel" aria-labelledby="revenue-tab-${escape(currency)}"></div>`;
   const panel=host.querySelector('[role=tabpanel]');
   if(!known){panel.innerHTML='<p class="note">통화를 확인할 수 없는 예약은 금액 합계와 그래프에서 제외합니다.</p>'+groups.map(g=>`<div class="revenue-unknown-property"><span>${escape(name(g.key))}</span><b>${g.bookings}건</b></div>`).join('');renderEmpty();onLayout?.();return;}
   const windowBounds=m=>{if(!m)return {from:state.from,to:state.to};const [y,n]=m.split('-').map(Number),end=new Date(Date.UTC(y,n,0)).toISOString().slice(0,10);return {from:m+'-01'<state.from?state.from:m+'-01',to:end>state.to?state.to:end};};

@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>매출 관리 · OMS</title><link rel="stylesheet" href="online.css?v=20261127-compact-details"><link rel="stylesheet" href="revenue.css?v=20261128-columns"><link rel="stylesheet" href="revenue-charts.css?v=20261128-columns"></head><body><main>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>매출 관리 · OMS</title><link rel="stylesheet" href="online.css?v=20261127-compact-details"><link rel="stylesheet" href="revenue.css?v=20261128-compact-fit"><link rel="stylesheet" href="revenue-charts.css?v=20261128-compact-fit"></head><body><main>
 <header><a class="home" href="online.html">‹ 온라인 관리</a><div id="revenueProperties"></div></header>
 <div class="heading"><div class="eyebrow">ONLINE · REVENUE</div><h1>매출 관리</h1><p>지점·기간·예약사이트별 예약 매출</p></div>
 <section class="card revenue-filters">
@@ -15,9 +15,9 @@
 </section>
 <section id="revenueResults" hidden>
 <div class="revenue-summary"><div class="revenue-total"><span>예약 매출 · 통화별 합계</span><div id="revenueTotals"></div><small id="revenueSummaryNote"></small></div><div><span>예약</span><strong id="revenueCount">-</strong><small id="revenueNights"></small></div></div><p id="revenueMissing" class="revenue-warning" hidden></p>
-<section class="card" id="revenuePropertySection"><h2>지점별 매출</h2><div id="revenuePropertyBreakdown"></div></section>
+<section class="card" id="revenuePropertySection"><div id="revenuePropertyBreakdown"></div></section>
 <section class="card" id="revenueChannelSection"><h2>예약사이트별 매출</h2><div id="revenueChannelBreakdown"></div></section>
 <section class="card" id="revenuePeriodSection"><div class="revenue-section-head"><h2>기간별 매출</h2><small id="revenueRange"></small></div><div id="revenuePeriods"></div></section>
 </section>
 <dialog id="revenueImportDialog" class="revenue-import"><form method="dialog"><div class="revenue-section-head"><h2>예약 불러오기</h2><button class="revenue-dialog-close" aria-label="닫기">×</button></div></form><p>지점 하나·한 달씩 가져옵니다. 연간 통계는 저장된 자료로 비교할 수 있습니다.</p><label>지점<select id="revenueImportProperty"></select></label><label>불러올 월<input id="revenueImportMonth" type="month"></label><small id="revenueImportBasis"></small><button id="revenueImportStart" type="button" class="primary">한 달 불러오기</button><p id="revenueImportStatus" role="status"></p></dialog>
-</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script><script src="property-selector.js?v=20261112-online-multi"></script><script type="module" src="revenue.js?v=20261128-columns"></script></body></html>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="rpc-transport.js?v=20261116-egress"></script><script src="supabase-client.js"></script><script src="property-selector.js?v=20261112-online-multi"></script><script type="module" src="revenue.js?v=20261128-compact-fit"></script></body></html>

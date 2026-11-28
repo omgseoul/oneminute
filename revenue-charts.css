@@ -64,3 +64,32 @@ main{padding-top:12px;padding-bottom:40px}header{margin-bottom:12px}.heading{mar
 .revenue-currency-group+.revenue-currency-group{margin-top:8px;padding-top:7px}.revenue-currency-heading{margin:1px 0 4px}.revenue-matrix th,.revenue-matrix td{padding-top:4px;padding-bottom:4px}.revenue-rank{margin:3px 0 1px}
 .revenue-chart{height:113px;margin-bottom:4px;padding:4px 0}.revenue-table th,.revenue-table td{padding-top:5px;padding-bottom:5px}.revenue-period-details{font-size:11px;margin:3px 0 0;color:#567698}.revenue-period-details>summary{padding:4px 0;cursor:pointer}.revenue-period-details[open]>.revenue-table{margin-top:3px}
 @media(max-width:360px){main{padding:12px 10px 40px}.card{padding:9px}.revenue-column-chart{--plot-height:108px}.revenue-property-tools h2{font-size:14px}.revenue-currency-total strong[data-fit-amount]{font-size:17px}.revenue-currency-total[data-total-currency=UNKNOWN] strong[data-fit-amount]{font-size:10px}.revenue-property-name{font-size:9px}}
+
+/* Monthly comparisons never show multi-month grand totals. */
+.revenue-options.is-monthly{grid-template-columns:1fr 1fr}
+.revenue-view-switch{display:flex;gap:0;background:#edf4fe;border:1px solid #d8e5f7;border-radius:9px;overflow:hidden;flex:none}
+.revenue-view-switch button{border:0;border-radius:0;box-shadow:none;background:transparent;font-size:12px;font-weight:600;padding:6px 15px;min-height:30px;color:#52769b}
+.revenue-view-switch button[aria-pressed=true]{background:#286bbb;color:#fff}
+.revenue-monthly-meta{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;color:#7a899e;margin:5px 0 2px}
+.revenue-monthly-meta small{font-size:9px}
+.revenue-focus-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:3px;margin:6px 0;background:#edf4fe;border-radius:9px}
+.revenue-focus-tabs button{flex:1 1 75px;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;padding:6px 5px;min-height:29px;box-shadow:none;background:transparent;border:0;border-radius:7px;color:#52769b}
+.revenue-focus-tabs button[aria-pressed=true]{color:#fff;background:#286bbb}
+.revenue-focused-name{font-size:11px;color:#52769b;margin:4px 0 1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.revenue-column-chart.is-monthly{--plot-height:112px;padding-top:21px;grid-template-columns:29px minmax(0,1fr);gap:5px}
+.revenue-column-chart.is-property-focus{--plot-height:118px}
+.is-monthly .revenue-plot-inner{width:max(100%,calc(100% * var(--month-count) / var(--visible-months)));min-width:calc(var(--month-count) * var(--series-count) * 25px)}
+.is-monthly .revenue-plot-groups{grid-template-columns:repeat(var(--month-count),minmax(0,1fr))}
+.is-monthly .revenue-property-group{padding:0 2px}
+.is-monthly .revenue-property-columns{gap:1px}
+.is-monthly .revenue-property-bar{max-width:none}
+.is-monthly .revenue-property-bar>i{left:12%;right:12%;max-width:40px;margin:0 auto}
+.is-monthly .revenue-property-bar>b{width:100%;font-size:11px;bottom:calc(var(--bar-height) + 4px);line-height:1.25}
+.is-monthly .revenue-property-name{font-size:10px;height:24px;padding-top:5px}
+.is-monthly .revenue-y-axis{font-size:9px}
+.revenue-property-legend{display:flex;flex-wrap:wrap;gap:5px 12px;margin:3px 0 5px;font-size:10px;color:#677e9c}
+.revenue-property-legend>span{display:flex;align-items:center;gap:4px;min-width:0;max-width:100%}
+.revenue-property-legend>span>span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.revenue-property-legend i{flex:none;width:8px;height:8px;border-radius:2px}
+.revenue-monthly-hint{font-size:9px;line-height:1.4;margin:5px 0 0;color:#7a899e}
+@media(max-width:360px){.revenue-view-switch button{padding:6px 11px}.revenue-column-chart.is-monthly{grid-template-columns:26px minmax(0,1fr);gap:4px}.revenue-property-legend{gap:4px 8px}}

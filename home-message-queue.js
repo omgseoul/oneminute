@@ -66,7 +66,7 @@
   if(!active&&queue.length)render();else if(active)updateCount();
  }
  function update(items,accessToken,announce){
-  bind(accessToken);flushReads();const fresh=active&&items.find(i=>i.message_id===active.message_id);if((fresh?.guest_context?.translation&&fresh.guest_context.translation!==active.guest_context?.translation)||fresh?.auto_message?.followup!==active?.auto_message?.followup){active={...active,guest_context:fresh.guest_context,auto_message:fresh.auto_message};render();}
+  bind(accessToken);flushReads();const fresh=active&&items.find(i=>i.message_id===active.message_id);if(fresh&&((fresh.guest_context?.translation&&fresh.guest_context.translation!==active.guest_context?.translation)||fresh.auto_message?.followup!==active?.auto_message?.followup)){active={...active,guest_context:fresh.guest_context,auto_message:fresh.auto_message};render();}
   const incoming=items.filter(i=>!i.is_sender&&!i.read_at&&!['announcement','attendance_warning','work_confirmation'].includes(i.message_type)&&
    (i.source==='reminder'||/^(To do 알림|일정 알림)$/.test(i.sender_label||'')||(announce&&observed&&!observed.has(i.message_id))))
    .sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||''))||String(a.message_id).localeCompare(String(b.message_id)));

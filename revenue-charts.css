@@ -1,0 +1,50 @@
+/* Preserve every digit; the measured font fit runs after content and width changes. */
+[data-fit-amount]{min-width:0;white-space:nowrap;overflow-wrap:normal!important;word-break:normal;font-variant-numeric:tabular-nums}
+[data-fit-amount]>span{display:inline-block;font:inherit;color:inherit;white-space:nowrap}
+.revenue-summary strong[data-fit-amount]{display:block;width:100%;line-height:1.35}
+.revenue-property-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 12px;min-width:0}
+.revenue-property-tools>small{flex:none;font-size:10px;color:#7a899e}
+.revenue-currency-tabs{display:flex;gap:3px;padding:3px;background:#edf4fe;border-radius:10px;min-width:0;overflow-x:auto}
+.revenue-currency-tabs button{flex:none;min-width:48px;border:0;background:transparent;border-radius:8px;box-shadow:none;padding:6px 10px;font-size:12px;color:#58799f;line-height:1.2}
+.revenue-currency-tabs button[aria-selected=true]{color:#fff;background:#286bbb}
+.revenue-currency-tabs button:focus-visible,.revenue-property-bar:focus-visible{outline:2px solid #1a65b8;outline-offset:2px}
+.revenue-property-range{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px;margin:0 0 6px;color:#567698;font-size:11px;font-variant-numeric:tabular-nums}
+.revenue-property-range>small{font-size:10px;color:#7a899e}
+.revenue-month-pages{display:flex;align-items:center;gap:7px}
+.revenue-month-pages button{height:28px;width:28px;padding:0;min-height:0;box-shadow:none;border-radius:8px;font-size:19px}
+.revenue-month-pages small{font-size:10px}
+.revenue-column-chart{--plot-height:174px;display:grid;grid-template-columns:36px minmax(0,1fr);gap:7px;padding-top:23px;min-width:0}
+.revenue-column-chart.is-grouped{padding-top:14px}
+.revenue-y-axis{position:relative;height:var(--plot-height);color:#7f91a9;font-size:10px;font-variant-numeric:tabular-nums}
+.revenue-y-axis>span{position:absolute;right:0;transform:translateY(50%);white-space:nowrap}
+.revenue-plot-scroll{min-width:0;overflow-x:auto;scrollbar-width:thin;overscroll-behavior-x:contain;padding-top:22px;margin-top:-22px}
+.revenue-plot-inner{position:relative;min-width:calc(var(--property-count) * 76px);width:100%}
+.revenue-plot-grid{position:absolute;top:0;left:0;right:0;height:var(--plot-height);pointer-events:none}
+.revenue-plot-grid i{position:absolute;left:0;right:0;height:1px;background:#e7eef8}
+.revenue-plot-grid i:first-child{background:#bfd0e5}
+.revenue-plot-groups{display:grid;grid-template-columns:repeat(var(--property-count),minmax(0,1fr));gap:0;position:relative}
+.revenue-property-group{min-width:0;padding:0 6px}
+.revenue-property-columns{display:flex;justify-content:center;gap:4px;min-width:0;height:var(--plot-height)}
+.revenue-property-columns .revenue-property-bar{height:100%;position:relative;flex:1;min-width:0;max-width:64px;border:0;border-radius:0;padding:0;background:none;box-shadow:none;overflow:visible}
+.revenue-property-bar>i{position:absolute;bottom:0;left:0;right:0;height:var(--bar-height);border-radius:5px 5px 0 0;background:var(--bar-color);background:linear-gradient(180deg,color-mix(in srgb,var(--bar-color),white 12%),var(--bar-color));pointer-events:none}
+.revenue-property-bar.is-incomplete>i{background:repeating-linear-gradient(135deg,var(--bar-color),var(--bar-color) 4px,color-mix(in srgb,var(--bar-color),white 35%) 4px,color-mix(in srgb,var(--bar-color),white 35%) 7px)}
+.revenue-property-bar> b{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--bar-height) + 5px);width:calc(100% + 10px);font-size:11px;font-weight:700;color:#214d7e;pointer-events:none}
+.revenue-property-bar[aria-pressed=true]>i{outline:2px solid #1b65b6;outline-offset:2px;box-shadow:0 0 0 5px #d9eaff}
+.revenue-property-bar .revenue-missing-marker{position:absolute;bottom:0;left:0;right:0;font-size:15px;color:#8493a6}
+.revenue-property-name{min-width:0;height:30px;line-height:1.3;padding-top:8px;font-size:11px;text-align:center;color:#28445f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.revenue-month-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 13px;font-size:10px;color:#667f9c;margin:8px 0 2px}
+.revenue-month-legend>span{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.revenue-month-legend i{height:9px;width:9px;border-radius:3px}
+.revenue-chart-hint{margin:7px 0 9px;font-size:10px;color:#7a899e;line-height:1.5}
+.revenue-bar-detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 8px;padding:9px 10px;margin-bottom:9px;border-left:3px solid #347dce;border-radius:8px;background:#f0f6ff;font-size:11px;align-items:center}
+.revenue-bar-detail>div{min-width:0}
+.revenue-bar-detail b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.revenue-bar-detail small{display:block;font-size:9px;color:#7a899e;margin-top:3px;line-height:1.4}
+.revenue-bar-detail>strong{font-size:13px;text-align:right;color:#1c4f89}
+.revenue-bar-detail button{grid-column:2;justify-self:end;box-shadow:none;border:0;background:none;padding:3px 0;min-height:0;font-size:11px;color:#2566a9}
+.revenue-property-total{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border-radius:9px;background:#eef5ff;color:#225586;font-size:12px;font-weight:600}
+.revenue-property-total>span{flex:none;white-space:nowrap}
+.revenue-property-total strong{flex:1;font-size:15px;text-align:right}
+.revenue-unknown-property{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #edf1f6;font-size:12px}
+.revenue-unknown-property>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:360px){.revenue-column-chart{grid-template-columns:30px minmax(0,1fr);gap:5px;--plot-height:156px}.revenue-currency-tabs button{padding:6px 7px;min-width:43px;font-size:11px}.revenue-property-tools{gap:6px}.revenue-property-name{font-size:10px}.revenue-property-group{padding:0 5px}.revenue-plot-inner{min-width:calc(var(--property-count) * 70px)}.revenue-property-total{gap:8px;font-size:11px}.revenue-y-axis{font-size:9px}}

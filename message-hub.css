@@ -231,3 +231,13 @@ html:has(body.bot-open){scrollbar-gutter:auto}
 .bot-failure-property{flex:0 1 auto;max-width:30%}
 .bot-failure-guest{flex:1}
 .bot-failure-room,.bot-failure-dates{flex:none}
+
+.bot-roster-line,.bot-lock-line{display:grid;align-items:center;gap:6px;min-width:0;font-size:12px;line-height:22px}
+.bot-roster-line{grid-template-columns:36px minmax(0,1fr) minmax(0,76px)}
+.bot-roster-line span,.bot-lock-line span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bot-roster{min-width:0;margin:8px 0}
+.bot-roster>strong{font-size:13px}
+.bot-roster-head{color:#64748b;font-weight:700;border-bottom:1px solid #dce7f1}
+.bot-roster [role=row]+[role=row]{border-bottom:1px solid #edf2f7}
+.bot-lock-footer{grid-template-columns:minmax(0,1fr) minmax(0,auto) auto}
+.bot-lock-footer .bot-chat-action{font-size:11px;line-height:20px;padding:0;min-height:0;white-space:nowrap}

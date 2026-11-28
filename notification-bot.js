@@ -32,6 +32,8 @@ window.NotificationBot=(()=>{
  }
  function cardContent(i){
   const text=body(i),lines=text.split('\n');
+  const lock=lockSummary(i,lines);if(lock)return lock;
+  const briefing=briefingSummary(i,lines);if(briefing)return briefing;
   const failure=failureSummary(i,lines);if(failure)return failure;
   if(bookingNotice(i))return {heading:'당일 예약 알림',meta:lines[1]||'',text:lines.slice(2).join('\n'),booking:bookingCard(i,lines)};
   if(onlineBooking(i))return {heading:'온라인 게스트 메세지',meta:lines[0],text:lines.slice(1).join('\n')};
@@ -64,6 +66,33 @@ window.NotificationBot=(()=>{
   }
   return {heading:title(i),text,urgent:i.priority==='urgent'};
  }
+ function lockSummary(i,lines){
+  if(i.sender_type!=='system')return null;
+  const headings={'[IOT 도어락 비밀번호 등록 완료]':'도어락 등록 완료','[IOT 도어락 사용 종료]':'도어락 사용 종료'};
+  const heading=headings[lines[0]];
+  const room=lines[1]?.match(/ · 객실 (.+)$/)?.[1];
+  const field=label=>lines.find(line=>line.startsWith(label+': '))?.slice(label.length+2).trim();
+  const guest=field('게스트'),stay=field('숙박');
+  if(!heading||!room||!guest||!stay)return null;
+  return {heading,lock:{room,guest,channel:i.iot_booking?.channel||field('예약사이트')||'—',
+   dates:stay.replace(/\b\d{4}-(\d{2})-(\d{2})\b/g,'$1/$2').replace(/\s*~\s*/,'–'),pin:i.iot_booking?.pin||'—'}};
+ }
+ function briefingSummary(i,lines){
+  if(i.sender_type!=='system'||!lines[0]?.startsWith('[메시지 브리핑]'))return null;
+  const index=lines.findIndex(line=>/^■ 체크인 명단 · \d{4}-\d{2}-\d{2}$/.test(line));
+  if(index<0)return null;
+  const next=lines.findIndex((line,n)=>n>index&&line.startsWith('■ '));
+  const end=next<0?lines.length:next;
+  const rows=[];
+  for(const line of lines.slice(index+1,end).filter(line=>line.trim())){
+   const match=line.match(/^(.+?) · (.+) · (?:\d{4}-\d{2}-\d{2}|미정)~(?:\d{4}-\d{2}-\d{2}|미정) · (.+) · 비번 .+$/);
+   if(!match)return null;
+   rows.push(match.slice(1));
+  }
+  if(!rows.length)return null;
+  return {heading:title(i),briefing:{before:[lines[0].slice('[메시지 브리핑]'.length).trim(),...lines.slice(1,index)].join('\n').trim(),after:lines.slice(end).join('\n').trim(),title:lines[index].slice(2),rows}};
+ }
+ function compactCell(value){return `<span title="${e(value)}">${e(value)}</span>`;}
  // Summarize only system failure envelopes. Keep the original item for details/search/retry.
  function failureSummary(i,lines){
   if(i.sender_type!=='system')return null;
@@ -95,6 +124,14 @@ window.NotificationBot=(()=>{
  }
  function ordinary(i){
   const c=cardContent(i),action=bookingNotice(i)?(session.sessionKind==='owner'?'예약 상세':'내용 확인'):onlineBooking(i)?(session.sessionKind==='owner'?'대화 열기':'내용 확인'):guestRoom(i)?'대화 열기':StaffChat.contractId(i.message)?'계약서 확인':needsAck(i)&&!i.is_sender&&!i.acknowledged_at?'내용 확인':i.approval_status==='pending'?'결재 보기':'상세 보기';
+  if(c.lock){
+   const {room,guest,channel,dates,pin}=c.lock;
+   return row(i,`<div class="bot-chat-bubble bot-notice bot-lock-notice"><div class="bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-lock-line bot-roster-line">${[room,guest,channel].map(compactCell).join('')}</div><div class="bot-lock-line bot-lock-footer">${compactCell(dates)}${compactCell('비번 '+pin)}<button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}">상세보기 ›</button></div></div>`);
+  }
+  if(c.briefing){
+   const b=c.briefing;
+   return row(i,`<div class="bot-chat-bubble bot-notice"><div class="bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-notice-body">${b.before?contentHTML({text:b.before}):''}<section class="bot-roster"><strong>${e(b.title)}</strong><div role="table" aria-label="체크인 명단"><div class="bot-roster-line bot-roster-head" role="row">${['객실','이름','사이트'].map(label=>`<span role="columnheader">${label}</span>`).join('')}</div>${b.rows.map(values=>`<div class="bot-roster-line" role="row">${values.map(value=>`<span role="cell" title="${e(value)}">${e(value)}</span>`).join('')}</div>`).join('')}</div></section>${b.after?contentHTML({text:b.after}):''}</div>${footer(i,action)}</div>`);
+  }
   if(c.failure)return row(i,`<div class="bot-chat-bubble bot-notice bot-failure-notice"><div class="bot-chat-category bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-failure-summary"><p class="bot-failure-identity" title="${e(c.summary)}"><span class="bot-failure-property">${e(c.property)}</span><span class="bot-failure-room"> · ${e(c.room)}</span><span class="bot-failure-guest"> · ${e(c.guest)}</span>${c.dates?`<span class="bot-failure-dates" title="체크인~체크아웃"> · ${e(c.dates)}</span>`:''}</p><div class="bot-failure-reason"><p title="${e(c.reason)}">${e(c.reason)}</p><button class="bot-chat-action bot-failure-details" type="button" data-bot-message="${e(i.message_id)}">상세보기 ›</button></div></div></div>`);
   if(c.booking){const b=c.booking;return row(i,`<div class="bot-chat-bubble bot-notice bot-booking-notice"><div class="bot-booking-header"><div class="bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div class="bot-booking-summary"><strong class="bot-booking-room">${e(b.room)}</strong>${b.property?`<strong class="bot-booking-property" title="${e(b.property)}">· ${e(b.property)}</strong>`:''}<span class="bot-booking-channel" title="${e(b.channel)}">${window.OMSGuestMessageCard?.channelIcon(b.channel)?.outerHTML||''}${e(b.channel)}</span></div></div><div class="bot-notice-body bot-booking-body"><p class="bot-booking-guest">${e(b.guest)}</p><div class="bot-notice-footer"><span class="bot-booking-dates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>${e(b.dates)}</span><button class="bot-chat-action" type="button" data-bot-message="${e(i.message_id)}">${e(action)} ›</button></div></div></div>`);}
   if(onlineBooking(i)&&window.OMSGuestMessageCard?.read(i)?.kind==='online')return row(i,`<div class="bot-chat-bubble bot-notice bot-online-notice"><div class="bot-chat-category bot-notice-heading"><span class="bot-notice-badge">${e(c.heading)}</span></div><div data-bot-online-card="${e(i.message_id)}"></div>${footer(i,action)}</div>`);

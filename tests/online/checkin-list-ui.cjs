@@ -11,7 +11,7 @@ async function navigateTo(b,hash){const changed=new Promise(resolve=>b.w.addEven
 const openCustom=b=>{b.$('#checkinPeriodButton').click();if(b.$('#searchForm').hidden)b.$('#checkinCustomPeriodButton').click();};
 (async()=>{
  let b=await boot();
- assert.deepEqual([...b.w.document.querySelectorAll('.menu-card')].map(e=>e.hash),['#settings','#checkin','#cleaning','#booking-data','#logs']);
+ assert.deepEqual([...b.w.document.querySelectorAll('.menu-card')].map(e=>e.getAttribute('href')),['#settings','#checkin','#cleaning','#booking-data','#logs','revenue.html']);
  assert.equal(b.$('#pageTitle').textContent,'체크인 list');assert.equal(b.query().basis,'arrival');assert.equal(b.query().from,b.query().to);assert.deepEqual(selected(b),['arrival']);
  assert.equal(b.$('#bookingSortLabel').textContent,'최신순');assert.equal(b.$('.booking-name').textContent,'Newest','default is booking-created descending');
  assert.equal(b.$('.booking-property').textContent,'One');assert(b.$('.booking-room'));b.$('[data-channel]').click();assert(!b.$('.booking-item').open,'source icon does not expand reservation');assert(!b.$('.channel-popover').hidden);

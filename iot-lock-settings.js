@@ -45,30 +45,45 @@
 
  $('iotEnabled').onchange=e=>{if(!e.target.checked){run('toggle',{enabled:false},'자동발급을 중지했습니다.');return;}e.target.checked=false;if(dirty){status('매칭과 발급 설정을 먼저 저장해주세요.',true);return;}$('iotEnableError').textContent='';$('iotSensitive').value='';$('iotBedsOff').checked=false;$('iotEnableDialog').showModal();};$('iotEnableCancel').onclick=()=>$('iotEnableDialog').close();$('iotEnableDialog').addEventListener('close',()=>$('iotSensitive').value='');
  $('iotEnableForm').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;controls();$('iotEnableSubmit').disabled=true;try{$('iotEnableError').textContent='예약정보를 갱신하고 자동발급을 시작합니다…';const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:state.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}),from=fmt.format(new Date()),to=fmt.format(new Date(Date.now()+31*86400000));const sync=await request('sync_bookings',{basis:'staying',from,to},'beds24');if((sync.warning&&sync.warning!=='최근 동기화 내역을 표시합니다.')||sync.warnings?.length)throw Error(sync.warning||sync.warnings.join(' '));state=await request('toggle',{enabled:true,beds24_disabled:$('iotBedsOff').checked,sensitive_password:$('iotSensitive').value});dirty=false;dirtyGroups.clear();render();$('iotEnableDialog').close();status('자동발급을 시작했습니다. 처리 결과는 아래 내역과 봇 알림에서 확인하세요.');}catch(err){$('iotEnableError').textContent=err.message;}finally{busy=false;$('iotEnableSubmit').disabled=false;$('iotSensitive').value='';controls();}};
- const logCache=new Map();let logSelection='',logLoading=false;
+ const logCache=new Map(),DAY=86400000;let logSelection='',logLoading=false,logAnchor=Date.now();
  const recordLabels={1:'앱 열림',4:'비밀번호 열림',7:'카드 열림',8:'지문 열림',55:'리모컨',[-4]:'QR 코드',[-5]:'얼굴 인식'};
- function logLocks(){return [...new Map((state?.settings.mappings||[]).map(m=>[Number(m.lock_id),{id:Number(m.lock_id),name:state.settings.locks.find(l=>Number(l.lockId)===Number(m.lock_id))?.lockAlias||m.room_name||'공용 출입문'}])).values()];}
+ function logLocks(){return [...new Map((state?.settings.mappings||[]).map(m=>[Number(m.lock_id),{id:Number(m.lock_id),label:m.room_name||'공용',name:state.settings.locks.find(l=>Number(l.lockId)===Number(m.lock_id))?.lockAlias||m.room_name||'공용 출입문'}])).values()];}
+ function canLoadOlder(entry){return entry&&entry.start_date>logAnchor-180*DAY;}
+ function logUser(r){
+  const legacy=/^OMS ([0-9a-f-]{36})$/i.exec(r.operator||'');
+  return (legacy&&state.jobs.find(j=>j.id===legacy[1])?.guest_name)||r.operator||'이용자 미등록';
+ }
  function showLogs(){
   const locks=logLocks(),selected=locks.filter(l=>!logSelection||String(l.id)===logSelection);
-  $('iotLogTabs').innerHTML=[{id:'',name:'전체'},...locks].map(l=>`<button type="button" class="btn ${String(l.id)===logSelection?'primary':''}" aria-pressed="${String(l.id)===logSelection}" data-log-lock="${esc(l.id)}">${esc(l.name)}</button>`).join('');
+  $('iotLogTabs').innerHTML=[{id:'',label:'전체',name:'전체 도어락'},...locks].map(l=>`<button type="button" class="btn ${String(l.id)===logSelection?'primary':''}" title="${esc(l.name)}" aria-pressed="${String(l.id)===logSelection}" data-log-lock="${esc(l.id)}">${l.id===''?'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h4v4H2zM10 2h4v4h-4zM2 10h4v4H2zM10 10h4v4h-4z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>':''}<span>${esc(l.label)}</span></button>`).join('');
   $('iotLogTabs').querySelectorAll('[data-log-lock]').forEach(b=>b.onclick=()=>{logSelection=b.dataset.logLock;showLogs();loadLogs();});
   const records=selected.flatMap(l=>(logCache.get(l.id)?.records||[]).map(r=>({...r,lock_name:l.name}))).sort((a,b)=>(b.at||0)-(a.at||0));
   const fmt=new Intl.DateTimeFormat('ko-KR',{timeZone:state?.timezone||'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
-  $('iotLogRows').innerHTML=records.map(r=>`<div class="iot-log-row"><strong title="${esc(r.lock_name)}">${esc(r.lock_name)}</strong><span>${esc(recordLabels[r.type]||'기록 '+r.type)}${r.success?'':' · 실패'}</span><time>${esc(r.at?fmt.format(new Date(r.at)):'시간 없음')}</time><small>${esc(r.passcode?'비밀번호 '+r.passcode:r.operator||'')}</small></div>`).join('')||'<p class="help">표시할 기록이 없습니다.</p>';
-  $('iotLogMore').hidden=!selected.some(l=>logCache.get(l.id)?.more);
+  $('iotLogRows').innerHTML=records.map(r=>`<div class="iot-log-row"><strong title="${esc(r.lock_name)}">${esc(r.lock_name)}</strong><span class="iot-log-user" title="${esc(logUser(r))}">${esc(logUser(r))}</span><span class="iot-log-action">${esc(recordLabels[r.type]||'기록 '+r.type)}${r.success?'':' · 실패'}</span><time>${esc(r.at?fmt.format(new Date(r.at)):'시간 없음')}</time></div>`).join('')||'<p class="help">조회 기간에 기록이 없습니다.</p>';
+  $('iotLogMore').hidden=!selected.some(l=>logCache.get(l.id)?.more||canLoadOlder(logCache.get(l.id)));
+  $('iotLogMore').textContent=selected.some(l=>logCache.get(l.id)?.more)?'더 보기':'이전 7일 더 보기';
+  const starts=selected.map(l=>logCache.get(l.id)?.start_date).filter(Number.isFinite);
+  $('iotLogRange').textContent=starts.length?'최근 '+Math.ceil((logAnchor-Math.min(...starts))/DAY)+'일':'최근 7일';
   $('iotLogMore').disabled=logLoading;$('iotLogRefresh').disabled=logLoading;
  }
  async function loadLogs(refresh=false,more=false){
   if(logLoading||!state)return;
+  if(refresh){logAnchor=Date.now();logCache.clear();}
   logLoading=true;showLogs();$('iotLogStatus').textContent='기록을 불러오는 중…';
-  const locks=logLocks().filter(l=>(!logSelection||String(l.id)===logSelection)&&(refresh||!logCache.has(l.id)||more&&logCache.get(l.id).more));
+  const locks=logLocks().filter(l=>(!logSelection||String(l.id)===logSelection)&&(!logCache.has(l.id)||more&&(logCache.get(l.id).more||canLoadOlder(logCache.get(l.id)))));
+  // Drain pages in the current window before extending any lock to an older window.
+  const hasPages=more&&locks.some(l=>logCache.get(l.id)?.more);
+  const targets=hasPages?locks.filter(l=>logCache.get(l.id)?.more):locks;
   const errors=[];let index=0;
-  const worker=async()=>{while(index<locks.length){const lock=locks[index++],old=logCache.get(lock.id),page=more?(old?.page||0)+1:1;try{
-   const result=await request('records',{lock_id:lock.id,page});
-   const entries=page===1?result.records:[...(old?.records||[]),...result.records];
-   logCache.set(lock.id,{...result,records:[...new Map(entries.map(r=>[r.id,r])).values()]});
-  }catch(e){errors.push(lock.name+' · '+e.message);}}};
-  try{await Promise.all(Array.from({length:Math.min(3,locks.length)},worker));if(locks.length)$('iotLogUpdated').textContent='조회 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hourCycle:'h23'});$('iotLogStatus').textContent=errors.join(' / ');}
+  const worker=async()=>{while(index<targets.length){const lock=targets[index++],old=logCache.get(lock.id);
+   const page=more&&old?.more?old.page+1:1,end=more&&old?(old.more?old.end_date:old.start_date):logAnchor;
+   const start=more&&old?.more?old.start_date:Math.max(logAnchor-180*DAY,end-7*DAY);
+   try{
+    const result=await request('records',{lock_id:lock.id,page,start_date:start,end_date:end});
+    const entries=more?[...(old?.records||[]),...result.records]:result.records;
+    logCache.set(lock.id,{...result,start_date:start,end_date:end,records:[...new Map(entries.map(r=>[r.id,r])).values()]});
+   }catch(e){errors.push(lock.name+' · '+e.message);}}};
+  try{await Promise.all(Array.from({length:Math.min(3,targets.length)},worker));if(targets.length)$('iotLogUpdated').textContent='조회 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hourCycle:'h23'});$('iotLogStatus').textContent=errors.join(' / ');}
   finally{logLoading=false;showLogs();if(!errors.length&&logLocks().some(l=>(!logSelection||String(l.id)===logSelection)&&!logCache.has(l.id)))loadLogs();}
  }
  $('iotLogSection').addEventListener('toggle',()=>{if($('iotLogSection').open)loadLogs();});

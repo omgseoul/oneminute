@@ -27,10 +27,18 @@ main{max-width:800px}.top{margin-bottom:18px}h1{font-size:28px}h2{font-size:18px
 .iot-job-feedback .iot-retry{float:right;margin:12px 0 0 8px;shape-outside:inset(12px 0 0);padding:1px 7px;min-height:20px;font-size:10px;line-height:14px;white-space:nowrap;border-radius:6px}
 .iot-job-feedback .iot-error:focus{-webkit-line-clamp:unset}
 
-.iot-log-tabs{display:flex;gap:6px;overflow:auto;padding:2px 0 8px}
-.iot-log-tabs button{flex:none;font-size:12px;padding:5px 9px}
-.iot-log-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:3px 6px;padding:7px 0;border-bottom:1px solid var(--line);font-size:11px}
-.iot-log-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.iot-log-row time{font-size:10px;color:var(--muted)}
-.iot-log-row small{grid-column:1/-1;color:var(--muted)}
-#iotLogSection{margin-top:12px}
+.iot-log-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:2px 0 4px}
+.iot-log-tabs button{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:28px;font-size:12px;padding:4px 6px;border-radius:8px;line-height:18px}
+.iot-log-tabs button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iot-log-tabs svg{width:12px;height:12px;flex:none}
+.iot-log-toolbar{display:flex;align-items:center;gap:5px;margin:0 0 7px;color:var(--muted)}
+#iotLogRange{margin-right:auto;font-size:10px}#iotLogUpdated{font-size:9px;line-height:14px}
+#iotLogRefresh{display:grid;place-items:center;width:26px;height:26px;min-height:0;padding:3px;border-radius:7px}
+#iotLogRefresh svg{width:17px;height:17px}
+.iot-log-columns,.iot-log-row{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.5fr) minmax(0,1fr);gap:3px 8px;font-size:11px}
+.iot-log-columns{font-size:10px;color:var(--muted);padding:3px 0 5px;border-bottom:1px solid var(--line)}
+.iot-log-row{padding:7px 0;border-bottom:1px solid var(--line);line-height:16px}
+.iot-log-row strong,.iot-log-user{min-width:0;overflow-wrap:anywhere;white-space:normal}
+.iot-log-user{font-weight:600}.iot-log-action{font-size:10px;overflow-wrap:anywhere}
+.iot-log-row time{grid-column:1/-1;text-align:right;font-size:10px;color:var(--muted);line-height:13px}
+#iotLogStatus:empty{display:none}#iotLogSection{margin-top:12px}

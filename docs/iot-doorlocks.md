@@ -16,8 +16,8 @@ Existing hardware must support remote custom passcodes through a gateway or WiFi
 - Any existing `LOCK_PIN` (including blank or duplicate items) blocks a new issue. Keep it untouched and issue a terminal bot notice including guest, booking reference, room and stay dates: `기존 Lock info가 있어 비밀번호를 생성하지 못했습니다. 기존 Lock info를 삭제한 뒤 다시 시도해 주십시오.`
 - Only a journaled OMS write-intent with the exact same PIN can be reconciled as a prior successful write after a lost response. A different value is never overwritten.
 - Register and read back the custom PIN on every selected lock before adding a new `LOCK_PIN`. Recheck live booking identity/dates and existing info immediately before the write. Beds24 offers no atomic compare-and-set; a final read detects concurrent external changes. Do not run both issuers together.
-- Unique job/property/booking, expiring leases, persisted planned locks and names `OMS {job UUID}` prevent duplicate additions after response loss. Retry is for that failed reservation only. Ordinary errors retry up to three attempts; existing info fails immediately.
-- Cancellation, room/date changes and expiry maintain/delete **only OMS-owned** codes identified by the job name and tracked lock set. External codes are never removed. OFF pauses all issuance/maintenance; validity already stored on the lock still expires normally.
+- Unique job/property/booking, expiring leases, persisted planned locks, passcode IDs and add intents prevent duplicate additions after response loss. Retry is for that failed reservation only. Ordinary errors retry up to three attempts; existing info fails immediately.
+- Cancellation, room/date changes and expiry maintain/delete **only OMS-owned** codes identified by persisted passcode IDs or exact pending add intents (name, PIN and validity) and tracked lock set. External codes are never removed. OFF pauses all issuance/maintenance; validity already stored on the lock still expires normally.
 - No PIN or API token is returned in processing history or bot notifications. The guest PIN remains available through the established live Beds24 booking-detail path.
 
 ## Scheduling and counts
@@ -38,4 +38,10 @@ Every attempted TTLock request reserves one count atomically before it is sent; 
 - `node --test tests/iot-locks/worker.test.mjs`
 - `NODE_PATH=tests/attendance-nfc/node_modules node tests/iot-locks/ui.cjs`
 
-Live account authentication and physical-door validation require the operator-entered Client ID/Secret, property account and an enabled mapped room. Tests use simulated provider responses, not a production guest reservation. Opening logs / web-checkin custom guest PIN selection are separate follow-up capabilities, not enabled here.
+Live account authentication and physical-door validation require the operator-entered Client ID/Secret, property account and an enabled mapped room. Tests use simulated provider responses, not a production guest reservation. New jobs freeze labels as `OMS {guest name} {booking site}` before their first write; pre-existing jobs retain UUID labels. Equal display names never establish ownership by themselves. Response-loss retries recover only the exact journaled add, then retain its provider ID.
+
+## Door lock logs
+
+Owners can read cloud logs only for locks mapped to the selected property. Default window is the last seven days; each request fetches up to 200 records from one lock. More first drains outstanding pages, then extends by seven days (up to 180 days). Tabs cache results; explicit refresh resets to seven days. There is no background polling. Each page/lock request consumes one counted API call, independent of returned row count; token refresh may add a call.
+
+Rows show lock alias, TTLock operator/passcode name, action and timestamp. Unnamed operators display `이용자 미등록`; common/shared credentials do not identify the physical person. The UI can resolve an old OMS UUID against the property's already-loaded job list without additional TTLock calls. Four equal-width lock buttons wrap per row. Web-checkin custom guest PIN selection remains a separate capability.

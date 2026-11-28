@@ -8,6 +8,14 @@ export function localTime(date,time,zone){
  const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:zone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
  let t=target;for(let i=0;i<3;i++){const p=Object.fromEntries(fmt.formatToParts(new Date(t)).map(x=>[x.type,x.value]));const wall=Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}Z`);t+=target-wall;}return t;
 }
+const DAY=86400000;
+const cleanLabel=v=>String(v??'').replace(/[\x00-\x1f\x7f]/g,' ').replace(/\s+/g,' ').trim();
+export function passcodeName(b){
+ const guest=cleanLabel([b.firstName,b.lastName].filter(Boolean).join(' '))||'이름 미등록';
+ let site=cleanLabel(b.apiSource)||cleanLabel(b.referer)||'사이트 미등록';
+ if(/booking/i.test(site))site='Booking.com';else if(/airbnb/i.test(site))site='Airbnb';else if(/agoda/i.test(site))site='Agoda';else if(/expedia/i.test(site))site='Expedia';
+ return 'OMS '+Array.from(guest).slice(0,80).join('')+' '+Array.from(site).slice(0,35).join('');
+}
 export function bookingVersion(b){return JSON.stringify([b.id,b.propertyId,b.roomId,b.unitId,b.arrival,b.departure,b.status]);}
 export function lockPinItems(b){return (b.infoItems||[]).filter(x=>x.code==='LOCK_PIN'&&(!x.bookingId||Number(x.bookingId)===Number(b.id)));}
 const CONFLICT='기존 Lock info가 있어 비밀번호를 생성하지 못했습니다. 기존 Lock info를 삭제한 뒤 다시 시도해 주십시오.';
@@ -66,12 +74,14 @@ export function createIotService({rpc,fetcher=fetch,now=()=>Date.now()}){
  async function reload(p){const s=await credentials(p);await ctl('locks',p,{locks:safeLocks(await list('/v3/lock/list',p,s.accessToken))});}
  async function records(p,d){
   const lockId=positive(d.lock_id),page=positive(d.page||1);
+  const end=Number(d.end_date??now()),start=Number(d.start_date??(end-7*DAY));
+  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<now()-181*DAY||end>now()+60000||end<=start||end-start>7*DAY)throw Error('조회 기간은 최근 6개월 이내, 최대 7일씩 선택해주세요.');
   const c=await ctl('credentials',p);
   if(!(c.settings?.mappings||[]).some(m=>Number(m.lock_id)===lockId))throw Error('이 지점에 연결된 도어락을 선택해주세요.');
   const token=await credentials(p);
-  const value=await tt('/v3/lockRecord/list',p,{accessToken:token.accessToken,lockId,pageNo:page,pageSize:100},'GET');
+  const value=await tt('/v3/lockRecord/list',p,{accessToken:token.accessToken,lockId,pageNo:page,pageSize:200,startDate:start,endDate:end},'GET');
   if(!Array.isArray(value.list))throw Error('도어락 기록 응답을 확인하지 못했습니다.');
-  return {ok:true,lock_id:lockId,page,more:page<Number(value.pages||1),records:value.list.map(row=>({
+  return {ok:true,lock_id:lockId,page,start_date:start,end_date:end,more:page<Number(value.pages||1),records:value.list.map(row=>({
    id:String(row.recordId??row.id??[row.lockDate,row.recordType,row.serverDate].join('-')),
    lock_id:lockId,type:Number(row.recordType),success:Number(row.success)===1,
    at:Number(row.lockDate)||Number(row.serverDate)||null,
@@ -107,11 +117,21 @@ export function createIotService({rpc,fetcher=fetch,now=()=>Date.now()}){
    const token=(await credentials(p)).accessToken;
    // Keep every attempted lock until it is reconciled, including a timed-out add before a room move.
    for(const lock of state.planned_locks||[])if(!state.grants.some(g=>Number(g.lock_id)===Number(lock)))state.grants.push({lock_id:lock});
-   const name='OMS '+j.id,live=new Map();
+   // Existing jobs retain their UUID label. New labels are frozen before any write.
+   const legacy=!state.pwd_name&&(state.pin||state.planned_locks?.length||state.grants.length||state.beds_write_intent);
+   state.pwd_name ||= legacy?'OMS '+j.id:passcodeName(b);
+   const name=state.pwd_name,live=new Map();
+   const owns=(x,lock)=>{
+    if(name==='OMS '+j.id)return x.keyboardPwdName===name;
+    const grant=state.grants.find(g=>Number(g.lock_id)===Number(lock)&&g.pwd_id);
+    if(grant)return Number(x.keyboardPwdId)===Number(grant.pwd_id);
+    const intent=state.pending_codes?.[lock];
+    return !!intent&&x.keyboardPwdName===name&&String(x.keyboardPwd)===intent.pin&&Number(x.startDate)===intent.start&&Number(x.endDate)===intent.end;
+   };
    const codes=async lock=>{lock=positive(lock);if(!live.has(lock))live.set(lock,await list('/v3/lock/listKeyboardPwd',p,token,{lockId:lock}));return live.get(lock);};
    const remove=async(lock,item)=>{await gate();await tt('/v3/keyboardPwd/delete',p,{accessToken:token,lockId:lock,keyboardPwdId:positive(item.keyboardPwdId),deleteType:2});live.delete(Number(lock));};
    const start=localTime(b.arrival,s.start_time,j.timezone),end=localTime(b.departure,s.end_time,j.timezone);
-   const removeGrants=async keep=>{for(const g of [...state.grants]){if(keep.has(Number(g.lock_id)))continue;const matches=(await codes(g.lock_id)).filter(x=>x.keyboardPwdName===name);for(const x of matches)await remove(g.lock_id,x);state.grants=state.grants.filter(x=>x.lock_id!==g.lock_id);await checkpoint();}};
+   const removeGrants=async keep=>{for(const g of [...state.grants]){if(keep.has(Number(g.lock_id)))continue;const matches=(await codes(g.lock_id)).filter(x=>owns(x,g.lock_id));for(const x of matches)await remove(g.lock_id,x);state.grants=state.grants.filter(x=>x.lock_id!==g.lock_id);await checkpoint();}};
    if(!['new','confirmed'].includes(b.status)||end<=now()){
     // Recover an add that succeeded remotely before its response/checkpoint was lost.
     for(const lock of state.planned_locks||[])if(!state.grants.some(g=>Number(g.lock_id)===Number(lock)))state.grants.push({lock_id:lock});
@@ -133,13 +153,13 @@ export function createIotService({rpc,fetcher=fetch,now=()=>Date.now()}){
    const all=[];for(const lock of locks)all.push(...await codes(lock));
    if(!state.pin){state.pin=choosePin(b,new Set(all.map(x=>String(x.keyboardPwd))),s);}
    // Detect collisions before touching any door. Never reuse another reservation's PIN.
-   if(all.some(x=>String(x.keyboardPwd)===state.pin&&x.keyboardPwdName!==name))throw Error('같은 비밀번호가 다른 출입정보에 사용 중입니다. 수동 확인이 필요합니다.');
+   if(locks.some(lock=>live.get(lock).some(x=>String(x.keyboardPwd)===state.pin&&!owns(x,lock))))throw Error('같은 비밀번호가 다른 출입정보에 사용 중입니다. 수동 확인이 필요합니다.');
    state.planned_locks=locks;state.booking_version=bookingVersion(b);await checkpoint();
    for(const lock of locks){
-    await gate();let own=(await codes(lock)).filter(x=>x.keyboardPwdName===name);if(own.length>1)throw Error('예약용 비밀번호가 중복되어 있습니다. 도어락을 확인해주세요.');
-    if(!own.length){await tt('/v3/keyboardPwd/add',p,{accessToken:token,lockId:lock,keyboardPwd:state.pin,keyboardPwdName:name,keyboardPwdType:3,startDate:start,endDate:end,addType:2});live.delete(lock);}
-    else if(String(own[0].keyboardPwd)!==state.pin||Number(own[0].startDate)!==start||Number(own[0].endDate)!==end){await tt('/v3/keyboardPwd/change',p,{accessToken:token,lockId:lock,keyboardPwdId:positive(own[0].keyboardPwdId),newKeyboardPwd:state.pin,keyboardPwdName:name,startDate:start,endDate:end,changeType:2});live.delete(lock);}
-    own=(await codes(lock)).filter(x=>x.keyboardPwdName===name&&String(x.keyboardPwd)===state.pin&&Number(x.startDate)===start&&Number(x.endDate)===end);
+    await gate();let own=(await codes(lock)).filter(x=>owns(x,lock));if(own.length>1)throw Error('예약용 비밀번호가 중복되어 있습니다. 도어락을 확인해주세요.');
+    if(!own.length){state.pending_codes||={};state.pending_codes[lock]={pin:state.pin,start,end};await checkpoint();await tt('/v3/keyboardPwd/add',p,{accessToken:token,lockId:lock,keyboardPwd:state.pin,keyboardPwdName:name,keyboardPwdType:3,startDate:start,endDate:end,addType:2});live.delete(lock);}
+    else if(String(own[0].keyboardPwd)!==state.pin||Number(own[0].startDate)!==start||Number(own[0].endDate)!==end){state.grants=state.grants.filter(x=>Number(x.lock_id)!==lock);state.grants.push({lock_id:lock,pwd_id:own[0].keyboardPwdId});await checkpoint();await tt('/v3/keyboardPwd/change',p,{accessToken:token,lockId:lock,keyboardPwdId:positive(own[0].keyboardPwdId),newKeyboardPwd:state.pin,keyboardPwdName:name,startDate:start,endDate:end,changeType:2});live.delete(lock);}
+    own=(await codes(lock)).filter(x=>owns(x,lock)&&String(x.keyboardPwd)===state.pin&&Number(x.startDate)===start&&Number(x.endDate)===end);
     if(own.length!==1)throw Error('도어락의 비밀번호 등록 완료를 확인하지 못했습니다. 게스트 안내 전 확인이 필요합니다.');
     state.grants=state.grants.filter(x=>Number(x.lock_id)!==lock);state.grants.push({lock_id:lock,pwd_id:own[0].keyboardPwdId});await checkpoint();
    }

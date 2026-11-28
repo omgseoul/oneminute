@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {createIotService,createIotHandler,choosePin,pinUpdate,localTime} from '../../supabase/functions/iot-locks/handler.mjs';
+import {createIotService,createIotHandler,choosePin,pinUpdate,localTime,passcodeName} from '../../supabase/functions/iot-locks/handler.mjs';
 const id='00000000-0000-0000-0000-000000000001',now=Date.parse('2026-11-26T03:00Z');
 function fixture({info=[],state={},booking={},failAdd=false,failBeds=false,conflictAfterAdd=false,failVerify=false}={}){
  let book={id:12345,propertyId:10,roomId:20,unitId:1,arrival:'2026-11-26',departure:'2026-11-28',status:'confirmed',firstName:'Guest',phone:'010-2345-6789',infoItems:info,...booking};
@@ -78,5 +78,29 @@ test('log reads stay within mapped property, paginate and count each TTLock requ
  const actions=[],requests=[];
  const svc=createIotService({now:()=>now,rpc:async(_,a)=>{actions.push(a.p_action);if(a.p_action==='credentials')return {secret:{accessToken:'test-token',expiresAt:now+3600000},settings:{mappings:[{lock_id:7}]}};if(a.p_action==='api_reserve')return {clientId:'app',clientSecret:'secret'};throw Error('unexpected mutation');},fetcher:async(url,opt)=>{requests.push([new URL(url),opt]);return Response.json({pages:3,list:[{recordId:9,recordType:4,success:1,lockDate:now,keyboardPwd:'0056',username:'Guest',secret:'not exposed'}]});}});
  await assert.rejects(()=>svc.records(id,{lock_id:99}),/지점/);assert.equal(requests.length,0);assert(!actions.includes('api_reserve'));
- const result=await svc.records(id,{lock_id:7,page:2});assert.equal(result.more,true);assert.equal(result.records[0].passcode,'0056');assert.equal(result.records[0].secret,undefined);assert.equal(result.records[0].at,now);assert.equal(actions.filter(a=>a==='api_reserve').length,1);assert.equal(requests[0][0].pathname,'/v3/lockRecord/list');assert.equal(requests[0][0].searchParams.get('pageNo'),'2');assert.equal(requests[0][1].method,'GET');
+ const result=await svc.records(id,{lock_id:7,page:2});assert.equal(result.more,true);assert.equal(result.records[0].passcode,'0056');assert.equal(result.records[0].operator,'Guest');assert.equal(result.start_date,now-7*86400000);assert.equal(requests[0][0].searchParams.get('pageSize'),'200');assert.equal(Number(requests[0][0].searchParams.get('startDate')),now-7*86400000);assert.equal(result.records[0].secret,undefined);assert.equal(result.records[0].at,now);assert.equal(actions.filter(a=>a==='api_reserve').length,1);assert.equal(requests[0][0].pathname,'/v3/lockRecord/list');assert.equal(requests[0][0].searchParams.get('pageNo'),'2');assert.equal(requests[0][1].method,'GET');
+});
+
+test('new labels include guest and site; duplicate guest names never confer ownership',async()=>{
+ assert.equal(passcodeName({firstName:' Heamin ',lastName:'Lee',apiSource:'airbnb.com'}),'OMS Heamin Lee Airbnb');
+ assert.equal(passcodeName({firstName:'김민수',referer:'Booking.com'}),'OMS 김민수 Booking.com');
+ assert.equal(passcodeName({}),'OMS 이름 미등록 사이트 미등록');
+ const f=fixture({booking:{lastName:'Kim',apiSource:'Booking.com'}});
+ f.locks.get(7).push({keyboardPwdId:99,keyboardPwdName:'OMS Guest Kim Booking.com',keyboardPwd:'2222'});
+ await f.run();assert.equal(f.finishes.at(-1).status,'done');assert.equal(f.locks.get(7)[1].keyboardPwdName,'OMS Guest Kim Booking.com');
+ f.book.status='cancelled';await f.run();assert.deepEqual(f.locks.get(7).map(x=>x.keyboardPwdId),[99]);
+});
+test('legacy jobs retain labels and reconcile an interrupted old add',async()=>{
+ const f=fixture({state:{pin:'6789',planned_locks:[7]}});
+ f.locks.get(7).push({keyboardPwdId:70,keyboardPwdName:'OMS '+id,keyboardPwd:'6789',startDate:localTime('2026-11-26','15:00','Asia/Seoul'),endDate:localTime('2026-11-28','11:00','Asia/Seoul')});
+ await f.run();assert.equal(f.finishes.at(-1).status,'done');assert.equal(f.locks.get(7).length,1);assert.equal(f.locks.get(8)[0].keyboardPwdName,'OMS '+id);
+});
+test('lost add then changed booking dates recovers exact intent before updating the owned ID',async()=>{
+ const f=fixture({failAdd:true});await f.run();f.book.departure='2026-11-29';f.book.firstName='Changed';
+ await f.run(2);assert.equal(f.finishes.at(-1).status,'done');assert.equal(f.locks.get(7).length,1);
+ assert.equal(f.locks.get(7)[0].keyboardPwdName,'OMS Guest 사이트 미등록');assert.equal(f.locks.get(7)[0].endDate,localTime('2026-11-29','11:00','Asia/Seoul'));
+});
+test('invalid and oversized log ranges are rejected before any provider call',async()=>{
+ const svc=createIotService({now:()=>now,rpc:async()=>{throw Error('unexpected RPC');}});
+ for(const range of [{start_date:now-8*86400000,end_date:now},{start_date:'invalid'},{start_date:now,end_date:now-1},{start_date:now-190*86400000,end_date:now-189*86400000}])await assert.rejects(()=>svc.records(id,{lock_id:7,...range}),/조회 기간/);
 });

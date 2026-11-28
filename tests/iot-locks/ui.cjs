@@ -29,7 +29,7 @@ const {chromium}=require('playwright'),fs=require('fs'),http=require('http'),pat
  const beforeOpen=calls.filter(c=>c.action==='records').length;
  await page.reload();await page.locator('#iotLogSection > summary').click();await page.waitForFunction(()=>document.querySelectorAll('[data-log-lock]').length===12);assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen);
  await page.locator('[data-log-lock="100"]').click();await page.waitForFunction(()=>document.querySelectorAll('.iot-log-row').length===1);assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen+1);assert.equal(calls.at(-1).data.lock_id,100);
- await page.locator('[data-log-lock="101"]').click();await page.waitForFunction(()=>document.querySelector('.iot-log-row strong').textContent==='Seoulnest 102');assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen+2);
+ await page.locator('[data-log-lock="101"]').click();await page.waitForFunction(()=>document.querySelector('.iot-log-row strong')?.textContent==='Seoulnest 102');assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen+2);
  await page.locator('[data-log-lock="100"]').click();assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen+2,'switching back reuses only that lock cache');
  await page.locator('#iotLogRefresh').click();await page.waitForFunction(()=>!document.querySelector('#iotLogRefresh').disabled);assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen+3);assert.equal(calls.at(-1).data.lock_id,100);
  await page.locator('[data-log-lock="101"]').click();assert.equal(calls.filter(c=>c.action==='records').length,beforeOpen+3,'refreshing one lock preserves another lock cache');

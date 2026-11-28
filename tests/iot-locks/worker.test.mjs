@@ -73,3 +73,10 @@ test('secondary digit length is independent; final random keeps primary length',
  assert.throws(()=>choosePin({},new Set(),{...s,pin_length_secondary:3}),/생성 방식/);
  assert.throws(()=>choosePin({},new Set(),{...s,pin_length_secondary:10}),/생성 방식/);
 });
+
+test('log reads stay within mapped property, paginate and count each TTLock request',async()=>{
+ const actions=[],requests=[];
+ const svc=createIotService({now:()=>now,rpc:async(_,a)=>{actions.push(a.p_action);if(a.p_action==='credentials')return {secret:{accessToken:'test-token',expiresAt:now+3600000},settings:{mappings:[{lock_id:7}]}};if(a.p_action==='api_reserve')return {clientId:'app',clientSecret:'secret'};throw Error('unexpected mutation');},fetcher:async(url,opt)=>{requests.push([new URL(url),opt]);return Response.json({pages:3,list:[{recordId:9,recordType:4,success:1,lockDate:now,keyboardPwd:'0056',username:'Guest',secret:'not exposed'}]});}});
+ await assert.rejects(()=>svc.records(id,{lock_id:99}),/지점/);assert.equal(requests.length,0);assert(!actions.includes('api_reserve'));
+ const result=await svc.records(id,{lock_id:7,page:2});assert.equal(result.more,true);assert.equal(result.records[0].passcode,'0056');assert.equal(result.records[0].secret,undefined);assert.equal(result.records[0].at,now);assert.equal(actions.filter(a=>a==='api_reserve').length,1);assert.equal(requests[0][0].pathname,'/v3/lockRecord/list');assert.equal(requests[0][0].searchParams.get('pageNo'),'2');assert.equal(requests[0][1].method,'GET');
+});

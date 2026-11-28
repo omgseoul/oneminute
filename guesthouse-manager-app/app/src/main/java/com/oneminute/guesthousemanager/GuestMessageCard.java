@@ -13,7 +13,7 @@ final class GuestMessageCard {
  final JSONObject data;final String body;
  private GuestMessageCard(JSONObject data,String body){this.data=data;this.body=body;}
  static GuestMessageCard parse(String json,String message){
-  try{if(json==null||json.length()>3000)return null;JSONObject d=new JSONObject(json);String kind=d.optString("kind");if(!kind.equals("online")&&!kind.equals("onsite")&&!kind.equals("same_day"))return null;
+  try{if(json==null||json.length()>10000)return null;JSONObject d=new JSONObject(json);String kind=d.optString("kind");if(!kind.equals("online")&&!kind.equals("onsite")&&!kind.equals("same_day"))return null;
    String body=message==null?"":message;
    if(kind.equals("online")){body=body.replaceFirst("^\\[OMS-ONLINE:[0-9]+\\]\\s*","");String name=d.optString("guest");if(!name.isEmpty()&&body.startsWith(name+"\n"))body=body.substring(name.length()+1);}
    return new GuestMessageCard(d,body);
@@ -52,6 +52,12 @@ final class GuestMessageCard {
   TextView guest=text(c,data.optString("guest","게스트"),18,true,navy);guest.setPadding(0,dp(c,6),0,0);strip.addView(guest,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout.LayoutParams stripParams=new LinearLayout.LayoutParams(-1,-2);stripParams.bottomMargin=dp(c,10);box.addView(strip,stripParams);
   if(!sameDay()){TextView message=text(c,body.isEmpty()?"메세지 메뉴에서 확인해주세요.":body,16,false,navy);message.setLineSpacing(dp(c,3),1);box.addView(message,new LinearLayout.LayoutParams(-1,-2));}
+  String aiStatus=data.optString("ai_status");
+  if(aiStatus.equals("completed")||aiStatus.equals("unavailable")){
+   View line=new View(c);line.setBackgroundColor(Color.rgb(220,229,240));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(c,1));lp.topMargin=dp(c,12);lp.bottomMargin=dp(c,8);box.addView(line,lp);
+   box.addView(text(c,aiStatus.equals("completed")?"자동답변 완료":"자동답변 불가",11,true,aiStatus.equals("completed")?Color.rgb(40,120,95):Color.rgb(162,101,49)));
+   if(aiStatus.equals("completed")&&!data.optString("ai_reply").isEmpty()){TextView answer=text(c,data.optString("ai_reply"),12,false,muted);answer.setPadding(0,dp(c,4),0,0);answer.setLineSpacing(dp(c,2),1);box.addView(answer,new LinearLayout.LayoutParams(-1,-2));}
+  }
   String time=data.optString("sent");if(!time.isEmpty()){TextView received=text(c,time,10,false,muted);received.setGravity(Gravity.RIGHT);received.setPadding(0,dp(c,9),0,0);box.addView(received,new LinearLayout.LayoutParams(-1,-2));}
   return box;
  }

@@ -11,3 +11,5 @@
 .cp-disclosure{width:100%;border:0;background:transparent;text-align:left}.cp-saved-state{margin-left:auto;flex-shrink:0;font-size:10px;font-weight:600;color:#27835c}.cp-chevron{font-size:17px;color:#71839b}
 
 .cp-fields{display:grid;gap:10px;margin:0 0 14px}.cp-fields>p{margin:0;color:#718198;font-size:12px}.cp-fields .cp-check{justify-content:flex-start}.cp-fields input{width:17px;height:17px;min-height:0;margin:0;padding:0;accent-color:#397bc6}.cp-mode-help .cp-cap-help{margin-bottom:5px;color:#41658b}
+
+.cp-ai-row{display:flex;align-items:center;gap:6px;margin-top:10px}.cp-ai-row .cp-check{margin:0;flex:1;font-size:12px}.cp-ai-help{flex:0 0 23px;width:23px;height:23px;min-height:0;padding:0;border:1px solid #dce4ee;border-radius:50%;background:#eff4fa;color:#3c6997;font-weight:700}

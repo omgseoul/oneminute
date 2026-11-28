@@ -65,3 +65,9 @@ console.log('PASS combined editable prompt, precedence, cache invalidation, sing
 for(const text of ['뭐하냐','안녕하세요','thanks','빨리 답장해']){const fixture=setup({jobOverride:{alert_rules:rules,history:[{role:'user',content:text}]},output:{...partial,disposition:'urgent',alert_kind:'emergency'}});await fixture.run();assert.notEqual(fixture.settled.alert_kind,'emergency','ordinary chat must not become an emergency: '+text);assert.notEqual(fixture.settled.disposition,'urgent');}
 const contextUrgent=setup({jobOverride:{alert_rules:rules,history:[{role:'user',content:'방에 불이 났어요'},{role:'assistant',content:'안전한 곳으로 이동해주세요.'},{role:'user',content:'뭐하냐'}]},output:{...partial,disposition:'urgent',alert_kind:'emergency'}});await contextUrgent.run();assert.equal(contextUrgent.settled.disposition,'urgent','actual incident context is preserved');
 console.log('PASS ordinary conversation cannot trigger emergency escalation; actual incident context is preserved');
+
+const blankJob={...job,room_number:'401',data:[{id:'1',title:'난방',rooms:'전체',answer:'공통 난방'},{id:'2',title:'난방',rooms:'401',answer:'  '}]};
+assert(!buildRequest(blankJob).input[1].content[0].text.includes('공통 난방'));
+assert.equal(validateAnswer({reply:'직원에게 문의해주세요.',disposition:'handoff',reason:'미등록',parts:[{question:'미등록',sources:[],needs_human:true}]},blankJob).reply,'');
+assert.equal(validateAnswer({reply:'',disposition:'handoff',reason:'공란',parts:[{question:'난방',sources:[],needs_human:true}]},blankJob).reply,'');
+assert.throws(()=>validateAnswer({...answer,parts:[{question:'난방',sources:['2'],needs_human:false}]},blankJob),/invalid_source/);

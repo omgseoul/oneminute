@@ -26,3 +26,11 @@ main{max-width:800px}.top{margin-bottom:18px}h1{font-size:28px}h2{font-size:18px
 .iot-job-feedback:has(.iot-retry){min-height:32px}
 .iot-job-feedback .iot-retry{float:right;margin:12px 0 0 8px;shape-outside:inset(12px 0 0);padding:1px 7px;min-height:20px;font-size:10px;line-height:14px;white-space:nowrap;border-radius:6px}
 .iot-job-feedback .iot-error:focus{-webkit-line-clamp:unset}
+
+.iot-log-tabs{display:flex;gap:6px;overflow:auto;padding:2px 0 8px}
+.iot-log-tabs button{flex:none;font-size:12px;padding:5px 9px}
+.iot-log-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:3px 6px;padding:7px 0;border-bottom:1px solid var(--line);font-size:11px}
+.iot-log-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iot-log-row time{font-size:10px;color:var(--muted)}
+.iot-log-row small{grid-column:1/-1;color:var(--muted)}
+#iotLogSection{margin-top:12px}

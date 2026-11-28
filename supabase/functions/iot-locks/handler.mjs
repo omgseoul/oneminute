@@ -64,6 +64,21 @@ export function createIotService({rpc,fetcher=fetch,now=()=>Date.now()}){
   if(s.expiresAt<now()+60000){const v=await tt('/oauth2/token',p,{grant_type:'refresh_token',refresh_token:s.refreshToken});if(!v.access_token||!v.refresh_token)throw Error('TTLock 계정을 다시 연결해주세요.');s={...s,accessToken:v.access_token,refreshToken:v.refresh_token,expiresAt:now()+Number(v.expires_in||7776000)*1000};await ctl('token',p,{secret:s});}return s;
  }
  async function reload(p){const s=await credentials(p);await ctl('locks',p,{locks:safeLocks(await list('/v3/lock/list',p,s.accessToken))});}
+ async function records(p,d){
+  const lockId=positive(d.lock_id),page=positive(d.page||1);
+  const c=await ctl('credentials',p);
+  if(!(c.settings?.mappings||[]).some(m=>Number(m.lock_id)===lockId))throw Error('이 지점에 연결된 도어락을 선택해주세요.');
+  const token=await credentials(p);
+  const value=await tt('/v3/lockRecord/list',p,{accessToken:token.accessToken,lockId,pageNo:page,pageSize:100},'GET');
+  if(!Array.isArray(value.list))throw Error('도어락 기록 응답을 확인하지 못했습니다.');
+  return {ok:true,lock_id:lockId,page,more:page<Number(value.pages||1),records:value.list.map(row=>({
+   id:String(row.recordId??row.id??[row.lockDate,row.recordType,row.serverDate].join('-')),
+   lock_id:lockId,type:Number(row.recordType),success:Number(row.success)===1,
+   at:Number(row.lockDate)||Number(row.serverDate)||null,
+   operator:String(row.username||'').slice(0,120),
+   passcode:Number(row.recordType)===4?String(row.keyboardPwd||'').slice(0,20):''
+  }))};
+ }
  const bedsCtl=(action,p,data={})=>rpc('online_internal',{p_action:action,p_property:p,p_data:data});
  async function bedsRequest(p,path,token,body){
   const gate=await rpc('online_sync_control',{p_action:'check',p_property:p,p_data:{}});if(gate.skip)throw Error('Beds24 호출 제한으로 잠시 대기합니다.');
@@ -137,7 +152,7 @@ export function createIotService({rpc,fetcher=fetch,now=()=>Date.now()}){
    await removeGrants(new Set(locks));await checkpoint();await finish('done');
   }catch(e){const message=e.message||'도어락 처리에 실패했습니다.';await finish(message===CONFLICT||j.attempt>=3?'failed':'waiting',message).catch(()=>{});}
  }
- return {connect,reload,process,ctl};
+ return {connect,reload,process,records,ctl};
 }
 export function createIotHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})}){
  const rpc=async(name,args)=>{const key=env('SUPABASE_SERVICE_ROLE_KEY');const r=await fetcher(env('SUPABASE_URL')+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'도어락 설정을 처리하지 못했습니다.');return v;};
@@ -156,6 +171,7 @@ export function createIotHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{})
     return reply(await rpc('iot_platform',{p_user:u.id,p_action:b.action,p_data:d}));}
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
    const auth=await rpc('iot_owner',{p_token:b.access_token,p_action:'auth',p_data:d}),p=auth.property_id;
+   if(b.action==='records')return reply(await service.records(p,d));
    if(b.action==='connect'||b.action==='reload'){
     await rpc('iot_owner',{p_token:b.access_token,p_action:'get',p_data:{property_id:p}});
     if(b.action==='connect')await service.connect(p,d);else await service.reload(p);

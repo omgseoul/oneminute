@@ -1,3 +1,4 @@
+import {createPinCalendar,isPinSentWrite} from './pin-calendar.mjs';
 import {createAutoMessages,includesPin} from './auto-messages.mjs';
 import {createWebCheckin,accessCode,assignedUnit} from './web-checkin.mjs';
 import {createDocumentReader} from './web-checkin-document.mjs';
@@ -17,14 +18,15 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
  async function rpc(name,args){const r=await fetcher(url()+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+key(),'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(15000)});const v=await r.json();if(!r.ok)throw Error(v.code==='P0001'?v.message:'서버 처리에 실패했습니다. 다시 시도해주세요.');return v;}
  const translation=createTranslation({rpc,fetcher});
  const autoMessages=createAutoMessages({rpc,credentials,api,saveBookings,messages,dispatchNotice:async id=>{const r=await fetcher(url()+'/functions/v1/dispatch-briefing',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-secret':env('PUSH_ADMIN_SECRET')||''},body:JSON.stringify({message_id:id}),signal:AbortSignal.timeout(20000)});return r.ok&&(await r.json()).ok===true;}});
+ const pinCalendar=createPinCalendar({rpc,credentials,api,saveBookings});
  const webCheckin=createWebCheckin({rpc,credentials,api,readDocument:createDocumentReader({rpc,fetcher})});
  const internal=(action,property,data={})=>rpc('online_internal',{p_action:action,p_property:property,p_data:data});
  const pinCtl=(action,property,data={})=>rpc('pin_delivery_internal',{p_action:action,p_property:property,p_data:data});
  const tokenProperties=new Map();
  const control=(action,property,data={})=>rpc('online_sync_control',{p_action:action,p_property:property,p_data:data});
  const owner=(token,action,data={})=>rpc('online_owner',{p_token:token,p_action:action,p_data:data});
- async function api(path,headers={},body,{method=body?'POST':'GET',confirmation}={}){
-  const ordinary=method==='GET'||(method==='POST'&&['/bookings/messages','/authentication/setup'].includes(path));
+ async function api(path,headers={},body,{method=body?'POST':'GET',confirmation,pinSent=false}={}){
+  const ordinary=(pinSent&&method==='POST'&&isPinSentWrite(path,body))||method==='GET'||(method==='POST'&&['/bookings/messages','/authentication/setup'].includes(path));
   if(!ordinary||confirmation){
    if(!UUID.test(confirmation?.accessToken||'')||typeof confirmation.password!=='string'||!confirmation.password)
     throw Error('관리자 2차 비밀번호를 입력해주세요.');
@@ -152,7 +154,7 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     await internal('webhook',p,{key:secret,booking_id:positive(payload.booking?.id),event_kind:payload.message||payload.messages?'message':'booking'});waitUntil(drain());return reply({ok:true});
    }
    if(req.method!=='POST')return reply({ok:false},405);
-   if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(Promise.all([drain(),autoMessages.drain()]));return reply({ok:true},202);}
+   if(u.pathname.endsWith('/worker')){if(!await internal('worker_verify',null,{secret:req.headers.get('x-worker-secret')}))return reply({ok:false},401);waitUntil(Promise.all([drain(),autoMessages.drain(),pinCalendar.drain()]));return reply({ok:true},202);}
    const reader=req.body?.getReader();if(!reader)return reply({ok:false},400);let size=0;const chunks=[];
    while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>5700000){await reader.cancel();return reply({ok:false,message:'첨부 이미지가 너무 큽니다.'},413);}chunks.push(value);}
    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
@@ -170,6 +172,22 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     throw Error('지원하지 않는 운영센터 요청입니다.');
    }
    if(!UUID.test(b.access_token||''))return reply({ok:false,message:'관리자 로그인이 필요합니다.'},401);
+   if(b.action==='auto_message_followup'){
+    const input={delivery_id:d.delivery_id,retry_count:d.retry_count,action:d.action};
+    const f=await rpc('auto_message_followup',{p_token:b.access_token,p_data:{...input,action:'state'}});
+    if(d.action==='external'&&f.pin_notice&&['open','planned'].includes(f.status)){
+     const c=await credentials(f.property_id),id=positive(f.booking_id);
+     const live=await api('/bookings?id='+id+'&propertyId='+c.beds_property_id+'&includeInfoItems=true',{token:c.secret.token});
+     const lb=live.data?.length===1&&live.data[0];if(!lb||Number(lb.id)!==id||Number(lb.propertyId)!==Number(c.beds_property_id))throw Error('예약정보를 확인하지 못했습니다.');
+     const inv=await api('/properties?id='+c.beds_property_id+'&includeAllRooms=true&includeUnitDetails=true',{token:c.secret.token});
+     const prop=inv.data?.find(x=>Number(x.id)===Number(c.beds_property_id));
+     input.pin=accessCode(lb,prop&&assignedUnit(lb,prop),c.password_source||'info:LOCK_PIN');
+     if(!input.pin)throw Error('현재 비밀번호를 확인할 수 없습니다. 예약정보에서 전달한 번호를 확인해주세요.');
+     await saveBookings(f.property_id,c,[lb]);
+    }
+    const result=await rpc('auto_message_followup',{p_token:b.access_token,p_data:input});
+    if(result.status==='external')waitUntil(pinCalendar.drain());return reply(result);
+   }
    if(['auto_message_list','auto_message_save','auto_message_toggle','auto_message_retry'].includes(b.action))return reply(await rpc('auto_message_owner',{p_token:b.access_token,p_action:b.action.slice(13),p_data:d}));
    const a=await owner(b.access_token,'auth',{property_id:d.property_id,request_action:b.action==='booking_detail'?'booking_data':b.action==='pin_external'?'send':b.action}),p=a.property_id;
    const scoped=(action,data=d)=>owner(b.access_token,action,{...data,property_id:p});

@@ -38,7 +38,7 @@ for(const apiSourceId of [14,19,30,46])assert.equal(supportsAutoMessageChannel({
 assert.equal(supportsAutoMessageChannel({apiSourceId:10,apiSource:'Airbnb'}),false,'iCal cannot masquerade as Airbnb API');
 assert.equal(supportsAutoMessageChannel({apiSourceId:17,apiSource:'Booking.com'}),false,'source ID takes precedence');
 sendMode='ok';ready=true;
-for(const source of ['Agoda','Hostelworld','Direct','unknown']){
+for(const source of ['Agoda','Hostelworld','unknown']){
  b.apiSource=source;writes=[];await worker.process(job);assert.equal(writes.length,0,source+' must not POST to unsupported messaging');assert.equal(finish.at(-1).status,'failed');assert.match(finish.at(-1).error,/메시지 연동/);assert.match(finish.at(-1).error,/수동으로 확인/);
 }
 b.apiSource='Booking.com';writes=[];await worker.process(job);assert.equal(writes.length,1,'supported OTA can initiate a conversation with no earlier message thread');assert.equal(finish.at(-1).status,'sent');

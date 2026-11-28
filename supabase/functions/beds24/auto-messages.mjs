@@ -1,4 +1,5 @@
 import {accessCode,assignedUnit} from './web-checkin.mjs';
+import {isDirectBooking} from './booking-source.mjs';
 
 // Nationality/country is explicit provider metadata; never guess from guest names.
 export function messageLanguage(booking,messages){
@@ -53,6 +54,7 @@ export function createAutoMessages({rpc,credentials,api,saveBookings,messages,di
    if(!Array.isArray(v.data)||v.data.length===0)throw new MessageValidationError('예약정보를 조회하지 못했습니다. 예약 연동 상태를 확인해주세요.');
    if(v.data.length!==1||Number(v.data[0].id)!==Number(job.booking_id)||Number(v.data[0].propertyId)!==Number(c.beds_property_id))throw new MessageValidationError('예약의 지점이 일치하지 않습니다.');
    const b=v.data[0];stage='예약정보 동기화';await saveBookings(job.property_id,c,[b]);
+   if(isDirectBooking(b))return await ctl('exclude_direct',{id:job.id,lease:job.lease});
    if(!['new','confirmed'].includes(b.status))return await finish('skipped','확정·신규 예약이 아닙니다.');
    const today=new Intl.DateTimeFormat('en-CA',{timeZone:job.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
    if(b.departure<today)return await finish('skipped','체크아웃한 예약입니다.');

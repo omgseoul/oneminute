@@ -19,6 +19,7 @@ jobs:
         run: |
           node --check online.js
           node --test tests/online/revenue-model.mjs
+          node --test tests/online/revenue-edge.mjs
           node tests/online/revenue-database.cjs
           node tests/online/revenue-ui.cjs
           node tests/online/employee-cleaning-settings.cjs

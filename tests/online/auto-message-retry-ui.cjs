@@ -48,6 +48,10 @@ const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
  for(const width of [320,390,760]){await page.setViewportSize({width,height:900});await inlineDetails();await page.screenshot({path:'/tmp/auto-message-missed-inline-'+width+'.png'});}
  await page.evaluate(()=>{item.auto_message.arrival=null;item.auto_message.departure=null;NotificationBot.update({messages:[item]});});
  assert.equal(await page.locator('.bot-failure-dates').textContent(),' · 미정~미정','missing stay dates are not guessed from scheduled send time');
+ await page.addStyleTag({content:fs.readFileSync('auto-message-actions.css','utf8')});
+ await page.evaluate(()=>{item.auto_message.followup='open';item.auto_message.status='failed';item.message=item.message.replace('[자동메시지 미발송]','[자동메시지 발송실패]');NotificationBot.update({messages:[item]});});
+ await page.setViewportSize({width:320,height:900});await page.locator('.auto-followup-actions summary').click();
+ assert.equal(await page.locator('.auto-followup-choices button').count(),3);assert(await page.locator('.auto-followup-actions').evaluate(e=>e.scrollWidth<=e.clientWidth));await page.screenshot({path:'/tmp/auto-message-followup-bot.png'});
  await page.evaluate(()=>{document.getElementById('detail').hidden=true;delete item.auto_message;item.message='[IOT 도어락 처리 실패]\n서울네스트 · 객실 401\n게스트: Guest <img src=x>\n예약 #401\n숙박: 2026-11-27 ~ 2026-11-29\n기존 Lock info가 있어 비밀번호를 생성하지 못했습니다. 기존 Lock info를 삭제한 뒤 다시 시도해 주십시오.\nProperty > IOT 도어락 연동에서 해당 예약을 확인하고 재시도해주세요.';NotificationBot.update({messages:[item]});});
  assert.deepEqual(await page.locator('.bot-failure-summary p').allTextContents(),['서울네스트 · 401 · Guest <img src=x> · 11.27~11.29','기존 비밀번호가 있어 새 비밀번호 설정 실패']);
  assert.equal(await page.locator('.bot-failure-summary img').count(),0,'guest text is escaped');

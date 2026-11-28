@@ -42,3 +42,8 @@ main{max-width:800px}.top{margin-bottom:18px}h1{font-size:28px}h2{font-size:18px
 .iot-log-user{font-weight:600}.iot-log-action{font-size:10px;overflow-wrap:anywhere}
 .iot-log-row time{grid-column:1/-1;text-align:right;font-size:10px;color:var(--muted);line-height:13px}
 #iotLogStatus:empty{display:none}#iotLogSection{margin-top:12px}
+/* Match the compact settings menu, including narrow Android screens. */
+main .card.iot-section{padding:0;margin:8px 0;border-radius:16px}
+main .iot-section>summary{padding:11px 16px;gap:8px;min-height:0}
+main .iot-section-heading h2{font-size:17px;line-height:1.3}
+main .iot-section-description{margin-top:3px;font-size:11px;line-height:1.35}

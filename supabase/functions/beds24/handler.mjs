@@ -7,6 +7,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BASE='https://beds24.com/api/v2';
 export function positive(v){const n=Number(v);if(!Number.isSafeInteger(n)||n<=0)throw Error('예약번호를 확인해주세요.');return n;}
 export function dateRange(d){const valid=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;if(!valid(d.from)||!valid(d.to)||d.to<d.from||(Date.parse(d.to)-Date.parse(d.from))/86400000>92)throw Error('조회 기간은 최대 93일입니다.');if(!['arrival','departure','booked','staying'].includes(d.basis))throw Error('조회 기준을 확인해주세요.');return d;}
+export function revenueImportRange(d){if(typeof d.from!=='string'||typeof d.to!=='string'||!['staying','arrival','booked'].includes(d.basis)||d.from.slice(0,7)!==d.to.slice(0,7)||(Date.parse(d.to)-Date.parse(d.from))/86400000>30)throw Error('예약 불러오기는 한 지점의 같은 달 안에서 최대 31일만 가능합니다.');dateRange(d);return d;}
 export function selectBooking(b){return {...Object.fromEntries(['id','propertyId','roomId','roomName','unitId','firstName','lastName','arrival','departure','bookingTime','status','apiSource','referer','apiReference','numAdult','numChild','arrivalTime'].map(k=>[k,b[k]??null])),price:typeof b.price==='number'&&Number.isFinite(b.price)&&b.price>=0?b.price:null};}
 // Retain only inventory identifiers and display fields, never provider notes or credentials.
 export function selectProperty(p){return {id:positive(p.id),name:String(p.name||''),roomTypes:(p.roomTypes||[]).map(r=>({id:positive(r.id),name:String(r.name||''),roomType:String(r.roomType||''),qty:Number.isInteger(r.qty)&&r.qty>=0?r.qty:null,units:(r.units||[]).map(u=>({id:positive(u.id),name:String(u.name||''),name2:String(u.name2||'')}))}))};}
@@ -231,23 +232,25 @@ export function createBedsHandler({env,fetcher=fetch,waitUntil=p=>p.catch(()=>{}
     await internal('connect',p,{secret,actor:a.actor});
     const props=[];await pages('/properties?includeAllRooms=true&includeUnitDetails=true',{token:t.token},async items=>props.push(...items.map(selectProperty)));await internal('connect',p,{secret,properties:props,actor:a.actor});return reply(await scoped('settings'));
    }
-   if(['sync_messages','sync_bookings','sync_booking_data'].includes(b.action)){
-    const bookingData=b.action==='sync_booking_data',bookingsSync=b.action==='sync_bookings'||bookingData;if(bookingData)d.basis='booked';
+   if(['sync_messages','sync_bookings','sync_booking_data','sync_revenue'].includes(b.action)){
+    const revenueSync=b.action==='sync_revenue',bookingData=b.action==='sync_booking_data',bookingsSync=b.action==='sync_bookings'||bookingData||revenueSync;if(bookingData)d.basis='booked';
     const id=b.action==='sync_messages'&&d.booking_id?positive(d.booking_id):null;
-    if(bookingsSync)dateRange(d);
+    if(revenueSync){if(a.kind!=='owner')throw Error('관리자 로그인이 필요합니다.');revenueImportRange(d);}else if(bookingsSync)dateRange(d);
     const scope=bookingsSync?'bookings:'+d.basis+':'+d.from+':'+d.to:id?'thread:'+id:'inbox',read=bookingData?'booking_data':bookingsSync?'bookings':id?'thread':'inbox';
     const claim=await control('begin',p,{scope});
+    if(claim.skip&&revenueSync)return reply({ok:true,complete:false,cached:true,retry_at:claim.retry_at,warning:claim.limited?'Beds24 요청 제한으로 대기 중입니다.':'최근 조회 또는 처리 중인 요청이 있어 저장된 자료를 표시합니다.'});
     if(claim.skip)return reply({...await scoped(read),cached:true,retry_at:claim.retry_at,warning:claim.limited?'Beds24 요청 제한 · 저장된 내역을 표시합니다.':'최근 동기화 내역을 표시합니다.'});
     let success=false,warning;
     try{const c=await credentials(p);if(!c.beds_property_id)throw Error('기본정보에서 연동할 숙소를 선택하고 저장해주세요.');
      if(bookingsSync){
       let q='propertyId='+c.beds_property_id;const before=new Date(Date.parse(d.from)-86400000).toISOString().slice(0,10),after=new Date(Date.parse(d.to)+86400000).toISOString().slice(0,10);
       if(d.basis==='booked')q+='&bookingTimeFrom='+before+'T00:00:00&bookingTimeTo='+after+'T23:59:59';else if(d.basis==='staying')q+='&arrivalTo='+after+'&departureFrom='+before;else if(d.basis==='departure')q+='&departureFrom='+before+'&departureTo='+after;else q+='&arrivalFrom='+before+'&arrivalTo='+after;
-      for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix+'&includeInfoItems=true',{token:c.secret.token},rows=>saveBookings(p,c,rows));
+      for(const suffix of ['', '&status=cancelled'])await pages('/bookings?'+q+suffix+'&includeInfoItems=true',{token:c.secret.token},rows=>{if(revenueSync&&rows.some(row=>Number(row.propertyId)!==Number(c.beds_property_id)))throw Error('예약 숙소가 일치하지 않습니다.');return saveBookings(p,c,rows);});
      }else{if(id)await booking(p,c,id);const age=claim.last_success?Math.min(30,Math.max(2,Math.ceil((Date.now()-Date.parse(claim.last_success))/86400000)+1)):30;await messages(p,c,id,true,age);}
      await push(p);await internal('synced',p);success=true;
     }catch(e){warning=e.message+' · 저장된 내역을 표시합니다.';}
     finally{await control('finish',p,{scope,lease:claim.lease,success});}
+    if(revenueSync){const gate=success?{}:await control('check',p);return reply({ok:true,complete:success,cached:!success,property_id:p,from:d.from,to:d.to,...(gate.retry_at?{retry_at:gate.retry_at}:{}),...(warning?{warning}:{})});}
     return reply({...await scoped(read),cached:!success,...(warning?{warning}:{})});
    }
    const c=await credentials(p);

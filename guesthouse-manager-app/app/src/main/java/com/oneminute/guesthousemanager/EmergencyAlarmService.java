@@ -51,6 +51,7 @@ public class EmergencyAlarmService extends Service {
     private String message;
     private String mode;
     private String senderLabel;
+    private String guestContext;
     private long deadlineEpochMs;
 
     @Override
@@ -96,6 +97,7 @@ public class EmergencyAlarmService extends Service {
         message = intent.getStringExtra("message");
         mode = intent.getStringExtra("mode");
         senderLabel = intent.getStringExtra("senderLabel");
+        guestContext = intent.getStringExtra("guestContext");
         if (senderLabel == null || senderLabel.trim().isEmpty()) senderLabel = "사장님";
         if (message == null || message.trim().isEmpty()) message = "사장님이 보낸 메시지입니다.";
         if (!"test".equals(mode)) mode = "urgent";
@@ -117,7 +119,7 @@ public class EmergencyAlarmService extends Service {
         // unlocked-screen path; the full-screen notification remains the
         // lock-screen path.
         boolean overlayShown = overlayController.show(
-                alertId, message, mode, senderLabel, deadlineEpochMs);
+                alertId, message, mode, senderLabel, deadlineEpochMs, guestContext);
 
         // Full-screen intent wakes the lock screen. Direct launch also displays the
         // same dog countdown immediately while the employee is already in the app.
@@ -154,6 +156,7 @@ public class EmergencyAlarmService extends Service {
                 .putExtra("message", message)
                 .putExtra("mode", mode)
                 .putExtra("senderLabel", senderLabel)
+                .putExtra("guestContext", guestContext)
                 .putExtra("deadlineEpochMs", deadlineEpochMs);
     }
 

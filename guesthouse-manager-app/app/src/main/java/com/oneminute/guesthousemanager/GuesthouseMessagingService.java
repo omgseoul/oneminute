@@ -96,6 +96,7 @@ public class GuesthouseMessagingService extends FirebaseMessagingService {
             service.putExtra("message", message.getData().get("message"));
             service.putExtra("mode", mode == null ? "urgent" : mode);
             service.putExtra("senderLabel", message.getData().get("senderLabel"));
+            service.putExtra("guestContext", message.getData().get("guestContext"));
             service.putExtra("guestNotification",NativeMessageBadge.guest(message.getData()));
             service.putExtra("botNotification",NativeMessageBadge.bot(message.getData().get("route")));
         }

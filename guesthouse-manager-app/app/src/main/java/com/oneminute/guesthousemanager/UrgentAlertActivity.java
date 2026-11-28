@@ -153,11 +153,14 @@ public class UrgentAlertActivity extends AppCompatActivity {
         titleParams.setMargins(0, dp(3), 0, dp(10));
         card.addView(title, titleParams);
 
+        GuestMessageCard guest=GuestMessageCard.parse(getIntent().getStringExtra("guestContext"),message);
+        if(guest!=null){title.setText(guest.title());card.addView(guest.view(this),new LinearLayout.LayoutParams(-1,-2));}else{
         TextView messageBox = label(message, 20, Color.rgb(55, 58, 64), true, Gravity.CENTER);
         messageBox.setMinHeight(dp(76));
         messageBox.setPadding(dp(16), dp(13), dp(16), dp(13));
         messageBox.setBackground(rounded(Color.rgb(255, 239, 240), 18));
         card.addView(messageBox, new LinearLayout.LayoutParams(-1, -2));
+        }
 
         countdownView = new CountdownView(this);
         LinearLayout.LayoutParams counterParams = new LinearLayout.LayoutParams(dp(102), dp(102));
